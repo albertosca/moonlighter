@@ -349,7 +349,7 @@ async def retry_apply(job_id: int) -> str:
 @mcp.tool()
 async def get_pipeline() -> str:
     """Show full application funnel: counts and list by status."""
-    statuses = ["applying", "submitted", "screening", "interview", "offer", "rejected"]
+    statuses = ["draft", "submitted", "screening", "interview", "offer", "rejected"]
     lines = ["# Pipeline de Candidaturas\n"]
     for status in statuses:
         apps = list(
