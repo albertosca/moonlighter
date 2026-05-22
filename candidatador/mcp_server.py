@@ -12,6 +12,7 @@ from candidatador.db import init_db, Job, ScanLog
 from candidatador.config import load_config, load_profile, load_company_list
 from candidatador.scanner.http_sources import GreenhouseScanner, LeverScanner, AshbyScanner
 from candidatador.evaluator import evaluate_job
+from candidatador import browser as _browser_mod
 
 mcp = FastMCP("candidatador")
 _config = load_config()
@@ -75,6 +76,17 @@ async def scan_and_evaluate(keywords: str = "") -> str:
         if slugs:
             raw = await scanner.scan(slugs)
             all_raw.extend(raw)
+
+    # LinkedIn scan (Playwright — requires prior login)
+    from candidatador.scanner.playwright_sources import LinkedInScanner
+    try:
+        li_page = await _browser_mod.new_page(_config)
+        li_scanner = LinkedInScanner(li_page)
+        li_jobs = await li_scanner.scan(keywords=keywords or "software engineer")
+        all_raw.extend(li_jobs)
+        await li_page.close()
+    except Exception:
+        pass  # LinkedIn scan failing shouldn't block HTTP results
 
     # Dedup against scan_log
     seen_urls = {row.job_url for row in ScanLog.select(ScanLog.job_url)}
@@ -155,6 +167,20 @@ async def get_job(id: int) -> str:
     lines.append(f"\n**Por quê esse score:** {job.score_notes}")
     lines.append(f"\n---\n{job.description or '(sem descrição)'}")
     return "\n".join(lines)
+
+
+@mcp.tool()
+async def login(platform: str = "linkedin") -> str:
+    """Open Brave for manual login. Session is saved and reused in future scans."""
+    if platform != "linkedin":
+        return f"Platform '{platform}' not supported yet. Supported: linkedin"
+    page = await _browser_mod.new_page(_config)
+    await page.goto("https://www.linkedin.com/login")
+    return (
+        "Brave aberto em linkedin.com/login. "
+        "Faça login manualmente. "
+        "A sessão será salva automaticamente em ~/.candidatador/browser-session/"
+    )
 
 
 def main():
