@@ -44,8 +44,10 @@ async def evaluate_job(
     description: str,
     profile: dict,
     model: str = "claude-sonnet-4-6",
+    _client=None,
 ) -> EvaluationResult:
-    client = anthropic.Anthropic()
+    if _client is None:
+        _client = anthropic.AsyncAnthropic()
     prompt = EVAL_PROMPT.format(
         profile_yaml=yaml.dump(profile, allow_unicode=True),
         company=company,
@@ -53,7 +55,7 @@ async def evaluate_job(
         description=description[:8000],  # cap to avoid huge context
     )
     try:
-        message = client.messages.create(
+        message = await _client.messages.create(
             model=model,
             max_tokens=512,
             messages=[{"role": "user", "content": prompt}],

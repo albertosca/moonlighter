@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import httpx
 from candidatador.scanner.base import BaseScanner, RawJob, normalize_remote_type
@@ -72,15 +72,19 @@ class LeverScanner(BaseScanner):
             return []
         jobs = []
         for item in r.json():
+            title = item.get("text", "")
+            url = item.get("hostedUrl", "")
+            if not title or not url:
+                continue
             location = item.get("categories", {}).get("location")
             posted_at = None
             if item.get("createdAt"):
-                posted_at = datetime.fromtimestamp(item["createdAt"] / 1000)
+                posted_at = datetime.fromtimestamp(item["createdAt"] / 1000, tz=timezone.utc)
             jobs.append(RawJob(
                 source="lever",
                 company=slug,
-                title=item.get("text", ""),
-                url=item.get("hostedUrl", ""),
+                title=title,
+                url=url,
                 location=location,
                 remote_type=normalize_remote_type(location),
                 posted_at=posted_at,
