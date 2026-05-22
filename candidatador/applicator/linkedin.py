@@ -55,6 +55,16 @@ class LinkedInApplier(BaseApplier):
                             await asyncio.sleep(0.4)
             except Exception:
                 continue
+        # Upload CV if file input exists in the modal
+        try:
+            file_input = await self.page.query_selector(
+                ".jobs-easy-apply-modal input[type='file']"
+            )
+            if file_input and cv_path:
+                await file_input.set_input_files(cv_path)
+                await asyncio.sleep(1)
+        except Exception:
+            pass
 
     async def submit(self) -> bool:
         """Click through multi-step Easy Apply and submit."""

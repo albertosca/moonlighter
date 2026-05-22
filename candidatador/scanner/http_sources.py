@@ -1,11 +1,12 @@
 import asyncio
+import re
 from datetime import datetime, timezone
 from typing import Optional
 import httpx
 from candidatador.scanner.base import BaseScanner, RawJob, normalize_remote_type
 
 class GreenhouseScanner(BaseScanner):
-    BASE = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
+    BASE = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
     HEADERS = {"User-Agent": "candidatador/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs) -> list[RawJob]:
@@ -36,6 +37,8 @@ class GreenhouseScanner(BaseScanner):
                     posted_at = datetime.fromisoformat(item["updated_at"].replace("Z", "+00:00"))
                 except ValueError:
                     pass
+            raw_content = item.get("content", "") or ""
+            description = re.sub(r'<[^>]+>', ' ', raw_content).strip() if raw_content else None
             jobs.append(RawJob(
                 source="greenhouse",
                 company=slug,
@@ -44,6 +47,7 @@ class GreenhouseScanner(BaseScanner):
                 location=location,
                 remote_type=normalize_remote_type(location),
                 posted_at=posted_at,
+                description=description,
             ))
         return jobs
 

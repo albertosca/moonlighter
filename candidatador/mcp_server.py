@@ -111,9 +111,11 @@ async def scan_and_evaluate(keywords: str = "") -> str:
     if not new_raw:
         return "Nenhuma vaga nova encontrada."
 
-    # Evaluate each new job with LLM
+    # Evaluate jobs concurrently in batches of 10
+    BATCH_SIZE = 10
     results = []
-    for raw in new_raw:
+
+    async def _eval_and_save(raw) -> Job | None:
         eval_result = await evaluate_job(
             company=raw.company,
             title=raw.title,
@@ -136,9 +138,14 @@ async def scan_and_evaluate(keywords: str = "") -> str:
                 status="new" if eval_result.score >= threshold else "archived",
             )
             ScanLog.create(job_url=raw.url, source=raw.source)
-            results.append(job)
+            return job
         except IntegrityError:
-            pass  # URL already in DB, skip
+            return None
+
+    for i in range(0, len(new_raw), BATCH_SIZE):
+        batch = new_raw[i:i + BATCH_SIZE]
+        batch_results = await asyncio.gather(*[_eval_and_save(raw) for raw in batch])
+        results.extend([j for j in batch_results if j is not None])
 
     above = [j for j in results if j.status == "new"]
     below = len(results) - len(above)
@@ -293,7 +300,7 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
     if answers:
         stored_answers.update(answers)
 
-    cv_path = os.path.join("profile", "cv.pdf")
+    cv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "profile", "cv.pdf")
     if not os.path.exists(cv_path):
         return f"⚠️  CV não encontrado em {cv_path}. Coloque seu CV em profile/cv.pdf."
 
@@ -331,6 +338,7 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
     except Exception as e:
         app.status = "draft"
         app.save()
+        Job.update(status="reviewed").where(Job.id == job_id).execute()
         return f"⚠️  Erro ao submeter vaga #{job_id}: {e}"
     finally:
         await page.close()
