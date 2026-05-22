@@ -8,11 +8,17 @@ from rich.console import Console
 from rich import box
 import io
 
-from candidatador.db import init_db, Job, ScanLog
+from candidatador.db import init_db, Job, ScanLog, Application
 from candidatador.config import load_config, load_profile, load_company_list
 from candidatador.scanner.http_sources import GreenhouseScanner, LeverScanner, AshbyScanner
 from candidatador.evaluator import evaluate_job
 from candidatador import browser as _browser_mod
+import os
+from candidatador.applicator.greenhouse import GreenhouseApplier
+from candidatador.applicator.lever import LeverApplier
+from candidatador.applicator.ashby import AshbyApplier
+from candidatador.applicator.linkedin import LinkedInApplier
+from candidatador.applicator.base import generate_answers
 
 mcp = FastMCP("candidatador")
 _config = load_config()
@@ -56,6 +62,16 @@ def _render_table(jobs: list[Job]) -> str:
         )
     console.print(table)
     return buf.getvalue()
+
+
+_APPLIER_CLASSES = [LinkedInApplier, GreenhouseApplier, LeverApplier, AshbyApplier]
+
+async def _detect_applier(page, config, profile):
+    for cls in _APPLIER_CLASSES:
+        applier = cls(page, config, profile)
+        if await applier.detect():
+            return applier
+    return None
 
 
 @mcp.tool()
@@ -181,6 +197,153 @@ async def login(platform: str = "linkedin") -> str:
         "Faça login manualmente. "
         "A sessão será salva automaticamente em ~/.candidatador/browser-session/"
     )
+
+
+@mcp.tool()
+async def apply_jobs(ids: list[int]) -> str:
+    """
+    Start application flow for given job IDs.
+    Opens each job in Brave, extracts form fields, generates LLM answers.
+    Returns draft answers for review before submission.
+    """
+    drafts_output = []
+    for job_id in ids:
+        try:
+            job = Job.get_by_id(job_id)
+        except Job.DoesNotExist:
+            drafts_output.append(f"⚠️  Vaga #{job_id} não encontrada.")
+            continue
+
+        page = await _browser_mod.new_page(_config)
+        try:
+            await page.goto(job.url, timeout=30000)
+            await page.wait_for_load_state("networkidle", timeout=15000)
+            await _browser_mod.save_screenshot(page, job_id, "01-job-page", _config)
+
+            applier = await _detect_applier(page, _config, _profile)
+            if not applier:
+                drafts_output.append(f"⚠️  Vaga #{job_id}: ATS não reconhecido. URL: {job.url}")
+                continue
+
+            if isinstance(applier, LinkedInApplier):
+                if not await applier.is_easy_apply():
+                    drafts_output.append(
+                        f"⚠️  Vaga #{job_id} ({job.company}/{job.title}): não tem Easy Apply. "
+                        f"Candidatura manual necessária: {job.url}"
+                    )
+                    continue
+
+            fields = await applier.extract_fields()
+            await _browser_mod.save_screenshot(page, job_id, "02-form", _config)
+
+            draft = await generate_answers(
+                company=job.company,
+                title=job.title,
+                description=job.description or "",
+                fields=fields,
+                profile=_profile,
+                model=_config["llm_model"],
+                job_id=job_id,
+            )
+
+            # Save draft to DB
+            app, created = Application.get_or_create(
+                job=job,
+                defaults={"status": "draft", "form_data": json.dumps(draft.answers)}
+            )
+            if not created:
+                app.form_data = json.dumps(draft.answers)
+                app.status = "draft"
+                app.updated_at = datetime.now()
+                app.save()
+
+            Job.update(status="applying").where(Job.id == job_id).execute()
+
+            lines = [f"\n## Rascunho — Vaga #{job_id}: {job.company} / {job.title}"]
+            if draft.error:
+                lines.append(f"⚠️ Erro ao gerar respostas: {draft.error}")
+            for field, answer in draft.answers.items():
+                lines.append(f"\n**{field}**\n{answer}")
+            lines.append(f"\nPara aprovar e candidatar: `confirm_apply(job_id={job_id})`")
+            lines.append(f"Para editar: passe `answers={{\"campo\": \"nova resposta\"}}` no confirm_apply")
+            drafts_output.append("\n".join(lines))
+
+        except Exception as e:
+            drafts_output.append(f"⚠️  Vaga #{job_id}: erro — {e}")
+        finally:
+            await page.close()
+
+    return "\n\n---\n".join(drafts_output)
+
+
+@mcp.tool()
+async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
+    """
+    Submit the application for a job.
+    job_id: ID of the job (must have a draft Application in DB)
+    answers: optional dict of {field: answer} overrides merged into the saved draft
+    """
+    try:
+        job = Job.get_by_id(job_id)
+        app = Application.get(Application.job == job)
+    except (Job.DoesNotExist, Application.DoesNotExist):
+        return f"⚠️  Vaga #{job_id} não encontrada ou sem rascunho. Rode apply_jobs primeiro."
+
+    stored_answers = app.get_form_data()
+    if answers:
+        stored_answers.update(answers)
+
+    cv_path = os.path.join("profile", "cv.pdf")
+    if not os.path.exists(cv_path):
+        return f"⚠️  CV não encontrado em {cv_path}. Coloque seu CV em profile/cv.pdf."
+
+    page = await _browser_mod.new_page(_config)
+    try:
+        await page.goto(job.url, timeout=30000)
+        await page.wait_for_load_state("networkidle", timeout=15000)
+
+        applier = await _detect_applier(page, _config, _profile)
+        if not applier:
+            return f"⚠️  ATS não reconhecido para vaga #{job_id}."
+
+        if isinstance(applier, LinkedInApplier):
+            await applier.extract_fields()  # opens the modal
+
+        await applier.fill_form(stored_answers, cv_path)
+        await _browser_mod.save_screenshot(page, job_id, "03-filled", _config)
+
+        success = await applier.submit()
+        await _browser_mod.save_screenshot(page, job_id, "04-submitted", _config)
+
+        if success:
+            app.status = "submitted"
+            app.applied_at = datetime.now()
+            app.form_data = json.dumps(stored_answers)
+            app.updated_at = datetime.now()
+            app.save()
+            Job.update(status="applied").where(Job.id == job_id).execute()
+            return f"✓ Candidatura #{job_id} submetida: {job.company} / {job.title}"
+        else:
+            return (
+                f"⚠️  Submissão falhou para vaga #{job_id}. "
+                f"Screenshot em ~/.candidatador/screenshots/{job_id}/04-submitted.png"
+            )
+    except Exception as e:
+        app.status = "draft"
+        app.save()
+        return f"⚠️  Erro ao submeter vaga #{job_id}: {e}"
+    finally:
+        await page.close()
+
+
+@mcp.tool()
+async def retry_apply(job_id: int) -> str:
+    """Retry a failed application. Reuses stored draft answers."""
+    try:
+        Application.get(Application.job == Job.get_by_id(job_id))
+    except (Job.DoesNotExist, Application.DoesNotExist):
+        return f"Vaga #{job_id} não tem rascunho salvo. Rode apply_jobs(ids=[{job_id}]) primeiro."
+    return await confirm_apply(job_id)
 
 
 def main():
