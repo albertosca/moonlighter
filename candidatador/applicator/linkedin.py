@@ -1,0 +1,80 @@
+import asyncio
+from playwright.async_api import TimeoutError as PlaywrightTimeout
+from candidatador.applicator.base import BaseApplier
+
+class LinkedInApplier(BaseApplier):
+    async def detect(self) -> bool:
+        return "linkedin.com/jobs" in self.page.url
+
+    async def is_easy_apply(self) -> bool:
+        btn = await self.page.query_selector(".jobs-apply-button--top-card .artdeco-button")
+        if not btn:
+            return False
+        text = (await btn.inner_text()).strip().lower()
+        return "easy apply" in text
+
+    async def extract_fields(self) -> list[str]:
+        # Click Easy Apply button to open the modal
+        try:
+            btn = await self.page.query_selector(".jobs-apply-button--top-card .artdeco-button")
+            if btn:
+                await btn.click()
+                await asyncio.sleep(2)
+        except Exception:
+            return []
+
+        fields = []
+        try:
+            await self.page.wait_for_selector(".jobs-easy-apply-modal", timeout=10000)
+            label_els = await self.page.query_selector_all(
+                ".jobs-easy-apply-modal label, .jobs-easy-apply-modal .fb-dash-form-element__label"
+            )
+            for el in label_els:
+                text = (await el.inner_text()).strip()
+                if text:
+                    fields.append(text)
+        except PlaywrightTimeout:
+            pass
+        return fields
+
+    async def fill_form(self, answers: dict[str, str], cv_path: str) -> None:
+        for label_text, answer in answers.items():
+            try:
+                label = await self.page.query_selector(
+                    f".jobs-easy-apply-modal label:text-is('{label_text}')"
+                )
+                if not label:
+                    continue
+                for_id = await label.get_attribute("for")
+                if for_id:
+                    field = await self.page.query_selector(f"#{for_id}")
+                    if field:
+                        tag = await field.evaluate("el => el.tagName.toLowerCase()")
+                        if tag in ("input", "textarea"):
+                            await field.fill(answer)
+                            await asyncio.sleep(0.4)
+            except Exception:
+                continue
+
+    async def submit(self) -> bool:
+        """Click through multi-step Easy Apply and submit."""
+        for _ in range(10):  # max 10 steps
+            try:
+                submit_btn = await self.page.query_selector(
+                    "button[aria-label='Submit application'], button:text('Submit application')"
+                )
+                if submit_btn:
+                    await submit_btn.click()
+                    await asyncio.sleep(2)
+                    return True
+                next_btn = await self.page.query_selector(
+                    "button[aria-label='Continue to next step'], button:text('Next'), button:text('Review')"
+                )
+                if next_btn:
+                    await next_btn.click()
+                    await asyncio.sleep(1.5)
+                else:
+                    break
+            except Exception:
+                break
+        return False
