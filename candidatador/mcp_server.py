@@ -346,5 +346,63 @@ async def retry_apply(job_id: int) -> str:
     return await confirm_apply(job_id)
 
 
+@mcp.tool()
+async def get_pipeline() -> str:
+    """Show full application funnel: counts and list by status."""
+    statuses = ["applying", "submitted", "screening", "interview", "offer", "rejected"]
+    lines = ["# Pipeline de Candidaturas\n"]
+    for status in statuses:
+        apps = list(
+            Application.select(Application, Job)
+            .join(Job)
+            .where(Application.status == status)
+            .order_by(Application.updated_at.desc())
+        )
+        if not apps:
+            continue
+        lines.append(f"## {status.capitalize()} ({len(apps)})")
+        for app in apps:
+            date = app.applied_at.strftime("%d/%m") if app.applied_at else "—"
+            next_action = f" → {app.next_action}" if app.next_action else ""
+            lines.append(f"- #{app.job.id} {app.job.company}/{app.job.title} ({date}){next_action}")
+        lines.append("")
+
+    total = Application.select().count()
+    lines.append(f"**Total de candidaturas:** {total}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def update_status(job_id: int, status: str, notes: str = "", next_action: str = "") -> str:
+    """
+    Update application status manually.
+    status: 'screening' | 'interview' | 'offer' | 'rejected' | 'submitted' | 'draft'
+    notes: free text notes appended to history
+    next_action: e.g. 'follow up em 2026-06-01'
+    """
+    valid = {"screening", "interview", "offer", "rejected", "submitted", "draft"}
+    if status not in valid:
+        return f"Status inválido. Valores aceitos: {', '.join(sorted(valid))}"
+    try:
+        job = Job.get_by_id(job_id)
+        app = Application.get(Application.job == job)
+    except (Job.DoesNotExist, Application.DoesNotExist):
+        return f"Vaga #{job_id} não encontrada ou sem candidatura registrada."
+
+    app.status = status
+    app.updated_at = datetime.now()
+    if notes:
+        existing = app.notes or ""
+        app.notes = f"{existing}\n[{datetime.now().strftime('%Y-%m-%d')}] {notes}".strip()
+    if next_action:
+        app.next_action = next_action
+    app.save()
+
+    result = f"✓ Vaga #{job_id} ({job.company}/{job.title}): status → {status}"
+    if next_action:
+        result += f"\n  Próxima ação: {next_action}"
+    return result
+
+
 def main():
     mcp.run()
