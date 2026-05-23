@@ -20,15 +20,21 @@ from candidatador.applicator.ashby import AshbyApplier
 from candidatador.applicator.linkedin import LinkedInApplier
 from candidatador.applicator.base import generate_answers
 
+from candidatador.startup import validate_startup, StartupWarning
+
 mcp = FastMCP("candidatador")
 _config = load_config()
 try:
     _profile = load_profile()
 except FileNotFoundError:
-    print("⚠️  profile/profile.yaml não encontrado — usando perfil vazio. Crie o arquivo para avaliações melhores.")
     _profile = {}
 _companies = load_company_list()
 init_db()
+
+_startup_warnings = validate_startup(_config, _profile)
+for _w in _startup_warnings:
+    _prefix = "🚫" if _w.level == "error" else "⚠️ "
+    print(f"{_prefix} {_w.message}", flush=True)
 
 def _render_table(jobs: list[Job]) -> str:
     buf = io.StringIO()
@@ -175,10 +181,11 @@ async def get_job(id: int) -> str:
     except Job.DoesNotExist:
         return f"Vaga #{id} não encontrada."
     caveats = job.get_caveats()
+    score_str = f"{job.score:.1f}" if job.score is not None else "—"
     lines = [
         f"# {job.company} — {job.title}",
         f"**Source:** {job.source}  |  **Status:** {job.status}",
-        f"**Score:** {job.score:.1f}/10  |  **Remoto:** {job.remote_type or 'n/d'}",
+        f"**Score:** {score_str}/10  |  **Remoto:** {job.remote_type or 'n/d'}",
         f"**Publicada:** {job.posted_at.strftime('%d/%m/%Y') if job.posted_at else 'n/d'}",
         f"**URL:** {job.url}",
     ]
@@ -414,3 +421,7 @@ async def update_status(job_id: int, status: str, notes: str = "", next_action: 
 
 def main():
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()

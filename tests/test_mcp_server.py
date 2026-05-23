@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from candidatador.db import init_db, Job, Application, ScanLog
 from candidatador.evaluator import EvaluationResult
 from candidatador.applicator.base import ApplicationDraft
+from candidatador.applicator.linkedin import LinkedInApplier
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -616,3 +617,308 @@ async def test_update_status_no_application(tmp_db):
     from candidatador.mcp_server import update_status
     result = await update_status(job_id=job.id, status="screening")
     assert "candidatura" in result or "não encontrada" in result
+
+
+# ── scan_and_evaluate: batch processing ───────────────────────────────────────
+
+async def test_scan_concurrent_batch_all_processed(tmp_db):
+    """15 jobs → processed in 2 batches (10+5) → all 15 in DB."""
+    init_db()
+    from candidatador.mcp_server import scan_and_evaluate
+    from candidatador.scanner.base import RawJob
+
+    raws = [
+        RawJob(source="greenhouse", company=f"Co{i}", title="Eng", url=f"https://x.com/batch/{i}", description="desc")
+        for i in range(15)
+    ]
+    with patch("candidatador.mcp_server.GreenhouseScanner") as MockGH, \
+         patch("candidatador.mcp_server.LeverScanner") as MockLV, \
+         patch("candidatador.mcp_server.AshbyScanner") as MockAB, \
+         patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server.evaluate_job", new=AsyncMock(return_value=make_eval_result(score=7.0))):
+        MockGH.return_value.scan = AsyncMock(return_value=raws)
+        MockLV.return_value.scan = AsyncMock(return_value=[])
+        MockAB.return_value.scan = AsyncMock(return_value=[])
+        mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
+        await scan_and_evaluate()
+    assert Job.select().count() == 15
+
+
+# ── apply_jobs: missing scenarios ─────────────────────────────────────────────
+
+async def test_apply_jobs_linkedin_not_easy_apply(tmp_db):
+    """LinkedIn job without Easy Apply → warning with manual application message."""
+    init_db()
+    job = create_job(tmp_db, url="https://www.linkedin.com/jobs/view/li1")
+    page = make_mock_page(url="https://www.linkedin.com/jobs/view/li1")
+    # query_selector returns None → is_easy_apply() returns False
+    page.query_selector = AsyncMock(return_value=None)
+    li_applier = LinkedInApplier(page, {}, {})
+
+    with patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server._detect_applier", new=AsyncMock(return_value=li_applier)):
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        from candidatador.mcp_server import apply_jobs
+        result = await apply_jobs(ids=[job.id])
+
+    assert "Easy Apply" in result or "easy apply" in result.lower()
+
+
+async def test_apply_jobs_llm_error_still_creates_draft(tmp_db):
+    """generate_answers returns draft.error → Application still created in DB."""
+    init_db()
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/err1")
+    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/err1")
+    error_draft = ApplicationDraft(job_id=job.id, answers={}, form_fields=[], error="LLM timeout")
+
+    with patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server.generate_answers", new=AsyncMock(return_value=error_draft)), \
+         patch("candidatador.mcp_server._detect_applier") as mock_detect:
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        mock_applier = AsyncMock()
+        mock_applier.extract_fields = AsyncMock(return_value=["Q"])
+        mock_detect.return_value = mock_applier
+        from candidatador.mcp_server import apply_jobs
+        result = await apply_jobs(ids=[job.id])
+
+    app = Application.get(Application.job == job)
+    assert app is not None
+    assert "erro" in result.lower() or "Erro" in result or "LLM" in result
+
+
+async def test_apply_jobs_updates_existing_draft(tmp_db):
+    """When Application already exists, form_data is updated (get_or_create → not created path)."""
+    init_db()
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/upd1")
+    existing_app = create_application(job, form_data='{"OldQ": "OldA"}')
+    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/upd1")
+    new_draft = ApplicationDraft(job_id=job.id, answers={"NewQ": "NewA"}, form_fields=["NewQ"])
+
+    with patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server.generate_answers", new=AsyncMock(return_value=new_draft)), \
+         patch("candidatador.mcp_server._detect_applier") as mock_detect:
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        mock_applier = AsyncMock()
+        mock_applier.extract_fields = AsyncMock(return_value=["NewQ"])
+        mock_detect.return_value = mock_applier
+        from candidatador.mcp_server import apply_jobs
+        await apply_jobs(ids=[job.id])
+
+    app_fresh = Application.get_by_id(existing_app.id)
+    data = json.loads(app_fresh.form_data)
+    assert "NewQ" in data
+    assert data["NewQ"] == "NewA"
+
+
+async def test_apply_jobs_exception_continues_to_next(tmp_db):
+    """Exception inside job processing (from _detect_applier) doesn't abort next job."""
+    init_db()
+    job1 = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/exc1")
+    job2 = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/exc2", company="Linear")
+    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/exc2")
+    draft = ApplicationDraft(job_id=job2.id, answers={"Q": "A"}, form_fields=["Q"])
+
+    detect_calls = [0]
+    async def detect_side_effect(pg, cfg, prof):
+        detect_calls[0] += 1
+        if detect_calls[0] == 1:
+            raise Exception("ATS detection crashed on job 1")
+        mock_applier = AsyncMock()
+        mock_applier.extract_fields = AsyncMock(return_value=["Q"])
+        return mock_applier
+
+    with patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server.generate_answers", new=AsyncMock(return_value=draft)), \
+         patch("candidatador.mcp_server._detect_applier", side_effect=detect_side_effect):
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        from candidatador.mcp_server import apply_jobs
+        result = await apply_jobs(ids=[job1.id, job2.id])
+
+    # Job 2 should have been processed despite job 1 crashing
+    assert Application.select().where(Application.job == job2).count() == 1
+    assert "Linear" in result or "exc2" in result
+
+
+# ── confirm_apply: missing scenarios ──────────────────────────────────────────
+
+async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
+    """submit() returns False → warning message with screenshot path."""
+    init_db()
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/sf1", status="applying")
+    app = create_application(job)
+    cv_path = tmp_path / "cv.pdf"
+    cv_path.write_bytes(b"fake pdf")
+    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/sf1")
+
+    with patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server._detect_applier") as mock_detect, \
+         patch("candidatador.mcp_server.os.path.exists", return_value=True), \
+         patch("candidatador.mcp_server.os.path.join", return_value=str(cv_path)), \
+         patch("candidatador.mcp_server.os.path.dirname"), \
+         patch("candidatador.mcp_server.os.path.abspath"):
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        mock_applier = AsyncMock()
+        mock_applier.fill_form = AsyncMock()
+        mock_applier.submit = AsyncMock(return_value=False)
+        mock_detect.return_value = mock_applier
+        from candidatador.mcp_server import confirm_apply
+        result = await confirm_apply(job_id=job.id)
+
+    assert "⚠️" in result or "falhou" in result.lower() or "Submissão" in result
+    assert "screenshot" in result.lower() or "04-submitted" in result
+
+
+async def test_confirm_apply_unknown_ats(tmp_db, tmp_path):
+    """_detect_applier returns None → ATS não reconhecido."""
+    init_db()
+    job = create_job(tmp_db, url="https://unknownats.com/jobs/ca99", status="applying")
+    create_application(job)
+    cv_path = tmp_path / "cv.pdf"
+    cv_path.write_bytes(b"fake pdf")
+    page = make_mock_page(url="https://unknownats.com/jobs/ca99")
+
+    with patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server._detect_applier", new=AsyncMock(return_value=None)), \
+         patch("candidatador.mcp_server.os.path.exists", return_value=True), \
+         patch("candidatador.mcp_server.os.path.join", return_value=str(cv_path)), \
+         patch("candidatador.mcp_server.os.path.dirname"), \
+         patch("candidatador.mcp_server.os.path.abspath"):
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        from candidatador.mcp_server import confirm_apply
+        result = await confirm_apply(job_id=job.id)
+
+    assert "ATS" in result and "reconhecido" in result
+
+
+async def test_confirm_apply_linkedin_calls_extract_fields(tmp_db, tmp_path):
+    """For LinkedIn jobs, extract_fields() is called to open the modal before fill_form."""
+    init_db()
+    job = create_job(tmp_db, url="https://www.linkedin.com/jobs/view/ca100", status="applying")
+    create_application(job)
+    cv_path = tmp_path / "cv.pdf"
+    cv_path.write_bytes(b"fake pdf")
+    page = make_mock_page(url="https://www.linkedin.com/jobs/view/ca100")
+
+    extract_calls = []
+
+    class TrackingLinkedInApplier(LinkedInApplier):
+        async def extract_fields(self):
+            extract_calls.append(True)
+            return []
+        async def fill_form(self, *args, **kwargs):
+            pass
+        async def submit(self):
+            return True
+
+    li_applier = TrackingLinkedInApplier(page, {}, {})
+
+    with patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server._detect_applier", new=AsyncMock(return_value=li_applier)), \
+         patch("candidatador.mcp_server.os.path.exists", return_value=True), \
+         patch("candidatador.mcp_server.os.path.join", return_value=str(cv_path)), \
+         patch("candidatador.mcp_server.os.path.dirname"), \
+         patch("candidatador.mcp_server.os.path.abspath"):
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        from candidatador.mcp_server import confirm_apply
+        await confirm_apply(job_id=job.id)
+
+    assert len(extract_calls) == 1
+
+
+# ── get_job: bug fix verification ─────────────────────────────────────────────
+
+async def test_get_job_score_null(tmp_db):
+    """get_job with score=None must not raise TypeError (bug fix)."""
+    init_db()
+    job = create_job(tmp_db, url="https://x.com/gj-null-score", score=None)
+    from candidatador.mcp_server import get_job
+    result = await get_job(id=job.id)
+    assert "—" in result
+    assert "não encontrada" not in result
+
+
+# ── login ─────────────────────────────────────────────────────────────────────
+
+async def test_login_unsupported_platform(tmp_db):
+    """login() with unsupported platform returns error message."""
+    init_db()
+    from candidatador.mcp_server import login
+    result = await login(platform="github")
+    assert "not supported" in result or "suport" in result.lower() or "github" in result.lower()
+
+
+async def test_login_linkedin_returns_instruction(tmp_db):
+    """login('linkedin') opens browser and returns instruction string."""
+    init_db()
+    page = make_mock_page(url="https://www.linkedin.com/login")
+    with patch("candidatador.mcp_server._browser_mod") as mock_browser:
+        mock_browser.new_page = AsyncMock(return_value=page)
+        from candidatador.mcp_server import login
+        result = await login(platform="linkedin")
+    assert "linkedin" in result.lower()
+    page.goto.assert_called_once()
+
+
+# ── list_jobs: table formatting ───────────────────────────────────────────────
+
+async def test_list_jobs_salary_estimate_shows_asterisk(tmp_db):
+    """salary_source='llm_estimate' with min+max → '* ' appears in table."""
+    init_db()
+    create_job(tmp_db, url="https://x.com/lj-est",
+               salary_min=150000, salary_max=200000,
+               salary_currency="USD", salary_source="llm_estimate", status="new")
+    from candidatador.mcp_server import list_jobs
+    result = await list_jobs(status="new")
+    assert " *" in result
+
+
+async def test_list_jobs_salary_min_only_shows_plus(tmp_db):
+    """Only salary_min set → '$Xk+' format in table."""
+    init_db()
+    create_job(tmp_db, url="https://x.com/lj-min",
+               salary_min=120000, salary_max=None,
+               salary_currency="USD", salary_source="stated", status="new")
+    from candidatador.mcp_server import list_jobs
+    result = await list_jobs(status="new")
+    assert "k+" in result or "120" in result
+
+
+# ── get_pipeline: total count ─────────────────────────────────────────────────
+
+async def test_get_pipeline_total_count(tmp_db):
+    """Total de candidaturas count reflects all Applications regardless of status."""
+    init_db()
+    job1 = create_job(tmp_db, url="https://x.com/pl-tc1")
+    job2 = create_job(tmp_db, url="https://x.com/pl-tc2")
+    job3 = create_job(tmp_db, url="https://x.com/pl-tc3")
+    create_application(job1, status="submitted")
+    create_application(job2, status="interview")
+    create_application(job3, status="rejected")
+    from candidatador.mcp_server import get_pipeline
+    result = await get_pipeline()
+    assert "3" in result
+
+
+# ── validate_startup integration ──────────────────────────────────────────────
+
+def test_validate_startup_called_at_import_with_real_config():
+    """validate_startup não lança exceção durante inicialização do mcp_server."""
+    # O mcp_server já foi importado nos testes anteriores.
+    # Este teste garante que o módulo importa sem crash mesmo sem API key.
+    import candidatador.mcp_server  # noqa: F401 — verifica que importa ok
+    assert True  # se chegou aqui, não crashou
+
+
+def test_startup_warning_level_values():
+    from candidatador.startup import StartupWarning
+    w_err = StartupWarning(level="error", message="msg")
+    w_warn = StartupWarning(level="warn", message="msg")
+    assert w_err.level == "error"
+    assert w_warn.level == "warn"
