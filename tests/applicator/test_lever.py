@@ -1,0 +1,136 @@
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+from playwright.async_api import TimeoutError as PlaywrightTimeout
+from candidatador.applicator.lever import LeverApplier
+
+
+def make_applier(url="https://jobs.lever.co/gitlab/abc-123"):
+    page = MagicMock()
+    page.url = url
+    page.query_selector = AsyncMock(return_value=None)
+    page.query_selector_all = AsyncMock(return_value=[])
+    page.wait_for_selector = AsyncMock()
+    page.wait_for_load_state = AsyncMock()
+    return LeverApplier(page, {}, {})
+
+
+# ── detect() ─────────────────────────────────────────────────────────────────
+
+async def test_detect_lever_url():
+    applier = make_applier("https://jobs.lever.co/gitlab/abc-123")
+    assert await applier.detect() is True
+
+
+async def test_detect_non_lever_url():
+    applier = make_applier("https://boards.greenhouse.io/stripe/jobs/1")
+    assert await applier.detect() is False
+
+
+# ── extract_fields() ──────────────────────────────────────────────────────────
+
+async def test_extract_fields_waits_for_application_form():
+    applier = make_applier()
+    applier.page.query_selector_all = AsyncMock(return_value=[])
+    await applier.extract_fields()
+    applier.page.wait_for_selector.assert_called_once_with(".application-form", timeout=10000)
+
+
+async def test_extract_fields_timeout_returns_empty():
+    applier = make_applier()
+    applier.page.wait_for_selector = AsyncMock(side_effect=PlaywrightTimeout("timeout"))
+    result = await applier.extract_fields()
+    assert result == []
+
+
+async def test_extract_fields_filters_long_labels():
+    """Labels longer than 200 chars are excluded."""
+    applier = make_applier()
+    long_label = MagicMock()
+    long_label.inner_text = AsyncMock(return_value="x" * 201)
+    short_label = MagicMock()
+    short_label.inner_text = AsyncMock(return_value="Full Name")
+    applier.page.query_selector_all = AsyncMock(return_value=[long_label, short_label])
+    result = await applier.extract_fields()
+    assert result == ["Full Name"]
+
+
+async def test_extract_fields_excludes_empty_labels():
+    applier = make_applier()
+    empty_label = MagicMock()
+    empty_label.inner_text = AsyncMock(return_value="   ")
+    real_label = MagicMock()
+    real_label.inner_text = AsyncMock(return_value="Email")
+    applier.page.query_selector_all = AsyncMock(return_value=[empty_label, real_label])
+    result = await applier.extract_fields()
+    assert result == ["Email"]
+
+
+# ── fill_form() ───────────────────────────────────────────────────────────────
+
+async def test_fill_form_fills_labeled_fields():
+    applier = make_applier()
+    label = MagicMock()
+    label.get_attribute = AsyncMock(return_value="email")
+    field = MagicMock()
+    field.fill = AsyncMock()
+
+    async def qs(selector):
+        if "label" in selector:
+            return label
+        return field
+    applier.page.query_selector = qs
+
+    with patch("asyncio.sleep", new=AsyncMock()):
+        await applier.fill_form({"Email": "a@b.com"}, cv_path="")
+    field.fill.assert_called_once_with("a@b.com")
+
+
+async def test_fill_form_uploads_cv():
+    applier = make_applier()
+    file_input = MagicMock()
+    file_input.set_input_files = AsyncMock()
+
+    async def qs(selector):
+        if "file" in selector:
+            return file_input
+        return None
+    applier.page.query_selector = qs
+
+    with patch("asyncio.sleep", new=AsyncMock()):
+        await applier.fill_form({}, cv_path="/cv.pdf")
+    file_input.set_input_files.assert_called_once_with("/cv.pdf")
+
+
+async def test_fill_form_skips_missing_label():
+    """No crash and no fill when label not found."""
+    applier = make_applier()
+    applier.page.query_selector = AsyncMock(return_value=None)
+    await applier.fill_form({"Q": "A"}, cv_path="")  # should not raise
+
+
+# ── submit() ──────────────────────────────────────────────────────────────────
+
+async def test_submit_clicks_submit_button():
+    applier = make_applier()
+    btn = MagicMock()
+    btn.click = AsyncMock()
+    applier.page.query_selector = AsyncMock(return_value=btn)
+    applier.page.wait_for_load_state = AsyncMock()
+    assert await applier.submit() is True
+    btn.click.assert_called_once()
+
+
+async def test_submit_template_btn():
+    """Template submit button also triggers True return."""
+    applier = make_applier()
+    btn = MagicMock()
+    btn.click = AsyncMock()
+    applier.page.query_selector = AsyncMock(return_value=btn)
+    applier.page.wait_for_load_state = AsyncMock()
+    assert await applier.submit() is True
+
+
+async def test_submit_no_button_returns_false():
+    applier = make_applier()
+    applier.page.query_selector = AsyncMock(return_value=None)
+    assert await applier.submit() is False
