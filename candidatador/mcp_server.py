@@ -20,7 +20,7 @@ from candidatador.applicator.ashby import AshbyApplier
 from candidatador.applicator.linkedin import LinkedInApplier
 from candidatador.applicator.base import generate_answers
 
-from candidatador.startup import validate_startup, StartupWarning
+from candidatador.startup import validate_startup
 
 mcp = FastMCP("candidatador")
 _config = load_config()
@@ -35,6 +35,7 @@ _startup_warnings = validate_startup(_config, _profile)
 for _w in _startup_warnings:
     _prefix = "🚫" if _w.level == "error" else "⚠️ "
     print(f"{_prefix} {_w.message}", flush=True)
+
 
 def _render_table(jobs: list[Job]) -> str:
     buf = io.StringIO()

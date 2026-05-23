@@ -49,7 +49,7 @@ def validate_startup(
         warnings.append(StartupWarning(
             level="warn",
             message=(
-                f"Arquivo cv.pdf não encontrado. "
+                "Arquivo cv.pdf não encontrado. "
                 "confirm_apply vai falhar. Adicione seu currículo ao diretório correto."
             ),
         ))
