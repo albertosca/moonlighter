@@ -145,3 +145,35 @@ async def test_evaluate_job_salary_source_preserved():
     result = await evaluate_job(company="Co", title="Eng", description="desc", profile=PROFILE, model="test", _client=mock_client)
     assert result.salary_source == "stated"
     assert result.salary_min == 150000
+
+
+# ── LLM JSON parsing robustness ───────────────────────────────────────────────
+
+async def test_evaluate_job_strips_markdown_fence():
+    """LLM retorna JSON dentro de ```json ... ``` → parsed corretamente, score válido."""
+    payload = {"score": 7.5, "score_notes": "Good.", "caveats": [], "salary_min": None, "salary_max": None, "salary_currency": None, "salary_source": None}
+    wrapped = f"```json\n{json.dumps(payload)}\n```"
+    mock_client = MagicMock()
+    mock_client.messages.create = AsyncMock(return_value=MagicMock(content=[MagicMock(text=wrapped)]))
+    result = await evaluate_job(company="Co", title="Eng", description="desc", profile=PROFILE, model="test", _client=mock_client)
+    assert result.score == 7.5
+
+
+async def test_evaluate_job_strips_markdown_fence_without_json_label():
+    """LLM retorna JSON dentro de ``` ... ``` (sem 'json') → parsed corretamente."""
+    payload = {"score": 6.0, "score_notes": "Ok.", "caveats": [], "salary_min": None, "salary_max": None, "salary_currency": None, "salary_source": None}
+    wrapped = f"```\n{json.dumps(payload)}\n```"
+    mock_client = MagicMock()
+    mock_client.messages.create = AsyncMock(return_value=MagicMock(content=[MagicMock(text=wrapped)]))
+    result = await evaluate_job(company="Co", title="Eng", description="desc", profile=PROFILE, model="test", _client=mock_client)
+    assert result.score == 6.0
+
+
+async def test_evaluate_job_strips_leading_prose():
+    """LLM retorna texto introdutório seguido do JSON → JSON extraído e parsed."""
+    payload = {"score": 8.0, "score_notes": "Great.", "caveats": [], "salary_min": None, "salary_max": None, "salary_currency": None, "salary_source": None}
+    with_prose = f"Here is my evaluation:\n\n{json.dumps(payload)}"
+    mock_client = MagicMock()
+    mock_client.messages.create = AsyncMock(return_value=MagicMock(content=[MagicMock(text=with_prose)]))
+    result = await evaluate_job(company="Co", title="Eng", description="desc", profile=PROFILE, model="test", _client=mock_client)
+    assert result.score == 8.0

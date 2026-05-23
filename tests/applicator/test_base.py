@@ -116,3 +116,27 @@ async def test_generate_answers_uses_injected_client():
     with patch("candidatador.applicator.base.anthropic.AsyncAnthropic") as mock_anthropic:
         await generate_answers(company="Co", title="Eng", description="desc", fields=["Q"], profile=PROFILE, model="test", _client=mock_client)
     mock_anthropic.assert_not_called()
+
+
+# ── LLM JSON parsing robustness ───────────────────────────────────────────────
+
+async def test_generate_answers_strips_markdown_fence():
+    """LLM retorna respostas dentro de ```json ... ``` → parsed corretamente."""
+    answers = {"Why Stripe?": "Great mission"}
+    wrapped = f"```json\n{json.dumps(answers)}\n```"
+    mock_client = MagicMock()
+    mock_client.messages.create = AsyncMock(return_value=MagicMock(content=[MagicMock(text=wrapped)]))
+    result = await generate_answers(company="Stripe", title="Eng", description="desc", fields=["Why Stripe?"], profile=PROFILE, model="test", _client=mock_client)
+    assert result.error is None
+    assert result.answers.get("Why Stripe?") == "Great mission"
+
+
+async def test_generate_answers_strips_leading_prose():
+    """LLM retorna texto seguido do JSON → JSON extraído."""
+    answers = {"Why here?": "Interesting work"}
+    with_prose = f"Sure, here are the answers:\n{json.dumps(answers)}"
+    mock_client = MagicMock()
+    mock_client.messages.create = AsyncMock(return_value=MagicMock(content=[MagicMock(text=with_prose)]))
+    result = await generate_answers(company="Co", title="Eng", description="desc", fields=["Why here?"], profile=PROFILE, model="test", _client=mock_client)
+    assert result.error is None
+    assert result.answers.get("Why here?") == "Interesting work"

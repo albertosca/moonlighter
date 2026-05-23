@@ -1,9 +1,25 @@
 import json
+import re
 import yaml
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional
 import anthropic
+
+
+def _extract_json(raw: str) -> str:
+    """
+    Extrai JSON puro de uma resposta do LLM que pode conter markdown fences
+    ou texto introdutório antes/depois do JSON.
+    """
+    raw = raw.strip()
+    m = re.search(r'```(?:json)?\s*\n?([\s\S]*?)\n?```', raw)
+    if m:
+        return m.group(1).strip()
+    m = re.search(r'(\{[\s\S]*\})', raw)
+    if m:
+        return m.group(1)
+    return raw
 
 ANSWER_PROMPT = """You are filling out a job application on behalf of a senior software engineer.
 
@@ -85,7 +101,7 @@ async def generate_answers(
             max_tokens=2048,
             messages=[{"role": "user", "content": prompt}],
         )
-        raw = message.content[0].text.strip()
+        raw = _extract_json(message.content[0].text)
         answers = json.loads(raw)
         return ApplicationDraft(job_id=job_id, answers=answers, form_fields=fields)
     except Exception as e:
