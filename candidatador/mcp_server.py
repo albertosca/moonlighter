@@ -105,14 +105,18 @@ async def scan_and_evaluate(keywords: str = "") -> str:
     _li_warning: str | None = None
     try:
         li_page = await _browser_mod.new_page(_config)
-        li_scanner = LinkedInScanner(li_page)
-        li_jobs = await li_scanner.scan(keywords=keywords or "software engineer")
-        all_raw.extend(li_jobs)
-        await li_page.close()
-    except LinkedInSessionExpiredError as e:
-        _li_warning = f"⚠️  LinkedIn: {e}"
+        try:
+            li_scanner = LinkedInScanner(li_page)
+            li_jobs = await li_scanner.scan(keywords=keywords or "software engineer")
+            all_raw.extend(li_jobs)
+        except LinkedInSessionExpiredError as e:
+            _li_warning = f"⚠️  LinkedIn: {e}"
+        except Exception:
+            pass  # outros erros do LinkedIn não bloqueiam resultados HTTP
+        finally:
+            await li_page.close()
     except Exception:
-        pass  # outros erros do LinkedIn não bloqueiam resultados HTTP
+        pass  # new_page() falhou — sem browser disponível
 
     # Dedup against scan_log
     seen_urls = {row.job_url for row in ScanLog.select(ScanLog.job_url)}

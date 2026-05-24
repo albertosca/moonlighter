@@ -1,25 +1,11 @@
 import json
-import re
 import yaml
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional
 import anthropic
 
-
-def _extract_json(raw: str) -> str:
-    """
-    Extrai JSON puro de uma resposta do LLM que pode conter markdown fences
-    ou texto introdutório antes/depois do JSON.
-    """
-    raw = raw.strip()
-    m = re.search(r'```(?:json)?\s*\n?([\s\S]*?)\n?```', raw)
-    if m:
-        return m.group(1).strip()
-    m = re.search(r'(\{[\s\S]*\})', raw)
-    if m:
-        return m.group(1)
-    return raw
+from candidatador.parsing import _extract_json
 
 async def _query_labels_with_fallback(page, selectors: list[str]) -> list:
     """

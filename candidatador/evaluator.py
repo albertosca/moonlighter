@@ -1,28 +1,11 @@
 import asyncio
 import json
-import re
 import yaml
 from dataclasses import dataclass, field
 from typing import Optional
 import anthropic
 
-
-def _extract_json(raw: str) -> str:
-    """
-    Extrai JSON puro de uma resposta do LLM que pode conter markdown fences
-    ou texto introdutório antes/depois do JSON.
-    Tentativas em ordem: fence com label, fence sem label, objeto JSON nu.
-    """
-    raw = raw.strip()
-    # ```json ... ``` ou ``` ... ```
-    m = re.search(r'```(?:json)?\s*\n?([\s\S]*?)\n?```', raw)
-    if m:
-        return m.group(1).strip()
-    # Objeto JSON bare no meio de texto (ex: "Here is:\n{...}")
-    m = re.search(r'(\{[\s\S]*\})', raw)
-    if m:
-        return m.group(1)
-    return raw
+from candidatador.parsing import _extract_json
 
 EVAL_PROMPT = """You are evaluating a job posting for a senior software engineer.
 
