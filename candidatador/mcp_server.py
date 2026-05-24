@@ -101,22 +101,28 @@ async def scan_and_evaluate(keywords: str = "") -> str:
             all_raw.extend(raw)
 
     # LinkedIn scan (Playwright — requires prior login)
-    from candidatador.scanner.playwright_sources import LinkedInScanner
+    from candidatador.scanner.playwright_sources import LinkedInScanner, LinkedInSessionExpiredError
+    _li_warning: str | None = None
     try:
         li_page = await _browser_mod.new_page(_config)
         li_scanner = LinkedInScanner(li_page)
         li_jobs = await li_scanner.scan(keywords=keywords or "software engineer")
         all_raw.extend(li_jobs)
         await li_page.close()
+    except LinkedInSessionExpiredError as e:
+        _li_warning = f"⚠️  LinkedIn: {e}"
     except Exception:
-        pass  # LinkedIn scan failing shouldn't block HTTP results
+        pass  # outros erros do LinkedIn não bloqueiam resultados HTTP
 
     # Dedup against scan_log
     seen_urls = {row.job_url for row in ScanLog.select(ScanLog.job_url)}
     new_raw = [j for j in all_raw if j.url not in seen_urls]
 
+    def _with_li_warning(msg: str) -> str:
+        return f"{msg}\n\n{_li_warning}" if _li_warning else msg
+
     if not new_raw:
-        return "Nenhuma vaga nova encontrada."
+        return _with_li_warning("Nenhuma vaga nova encontrada.")
 
     # Evaluate jobs concurrently in batches of 10
     BATCH_SIZE = 10
@@ -158,11 +164,11 @@ async def scan_and_evaluate(keywords: str = "") -> str:
     below = len(results) - len(above)
 
     if not above:
-        return f"{len(results)} vagas processadas. Nenhuma passou o threshold de {threshold}."
+        return _with_li_warning(f"{len(results)} vagas processadas. Nenhuma passou o threshold de {threshold}.")
 
     table = _render_table(above)
     footer = f"\n∗ = salário estimado pelo LLM  |  {below} vagas abaixo do threshold arquivadas"
-    return f"{len(results)} vagas novas processadas. {len(above)} acima do threshold:\n\n{table}{footer}"
+    return _with_li_warning(f"{len(results)} vagas novas processadas. {len(above)} acima do threshold:\n\n{table}{footer}")
 
 
 @mcp.tool()

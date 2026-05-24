@@ -922,3 +922,57 @@ def test_startup_warning_level_values():
     w_warn = StartupWarning(level="warn", message="msg")
     assert w_err.level == "error"
     assert w_warn.level == "warn"
+
+
+# ── LinkedIn session expired warning ──────────────────────────────────────────
+
+async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
+    """LinkedInSessionExpiredError → aviso explícito no resultado (não silêncio)."""
+    init_db()
+    from candidatador.mcp_server import scan_and_evaluate
+    from candidatador.scanner.playwright_sources import LinkedInSessionExpiredError
+
+    with patch("candidatador.mcp_server.GreenhouseScanner") as MockGH, \
+         patch("candidatador.mcp_server.LeverScanner") as MockLV, \
+         patch("candidatador.mcp_server.AshbyScanner") as MockAB, \
+         patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.scanner.playwright_sources.LinkedInScanner") as MockLI:
+        MockGH.return_value.scan = AsyncMock(return_value=[])
+        MockLV.return_value.scan = AsyncMock(return_value=[])
+        MockAB.return_value.scan = AsyncMock(return_value=[])
+        mock_browser.new_page = AsyncMock(return_value=make_mock_page())
+        MockLI.return_value.scan = AsyncMock(
+            side_effect=LinkedInSessionExpiredError("Sessão expirada.")
+        )
+        result = await scan_and_evaluate()
+
+    assert "LinkedIn" in result
+    assert "expirada" in result or "login" in result.lower()
+
+
+async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db):
+    """LinkedInSessionExpiredError não impede que vagas HTTP sejam retornadas."""
+    init_db()
+    from candidatador.mcp_server import scan_and_evaluate
+    from candidatador.scanner.base import RawJob
+    from candidatador.scanner.playwright_sources import LinkedInSessionExpiredError
+
+    raw = RawJob(source="greenhouse", company="Stripe", title="Eng", url="https://x.com/li-exp-1", description="desc")
+
+    with patch("candidatador.mcp_server.GreenhouseScanner") as MockGH, \
+         patch("candidatador.mcp_server.LeverScanner") as MockLV, \
+         patch("candidatador.mcp_server.AshbyScanner") as MockAB, \
+         patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.scanner.playwright_sources.LinkedInScanner") as MockLI, \
+         patch("candidatador.mcp_server.evaluate_job", new=AsyncMock(return_value=make_eval_result(score=8.0))):
+        MockGH.return_value.scan = AsyncMock(return_value=[raw])
+        MockLV.return_value.scan = AsyncMock(return_value=[])
+        MockAB.return_value.scan = AsyncMock(return_value=[])
+        mock_browser.new_page = AsyncMock(return_value=make_mock_page())
+        MockLI.return_value.scan = AsyncMock(
+            side_effect=LinkedInSessionExpiredError("Sessão expirada.")
+        )
+        result = await scan_and_evaluate()
+
+    assert "Stripe" in result  # vaga HTTP aparece
+    assert "LinkedIn" in result  # aviso aparece também

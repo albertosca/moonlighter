@@ -4,6 +4,11 @@ from playwright.async_api import Page, TimeoutError as PlaywrightTimeout
 from candidatador.scanner.base import BaseScanner, RawJob, normalize_remote_type
 
 
+class LinkedInSessionExpiredError(Exception):
+    """Levantada quando o LinkedIn redireciona para login após goto()."""
+    pass
+
+
 class LinkedInScanner(BaseScanner):
     SEARCH_URL = (
         "https://www.linkedin.com/jobs/search/?"
@@ -22,7 +27,14 @@ class LinkedInScanner(BaseScanner):
         jobs = []
         try:
             await self.page.goto(url, timeout=30000)
+            redirect_markers = ("/login", "/checkpoint", "/authwall")
+            if any(marker in self.page.url for marker in redirect_markers):
+                raise LinkedInSessionExpiredError(
+                    "Sessão LinkedIn expirada. Execute login(platform='linkedin') para re-autenticar."
+                )
             await self.page.wait_for_selector(".jobs-search__results-list", timeout=15000)
+        except LinkedInSessionExpiredError:
+            raise  # propaga sem engolir
         except PlaywrightTimeout:
             return []
 
