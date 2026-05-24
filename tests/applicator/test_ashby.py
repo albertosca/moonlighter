@@ -109,3 +109,62 @@ async def test_submit_no_button_returns_false():
     applier = make_applier()
     applier.page.query_selector = AsyncMock(return_value=None)
     assert await applier.submit() is False
+
+
+async def test_extract_fields_excludes_empty_labels():
+    """Labels with empty/whitespace text are excluded."""
+    applier = make_applier()
+    empty_label = MagicMock()
+    empty_label.inner_text = AsyncMock(return_value="   ")
+    real_label = MagicMock()
+    real_label.inner_text = AsyncMock(return_value="Full Name")
+    applier.page.query_selector_all = AsyncMock(return_value=[empty_label, real_label])
+    result = await applier.extract_fields()
+    assert result == ["Full Name"]
+
+
+async def test_fill_form_skips_label_without_for_attr():
+    """Label with no 'for' attribute → fill never called."""
+    applier = make_applier()
+    label = MagicMock()
+    label.get_attribute = AsyncMock(return_value=None)
+    field = MagicMock()
+    field.fill = AsyncMock()
+
+    async def qs(selector):
+        if "label" in selector:
+            return label
+        return field
+    applier.page.query_selector = qs
+    with patch("asyncio.sleep", new=AsyncMock()):
+        await applier.fill_form({"Q": "A"}, cv_path="")
+    field.fill.assert_not_called()
+
+
+async def test_submit_exception_returns_false():
+    """Exception during submit click → returns False."""
+    applier = make_applier()
+    btn = MagicMock()
+    btn.click = AsyncMock(side_effect=Exception("crash"))
+    applier.page.query_selector = AsyncMock(return_value=btn)
+    assert await applier.submit() is False
+
+
+async def test_extract_fields_falls_back_when_primary_selector_empty():
+    """Seletor primário vazio → seletor alternativo tentado."""
+    applier = make_applier()
+
+    fallback_label = MagicMock()
+    fallback_label.inner_text = AsyncMock(return_value="Why Ashby?")
+
+    call_count = [0]
+    async def qs_all(selector):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return []
+        return [fallback_label]
+
+    applier.page.query_selector_all = qs_all
+    result = await applier.extract_fields()
+    assert "Why Ashby?" in result
+    assert call_count[0] >= 2

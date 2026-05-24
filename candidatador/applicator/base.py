@@ -21,6 +21,17 @@ def _extract_json(raw: str) -> str:
         return m.group(1)
     return raw
 
+async def _query_labels_with_fallback(page, selectors: list[str]) -> list:
+    """
+    Tenta cada seletor CSS em ordem até encontrar um que retorne elementos.
+    Retorna a primeira lista não-vazia, ou [] se todos forem vazios.
+    """
+    for selector in selectors:
+        results = await page.query_selector_all(selector)
+        if results:
+            return results
+    return []
+
 ANSWER_PROMPT = """You are filling out a job application on behalf of a senior software engineer.
 
 ## Candidate Profile

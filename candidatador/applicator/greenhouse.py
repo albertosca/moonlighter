@@ -17,7 +17,12 @@ class GreenhouseApplier(BaseApplier):
             pass
 
         labels = []
-        label_els = await self.page.query_selector_all("label, .field-label")
+        from candidatador.applicator.base import _query_labels_with_fallback
+        label_els = await _query_labels_with_fallback(self.page, [
+            "label, .field-label",
+            ".application-question label",
+            "[data-field-label]",
+        ])
         for el in label_els:
             text = (await el.inner_text()).strip()
             if text and text not in ("Resume/CV", "Cover Letter"):

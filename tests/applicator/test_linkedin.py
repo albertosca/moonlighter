@@ -335,3 +335,30 @@ async def test_submit_exception_returns_false():
         result = await applier.submit()
 
     assert result is False
+
+
+async def test_extract_fields_falls_back_when_primary_modal_selector_empty():
+    """Seletor primário do modal vazio → seletor alternativo tentado."""
+    applier = make_applier()
+    btn = MagicMock()
+    btn.click = AsyncMock()
+    applier.page.query_selector = AsyncMock(return_value=btn)
+    applier.page.wait_for_selector = AsyncMock()
+
+    fallback_label = MagicMock()
+    fallback_label.inner_text = AsyncMock(return_value="Phone Number")
+
+    call_count = [0]
+    async def qs_all(selector):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return []
+        return [fallback_label]
+
+    applier.page.query_selector_all = qs_all
+
+    with patch("asyncio.sleep", new=AsyncMock()):
+        fields = await applier.extract_fields()
+
+    assert "Phone Number" in fields
+    assert call_count[0] >= 2

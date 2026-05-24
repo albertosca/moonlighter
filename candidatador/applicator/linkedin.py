@@ -26,9 +26,12 @@ class LinkedInApplier(BaseApplier):
         fields = []
         try:
             await self.page.wait_for_selector(".jobs-easy-apply-modal", timeout=10000)
-            label_els = await self.page.query_selector_all(
-                ".jobs-easy-apply-modal label, .jobs-easy-apply-modal .fb-dash-form-element__label"
-            )
+            from candidatador.applicator.base import _query_labels_with_fallback
+            label_els = await _query_labels_with_fallback(self.page, [
+                ".jobs-easy-apply-modal label, .jobs-easy-apply-modal .fb-dash-form-element__label",
+                ".jobs-easy-apply-content label",
+                "[data-easy-apply-form] label",
+            ])
             for el in label_els:
                 text = (await el.inner_text()).strip()
                 if text:

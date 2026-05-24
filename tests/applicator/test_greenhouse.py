@@ -291,3 +291,24 @@ async def test_submit_exception_returns_false():
 
     result = await applier.submit()
     assert result is False
+
+
+async def test_extract_fields_falls_back_when_primary_selector_empty():
+    """Quando seletor primário retorna vazio, seletor alternativo é tentado."""
+    applier = make_applier()
+    applier.page.query_selector = AsyncMock(return_value=None)
+
+    fallback_label = MagicMock()
+    fallback_label.inner_text = AsyncMock(return_value="Portfolio URL")
+
+    call_count = [0]
+    async def qs_all(selector):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return []  # primeiro seletor vazio
+        return [fallback_label]  # fallback retorna label
+
+    applier.page.query_selector_all = qs_all
+    fields = await applier.extract_fields()
+    assert "Portfolio URL" in fields
+    assert call_count[0] >= 2  # tentou mais de um seletor

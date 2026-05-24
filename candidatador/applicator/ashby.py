@@ -12,7 +12,12 @@ class AshbyApplier(BaseApplier):
         except PlaywrightTimeout:
             return []
         labels = []
-        label_els = await self.page.query_selector_all("label")
+        from candidatador.applicator.base import _query_labels_with_fallback
+        label_els = await _query_labels_with_fallback(self.page, [
+            "label",
+            ".ashby-application-form label",
+            "[class*='label']:not(legend)",
+        ])
         for el in label_els:
             text = (await el.inner_text()).strip()
             if text and len(text) < 200:

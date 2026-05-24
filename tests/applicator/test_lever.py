@@ -134,3 +134,49 @@ async def test_submit_no_button_returns_false():
     applier = make_applier()
     applier.page.query_selector = AsyncMock(return_value=None)
     assert await applier.submit() is False
+
+
+async def test_fill_form_skips_label_without_for_attr():
+    """Label with no 'for' attribute → field.fill never called."""
+    applier = make_applier()
+    label = MagicMock()
+    label.get_attribute = AsyncMock(return_value=None)
+    field = MagicMock()
+    field.fill = AsyncMock()
+
+    async def qs(selector):
+        if "label" in selector:
+            return label
+        return field
+    applier.page.query_selector = qs
+    await applier.fill_form({"Q": "A"}, cv_path="")
+    field.fill.assert_not_called()
+
+
+async def test_submit_exception_returns_false():
+    """Exception during click → returns False."""
+    applier = make_applier()
+    btn = MagicMock()
+    btn.click = AsyncMock(side_effect=Exception("crash"))
+    applier.page.query_selector = AsyncMock(return_value=btn)
+    assert await applier.submit() is False
+
+
+async def test_extract_fields_falls_back_when_primary_selector_empty():
+    """Seletor primário vazio → seletor alternativo tentado."""
+    applier = make_applier()
+
+    fallback_label = MagicMock()
+    fallback_label.inner_text = AsyncMock(return_value="LinkedIn Profile")
+
+    call_count = [0]
+    async def qs_all(selector):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return []
+        return [fallback_label]
+
+    applier.page.query_selector_all = qs_all
+    result = await applier.extract_fields()
+    assert "LinkedIn Profile" in result
+    assert call_count[0] >= 2
