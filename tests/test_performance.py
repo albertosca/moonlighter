@@ -212,3 +212,35 @@ async def test_scan_log_dedup_1000_urls_fast(tmp_db):
 
     assert elapsed < 0.2, f"ScanLog dedup check took {elapsed:.3f}s, expected < 0.2s"
     assert len(seen_urls) == 1000
+
+
+async def test_generate_answers_concurrent_faster_than_sequential():
+    """
+    10 generate_answers calls in asyncio.gather should be faster than sequential.
+    Each mock call has 0.05s delay. Sequential: ~0.5s. Concurrent: ~0.05s.
+    """
+    import json
+    from candidatador.applicator.base import generate_answers
+
+    async def slow_create(*args, **kwargs):
+        await asyncio.sleep(0.05)
+        return MagicMock(content=[MagicMock(text=json.dumps({"Why this role?": "Great fit"}))])
+
+    mock_client = MagicMock()
+    mock_client.messages.create = slow_create
+
+    profile = {}
+    fields = ["Why this role?"]
+    calls = [
+        generate_answers(company=f"Co{i}", title="Eng", description="desc",
+                         fields=fields, profile=profile, model="test", _client=mock_client)
+        for i in range(10)
+    ]
+
+    t0 = time.perf_counter()
+    results = await asyncio.gather(*calls)
+    elapsed = time.perf_counter() - t0
+
+    assert elapsed < 0.2, f"Concurrent generate_answers took {elapsed:.3f}s, expected < 0.2s"
+    assert all(r.error is None for r in results)
+    assert all(r.answers.get("Why this role?") == "Great fit" for r in results)
