@@ -28,8 +28,14 @@ class GreenhouseScanner(BaseScanner):
         if r.status_code != 200:
             return []
         data = r.json()
+        if not isinstance(data, dict):
+            return []
         jobs = []
         for item in data.get("jobs", []):
+            title = item.get("title")
+            url = item.get("absolute_url")
+            if not title or not url:
+                continue
             location = item.get("location", {}).get("name")
             posted_at = None
             if item.get("updated_at"):
@@ -42,8 +48,8 @@ class GreenhouseScanner(BaseScanner):
             jobs.append(RawJob(
                 source="greenhouse",
                 company=slug,
-                title=item["title"],
-                url=item["absolute_url"],
+                title=title,
+                url=url,
                 location=location,
                 remote_type=normalize_remote_type(location),
                 posted_at=posted_at,
@@ -74,8 +80,11 @@ class LeverScanner(BaseScanner):
             return []
         if r.status_code != 200:
             return []
+        raw_list = r.json()
+        if not isinstance(raw_list, list):
+            return []
         jobs = []
-        for item in r.json():
+        for item in raw_list:
             title = item.get("text", "")
             url = item.get("hostedUrl", "")
             if not title or not url:
@@ -130,9 +139,18 @@ class AshbyScanner(BaseScanner):
             return []
         if r.status_code != 200:
             return []
-        data = r.json().get("data", {}).get("jobPostings", [])
+        response_data = r.json()
+        if "errors" in response_data:
+            return []
+        job_postings = response_data.get("data", {}).get("jobPostings") or []
+        if not isinstance(job_postings, list):
+            return []
         jobs = []
-        for item in data:
+        for item in job_postings:
+            title = item.get("title")
+            url = item.get("jobPostingAbsoluteUrl")
+            if not title or not url:
+                continue
             remote_type = "remote" if item.get("isRemote") else normalize_remote_type(item.get("locationName"))
             posted_at = None
             if item.get("publishedDate"):
@@ -143,8 +161,8 @@ class AshbyScanner(BaseScanner):
             jobs.append(RawJob(
                 source="ashby",
                 company=slug,
-                title=item.get("title", ""),
-                url=item.get("jobPostingAbsoluteUrl", ""),
+                title=title,
+                url=url,
                 location=item.get("locationName"),
                 remote_type=remote_type,
                 posted_at=posted_at,
