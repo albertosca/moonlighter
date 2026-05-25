@@ -22,10 +22,10 @@ def normalize_remote_type(location: Optional[str]) -> Optional[str]:
     if not location:
         return None
     loc = location.lower()
-    if "remote" in loc:
-        return "remote"
     if "hybrid" in loc:
         return "hybrid"
+    if "remote" in loc:
+        return "remote"
     return "onsite"
 
 class BaseScanner(ABC):

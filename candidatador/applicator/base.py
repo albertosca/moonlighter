@@ -3,9 +3,9 @@ import yaml
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional
-import anthropic
 
 from candidatador.parsing import _extract_json
+from candidatador.llm import LLMCaller, _make_api_caller
 
 async def _query_labels_with_fallback(page, selectors: list[str]) -> list:
     """
@@ -81,10 +81,10 @@ async def generate_answers(
     profile: dict,
     model: str = "claude-sonnet-4-6",
     job_id: int = 0,
-    _client=None,
+    _caller: LLMCaller | None = None,
 ) -> ApplicationDraft:
-    if _client is None:
-        _client = anthropic.AsyncAnthropic()
+    if _caller is None:
+        _caller = _make_api_caller(max_tokens=2048)
     prompt = ANSWER_PROMPT.format(
         profile_yaml=yaml.dump(profile, allow_unicode=True),
         company=company,
@@ -93,12 +93,8 @@ async def generate_answers(
         fields_list="\n".join(f"- {f}" for f in fields),
     )
     try:
-        message = await _client.messages.create(
-            model=model,
-            max_tokens=2048,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = _extract_json(message.content[0].text)
+        raw_text = await _caller(prompt, model)
+        raw = _extract_json(raw_text)
         answers = json.loads(raw)
         return ApplicationDraft(job_id=job_id, answers=answers, form_fields=fields)
     except Exception as e:

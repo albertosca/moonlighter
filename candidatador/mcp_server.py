@@ -21,6 +21,7 @@ from candidatador.applicator.linkedin import LinkedInApplier
 from candidatador.applicator.base import generate_answers
 
 from candidatador.startup import validate_startup
+from candidatador.llm import make_caller
 
 mcp = FastMCP("candidatador")
 _config = load_config()
@@ -30,6 +31,7 @@ except FileNotFoundError:
     _profile = {}
 _companies = load_company_list()
 init_db()
+_llm_caller = make_caller(_config)
 
 _startup_warnings = validate_startup(_config, _profile)
 for _w in _startup_warnings:
@@ -139,6 +141,7 @@ async def scan_and_evaluate(keywords: str = "") -> str:
             description=raw.description or f"{raw.title} at {raw.company}",
             profile=_profile,
             model=model,
+            _caller=_llm_caller,
         )
         try:
             job = Job.create(
@@ -269,6 +272,7 @@ async def apply_jobs(ids: list[int]) -> str:
                 profile=_profile,
                 model=_config["llm_model"],
                 job_id=job_id,
+                _caller=_llm_caller,
             )
 
             # Save draft to DB

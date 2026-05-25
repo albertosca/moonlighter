@@ -100,25 +100,23 @@ async def test_evaluate_10_jobs_concurrent_faster_than_sequential():
     from candidatador.evaluator import evaluate_job
 
     call_count = [0]
+    _response = json.dumps({
+        "score": 7.0, "score_notes": "ok", "caveats": [],
+        "salary_min": None, "salary_max": None,
+        "salary_currency": None, "salary_source": None,
+    })
 
-    async def slow_evaluate(*args, **kwargs):
+    async def slow_caller(prompt, model):
         await asyncio.sleep(0.05)
         call_count[0] += 1
-        return MagicMock(content=[MagicMock(text=json.dumps({
-            "score": 7.0, "score_notes": "ok", "caveats": [],
-            "salary_min": None, "salary_max": None,
-            "salary_currency": None, "salary_source": None,
-        }))])
-
-    mock_client = MagicMock()
-    mock_client.messages.create = slow_evaluate
+        return _response
 
     profile = {}
     jobs = [(f"Co{i}", f"Eng {i}", f"Job description {i}") for i in range(10)]
 
     t0 = time.perf_counter()
     await asyncio.gather(*[
-        evaluate_job(company=c, title=t, description=d, profile=profile, model="test", _client=mock_client)
+        evaluate_job(company=c, title=t, description=d, profile=profile, model="test", _caller=slow_caller)
         for c, t, d in jobs
     ])
     concurrent_elapsed = time.perf_counter() - t0
@@ -126,7 +124,7 @@ async def test_evaluate_10_jobs_concurrent_faster_than_sequential():
     # Sequential baseline (just measure)
     t0 = time.perf_counter()
     for c, t, d in jobs:
-        await evaluate_job(company=c, title=t, description=d, profile=profile, model="test", _client=mock_client)
+        await evaluate_job(company=c, title=t, description=d, profile=profile, model="test", _caller=slow_caller)
     sequential_elapsed = time.perf_counter() - t0
 
     assert concurrent_elapsed < sequential_elapsed * 0.5, (
@@ -142,15 +140,14 @@ async def test_evaluate_batch_size_10_processes_all():
     import json
     from candidatador.evaluator import evaluate_job
 
-    async def fast_evaluate(*args, **kwargs):
-        return MagicMock(content=[MagicMock(text=json.dumps({
-            "score": 7.0, "score_notes": "ok", "caveats": [],
-            "salary_min": None, "salary_max": None,
-            "salary_currency": None, "salary_source": None,
-        }))])
+    _response = json.dumps({
+        "score": 7.0, "score_notes": "ok", "caveats": [],
+        "salary_min": None, "salary_max": None,
+        "salary_currency": None, "salary_source": None,
+    })
 
-    mock_client = MagicMock()
-    mock_client.messages.create = fast_evaluate
+    async def fast_caller(prompt, model):
+        return _response
 
     profile = {}
     BATCH_SIZE = 10
@@ -160,7 +157,7 @@ async def test_evaluate_batch_size_10_processes_all():
     for i in range(0, len(all_jobs), BATCH_SIZE):
         batch = all_jobs[i:i + BATCH_SIZE]
         batch_results = await asyncio.gather(*[
-            evaluate_job(company=c, title=t, description=d, profile=profile, model="test", _client=mock_client)
+            evaluate_job(company=c, title=t, description=d, profile=profile, model="test", _caller=fast_caller)
             for c, t, d in batch
         ])
         results.extend(batch_results)
@@ -222,18 +219,15 @@ async def test_generate_answers_concurrent_faster_than_sequential():
     import json
     from candidatador.applicator.base import generate_answers
 
-    async def slow_create(*args, **kwargs):
+    async def slow_caller(prompt, model):
         await asyncio.sleep(0.05)
-        return MagicMock(content=[MagicMock(text=json.dumps({"Why this role?": "Great fit"}))])
-
-    mock_client = MagicMock()
-    mock_client.messages.create = slow_create
+        return json.dumps({"Why this role?": "Great fit"})
 
     profile = {}
     fields = ["Why this role?"]
     calls = [
         generate_answers(company=f"Co{i}", title="Eng", description="desc",
-                         fields=fields, profile=profile, model="test", _client=mock_client)
+                         fields=fields, profile=profile, model="test", _caller=slow_caller)
         for i in range(10)
     ]
 

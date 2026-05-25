@@ -1,6 +1,6 @@
 import pytest
 import json
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import patch
 from candidatador.applicator.base import ApplicationDraft, generate_answers
 
 MOCK_ANSWERS = json.dumps({
@@ -13,13 +13,14 @@ PROFILE = {
     "experience": [{"role": "Senior SWE", "company": "Acme", "highlights": ["Built OTP systems"]}],
 }
 
-@pytest.mark.asyncio
-async def test_generate_answers_returns_draft():
-    mock_client = MagicMock()
-    mock_message = MagicMock()
-    mock_message.content = [MagicMock(text=MOCK_ANSWERS)]
-    mock_client.messages.create = AsyncMock(return_value=mock_message)
 
+def _make_caller(text: str):
+    async def caller(prompt, model):
+        return text
+    return caller
+
+
+async def test_generate_answers_returns_draft():
     result = await generate_answers(
         company="Stripe",
         title="Sr Engineer",
@@ -27,11 +28,12 @@ async def test_generate_answers_returns_draft():
         fields=["Why do you want to work here?", "Describe your distributed systems experience"],
         profile=PROFILE,
         model="claude-sonnet-4-6",
-        _client=mock_client,
+        _caller=_make_caller(MOCK_ANSWERS),
     )
 
     assert isinstance(result, ApplicationDraft)
     assert "Stripe" in result.answers.get("Why do you want to work here?", "")
+
 
 def test_application_draft_serialization():
     draft = ApplicationDraft(
@@ -44,9 +46,7 @@ def test_application_draft_serialization():
 
 async def test_generate_answers_malformed_json():
     """LLM returns invalid JSON → ApplicationDraft with error, empty answers."""
-    mock_client = MagicMock()
-    mock_client.messages.create = AsyncMock(return_value=MagicMock(content=[MagicMock(text="not json")]))
-    result = await generate_answers(company="Co", title="Eng", description="desc", fields=["Q1"], profile=PROFILE, model="test", _client=mock_client)
+    result = await generate_answers(company="Co", title="Eng", description="desc", fields=["Q1"], profile=PROFILE, model="test", _caller=_make_caller("not json"))
     assert isinstance(result, ApplicationDraft)
     assert result.error is not None
     assert result.answers == {}
@@ -54,18 +54,17 @@ async def test_generate_answers_malformed_json():
 
 async def test_generate_answers_llm_exception():
     """LLM raises exception → ApplicationDraft with error string."""
-    mock_client = MagicMock()
-    mock_client.messages.create = AsyncMock(side_effect=Exception("API error"))
-    result = await generate_answers(company="Co", title="Eng", description="desc", fields=["Q1"], profile=PROFILE, model="test", _client=mock_client)
+    async def failing_caller(prompt, model):
+        raise Exception("API error")
+
+    result = await generate_answers(company="Co", title="Eng", description="desc", fields=["Q1"], profile=PROFILE, model="test", _caller=failing_caller)
     assert result.error is not None
     assert "API error" in result.error
 
 
 async def test_generate_answers_job_id_propagated():
     """job_id passed to generate_answers appears in returned draft."""
-    mock_client = MagicMock()
-    mock_client.messages.create = AsyncMock(return_value=MagicMock(content=[MagicMock(text=json.dumps({"Q1": "answer"}))]))
-    result = await generate_answers(company="Co", title="Eng", description="desc", fields=["Q1"], profile=PROFILE, model="test", job_id=42, _client=mock_client)
+    result = await generate_answers(company="Co", title="Eng", description="desc", fields=["Q1"], profile=PROFILE, model="test", job_id=42, _caller=_make_caller(json.dumps({"Q1": "answer"})))
     assert result.job_id == 42
 
 
@@ -74,14 +73,11 @@ async def test_generate_answers_description_capped():
     long_description = "y" * 6000
     captured = []
 
-    async def capture_create(**kwargs):
-        captured.append(kwargs["messages"][0]["content"])
-        return MagicMock(content=[MagicMock(text=json.dumps({"Q1": "answer"}))])
+    async def capture_caller(prompt, model):
+        captured.append(prompt)
+        return json.dumps({"Q1": "answer"})
 
-    mock_client = MagicMock()
-    mock_client.messages.create = capture_create
-
-    await generate_answers(company="Co", title="Eng", description=long_description, fields=["Q1"], profile=PROFILE, model="test", _client=mock_client)
+    await generate_answers(company="Co", title="Eng", description=long_description, fields=["Q1"], profile=PROFILE, model="test", _caller=capture_caller)
     assert "y" * 4001 not in captured[0]
     assert "y" * 3999 in captured[0]
 
@@ -90,14 +86,11 @@ async def test_generate_answers_fields_in_prompt():
     """All field names appear in the LLM prompt."""
     captured = []
 
-    async def capture_create(**kwargs):
-        captured.append(kwargs["messages"][0]["content"])
-        return MagicMock(content=[MagicMock(text=json.dumps({"Why Stripe?": "ans", "Years exp?": "ans"}))])
+    async def capture_caller(prompt, model):
+        captured.append(prompt)
+        return json.dumps({"Why Stripe?": "ans", "Years exp?": "ans"})
 
-    mock_client = MagicMock()
-    mock_client.messages.create = capture_create
-
-    await generate_answers(company="Stripe", title="Eng", description="desc", fields=["Why Stripe?", "Years exp?"], profile=PROFILE, model="test", _client=mock_client)
+    await generate_answers(company="Stripe", title="Eng", description="desc", fields=["Why Stripe?", "Years exp?"], profile=PROFILE, model="test", _caller=capture_caller)
     assert "Why Stripe?" in captured[0]
     assert "Years exp?" in captured[0]
 
@@ -109,13 +102,30 @@ def test_application_draft_with_error():
     assert draft.answers == {}
 
 
-async def test_generate_answers_uses_injected_client():
-    """When _client is passed, anthropic.AsyncAnthropic() is NOT instantiated."""
-    mock_client = MagicMock()
-    mock_client.messages.create = AsyncMock(return_value=MagicMock(content=[MagicMock(text=json.dumps({"Q": "a"}))]))
-    with patch("candidatador.applicator.base.anthropic.AsyncAnthropic") as mock_anthropic:
-        await generate_answers(company="Co", title="Eng", description="desc", fields=["Q"], profile=PROFILE, model="test", _client=mock_client)
-    mock_anthropic.assert_not_called()
+async def test_generate_answers_uses_injected_caller():
+    """When _caller is passed, _make_api_caller() is NOT called."""
+    called = []
+
+    async def tracking_caller(prompt, model):
+        called.append((prompt, model))
+        return json.dumps({"Q": "a"})
+
+    with patch("candidatador.applicator.base._make_api_caller") as mock_factory:
+        await generate_answers(company="Co", title="Eng", description="desc", fields=["Q"], profile=PROFILE, model="test", _caller=tracking_caller)
+    mock_factory.assert_not_called()
+    assert len(called) == 1
+
+
+async def test_generate_answers_caller_receives_model():
+    """The model argument is forwarded to the caller."""
+    received_models = []
+
+    async def capture_caller(prompt, model):
+        received_models.append(model)
+        return json.dumps({"Q": "answer"})
+
+    await generate_answers(company="Co", title="Eng", description="desc", fields=["Q"], profile=PROFILE, model="my-special-model", _caller=capture_caller)
+    assert received_models == ["my-special-model"]
 
 
 # ── LLM JSON parsing robustness ───────────────────────────────────────────────
@@ -124,9 +134,7 @@ async def test_generate_answers_strips_markdown_fence():
     """LLM retorna respostas dentro de ```json ... ``` → parsed corretamente."""
     answers = {"Why Stripe?": "Great mission"}
     wrapped = f"```json\n{json.dumps(answers)}\n```"
-    mock_client = MagicMock()
-    mock_client.messages.create = AsyncMock(return_value=MagicMock(content=[MagicMock(text=wrapped)]))
-    result = await generate_answers(company="Stripe", title="Eng", description="desc", fields=["Why Stripe?"], profile=PROFILE, model="test", _client=mock_client)
+    result = await generate_answers(company="Stripe", title="Eng", description="desc", fields=["Why Stripe?"], profile=PROFILE, model="test", _caller=_make_caller(wrapped))
     assert result.error is None
     assert result.answers.get("Why Stripe?") == "Great mission"
 
@@ -135,8 +143,6 @@ async def test_generate_answers_strips_leading_prose():
     """LLM retorna texto seguido do JSON → JSON extraído."""
     answers = {"Why here?": "Interesting work"}
     with_prose = f"Sure, here are the answers:\n{json.dumps(answers)}"
-    mock_client = MagicMock()
-    mock_client.messages.create = AsyncMock(return_value=MagicMock(content=[MagicMock(text=with_prose)]))
-    result = await generate_answers(company="Co", title="Eng", description="desc", fields=["Why here?"], profile=PROFILE, model="test", _client=mock_client)
+    result = await generate_answers(company="Co", title="Eng", description="desc", fields=["Why here?"], profile=PROFILE, model="test", _caller=_make_caller(with_prose))
     assert result.error is None
     assert result.answers.get("Why here?") == "Interesting work"

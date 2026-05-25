@@ -3,9 +3,9 @@ import json
 import yaml
 from dataclasses import dataclass, field
 from typing import Optional
-import anthropic
 
 from candidatador.parsing import _extract_json
+from candidatador.llm import LLMCaller, _make_api_caller
 
 EVAL_PROMPT = """You are evaluating a job posting for a senior software engineer.
 
@@ -46,10 +46,10 @@ async def evaluate_job(
     description: str,
     profile: dict,
     model: str = "claude-sonnet-4-6",
-    _client=None,
+    _caller: LLMCaller | None = None,
 ) -> EvaluationResult:
-    if _client is None:
-        _client = anthropic.AsyncAnthropic()
+    if _caller is None:
+        _caller = _make_api_caller()
     prompt = EVAL_PROMPT.format(
         profile_yaml=yaml.dump(profile, allow_unicode=True),
         company=company,
@@ -57,12 +57,8 @@ async def evaluate_job(
         description=description[:8000],  # cap to avoid huge context
     )
     try:
-        message = await _client.messages.create(
-            model=model,
-            max_tokens=512,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = _extract_json(message.content[0].text)
+        raw_text = await _caller(prompt, model)
+        raw = _extract_json(raw_text)
         data = json.loads(raw)
         return EvaluationResult(
             score=float(data.get("score", 0.0)),
