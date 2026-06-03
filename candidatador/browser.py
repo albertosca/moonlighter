@@ -1,35 +1,69 @@
+import asyncio
+import subprocess
+import urllib.request
 from pathlib import Path
 from typing import Optional
-from playwright.async_api import async_playwright, BrowserContext, Page
+from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
 _playwright = None
-_context: Optional[BrowserContext] = None
+_browser: Optional[Browser] = None
+_brave_process: Optional[subprocess.Popen] = None
+
+_DEBUG_PORT = 9222
+
+
+def _devtools_ready() -> bool:
+    try:
+        urllib.request.urlopen(
+            f"http://localhost:{_DEBUG_PORT}/json/version", timeout=1
+        )
+        return True
+    except Exception:
+        return False
 
 
 async def get_context(config: dict) -> BrowserContext:
-    """Return a persistent Brave browser context. Creates it once, reuses across calls."""
-    global _playwright, _context
-    if _context is not None:
-        return _context
+    """Return a Brave browser context via CDP. Launches Brave if not running."""
+    global _playwright, _browser, _brave_process
 
-    session_dir = Path(config["browser_session_dir"])
+    if _browser is not None and _browser.is_connected():
+        contexts = _browser.contexts
+        return contexts[0] if contexts else await _browser.new_context()
+
+    session_dir = Path(config["browser_session_dir"]).expanduser()
     session_dir.mkdir(parents=True, exist_ok=True)
 
+    if not _devtools_ready():
+        _brave_process = subprocess.Popen(
+            [
+                config["brave_path"],
+                f"--remote-debugging-port={_DEBUG_PORT}",
+                f"--user-data-dir={session_dir}",
+                "--no-first-run",
+                "--no-sandbox",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        for _ in range(60):
+            if _devtools_ready():
+                break
+            await asyncio.sleep(0.5)
+        else:
+            _brave_process.kill()
+            _brave_process = None
+            raise RuntimeError(
+                f"Brave não ficou disponível na porta {_DEBUG_PORT} em 30s"
+            )
+
     _playwright = await async_playwright().start()
-    _context = await _playwright.chromium.launch_persistent_context(
-        user_data_dir=str(session_dir),
-        executable_path=config["brave_path"],
-        headless=False,
-        slow_mo=config["slow_mo_ms"],
-        args=["--no-sandbox", "--disable-blink-features=AutomationControlled"],
-        viewport={"width": 1280, "height": 800},
-        user_agent=(
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36 Brave/1.61"
-        ),
+    _browser = await _playwright.chromium.connect_over_cdp(
+        f"http://localhost:{_DEBUG_PORT}",
+        slow_mo=config.get("slow_mo_ms", 300),
     )
-    return _context
+
+    contexts = _browser.contexts
+    return contexts[0] if contexts else await _browser.new_context()
 
 
 async def new_page(config: dict) -> Page:
@@ -46,10 +80,13 @@ async def save_screenshot(page: Page, job_id: int, step: str, config: dict) -> s
 
 
 async def close():
-    global _playwright, _context
-    if _context:
-        await _context.close()
-        _context = None
+    global _playwright, _browser, _brave_process
+    if _browser:
+        await _browser.close()
+        _browser = None
     if _playwright:
         await _playwright.stop()
         _playwright = None
+    if _brave_process:
+        _brave_process.terminate()
+        _brave_process = None
