@@ -227,3 +227,84 @@ def test_db_path_reads_env_var(tmp_db):
     """_db_path() returns value of CANDIDATADOR_DB_PATH env var when set."""
     from candidatador.db import _db_path
     assert _db_path() == tmp_db
+
+
+# ── Application: campos email (email_ref + current_stage) ─────────────────────
+
+def test_application_email_ref_stored_and_retrieved(tmp_db):
+    init_db()
+    job = _make_job()
+    app = Application.create(job=job, email_ref="x7k2mp")
+    saved = Application.get_by_id(app.id)
+    assert saved.email_ref == "x7k2mp"
+
+
+def test_application_email_ref_is_null_by_default(tmp_db):
+    init_db()
+    job = _make_job()
+    app = Application.create(job=job)
+    saved = Application.get_by_id(app.id)
+    assert saved.email_ref is None
+
+
+def test_application_email_ref_unique_constraint(tmp_db):
+    """email_ref é UNIQUE — dois apps com mesmo ref levantam IntegrityError."""
+    from peewee import IntegrityError
+    init_db()
+    job = _make_job()
+    Application.create(job=job, email_ref="abc123")
+    with pytest.raises(IntegrityError):
+        Application.create(job=_make_job(url="https://x.com/2"), email_ref="abc123")
+
+
+def test_application_email_ref_none_not_constrained(tmp_db):
+    """Múltiplos apps sem ref (null) devem coexistir sem violar unicidade."""
+    init_db()
+    job1 = _make_job(url="https://x.com/1")
+    job2 = _make_job(url="https://x.com/2")
+    Application.create(job=job1, email_ref=None)
+    Application.create(job=job2, email_ref=None)
+    assert Application.select().where(Application.email_ref.is_null(True)).count() == 2
+
+
+def test_application_current_stage_stored_and_retrieved(tmp_db):
+    init_db()
+    job = _make_job()
+    app = Application.create(job=job, current_stage="technical_interview")
+    saved = Application.get_by_id(app.id)
+    assert saved.current_stage == "technical_interview"
+
+
+def test_application_current_stage_is_null_by_default(tmp_db):
+    init_db()
+    job = _make_job()
+    app = Application.create(job=job)
+    assert Application.get_by_id(app.id).current_stage is None
+
+
+def test_application_status_interviews_is_valid(tmp_db):
+    """'interviews' (plural) é o status correto para etapas de entrevista."""
+    init_db()
+    job = _make_job()
+    app = Application.create(job=job, status="interviews")
+    assert Application.get_by_id(app.id).status == "interviews"
+
+
+def test_init_db_idempotent_preserves_email_ref(tmp_db):
+    """Chamar init_db() duas vezes não apaga dados existentes."""
+    init_db()
+    job = _make_job()
+    Application.create(job=job, email_ref="persist01", current_stage="live_coding")
+    init_db()  # segunda chamada — migration segura
+    saved = Application.get_by_id(1)
+    assert saved.email_ref == "persist01"
+    assert saved.current_stage == "live_coding"
+
+
+def test_application_email_ref_lookup_by_ref(tmp_db):
+    """Deve ser possível recuperar uma Application pelo email_ref."""
+    init_db()
+    job = _make_job()
+    Application.create(job=job, email_ref="lkp001")
+    found = Application.get(Application.email_ref == "lkp001")
+    assert found.email_ref == "lkp001"

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import secrets
 from datetime import datetime
 from mcp.server.fastmcp import FastMCP
 from peewee import IntegrityError
@@ -22,6 +23,9 @@ from candidatador.applicator.base import generate_answers
 
 from candidatador.startup import validate_startup
 from candidatador.llm import make_caller
+from candidatador.email_monitor import (
+    setup_gmail_service, sync_responses, _run_gmail_oauth, GmailAuthError
+)
 
 mcp = FastMCP("candidatador")
 _config = load_config()
@@ -345,10 +349,12 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
         await _browser_mod.save_screenshot(page, job_id, "04-submitted", _config)
 
         if success:
+            ref = secrets.token_urlsafe(4)[:6]
             app.status = "submitted"
             app.applied_at = datetime.now()
             app.form_data = json.dumps(stored_answers)
             app.updated_at = datetime.now()
+            app.email_ref = ref
             app.save()
             Job.update(status="applied").where(Job.id == job_id).execute()
             return f"✓ Candidatura #{job_id} submetida: {job.company} / {job.title}"
@@ -432,6 +438,69 @@ async def update_status(job_id: int, status: str, notes: str = "", next_action: 
     if next_action:
         result += f"\n  Próxima ação: {next_action}"
     return result
+
+
+def _build_email_alias(address: str, ref: str) -> str:
+    """'candidaturas@gmail.com' + 'x7k2mp' → 'candidaturas+x7k2mp@gmail.com'"""
+    local, _, domain = address.partition("@")
+    return f"{local}+{ref}@{domain}"
+
+
+@mcp.tool()
+async def setup_email() -> str:
+    """
+    Configura autenticação Gmail para candidaturas@gmail.com.
+    Rodar apenas uma vez. Abre o browser para autorizar acesso.
+    Requer gmail-client.json em ~/.candidatador/.
+    """
+    config = load_config()
+    email_cfg = config.get("email", {})
+    creds_path = os.path.expanduser(email_cfg.get("credentials_path", ""))
+    token_path = os.path.expanduser(email_cfg.get("token_path", ""))
+
+    if not os.path.exists(creds_path):
+        return (
+            f"⚠️  Arquivo de credenciais não encontrado: {creds_path}\n"
+            "Baixe o client_secret.json do Google Cloud Console e salve em "
+            "~/.candidatador/gmail-client.json"
+        )
+
+    try:
+        _run_gmail_oauth(creds_path, token_path)
+        setup_gmail_service(config)
+        return "✓ Autenticação Gmail configurada com sucesso."
+    except GmailAuthError as e:
+        return f"⚠️  Erro na autenticação Gmail: {e}"
+    except Exception as e:
+        return f"⚠️  Erro inesperado ao configurar Gmail: {e}"
+
+
+@mcp.tool()
+async def sync_email_responses() -> str:
+    """
+    Lê emails não lidos em candidaturas@gmail.com,
+    classifica com LLM e atualiza o banco de candidaturas.
+    Retorna resumo das atualizações feitas.
+    """
+    config = load_config()
+    updates = await sync_responses(config, _llm_caller)
+
+    if not updates:
+        return "Nenhum email novo encontrado."
+
+    lines = [f"# Sync de emails — {len(updates)} atualização(ões)\n"]
+    for u in updates:
+        company = u.get("company") or "?"
+        title = u.get("title") or "?"
+        msg_type = u.get("type", "?")
+        stage = u.get("stage") or ""
+        match_type = u.get("match_type", "")
+        stage_str = f" → {stage}" if stage else ""
+        lines.append(
+            f"- **{company}** / {title}: `{msg_type}`{stage_str} (match: {match_type})"
+        )
+
+    return "\n".join(lines)
 
 
 def main():

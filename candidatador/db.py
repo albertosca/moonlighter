@@ -51,9 +51,11 @@ class Application(BaseModel):
     applied_at = DateTimeField(null=True)
     form_data = TextField(null=True)     # JSON dict: field_name -> answer
     notes = TextField(null=True)
-    status = CharField(default="draft")  # 'draft'|'submitted'|'screening'|'interview'|'offer'|'rejected'
+    status = CharField(default="draft")  # 'draft'|'submitted'|'screening'|'interviews'|'offer'|'rejected'
     next_action = TextField(null=True)
     updated_at = DateTimeField(default=datetime.datetime.now)
+    email_ref = CharField(max_length=8, null=True, unique=True)
+    current_stage = CharField(null=True)
 
     def get_form_data(self) -> dict:
         return json.loads(self.form_data) if self.form_data else {}
@@ -71,3 +73,12 @@ def init_db():
     db.init(path)
     db.connect(reuse_if_open=True)
     db.create_tables([Job, Application, ScanLog], safe=True)
+    # Migration segura: adiciona colunas novas se ainda não existem
+    cursor = db.execute_sql("PRAGMA table_info(application)")
+    existing = {row[1] for row in cursor.fetchall()}
+    if "email_ref" not in existing:
+        db.execute_sql("ALTER TABLE application ADD COLUMN email_ref VARCHAR(8) NULL")
+        db.execute_sql("CREATE UNIQUE INDEX IF NOT EXISTS application_email_ref "
+                       "ON application (email_ref) WHERE email_ref IS NOT NULL")
+    if "current_stage" not in existing:
+        db.execute_sql("ALTER TABLE application ADD COLUMN current_stage VARCHAR(255) NULL")

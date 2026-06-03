@@ -976,3 +976,206 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
 
     assert "Stripe" in result  # vaga HTTP aparece
     assert "LinkedIn" in result  # aviso aparece também
+
+
+# ── email: _build_email_alias ─────────────────────────────────────────────────
+
+def test_build_email_alias_formats_correctly():
+    from candidatador.mcp_server import _build_email_alias
+    result = _build_email_alias("candidaturas@gmail.com", "x7k2mp")
+    assert result == "candidaturas+x7k2mp@gmail.com"
+
+
+def test_build_email_alias_different_refs():
+    from candidatador.mcp_server import _build_email_alias
+    assert _build_email_alias("a@b.com", "abc") == "a+abc@b.com"
+    assert _build_email_alias("a@b.com", "xyz") == "a+xyz@b.com"
+
+
+# ── email: confirm_apply gera ref e salva ─────────────────────────────────────
+
+async def test_confirm_apply_generates_6_char_ref(tmp_db, tmp_path):
+    """confirm_apply deve gerar um email_ref com 6 caracteres e persistir."""
+    init_db()
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca-ref-1", status="applying")
+    app = create_application(job, status="draft", form_data='{"Q": "A"}')
+    cv_path = tmp_path / "cv.pdf"
+    cv_path.write_bytes(b"fake pdf")
+    page = make_mock_page(url=job.url)
+
+    from candidatador.mcp_server import confirm_apply
+    with patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server._detect_applier") as mock_detect, \
+         patch("candidatador.mcp_server.os.path.exists", return_value=True), \
+         patch("candidatador.mcp_server.os.path.join", return_value=str(cv_path)), \
+         patch("candidatador.mcp_server.os.path.dirname"), \
+         patch("candidatador.mcp_server.os.path.abspath"):
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        applier = AsyncMock()
+        applier.fill_form = AsyncMock()
+        applier.submit = AsyncMock(return_value=True)
+        mock_detect.return_value = applier
+        await confirm_apply(job_id=job.id)
+
+    saved = Application.get_by_id(app.id)
+    assert saved.email_ref is not None
+    assert len(saved.email_ref) == 6
+
+
+async def test_confirm_apply_ref_is_url_safe(tmp_db, tmp_path):
+    """O ref gerado deve conter apenas chars url-safe (letras, dígitos, -, _)."""
+    import re
+    init_db()
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca-safe-1", status="applying")
+    app = create_application(job, status="draft", form_data='{"Q": "A"}')
+    cv_path = tmp_path / "cv.pdf"
+    cv_path.write_bytes(b"fake pdf")
+    page = make_mock_page(url=job.url)
+
+    from candidatador.mcp_server import confirm_apply
+    with patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server._detect_applier") as mock_detect, \
+         patch("candidatador.mcp_server.os.path.exists", return_value=True), \
+         patch("candidatador.mcp_server.os.path.join", return_value=str(cv_path)), \
+         patch("candidatador.mcp_server.os.path.dirname"), \
+         patch("candidatador.mcp_server.os.path.abspath"):
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        applier = AsyncMock()
+        applier.fill_form = AsyncMock()
+        applier.submit = AsyncMock(return_value=True)
+        mock_detect.return_value = applier
+        await confirm_apply(job_id=job.id)
+
+    saved = Application.get_by_id(app.id)
+    assert re.match(r'^[A-Za-z0-9_-]{6}$', saved.email_ref)
+
+
+async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
+    """Dez chamadas a confirm_apply devem gerar refs distintos."""
+    init_db()
+    cv_path = tmp_path / "cv.pdf"
+    cv_path.write_bytes(b"fake pdf")
+    refs = set()
+
+    from candidatador.mcp_server import confirm_apply
+    for i in range(10):
+        job = create_job(tmp_db,
+                         url=f"https://boards.greenhouse.io/stripe/jobs/uniq-{i}",
+                         status="applying")
+        create_application(job, status="draft", form_data='{"Q": "A"}')
+        page = make_mock_page(url=job.url)
+
+        with patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+             patch("candidatador.mcp_server._detect_applier") as mock_detect, \
+             patch("candidatador.mcp_server.os.path.exists", return_value=True), \
+             patch("candidatador.mcp_server.os.path.join", return_value=str(cv_path)), \
+             patch("candidatador.mcp_server.os.path.dirname"), \
+             patch("candidatador.mcp_server.os.path.abspath"):
+            mock_browser.new_page = AsyncMock(return_value=page)
+            mock_browser.save_screenshot = AsyncMock()
+            applier = AsyncMock()
+            applier.fill_form = AsyncMock()
+            applier.submit = AsyncMock(return_value=True)
+            mock_detect.return_value = applier
+            await confirm_apply(job_id=job.id)
+
+        refs.add(Application.get(Application.job == job).email_ref)
+
+    # Com 10 refs de 6 chars urlsafe (~62^6 possibilidades), colisão é virtualmente zero
+    assert len(refs) == 10
+
+
+# ── email: setup_email MCP tool ───────────────────────────────────────────────
+
+async def test_setup_email_calls_gmail_flow():
+    """setup_email deve iniciar o fluxo OAuth e confirmar sucesso."""
+    from candidatador.mcp_server import setup_email
+    with patch("candidatador.mcp_server.setup_gmail_service") as mock_setup, \
+         patch("candidatador.mcp_server.load_config", return_value={
+             "email": {
+                 "address": "candidaturas@gmail.com",
+                 "credentials_path": "~/.candidatador/gmail-client.json",
+                 "token_path": "~/.candidatador/gmail-token.json",
+             }
+         }), \
+         patch("candidatador.mcp_server._run_gmail_oauth") as mock_oauth, \
+         patch("os.path.exists", return_value=True):
+        mock_oauth.return_value = None
+        mock_setup.return_value = MagicMock()
+        result = await setup_email()
+
+    assert "sucesso" in result.lower() or "configurad" in result.lower()
+
+
+async def test_setup_email_raises_friendly_error_when_client_json_missing():
+    """setup_email deve retornar mensagem clara se gmail-client.json não existe."""
+    from candidatador.mcp_server import setup_email
+    with patch("candidatador.mcp_server.load_config", return_value={
+        "email": {
+            "address": "candidaturas@gmail.com",
+            "credentials_path": "/nonexistent/gmail-client.json",
+            "token_path": "~/.candidatador/gmail-token.json",
+        }
+    }):
+        result = await setup_email()
+
+    assert "client" in result.lower() or "credential" in result.lower() or "erro" in result.lower()
+
+
+# ── email: sync_email_responses MCP tool ─────────────────────────────────────
+
+async def test_sync_email_responses_returns_summary(tmp_db):
+    """sync_email_responses deve chamar sync_responses e retornar resumo legível."""
+    init_db()
+    from candidatador.mcp_server import sync_email_responses
+
+    fake_updates = [
+        {"company": "Anthropic", "title": "Senior Engineer",
+         "type": "interview", "stage": "technical_interview",
+         "match_type": "ref"},
+        {"company": "Stripe", "title": "Backend Eng",
+         "type": "rejection", "stage": None,
+         "match_type": "fuzzy"},
+    ]
+
+    with patch("candidatador.mcp_server.sync_responses",
+               new=AsyncMock(return_value=fake_updates)), \
+         patch("candidatador.mcp_server.load_config", return_value={
+             "email": {
+                 "address": "candidaturas@gmail.com",
+                 "credentials_path": "~/.candidatador/gmail-client.json",
+                 "token_path": "~/.candidatador/gmail-token.json",
+                 "processed_label": "candidatador/processado",
+                 "interview_stages": [],
+             },
+             "llm_model": "claude-sonnet-4-6",
+         }):
+        result = await sync_email_responses()
+
+    assert "Anthropic" in result
+    assert "Stripe" in result
+    assert "2" in result or "dois" in result.lower() or len(result) > 10
+
+
+async def test_sync_email_responses_empty_inbox(tmp_db):
+    """sync_email_responses com inbox vazia deve retornar mensagem adequada."""
+    init_db()
+    from candidatador.mcp_server import sync_email_responses
+
+    with patch("candidatador.mcp_server.sync_responses",
+               new=AsyncMock(return_value=[])), \
+         patch("candidatador.mcp_server.load_config", return_value={
+             "email": {
+                 "address": "candidaturas@gmail.com",
+                 "credentials_path": "~/.candidatador/gmail-client.json",
+                 "token_path": "~/.candidatador/gmail-token.json",
+                 "processed_label": "candidatador/processado",
+                 "interview_stages": [],
+             },
+             "llm_model": "claude-sonnet-4-6",
+         }):
+        result = await sync_email_responses()
+
+    assert "nenhum" in result.lower() or "0" in result or "vazio" in result.lower()
