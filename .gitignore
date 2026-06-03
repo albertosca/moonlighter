@@ -5,5 +5,8 @@ __pycache__/
 config.yaml
 profile/cv.pdf
 profile/profile.yaml
+profile/*.aux
+profile/*.log
+profile/*.out
 ~/.candidatador/
 .superpowers/
