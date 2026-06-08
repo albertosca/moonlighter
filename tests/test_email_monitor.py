@@ -577,7 +577,10 @@ class TestSyncResponses:
         assert app_refreshed.current_stage == "technical_interview"
         assert "[" in app_refreshed.notes  # tem data
         assert "match: ref" in app_refreshed.notes
-        mock_mark.assert_called_once()
+        # Read-only por padrão: Gmail não é tocado; dedup é local (ProcessedEmail).
+        mock_mark.assert_not_called()
+        from candidatador.db import ProcessedEmail
+        assert ProcessedEmail.select().where(ProcessedEmail.message_id == "msg0").exists()
         assert len(updates) == 1
 
     async def test_email_without_ref_fuzzy_match_by_company_and_title(self, tmp_db):
@@ -794,8 +797,10 @@ class TestSyncResponses:
 
         # Application não foi tocada
         assert Application.get_by_id(app.id).status == "submitted"
-        # Mas mark_processed foi chamado
-        mock_mark.assert_called_once()
+        # Read-only por padrão: Gmail não tocado, mas o email é registrado localmente.
+        mock_mark.assert_not_called()
+        from candidatador.db import ProcessedEmail
+        assert ProcessedEmail.select().where(ProcessedEmail.message_id == "msg0").exists()
         # Não retorna update pro unrelated
         assert len(updates) == 0
 
@@ -951,15 +956,13 @@ class TestSyncResponses:
         app_refreshed = Application.get_by_id(app.id)
         assert app_refreshed.updated_at > old_time
 
-    async def test_mark_processed_called_for_every_email(self, tmp_db):
+    async def test_every_email_recorded_locally_without_gmail_writes(self, tmp_db):
+        """Read-only por padrão: nenhum email é tocado no Gmail; cada um é registrado
+        localmente em ProcessedEmail."""
         init_db()
         classify_result = {
-            "type": "unrelated",
-            "stage": None,
-            "new_stage": None,
-            "company": None,
-            "job_title": None,
-            "summary": "Spam.",
+            "type": "unrelated", "stage": None, "new_stage": None,
+            "company": None, "job_title": None, "summary": "Spam.",
         }
         messages = [
             {"to": BASE_EMAIL, "from_": "a@a.com", "subject": "A", "body": "a"},
@@ -969,19 +972,64 @@ class TestSyncResponses:
         raw_ids = [{"id": f"msg{i}", "threadId": f"t{i}"} for i in range(3)]
 
         with patch("candidatador.email_monitor.setup_gmail_service", return_value=MagicMock()), \
-             patch("candidatador.email_monitor.fetch_unread_messages",
-                   return_value=raw_ids), \
-             patch("candidatador.email_monitor.parse_message",
-                   side_effect=messages), \
+             patch("candidatador.email_monitor.fetch_unread_messages", return_value=raw_ids), \
+             patch("candidatador.email_monitor.parse_message", side_effect=messages), \
              patch("candidatador.email_monitor.classify_response",
                    new=AsyncMock(return_value=classify_result)), \
              patch("candidatador.email_monitor.mark_processed") as mock_mark, \
-             patch("candidatador.email_monitor._get_or_create_label",
-                   return_value="Label_proc"):
+             patch("candidatador.email_monitor._get_or_create_label") as mock_label:
             from candidatador.email_monitor import sync_responses
             await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
-        assert mock_mark.call_count == 3
+        from candidatador.db import ProcessedEmail
+        mock_mark.assert_not_called()      # nada escrito no Gmail
+        mock_label.assert_not_called()     # nem o label é criado
+        assert ProcessedEmail.select().count() == 3
+
+    async def test_mark_processed_only_when_opted_in(self, tmp_db):
+        """Com email.mark_processed=True, o Gmail é mutado (marca lido + label)."""
+        init_db()
+        classify_result = {
+            "type": "unrelated", "stage": None, "new_stage": None,
+            "company": None, "job_title": None, "summary": "Spam.",
+        }
+        messages = [{"to": BASE_EMAIL, "from_": "a@a.com", "subject": "A", "body": "a"}]
+        raw_ids = [{"id": "msg0", "threadId": "t0"}]
+        cfg = {**self.CONFIG, "email": {**self.CONFIG["email"], "mark_processed": True}}
+
+        with patch("candidatador.email_monitor.setup_gmail_service", return_value=MagicMock()), \
+             patch("candidatador.email_monitor.fetch_unread_messages", return_value=raw_ids), \
+             patch("candidatador.email_monitor.parse_message", side_effect=messages), \
+             patch("candidatador.email_monitor.classify_response",
+                   new=AsyncMock(return_value=classify_result)), \
+             patch("candidatador.email_monitor.mark_processed") as mock_mark, \
+             patch("candidatador.email_monitor._get_or_create_label", return_value="Label_proc"):
+            from candidatador.email_monitor import sync_responses
+            await sync_responses(cfg, _make_llm_caller(classify_result))
+
+        mock_mark.assert_called_once()
+
+    async def test_already_processed_email_is_skipped(self, tmp_db):
+        """Email já registrado em ProcessedEmail não é reprocessado (sem re-chamar LLM)."""
+        init_db()
+        from candidatador.db import ProcessedEmail
+        ProcessedEmail.create(message_id="msg0")
+        classify_mock = AsyncMock(return_value={
+            "type": "unrelated", "stage": None, "new_stage": None,
+            "company": None, "job_title": None, "summary": "",
+        })
+
+        with patch("candidatador.email_monitor.setup_gmail_service", return_value=MagicMock()), \
+             patch("candidatador.email_monitor.fetch_unread_messages",
+                   return_value=[{"id": "msg0", "threadId": "t0"}]), \
+             patch("candidatador.email_monitor.parse_message") as mock_parse, \
+             patch("candidatador.email_monitor.classify_response", new=classify_mock):
+            from candidatador.email_monitor import sync_responses
+            updates = await sync_responses(self.CONFIG, _make_llm_caller({}))
+
+        mock_parse.assert_not_called()     # nem parseia
+        classify_mock.assert_not_called()  # nem classifica
+        assert updates == []
 
     async def test_returns_empty_list_when_no_emails(self, tmp_db):
         init_db()

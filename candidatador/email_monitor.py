@@ -289,7 +289,7 @@ async def sync_responses(config: dict, llm_caller) -> list[dict]:
 
     Retorna lista de dicts descrevendo cada update feito.
     """
-    from candidatador.db import Application
+    from candidatador.db import Application, ProcessedEmail
 
     service = setup_gmail_service(config)
     email_cfg = config["email"]
@@ -298,19 +298,31 @@ async def sync_responses(config: dict, llm_caller) -> list[dict]:
     stages = list(email_cfg.get("interview_stages", []))
     model = config.get("llm_model", "claude-sonnet-4-6")
 
-    label_id = _get_or_create_label(service, processed_label_name)
+    # Por padrão o sync é 100% LEITURA no Gmail: o dedup é feito numa tabela local
+    # (ProcessedEmail). Só escreve no Gmail (marca lido + label) se mark_processed=True.
+    mutate_gmail = bool(email_cfg.get("mark_processed", False))
+    label_id = _get_or_create_label(service, processed_label_name) if mutate_gmail else None
+
+    def _record_done(mid: str) -> None:
+        ProcessedEmail.get_or_create(message_id=mid)
+        if mutate_gmail and label_id:
+            mark_processed(service, mid, label_id)
+
     raw_messages = fetch_unread_messages(service)
     updates = []
 
     for msg_ref in raw_messages:
         msg_id = msg_ref["id"]
+        # Já processado numa rodada anterior? pula sem reprocessar (sem re-chamar o LLM).
+        if ProcessedEmail.select().where(ProcessedEmail.message_id == msg_id).exists():
+            continue
         message = parse_message(service, msg_id)
 
         classification = await classify_response(message, stages, llm_caller, model)
         msg_type = classification["type"]
 
         if msg_type == "unrelated":
-            mark_processed(service, msg_id, label_id)
+            _record_done(msg_id)
             continue
 
         # Adiciona stage novo ao config se o LLM propôs um inédito
@@ -333,7 +345,7 @@ async def sync_responses(config: dict, llm_caller) -> list[dict]:
                 "match_type": "incerto",
                 "summary": classification.get("summary", ""),
             })
-            mark_processed(service, msg_id, label_id)
+            _record_done(msg_id)
             continue
 
         # Atualiza status (só avança no funil)
@@ -367,7 +379,7 @@ async def sync_responses(config: dict, llm_caller) -> list[dict]:
             "summary": classification.get("summary", ""),
         })
 
-        mark_processed(service, msg_id, label_id)
+        _record_done(msg_id)
 
     return updates
 
@@ -437,20 +449,19 @@ if __name__ == "__main__":
     import sys
     import logging
 
+    # Loga só para stdout. No cron, a saída é redirecionada para o arquivo de log
+    # (>> email-sync.log), então um FileHandler aqui duplicaria cada linha.
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-            logging.FileHandler(
-                os.path.expanduser("~/.candidatador/email-sync.log")
-            ),
-        ],
+        handlers=[logging.StreamHandler(sys.stdout)],
     )
 
     from candidatador.config import load_config
     from candidatador.llm import make_caller
+    from candidatador.db import init_db
 
+    init_db()  # garante conexão + tabelas (inclui ProcessedEmail) no path standalone/cron
     cfg = load_config()
     llm_caller = make_caller(cfg)
 

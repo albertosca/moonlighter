@@ -67,12 +67,19 @@ class ScanLog(BaseModel):
     source = CharField()
 
 
+class ProcessedEmail(BaseModel):
+    """Dedup local de emails já processados pelo sync, para que o monitor não
+    precise marcar o email no Gmail (mantém o sync autônomo 100% leitura)."""
+    message_id = CharField(unique=True)
+    processed_at = DateTimeField(default=datetime.datetime.now)
+
+
 def init_db():
     path = _db_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     db.init(path)
     db.connect(reuse_if_open=True)
-    db.create_tables([Job, Application, ScanLog], safe=True)
+    db.create_tables([Job, Application, ScanLog, ProcessedEmail], safe=True)
     # Migration segura: adiciona colunas novas se ainda não existem
     cursor = db.execute_sql("PRAGMA table_info(application)")
     existing = {row[1] for row in cursor.fetchall()}
