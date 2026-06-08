@@ -29,6 +29,14 @@ def test_validate_startup_api_key_present_no_api_error(monkeypatch):
     assert not any("ANTHROPIC_API_KEY" in w.message for w in warnings)
 
 
+def test_validate_startup_cli_backend_skips_api_key_error(monkeypatch):
+    """BUG-05: com llm_backend='cli' não se usa API key, então ausência dela
+    não deve gerar erro."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    warnings = validate_startup(config={"llm_backend": "cli"}, profile={"skills": []})
+    assert not any("ANTHROPIC_API_KEY" in w.message for w in warnings)
+
+
 # ── cv.pdf ────────────────────────────────────────────────────────────────────
 
 def test_validate_startup_missing_cv_produces_warn(tmp_path):

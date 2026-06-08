@@ -32,8 +32,9 @@ def validate_startup(
             ),
         ))
 
-    # API key ausente → toda avaliação LLM retorna score=0.0
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    # API key ausente → toda avaliação LLM retorna score=0.0.
+    # Só é necessária no backend "api"; com llm_backend="cli" usa-se o `claude` CLI.
+    if config.get("llm_backend") != "cli" and not os.environ.get("ANTHROPIC_API_KEY"):
         warnings.append(StartupWarning(
             level="error",
             message=(

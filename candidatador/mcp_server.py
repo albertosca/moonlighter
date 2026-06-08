@@ -326,6 +326,13 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
     if answers:
         stored_answers.update(answers)
 
+    # Gera o ref e injeta o alias +ref no campo de email ANTES de preencher, para que
+    # a empresa responda em candidaturas+<ref>@gmail.com (conta monitorada).
+    ref = secrets.token_urlsafe(4)[:6]
+    base_address = _config.get("email", {}).get("address")
+    if base_address:
+        _inject_email_alias(stored_answers, _build_email_alias(base_address, ref))
+
     cv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "profile", "cv.pdf")
     if not os.path.exists(cv_path):
         return f"⚠️  CV não encontrado em {cv_path}. Coloque seu CV em profile/cv.pdf."
@@ -349,7 +356,6 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
         await _browser_mod.save_screenshot(page, job_id, "04-submitted", _config)
 
         if success:
-            ref = secrets.token_urlsafe(4)[:6]
             app.status = "submitted"
             app.applied_at = datetime.now()
             app.form_data = json.dumps(stored_answers)
@@ -385,7 +391,7 @@ async def retry_apply(job_id: int) -> str:
 @mcp.tool()
 async def get_pipeline() -> str:
     """Show full application funnel: counts and list by status."""
-    statuses = ["draft", "submitted", "screening", "interview", "offer", "rejected"]
+    statuses = ["draft", "submitted", "screening", "interviews", "offer", "rejected"]
     lines = ["# Pipeline de Candidaturas\n"]
     for status in statuses:
         apps = list(
@@ -416,7 +422,7 @@ async def update_status(job_id: int, status: str, notes: str = "", next_action: 
     notes: free text notes appended to history
     next_action: e.g. 'follow up em 2026-06-01'
     """
-    valid = {"screening", "interview", "offer", "rejected", "submitted", "draft"}
+    valid = {"screening", "interviews", "offer", "rejected", "submitted", "draft"}
     if status not in valid:
         return f"Status inválido. Valores aceitos: {', '.join(sorted(valid))}"
     try:
@@ -444,6 +450,23 @@ def _build_email_alias(address: str, ref: str) -> str:
     """'candidaturas@gmail.com' + 'x7k2mp' → 'candidaturas+x7k2mp@gmail.com'"""
     local, _, domain = address.partition("@")
     return f"{local}+{ref}@{domain}"
+
+
+def _inject_email_alias(answers: dict, alias: str) -> bool:
+    """
+    Sobrescreve o campo de email do formulário com o alias +ref de rastreamento.
+    Procura qualquer label contendo 'email' (case-insensitive). Se não houver,
+    adiciona uma chave 'Email' como fallback (label mais comum nos ATS).
+    Retorna True se algum campo existente foi sobrescrito.
+    """
+    injected = False
+    for key in list(answers.keys()):
+        if "email" in key.lower():
+            answers[key] = alias
+            injected = True
+    if not injected:
+        answers["Email"] = alias
+    return injected
 
 
 @mcp.tool()

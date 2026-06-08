@@ -157,6 +157,19 @@ class TestClassifyResponse:
         assert result["stage"] == "technical_interview"
         assert result["company"] == "Anthropic"
 
+    async def test_passes_model_to_caller(self, message):
+        """Regressão BUG-02: o caller real (_call_cli/api) exige (prompt, model)
+        sem default. classify_response deve repassar o model posicionalmente."""
+        from candidatador.email_monitor import classify_response
+        received = {}
+
+        async def strict_caller(prompt, model):  # sem default → pega chamada de 1 arg
+            received["model"] = model
+            return json.dumps({"type": "unrelated", "summary": ""})
+
+        await classify_response(message, BASE_STAGES, strict_caller, model="claude-test")
+        assert received["model"] == "claude-test"
+
     async def test_returns_rejection(self, message):
         from candidatador.email_monitor import classify_response
         caller = _make_llm_caller({

@@ -458,6 +458,43 @@ async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
     assert fill_calls[0]["Q2"] == "original2"
 
 
+async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
+    """BUG-01: confirm_apply deve injetar candidaturas+<ref>@... no campo de
+    email do formulário, para que respostas da empresa caiam na conta monitorada e
+    carreguem o ref de rastreamento."""
+    init_db()
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/alias1", status="applying")
+    app = create_application(job, form_data='{"Email": "pessoal@gmail.com", "Q1": "x"}')
+    cv_path = tmp_path / "cv.pdf"
+    cv_path.write_bytes(b"fake pdf")
+    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/alias1")
+
+    fill_calls = []
+    async def fake_fill(answers, cv):
+        fill_calls.append(answers.copy())
+
+    with patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server._detect_applier") as mock_detect, \
+         patch("candidatador.mcp_server.os.path.exists", return_value=True), \
+         patch("candidatador.mcp_server.os.path.join", return_value=str(cv_path)), \
+         patch("candidatador.mcp_server.os.path.dirname"), \
+         patch("candidatador.mcp_server.os.path.abspath"):
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        mock_applier = MagicMock()
+        mock_applier.fill_form = fake_fill
+        mock_applier.submit = AsyncMock(return_value=True)
+        mock_detect.return_value = mock_applier
+        from candidatador.mcp_server import confirm_apply, _build_email_alias, _config
+        await confirm_apply(job_id=job.id)
+
+    app_fresh = Application.get_by_id(app.id)
+    assert app_fresh.email_ref  # ref foi gerado
+    expected = _build_email_alias(_config["email"]["address"], app_fresh.email_ref)
+    assert fill_calls[0]["Email"] == expected
+    assert "+" in fill_calls[0]["Email"]
+
+
 async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
     init_db()
     job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca5", status="applying")
@@ -536,7 +573,7 @@ async def test_get_pipeline_groups_by_status(tmp_db):
     job1 = create_job(tmp_db, url="https://x.com/pl1", company="Stripe")
     job2 = create_job(tmp_db, url="https://x.com/pl2", company="Linear")
     create_application(job1, status="submitted")
-    create_application(job2, status="interview")
+    create_application(job2, status="interviews")
     from candidatador.mcp_server import get_pipeline
     result = await get_pipeline()
     assert "Submitted" in result or "submitted" in result.lower()
@@ -580,7 +617,7 @@ async def test_update_status_with_notes(tmp_db):
     job = create_job(tmp_db, url="https://x.com/us2")
     create_application(job)
     from candidatador.mcp_server import update_status
-    await update_status(job_id=job.id, status="interview", notes="Scheduled for Monday")
+    await update_status(job_id=job.id, status="interviews", notes="Scheduled for Monday")
     app = Application.get(Application.job == job)
     assert "Scheduled for Monday" in app.notes
 
@@ -899,7 +936,7 @@ async def test_get_pipeline_total_count(tmp_db):
     job2 = create_job(tmp_db, url="https://x.com/pl-tc2")
     job3 = create_job(tmp_db, url="https://x.com/pl-tc3")
     create_application(job1, status="submitted")
-    create_application(job2, status="interview")
+    create_application(job2, status="interviews")
     create_application(job3, status="rejected")
     from candidatador.mcp_server import get_pipeline
     result = await get_pipeline()

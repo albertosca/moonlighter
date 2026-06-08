@@ -205,7 +205,9 @@ def mark_processed(service, message_id: str, label_id: str) -> None:
     ).execute()
 
 
-async def classify_response(message: dict, stages: list[str], llm_caller) -> dict:
+async def classify_response(
+    message: dict, stages: list[str], llm_caller, model: str = "claude-sonnet-4-6"
+) -> dict:
     """
     Classifica uma resposta de email usando LLM.
 
@@ -236,7 +238,7 @@ Classifique este email e retorne JSON com exatamente estes campos:
 Responda APENAS com o JSON, sem texto adicional."""
 
     try:
-        raw = await llm_caller(prompt)
+        raw = await llm_caller(prompt, model)
         cleaned = _extract_json(raw)
         result = json.loads(cleaned)
         # Garante que todos os campos existem
@@ -294,6 +296,7 @@ async def sync_responses(config: dict, llm_caller) -> list[dict]:
     base_address = email_cfg["address"]
     processed_label_name = email_cfg.get("processed_label", "candidatador/processado")
     stages = list(email_cfg.get("interview_stages", []))
+    model = config.get("llm_model", "claude-sonnet-4-6")
 
     label_id = _get_or_create_label(service, processed_label_name)
     raw_messages = fetch_unread_messages(service)
@@ -303,7 +306,7 @@ async def sync_responses(config: dict, llm_caller) -> list[dict]:
         msg_id = msg_ref["id"]
         message = parse_message(service, msg_id)
 
-        classification = await classify_response(message, stages, llm_caller)
+        classification = await classify_response(message, stages, llm_caller, model)
         msg_type = classification["type"]
 
         if msg_type == "unrelated":
@@ -446,15 +449,12 @@ if __name__ == "__main__":
     )
 
     from candidatador.config import load_config
-    from candidatador.llm import call_llm
+    from candidatador.llm import make_caller
 
     cfg = load_config()
-    model = cfg.get("llm_model", "claude-sonnet-4-6")
+    llm_caller = make_caller(cfg)
 
-    async def _llm_caller(prompt):
-        return await call_llm(prompt, model=model)
-
-    updates = asyncio.run(sync_responses(cfg, _llm_caller))
+    updates = asyncio.run(sync_responses(cfg, llm_caller))
     logger.info("sync_responses: %d atualizações", len(updates))
     for u in updates:
         logger.info("  %s @ %s → %s (match: %s)", u.get("title"), u.get("company"),
