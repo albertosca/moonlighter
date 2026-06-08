@@ -46,13 +46,14 @@ class LeverApplier(BaseApplier):
         except Exception:
             pass
 
-    async def submit(self) -> bool:
+    async def submit(self) -> str:
+        from candidatador.applicator.base import _confirm_submitted
         try:
             btn = await self.page.query_selector("button[type='submit'], .template-btn-submit")
-            if btn:
-                await btn.click()
-                await self.page.wait_for_load_state("networkidle", timeout=15000)
-                return True
+            if not btn:
+                return "failed"
+            await btn.click()
+            await self.page.wait_for_load_state("networkidle", timeout=15000)
+            return "submitted" if await _confirm_submitted(self.page) else "unverified"
         except Exception:
-            pass
-        return False
+            return "failed"

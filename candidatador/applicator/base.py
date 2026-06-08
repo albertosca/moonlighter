@@ -18,6 +18,39 @@ async def _query_labels_with_fallback(page, selectors: list[str]) -> list:
             return results
     return []
 
+
+# Marcadores de confirmação de submissão. Conservador de propósito: na dúvida
+# retornamos False — um falso "enviado" é pior (Alberto não acompanha e perde a
+# vaga) do que um falso "falhou" (ele revisa o screenshot e re-tenta).
+SUCCESS_TEXT_MARKERS = (
+    "thank you for applying",
+    "thanks for applying",
+    "application submitted",
+    "application has been submitted",
+    "successfully submitted",
+    "your application was sent",
+    "application sent",
+    "we received your application",
+    "received your application",
+)
+SUCCESS_URL_MARKERS = ("thank", "confirmation", "submitted", "success")
+
+
+async def _confirm_submitted(page, extra_text_markers: tuple = ()) -> bool:
+    """
+    Verifica se a submissão foi de fato confirmada, lendo o texto da página
+    (marcador de sucesso) ou a URL (página de confirmação). Não levanta exceção.
+    """
+    try:
+        body = (await page.inner_text("body")).lower()
+    except Exception:
+        body = ""
+    for marker in SUCCESS_TEXT_MARKERS + tuple(extra_text_markers):
+        if marker in body:
+            return True
+    url = (getattr(page, "url", "") or "").lower()
+    return any(u in url for u in SUCCESS_URL_MARKERS)
+
 ANSWER_PROMPT = """You are filling out a job application on behalf of a senior software engineer.
 
 ## Candidate Profile

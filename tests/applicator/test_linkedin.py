@@ -11,6 +11,7 @@ def make_applier(url="https://www.linkedin.com/jobs/view/123"):
     page.query_selector_all = AsyncMock(return_value=[])
     page.wait_for_selector = AsyncMock()
     page.wait_for_load_state = AsyncMock()
+    page.inner_text = AsyncMock(return_value="")  # sem confirmação por padrão
     return LinkedInApplier(page, {}, {})
 
 
@@ -243,17 +244,32 @@ async def test_fill_form_exception_continues_to_next_field():
 # ── submit() — multi-step ─────────────────────────────────────────────────────
 
 async def test_submit_clicks_submit_button_directly():
-    """Submit button present immediately → True."""
+    """Submit button present immediately + confirmação → True."""
     applier = make_applier()
     submit_btn = MagicMock()
     submit_btn.click = AsyncMock()
     applier.page.query_selector = AsyncMock(return_value=submit_btn)
+    applier.page.inner_text = AsyncMock(return_value="Your application was sent")
 
     with patch("asyncio.sleep", new=AsyncMock()):
         result = await applier.submit()
 
-    assert result is True
+    assert result == "submitted"
     submit_btn.click.assert_called_once()
+
+
+async def test_submit_unverified_without_confirmation():
+    """RELIABILITY-01: clicou Submit mas sem 'application sent' → 'unverified'."""
+    applier = make_applier()
+    submit_btn = MagicMock()
+    submit_btn.click = AsyncMock()
+    applier.page.query_selector = AsyncMock(return_value=submit_btn)
+    applier.page.inner_text = AsyncMock(return_value="Phone Number Years of Experience")
+
+    with patch("asyncio.sleep", new=AsyncMock()):
+        result = await applier.submit()
+
+    assert result == "unverified"
 
 
 async def test_submit_clicks_next_then_submit():
@@ -279,24 +295,25 @@ async def test_submit_clicks_next_then_submit():
             return submit_btn  # submit btn found
         return None
     applier.page.query_selector = qs
+    applier.page.inner_text = AsyncMock(return_value="Your application was sent")
 
     with patch("asyncio.sleep", new=AsyncMock()):
         result = await applier.submit()
 
-    assert result is True
+    assert result == "submitted"
     next_btn.click.assert_called_once()
     submit_btn.click.assert_called_once()
 
 
-async def test_submit_no_buttons_returns_false():
-    """No submit or next buttons → False."""
+async def test_submit_no_buttons_returns_failed():
+    """No submit or next buttons → 'failed'."""
     applier = make_applier()
     applier.page.query_selector = AsyncMock(return_value=None)
 
     with patch("asyncio.sleep", new=AsyncMock()):
         result = await applier.submit()
 
-    assert result is False
+    assert result == "failed"
 
 
 async def test_submit_max_10_steps():
@@ -320,12 +337,12 @@ async def test_submit_max_10_steps():
     with patch("asyncio.sleep", new=AsyncMock()):
         result = await applier.submit()
 
-    assert result is False
+    assert result == "failed"
     assert next_btn.click.call_count == 10
 
 
-async def test_submit_exception_returns_false():
-    """Exception during click → breaks loop → False."""
+async def test_submit_exception_returns_failed():
+    """Exception during click → breaks loop → 'failed'."""
     applier = make_applier()
     submit_btn = MagicMock()
     submit_btn.click = AsyncMock(side_effect=Exception("click failed"))
@@ -334,7 +351,7 @@ async def test_submit_exception_returns_false():
     with patch("asyncio.sleep", new=AsyncMock()):
         result = await applier.submit()
 
-    assert result is False
+    assert result == "failed"
 
 
 async def test_extract_fields_falls_back_when_primary_modal_selector_empty():

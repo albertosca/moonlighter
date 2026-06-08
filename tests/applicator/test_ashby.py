@@ -11,6 +11,7 @@ def make_applier(url="https://jobs.ashbyhq.com/openai/123"):
     page.query_selector_all = AsyncMock(return_value=[])
     page.wait_for_selector = AsyncMock()
     page.wait_for_load_state = AsyncMock()
+    page.inner_text = AsyncMock(return_value="")  # sem confirmação por padrão
     return AshbyApplier(page, {}, {})
 
 
@@ -96,19 +97,31 @@ async def test_fill_form_uploads_cv():
 
 # ── submit() ──────────────────────────────────────────────────────────────────
 
-async def test_submit_button_click_returns_true():
+async def test_submit_button_click_returns_submitted():
     applier = make_applier()
     btn = MagicMock()
     btn.click = AsyncMock()
     applier.page.query_selector = AsyncMock(return_value=btn)
     applier.page.wait_for_load_state = AsyncMock()
-    assert await applier.submit() is True
+    applier.page.inner_text = AsyncMock(return_value="Application submitted. Thank you for applying!")
+    assert await applier.submit() == "submitted"
 
 
-async def test_submit_no_button_returns_false():
+async def test_submit_unverified_without_confirmation():
+    """RELIABILITY-01: clicou mas sem marcador de confirmação → 'unverified'."""
+    applier = make_applier()
+    btn = MagicMock()
+    btn.click = AsyncMock()
+    applier.page.query_selector = AsyncMock(return_value=btn)
+    applier.page.wait_for_load_state = AsyncMock()
+    applier.page.inner_text = AsyncMock(return_value="Why this role? Full Name Apply")
+    assert await applier.submit() == "unverified"
+
+
+async def test_submit_no_button_returns_failed():
     applier = make_applier()
     applier.page.query_selector = AsyncMock(return_value=None)
-    assert await applier.submit() is False
+    assert await applier.submit() == "failed"
 
 
 async def test_extract_fields_excludes_empty_labels():
@@ -141,13 +154,13 @@ async def test_fill_form_skips_label_without_for_attr():
     field.fill.assert_not_called()
 
 
-async def test_submit_exception_returns_false():
-    """Exception during submit click → returns False."""
+async def test_submit_exception_returns_failed():
+    """Exception during submit click → 'failed'."""
     applier = make_applier()
     btn = MagicMock()
     btn.click = AsyncMock(side_effect=Exception("crash"))
     applier.page.query_selector = AsyncMock(return_value=btn)
-    assert await applier.submit() is False
+    assert await applier.submit() == "failed"
 
 
 async def test_extract_fields_falls_back_when_primary_selector_empty():

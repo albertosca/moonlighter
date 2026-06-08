@@ -36,7 +36,7 @@ async def test_greenhouse_e2e_submit(browser_page):
     applier = GreenhouseApplier(page, {}, {})
     # submit() returns True when button is found and clicked
     result = await applier.submit()
-    assert result is True
+    assert result == "submitted"
 
 
 async def test_greenhouse_e2e_detect_false_for_local_url(browser_page):
@@ -75,7 +75,7 @@ async def test_lever_e2e_submit(browser_page):
     await page.goto(f"{base_url}/lever_form.html")
     applier = LeverApplier(page, {}, {})
     result = await applier.submit()
-    assert result is True
+    assert result == "submitted"
 
 
 # ── Ashby E2E ─────────────────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ async def test_ashby_e2e_submit(browser_page):
     await page.goto(f"{base_url}/ashby_form.html")
     applier = AshbyApplier(page, {}, {})
     result = await applier.submit()
-    assert result is True
+    assert result == "submitted"
 
 
 # ── LinkedIn E2E ──────────────────────────────────────────────────────────────

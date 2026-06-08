@@ -13,5 +13,13 @@
   <input type="file" name="resume">
   <button class="template-btn-submit" type="submit">Submit</button>
 </div>
+<script>
+  // Simula a confirmação do ATS: injeta o marcador de sucesso ao submeter.
+  document.querySelector('.template-btn-submit').addEventListener('click', function (e) {
+    e.preventDefault();
+    document.body.insertAdjacentHTML('beforeend',
+      '<div id="confirmation">Thank you for applying! We received your application.</div>');
+  });
+</script>
 </body>
 </html>

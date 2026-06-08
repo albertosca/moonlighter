@@ -389,7 +389,7 @@ async def test_confirm_apply_success(tmp_db, tmp_path):
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.fill_form = AsyncMock()
-        mock_applier.submit = AsyncMock(return_value=True)
+        mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
         from candidatador.mcp_server import confirm_apply
         result = await confirm_apply(job_id=job.id)
@@ -449,7 +449,7 @@ async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = MagicMock()
         mock_applier.fill_form = fake_fill
-        mock_applier.submit = AsyncMock(return_value=True)
+        mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
         from candidatador.mcp_server import confirm_apply
         await confirm_apply(job_id=job.id, answers={"Q1": "overridden"})
@@ -483,7 +483,7 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = MagicMock()
         mock_applier.fill_form = fake_fill
-        mock_applier.submit = AsyncMock(return_value=True)
+        mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
         from candidatador.mcp_server import confirm_apply, _build_email_alias, _config
         await confirm_apply(job_id=job.id)
@@ -552,7 +552,7 @@ async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.fill_form = AsyncMock()
-        mock_applier.submit = AsyncMock(return_value=True)
+        mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
         from candidatador.mcp_server import retry_apply
         result = await retry_apply(job_id=job.id)
@@ -801,13 +801,49 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.fill_form = AsyncMock()
-        mock_applier.submit = AsyncMock(return_value=False)
+        mock_applier.submit = AsyncMock(return_value="failed")
         mock_detect.return_value = mock_applier
         from candidatador.mcp_server import confirm_apply
         result = await confirm_apply(job_id=job.id)
 
     assert "⚠️" in result or "falhou" in result.lower() or "Submissão" in result
     assert "screenshot" in result.lower() or "04-submitted" in result
+    # 'failed' é re-tentável → volta para rascunho
+    assert Application.get_by_id(app.id).status == "draft"
+
+
+async def test_confirm_apply_unverified_marks_submitted_and_warns(tmp_db, tmp_path):
+    """RELIABILITY: submit 'unverified' (clicou mas sem confirmação) → registra como
+    ENVIADA (não re-submeter, evita duplicar) e avisa para conferir na mão."""
+    init_db()
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/uv1", status="applying")
+    app = create_application(job)
+    cv_path = tmp_path / "cv.pdf"
+    cv_path.write_bytes(b"fake pdf")
+    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/uv1")
+
+    with patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server._detect_applier") as mock_detect, \
+         patch("candidatador.mcp_server.os.path.exists", return_value=True), \
+         patch("candidatador.mcp_server.os.path.join", return_value=str(cv_path)), \
+         patch("candidatador.mcp_server.os.path.dirname"), \
+         patch("candidatador.mcp_server.os.path.abspath"):
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        mock_applier = AsyncMock()
+        mock_applier.fill_form = AsyncMock()
+        mock_applier.submit = AsyncMock(return_value="unverified")
+        mock_detect.return_value = mock_applier
+        from candidatador.mcp_server import confirm_apply
+        result = await confirm_apply(job_id=job.id)
+
+    app_fresh = Application.get_by_id(app.id)
+    assert app_fresh.status == "submitted"          # registrada como enviada
+    assert app_fresh.email_ref                       # ref de rastreamento gravado
+    assert Job.get_by_id(job.id).status == "applied"
+    assert "verificar manualmente" in (app_fresh.notes or "")
+    assert "04-submitted" in result                  # aponta o screenshot
+    assert "retry" in result.lower()                 # avisa para NÃO re-submeter
 
 
 async def test_confirm_apply_unknown_ats(tmp_db, tmp_path):
@@ -1051,7 +1087,7 @@ async def test_confirm_apply_generates_6_char_ref(tmp_db, tmp_path):
         mock_browser.save_screenshot = AsyncMock()
         applier = AsyncMock()
         applier.fill_form = AsyncMock()
-        applier.submit = AsyncMock(return_value=True)
+        applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = applier
         await confirm_apply(job_id=job.id)
 
@@ -1081,7 +1117,7 @@ async def test_confirm_apply_ref_is_url_safe(tmp_db, tmp_path):
         mock_browser.save_screenshot = AsyncMock()
         applier = AsyncMock()
         applier.fill_form = AsyncMock()
-        applier.submit = AsyncMock(return_value=True)
+        applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = applier
         await confirm_apply(job_id=job.id)
 
@@ -1114,7 +1150,7 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
             mock_browser.save_screenshot = AsyncMock()
             applier = AsyncMock()
             applier.fill_form = AsyncMock()
-            applier.submit = AsyncMock(return_value=True)
+            applier.submit = AsyncMock(return_value="submitted")
             mock_detect.return_value = applier
             await confirm_apply(job_id=job.id)
 

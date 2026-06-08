@@ -20,5 +20,13 @@
     <button type="submit" id="submit_app">Submit Application</button>
   </form>
 </div>
+<script>
+  // Simula a confirmação do ATS: injeta o marcador de sucesso ao submeter.
+  document.querySelector('form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    document.body.insertAdjacentHTML('beforeend',
+      '<div id="confirmation">Thank you for applying! Your application has been submitted.</div>');
+  });
+</script>
 </body>
 </html>

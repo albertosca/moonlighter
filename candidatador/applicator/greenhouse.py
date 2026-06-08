@@ -53,13 +53,14 @@ class GreenhouseApplier(BaseApplier):
         except Exception:
             pass
 
-    async def submit(self) -> bool:
+    async def submit(self) -> str:
+        from candidatador.applicator.base import _confirm_submitted
         try:
             submit_btn = await self.page.query_selector("input[type='submit'], button[type='submit']")
-            if submit_btn:
-                await submit_btn.click()
-                await self.page.wait_for_load_state("networkidle", timeout=15000)
-                return True
+            if not submit_btn:
+                return "failed"
+            await submit_btn.click()
+            await self.page.wait_for_load_state("networkidle", timeout=15000)
+            return "submitted" if await _confirm_submitted(self.page) else "unverified"
         except Exception:
-            pass
-        return False
+            return "failed"

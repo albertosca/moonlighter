@@ -10,6 +10,7 @@ def make_applier(url="https://boards.greenhouse.io/stripe/jobs/123"):
     page.query_selector = AsyncMock(return_value=None)
     page.query_selector_all = AsyncMock(return_value=[])
     page.wait_for_load_state = AsyncMock()
+    page.inner_text = AsyncMock(return_value="")  # sem confirmação por padrão
     config = {}
     profile = {}
     return GreenhouseApplier(page, config, profile)
@@ -258,31 +259,46 @@ async def test_fill_form_exception_in_field_continues():
 
 # ── submit() ──────────────────────────────────────────────────────────────────
 
-async def test_submit_clicks_submit_button():
-    """submit() clicks submit button and returns True."""
+async def test_submit_returns_submitted_on_confirmation():
+    """submit() → 'submitted' quando a página confirma o envio."""
     applier = make_applier()
 
     btn = MagicMock()
     btn.click = AsyncMock()
     applier.page.query_selector = AsyncMock(return_value=btn)
     applier.page.wait_for_load_state = AsyncMock()
+    applier.page.inner_text = AsyncMock(return_value="Thank you for applying! Application submitted.")
 
     result = await applier.submit()
-    assert result is True
+    assert result == "submitted"
     btn.click.assert_called_once()
 
 
-async def test_submit_no_button_returns_false():
-    """submit() returns False when no submit button found."""
+async def test_submit_unverified_without_confirmation():
+    """RELIABILITY-01: clicou mas sem marcador de confirmação → 'unverified'."""
+    applier = make_applier("https://boards.greenhouse.io/stripe/jobs/123")
+
+    btn = MagicMock()
+    btn.click = AsyncMock()
+    applier.page.query_selector = AsyncMock(return_value=btn)
+    applier.page.wait_for_load_state = AsyncMock()
+    applier.page.inner_text = AsyncMock(return_value="Full Name Email Submit Application")
+
+    result = await applier.submit()
+    assert result == "unverified"
+
+
+async def test_submit_no_button_returns_failed():
+    """submit() → 'failed' quando não acha o botão de enviar."""
     applier = make_applier()
     applier.page.query_selector = AsyncMock(return_value=None)
 
     result = await applier.submit()
-    assert result is False
+    assert result == "failed"
 
 
-async def test_submit_exception_returns_false():
-    """submit() returns False when click raises an exception."""
+async def test_submit_exception_returns_failed():
+    """submit() → 'failed' quando o clique levanta exceção."""
     applier = make_applier()
 
     btn = MagicMock()
@@ -290,7 +306,7 @@ async def test_submit_exception_returns_false():
     applier.page.query_selector = AsyncMock(return_value=btn)
 
     result = await applier.submit()
-    assert result is False
+    assert result == "failed"
 
 
 async def test_extract_fields_falls_back_when_primary_selector_empty():

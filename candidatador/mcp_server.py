@@ -352,23 +352,41 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
         await applier.fill_form(stored_answers, cv_path)
         await _browser_mod.save_screenshot(page, job_id, "03-filled", _config)
 
-        success = await applier.submit()
+        outcome = await applier.submit()
         await _browser_mod.save_screenshot(page, job_id, "04-submitted", _config)
+        shot = f"~/.candidatador/screenshots/{job_id}/04-submitted.png"
 
-        if success:
-            app.status = "submitted"
-            app.applied_at = datetime.now()
-            app.form_data = json.dumps(stored_answers)
-            app.updated_at = datetime.now()
-            app.email_ref = ref
+        if outcome == "failed":
+            # Nem conseguiu clicar em enviar — seguro re-tentar.
+            app.status = "draft"
             app.save()
-            Job.update(status="applied").where(Job.id == job_id).execute()
-            return f"✓ Candidatura #{job_id} submetida: {job.company} / {job.title}"
-        else:
+            Job.update(status="reviewed").where(Job.id == job_id).execute()
             return (
-                f"⚠️  Submissão falhou para vaga #{job_id}. "
-                f"Screenshot em ~/.candidatador/screenshots/{job_id}/04-submitted.png"
+                f"⚠️  Não consegui submeter a vaga #{job_id} (botão não encontrado ou erro). "
+                f"Confira {shot} e rode retry_apply({job_id}) se quiser tentar de novo."
             )
+
+        # outcome == "submitted" ou "unverified": em ambos o clique ocorreu, então
+        # tratamos como ENVIADA e NÃO re-submetemos (evita candidatura duplicada).
+        app.status = "submitted"
+        app.applied_at = datetime.now()
+        app.form_data = json.dumps(stored_answers)
+        app.updated_at = datetime.now()
+        app.email_ref = ref
+        if outcome == "unverified":
+            note = f"[{datetime.now().strftime('%Y-%m-%d')}] enviada sem confirmação automática — verificar manualmente"
+            app.notes = f"{app.notes}\n{note}" if app.notes else note
+        app.save()
+        Job.update(status="applied").where(Job.id == job_id).execute()
+
+        if outcome == "submitted":
+            return f"✓ Candidatura #{job_id} submetida e confirmada: {job.company} / {job.title}"
+        return (
+            f"⚠️  Candidatura #{job_id} ({job.company} / {job.title}) foi ENVIADA, mas não consegui "
+            f"confirmar o sucesso automaticamente.\n"
+            f"Confira na mão o screenshot: {shot}\n"
+            f"🚫 NÃO rode retry_apply — registrei como enviada para evitar candidatura duplicada."
+        )
     except Exception as e:
         app.status = "draft"
         app.save()
