@@ -39,10 +39,9 @@ class GreenhouseApplier(BaseApplier):
                 if for_attr:
                     field = await self.page.query_selector(f"#{for_attr}")
                     if field:
-                        tag = await field.evaluate("el => el.tagName.toLowerCase()")
-                        if tag in ("input", "textarea"):
-                            await field.fill(answer)
-                            await asyncio.sleep(0.3)
+                        from candidatador.applicator.base import _fill_field
+                        await _fill_field(field, answer)
+                        await asyncio.sleep(0.3)
             except Exception:
                 continue
         try:

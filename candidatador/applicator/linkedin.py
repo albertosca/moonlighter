@@ -52,10 +52,9 @@ class LinkedInApplier(BaseApplier):
                 if for_id:
                     field = await self.page.query_selector(f"#{for_id}")
                     if field:
-                        tag = await field.evaluate("el => el.tagName.toLowerCase()")
-                        if tag in ("input", "textarea"):
-                            await field.fill(answer)
-                            await asyncio.sleep(0.4)
+                        from candidatador.applicator.base import _fill_field
+                        await _fill_field(field, answer)
+                        await asyncio.sleep(0.4)
             except Exception:
                 continue
         # Upload CV if file input exists in the modal

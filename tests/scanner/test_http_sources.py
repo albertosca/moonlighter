@@ -23,6 +23,7 @@ LEVER_RESPONSE = [
         "hostedUrl": "https://jobs.lever.co/gitlab/abc-123",
         "categories": {"location": "Remote", "commitment": "Full-time"},
         "createdAt": 1716220800000,
+        "descriptionPlain": "Build distributed systems in Elixir and Go.",
     }
 ]
 
@@ -65,6 +66,7 @@ async def test_lever_scan():
     assert jobs[0].title == "Staff Engineer"
     assert jobs[0].remote_type == "remote"
     assert jobs[0].source == "lever"
+    assert "Elixir" in jobs[0].description  # QUALITY-01: descrição extraída
 
 @pytest.mark.asyncio
 async def test_greenhouse_404_skips_company():
@@ -223,6 +225,7 @@ async def test_lever_empty_array_response():
 ASHBY_RESPONSE = {"data": {"jobPostings": [
     {"id": "1", "title": "ML Engineer", "locationName": "Remote",
      "isRemote": True, "publishedDate": "2026-05-01",
+     "descriptionPlain": "Train and serve large language models.",
      "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/openai/1"}
 ]}}
 
@@ -234,6 +237,7 @@ async def test_ashby_scan_success():
     assert jobs[0].company == "openai"
     assert jobs[0].title == "ML Engineer"
     assert jobs[0].source == "ashby"
+    assert "language models" in jobs[0].description  # QUALITY-01: descrição extraída
 
 async def test_ashby_is_remote_flag_true():
     mock_client = _make_mock_client(ASHBY_RESPONSE)

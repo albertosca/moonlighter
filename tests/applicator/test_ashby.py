@@ -67,6 +67,7 @@ async def test_fill_form_fills_inputs():
     label.get_attribute = AsyncMock(return_value="why_role")
     field = MagicMock()
     field.fill = AsyncMock()
+    field.evaluate = AsyncMock(return_value="textarea")
 
     async def qs(selector):
         if "label" in selector:

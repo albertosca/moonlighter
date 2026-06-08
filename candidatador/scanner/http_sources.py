@@ -101,6 +101,7 @@ class LeverScanner(BaseScanner):
                 location=location,
                 remote_type=normalize_remote_type(location),
                 posted_at=posted_at,
+                description=item.get("descriptionPlain") or None,
             ))
         return jobs
 
@@ -113,7 +114,7 @@ class AshbyScanner(BaseScanner):
     query jobPostings($organizationHostedJobsPageName: String!) {
       jobPostings(organizationHostedJobsPageName: $organizationHostedJobsPageName) {
         id title locationName isRemote publishedDate
-        jobPostingAbsoluteUrl
+        jobPostingAbsoluteUrl descriptionPlain
       }
     }
     """
@@ -166,5 +167,6 @@ class AshbyScanner(BaseScanner):
                 location=item.get("locationName"),
                 remote_type=remote_type,
                 posted_at=posted_at,
+                description=item.get("descriptionPlain") or None,
             ))
         return jobs

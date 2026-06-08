@@ -51,6 +51,26 @@ async def _confirm_submitted(page, extra_text_markers: tuple = ()) -> bool:
     url = (getattr(page, "url", "") or "").lower()
     return any(u in url for u in SUCCESS_URL_MARKERS)
 
+async def _fill_field(field, answer: str) -> None:
+    """
+    Preenche um campo de formulário conforme o tipo do elemento.
+    - <select>: escolhe a opção por label visível e, se falhar, por value.
+    - <input>/<textarea>: digita o texto.
+    Radios/checkboxes não são tratados (label→for aponta uma única opção).
+    """
+    tag = await field.evaluate("el => el.tagName.toLowerCase()")
+    if tag == "select":
+        try:
+            await field.select_option(label=answer)
+        except Exception:
+            try:
+                await field.select_option(value=answer)
+            except Exception:
+                pass
+    elif tag in ("input", "textarea"):
+        await field.fill(answer)
+
+
 ANSWER_PROMPT = """You are filling out a job application on behalf of a senior software engineer.
 
 ## Candidate Profile

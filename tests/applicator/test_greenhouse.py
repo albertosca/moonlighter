@@ -152,6 +152,31 @@ async def test_fill_form_fills_text_inputs():
     field.fill.assert_called_once_with("Alberto")
 
 
+async def test_fill_form_selects_dropdown_option():
+    """QUALITY-02: campo <select> é resolvido via select_option (por label), não fill."""
+    applier = make_applier()
+
+    label = MagicMock()
+    label.get_attribute = AsyncMock(return_value="work_auth")
+
+    field = MagicMock()
+    field.evaluate = AsyncMock(return_value="select")
+    field.fill = AsyncMock()
+    field.select_option = AsyncMock()
+
+    async def query_selector_side(selector):
+        if "label" in selector:
+            return label
+        return field
+    applier.page.query_selector = query_selector_side
+
+    with patch("asyncio.sleep", new=AsyncMock()):
+        await applier.fill_form({"Authorized to work?": "Yes"}, cv_path="")
+
+    field.select_option.assert_called_once_with(label="Yes")
+    field.fill.assert_not_called()
+
+
 async def test_fill_form_fills_textareas():
     """fill() is also called on textarea fields."""
     applier = make_applier()

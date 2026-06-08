@@ -34,7 +34,8 @@ class LeverApplier(BaseApplier):
                 if for_id:
                     field = await self.page.query_selector(f"#{for_id}")
                     if field:
-                        await field.fill(answer)
+                        from candidatador.applicator.base import _fill_field
+                        await _fill_field(field, answer)
                         await asyncio.sleep(0.3)
             except Exception:
                 continue
