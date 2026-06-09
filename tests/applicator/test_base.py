@@ -1,7 +1,7 @@
 import pytest
 import json
-from unittest.mock import patch
-from candidatador.applicator.base import ApplicationDraft, generate_answers
+from unittest.mock import AsyncMock, MagicMock, patch
+from candidatador.applicator.base import ApplicationDraft, generate_answers, _fill_field
 
 MOCK_ANSWERS = json.dumps({
     "Why do you want to work here?": "I admire Stripe's mission to increase GDP of the internet.",
@@ -146,3 +146,96 @@ async def test_generate_answers_strips_leading_prose():
     result = await generate_answers(company="Co", title="Eng", description="desc", fields=["Why here?"], profile=PROFILE, model="test", _caller=_make_caller(with_prose))
     assert result.error is None
     assert result.answers.get("Why here?") == "Interesting work"
+
+
+# ── _fill_field ───────────────────────────────────────────────────────────────
+
+def _make_field(tag: str, input_type: str = "text") -> MagicMock:
+    field = MagicMock()
+    # First evaluate call returns tag; subsequent calls (radio JS) return None
+    field.evaluate = AsyncMock(side_effect=[tag, None, None])
+    field.get_attribute = AsyncMock(return_value=input_type)
+    field.is_checked = AsyncMock(return_value=False)
+    field.click = AsyncMock()
+    field.fill = AsyncMock()
+    field.select_option = AsyncMock()
+    return field
+
+
+class TestFillField:
+    async def test_text_input_calls_fill(self):
+        field = _make_field("input", "text")
+        await _fill_field(field, "hello")
+        field.fill.assert_called_once_with("hello")
+
+    async def test_textarea_calls_fill(self):
+        field = _make_field("textarea")
+        await _fill_field(field, "long answer")
+        field.fill.assert_called_once_with("long answer")
+
+    async def test_select_uses_label(self):
+        field = _make_field("select")
+        await _fill_field(field, "Option A")
+        field.select_option.assert_called_once_with(label="Option A")
+
+    async def test_select_falls_back_to_value(self):
+        field = _make_field("select")
+        field.select_option = AsyncMock(side_effect=[Exception("no label"), None])
+        await _fill_field(field, "val_a")
+        assert field.select_option.call_count == 2
+        field.select_option.assert_called_with(value="val_a")
+
+    async def test_select_both_fail_no_exception(self):
+        field = _make_field("select")
+        field.select_option = AsyncMock(side_effect=Exception("no match"))
+        await _fill_field(field, "unknown")  # must not raise
+
+    async def test_radio_calls_evaluate_with_answer(self):
+        field = _make_field("input", "radio")
+        await _fill_field(field, "Yes")
+        calls = field.evaluate.call_args_list
+        # First call: tag name; second call: radio JS with answer
+        assert len(calls) == 2
+        assert calls[1].args[1] == "Yes"
+
+    async def test_radio_js_contains_type_radio_selector(self):
+        field = _make_field("input", "radio")
+        await _fill_field(field, "No")
+        js_code = field.evaluate.call_args_list[1].args[0]
+        assert "type=radio" in js_code
+
+    async def test_checkbox_clicked_when_truthy_and_unchecked(self):
+        field = _make_field("input", "checkbox")
+        field.is_checked = AsyncMock(return_value=False)
+        await _fill_field(field, "yes")
+        field.click.assert_called_once()
+
+    async def test_checkbox_not_clicked_when_truthy_and_already_checked(self):
+        field = _make_field("input", "checkbox")
+        field.is_checked = AsyncMock(return_value=True)
+        await _fill_field(field, "yes")
+        field.click.assert_not_called()
+
+    async def test_checkbox_clicked_when_falsy_and_checked(self):
+        field = _make_field("input", "checkbox")
+        field.is_checked = AsyncMock(return_value=True)
+        await _fill_field(field, "no")
+        field.click.assert_called_once()
+
+    async def test_checkbox_not_clicked_when_falsy_and_already_unchecked(self):
+        field = _make_field("input", "checkbox")
+        field.is_checked = AsyncMock(return_value=False)
+        await _fill_field(field, "no")
+        field.click.assert_not_called()
+
+    async def test_checkbox_recognizes_sim_as_truthy(self):
+        field = _make_field("input", "checkbox")
+        field.is_checked = AsyncMock(return_value=False)
+        await _fill_field(field, "sim")
+        field.click.assert_called_once()
+
+    async def test_checkbox_recognizes_true_string(self):
+        field = _make_field("input", "checkbox")
+        field.is_checked = AsyncMock(return_value=False)
+        await _fill_field(field, "true")
+        field.click.assert_called_once()

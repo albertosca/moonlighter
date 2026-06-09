@@ -11,3 +11,4 @@ profile/*.log
 profile/*.out
 ~/.candidatador/
 .superpowers/
+pytest_output.txt

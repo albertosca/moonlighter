@@ -75,6 +75,7 @@ async def test_fill_form_fills_labeled_fields():
     field = MagicMock()
     field.fill = AsyncMock()
     field.evaluate = AsyncMock(return_value="input")
+    field.get_attribute = AsyncMock(return_value="text")
 
     async def qs(selector):
         if "label" in selector:

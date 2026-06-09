@@ -158,6 +158,7 @@ async def test_fill_form_fills_input_fields():
     label.get_attribute = AsyncMock(return_value="phone")
     field = MagicMock()
     field.evaluate = AsyncMock(return_value="input")
+    field.get_attribute = AsyncMock(return_value="text")
     field.fill = AsyncMock()
 
     async def qs(selector):
@@ -228,6 +229,7 @@ async def test_fill_form_exception_continues_to_next_field():
         if selector == "#f2":
             field = MagicMock()
             field.evaluate = AsyncMock(return_value="input")
+            field.get_attribute = AsyncMock(return_value="text")
             async def do_fill(val):
                 filled.append(val)
             field.fill = do_fill

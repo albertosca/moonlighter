@@ -3,6 +3,10 @@ from typing import Optional
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeout
 from candidatador.scanner.base import BaseScanner, RawJob, normalize_remote_type
 
+_DESCRIPTION_SELECTORS = (
+    ".jobs-description-content__text, .show-more-less-html__markup"
+)
+
 
 class LinkedInSessionExpiredError(Exception):
     """Levantada quando o LinkedIn redireciona para login após goto()."""
@@ -62,6 +66,8 @@ class LinkedInScanner(BaseScanner):
                 # Clean URL (remove tracking params)
                 url_val = url_val.split("?")[0]
 
+                description = await self._fetch_description(item)
+
                 jobs.append(RawJob(
                     source="linkedin",
                     company=company,
@@ -69,8 +75,23 @@ class LinkedInScanner(BaseScanner):
                     url=url_val,
                     location=location_text,
                     remote_type=normalize_remote_type(location_text) or "remote",
+                    description=description,
                 ))
             except Exception:
                 continue
 
         return jobs
+
+    async def _fetch_description(self, card_item) -> Optional[str]:
+        """Clica no card e extrai a descrição do painel lateral. Retorna None se falhar."""
+        try:
+            await card_item.click()
+            desc_el = await self.page.wait_for_selector(
+                _DESCRIPTION_SELECTORS, timeout=5000
+            )
+            if desc_el:
+                text = (await desc_el.inner_text()).strip()
+                return text or None
+        except Exception:
+            pass
+        return None

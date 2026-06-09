@@ -54,9 +54,10 @@ async def _confirm_submitted(page, extra_text_markers: tuple = ()) -> bool:
 async def _fill_field(field, answer: str) -> None:
     """
     Preenche um campo de formulário conforme o tipo do elemento.
-    - <select>: escolhe a opção por label visível e, se falhar, por value.
+    - <select>: opção por label visível; fallback por value.
+    - <input type=radio>: clica o radio do grupo cujo value ou label bate com answer.
+    - <input type=checkbox>: marca/desmarca conforme answer ser truthy/falsy.
     - <input>/<textarea>: digita o texto.
-    Radios/checkboxes não são tratados (label→for aponta uma única opção).
     """
     tag = await field.evaluate("el => el.tagName.toLowerCase()")
     if tag == "select":
@@ -67,7 +68,32 @@ async def _fill_field(field, answer: str) -> None:
                 await field.select_option(value=answer)
             except Exception:
                 pass
-    elif tag in ("input", "textarea"):
+    elif tag == "input":
+        input_type = ((await field.get_attribute("type")) or "text").lower()
+        if input_type == "radio":
+            await field.evaluate(
+                """(el, answer) => {
+                    const root = el.form || document;
+                    const name = el.getAttribute('name');
+                    const radios = root.querySelectorAll(`input[type=radio][name="${name}"]`);
+                    const a = answer.toLowerCase().trim();
+                    for (const r of radios) {
+                        if (r.value.toLowerCase().trim() === a) { r.click(); return; }
+                    }
+                    for (const r of radios) {
+                        const lbl = document.querySelector(`label[for="${r.id}"]`);
+                        if (lbl && lbl.textContent.trim().toLowerCase() === a) { r.click(); return; }
+                    }
+                }""",
+                answer,
+            )
+        elif input_type == "checkbox":
+            truthy = answer.lower() in ("yes", "true", "1", "sim", "on", "checked")
+            if truthy != await field.is_checked():
+                await field.click()
+        else:
+            await field.fill(answer)
+    elif tag == "textarea":
         await field.fill(answer)
 
 

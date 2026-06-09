@@ -100,9 +100,104 @@ async def test_linkedin_scanner_returns_jobs_on_success():
     with patch("asyncio.sleep", new=AsyncMock()):
         from candidatador.scanner.playwright_sources import LinkedInScanner
         scanner = LinkedInScanner(page)
-        jobs = await scanner.scan(keywords="engineer")
+        with patch.object(LinkedInScanner, "_fetch_description", new=AsyncMock(return_value=None)):
+            jobs = await scanner.scan(keywords="engineer")
 
     assert len(jobs) == 1
     assert jobs[0].title == "Senior Engineer"
     assert jobs[0].company == "Stripe"
     assert "?trk=" not in jobs[0].url  # tracking params removed
+
+
+# ── _fetch_description ────────────────────────────────────────────────────────
+
+class TestFetchDescription:
+    def _make_scanner(self):
+        page = make_page()
+        from candidatador.scanner.playwright_sources import LinkedInScanner
+        return LinkedInScanner(page), page
+
+    async def test_returns_description_when_panel_loads(self):
+        scanner, page = self._make_scanner()
+        card = MagicMock()
+        card.click = AsyncMock()
+
+        desc_el = MagicMock()
+        desc_el.inner_text = AsyncMock(return_value="  We are building payments infra.  ")
+        page.wait_for_selector = AsyncMock(return_value=desc_el)
+
+        result = await scanner._fetch_description(card)
+        assert result == "We are building payments infra."
+        card.click.assert_called_once()
+
+    async def test_returns_none_when_panel_times_out(self):
+        scanner, page = self._make_scanner()
+        card = MagicMock()
+        card.click = AsyncMock()
+
+        from playwright.async_api import TimeoutError as PlaywrightTimeout
+        page.wait_for_selector = AsyncMock(side_effect=PlaywrightTimeout("timeout"))
+
+        result = await scanner._fetch_description(card)
+        assert result is None
+
+    async def test_returns_none_when_desc_element_not_found(self):
+        scanner, page = self._make_scanner()
+        card = MagicMock()
+        card.click = AsyncMock()
+        page.wait_for_selector = AsyncMock(return_value=None)
+
+        result = await scanner._fetch_description(card)
+        assert result is None
+
+    async def test_returns_none_when_desc_text_is_empty(self):
+        scanner, page = self._make_scanner()
+        card = MagicMock()
+        card.click = AsyncMock()
+
+        desc_el = MagicMock()
+        desc_el.inner_text = AsyncMock(return_value="   ")
+        page.wait_for_selector = AsyncMock(return_value=desc_el)
+
+        result = await scanner._fetch_description(card)
+        assert result is None
+
+    async def test_returns_none_when_click_raises(self):
+        scanner, page = self._make_scanner()
+        card = MagicMock()
+        card.click = AsyncMock(side_effect=Exception("element detached"))
+
+        result = await scanner._fetch_description(card)
+        assert result is None
+
+    async def test_description_populated_in_scan_result(self):
+        """Quando _fetch_description retorna texto, RawJob.description é preenchido."""
+        page = make_page()
+
+        title_el = MagicMock()
+        title_el.inner_text = AsyncMock(return_value="Backend Engineer")
+        company_el = MagicMock()
+        company_el.inner_text = AsyncMock(return_value="Nubank")
+        link_el = MagicMock()
+        link_el.get_attribute = AsyncMock(return_value="https://www.linkedin.com/jobs/view/999")
+        location_el = MagicMock()
+        location_el.inner_text = AsyncMock(return_value="Remote")
+
+        listing = MagicMock()
+        listing.query_selector = AsyncMock(side_effect=lambda sel: {
+            ".base-search-card__title": title_el,
+            ".base-search-card__subtitle": company_el,
+            "a.base-card__full-link": link_el,
+            ".job-search-card__location": location_el,
+        }.get(sel))
+        page.query_selector_all = AsyncMock(return_value=[listing])
+
+        with patch("asyncio.sleep", new=AsyncMock()):
+            from candidatador.scanner.playwright_sources import LinkedInScanner
+            scanner = LinkedInScanner(page)
+            with patch.object(LinkedInScanner, "_fetch_description",
+                               new=AsyncMock(return_value="Build Pix infra at Nubank.")):
+                jobs = await scanner.scan(keywords="engineer")
+
+        assert len(jobs) == 1
+        assert jobs[0].description == "Build Pix infra at Nubank."
