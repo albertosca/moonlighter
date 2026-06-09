@@ -40,7 +40,6 @@ async def get_context(config: dict) -> BrowserContext:
                 f"--remote-debugging-port={_DEBUG_PORT}",
                 f"--user-data-dir={session_dir}",
                 "--no-first-run",
-                "--no-sandbox",
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
