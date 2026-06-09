@@ -610,6 +610,26 @@ class TestSetupGmailService:
         with pytest.raises(GmailAuthError, match="setup_email"):
             setup_gmail_service(config)
 
+    def test_gmail_oauth_sets_chmod_600_on_token(self, tmp_path):
+        from candidatador.email_monitor import _run_gmail_oauth
+
+        token_path = str(tmp_path / "subdir" / "gmail-token.json")
+        creds_path = str(tmp_path / "creds.json")
+
+        mock_creds = MagicMock()
+        mock_creds.to_json.return_value = '{"token": "abc"}'
+
+        mock_flow = MagicMock()
+        mock_flow.run_local_server.return_value = mock_creds
+
+        with patch("candidatador.email_monitor.InstalledAppFlow") as MockFlow, \
+             patch("os.chmod") as mock_chmod:
+            MockFlow.from_client_secrets_file.return_value = mock_flow
+            _run_gmail_oauth(creds_path, token_path)
+
+        expanded = os.path.expanduser(token_path)
+        mock_chmod.assert_called_once_with(expanded, 0o600)
+
     def test_refreshes_expired_token(self, tmp_path):
         from candidatador.email_monitor import setup_gmail_service
 
