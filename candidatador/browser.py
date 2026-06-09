@@ -5,6 +5,10 @@ from pathlib import Path
 from typing import Optional
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
+from candidatador.log import get_logger
+
+logger = get_logger(__name__)
+
 _playwright = None
 _browser: Optional[Browser] = None
 _brave_process: Optional[subprocess.Popen] = None
@@ -34,6 +38,7 @@ async def get_context(config: dict) -> BrowserContext:
     session_dir.mkdir(parents=True, exist_ok=True)
 
     if not _devtools_ready():
+        logger.info("Launching Brave on port %d", _DEBUG_PORT)
         _brave_process = subprocess.Popen(
             [
                 config["brave_path"],
@@ -60,6 +65,7 @@ async def get_context(config: dict) -> BrowserContext:
         f"http://localhost:{_DEBUG_PORT}",
         slow_mo=config.get("slow_mo_ms", 300),
     )
+    logger.info("CDP connected")
 
     contexts = _browser.contexts
     return contexts[0] if contexts else await _browser.new_context()
@@ -67,7 +73,9 @@ async def get_context(config: dict) -> BrowserContext:
 
 async def new_page(config: dict) -> Page:
     context = await get_context(config)
-    return await context.new_page()
+    page = await context.new_page()
+    logger.debug("new_page created")
+    return page
 
 
 async def save_screenshot(page: Page, job_id: int, step: str, config: dict) -> str:

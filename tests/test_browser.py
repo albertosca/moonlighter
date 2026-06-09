@@ -181,3 +181,17 @@ async def test_close_is_idempotent_when_already_closed():
     browser_mod._playwright = None
     browser_mod._brave_process = None
     await browser_mod.close()  # should not raise
+
+
+async def test_get_context_logs_cdp_connected(caplog):
+    """get_context() deve logar 'CDP connected' quando conecta com sucesso."""
+    import logging
+    mock_pw, mock_playwright, mock_browser, mock_context, mock_proc = _make_cdp_mocks()
+
+    with patch("candidatador.browser.async_playwright", return_value=mock_pw), \
+         patch("candidatador.browser.subprocess.Popen", return_value=mock_proc), \
+         patch("candidatador.browser._devtools_ready", return_value=True), \
+         caplog.at_level(logging.INFO, logger="candidatador.browser"):
+        await browser_mod.get_context(_CONFIG)
+
+    assert "CDP connected" in caplog.text
