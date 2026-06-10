@@ -48,6 +48,7 @@ async def test_call_cli_returns_stdout():
     assert result == "hello from claude\n"
     mock_exec.assert_called_once_with(
         "claude", "-p", "my prompt",
+        stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

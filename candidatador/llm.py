@@ -27,6 +27,7 @@ async def _call_cli(prompt: str, model: str) -> str:
     """
     proc = await asyncio.create_subprocess_exec(
         "claude", "-p", prompt,
+        stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
