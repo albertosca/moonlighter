@@ -201,3 +201,23 @@ class TestFetchDescription:
 
         assert len(jobs) == 1
         assert jobs[0].description == "Build Pix infra at Nubank."
+
+
+@pytest.mark.asyncio
+async def test_linkedin_scanner_logs_start_and_found(caplog):
+    import logging
+    from candidatador.scanner.playwright_sources import LinkedInScanner
+    page = AsyncMock()
+    page.url = "https://www.linkedin.com/jobs/search/?keywords=eng"
+    page.goto = AsyncMock()
+    page.wait_for_selector = AsyncMock()
+    page.keyboard = AsyncMock()
+    page.keyboard.press = AsyncMock()
+    page.query_selector_all = AsyncMock(return_value=[])  # 0 results
+
+    scanner = LinkedInScanner(page)
+    with caplog.at_level(logging.INFO, logger="candidatador.scanner.playwright_sources"):
+        result = await scanner.scan(keywords="eng")
+
+    assert "LinkedIn scan: starting" in caplog.text
+    assert "LinkedIn: found" in caplog.text

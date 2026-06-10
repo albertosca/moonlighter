@@ -2,6 +2,9 @@ import asyncio
 from typing import Optional
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeout
 from candidatador.scanner.base import BaseScanner, RawJob, normalize_remote_type
+from candidatador.log import get_logger
+
+logger = get_logger(__name__)
 
 _DESCRIPTION_SELECTORS = (
     ".jobs-description-content__text, .show-more-less-html__markup"
@@ -28,6 +31,7 @@ class LinkedInScanner(BaseScanner):
             keywords=keywords.replace(" ", "%20") or "software+engineer",
             location=location.replace(" ", "%20"),
         )
+        logger.info("LinkedIn scan: starting (keywords=%r)", keywords or "software engineer")
         jobs = []
         try:
             await self.page.goto(url, timeout=30000)
@@ -40,6 +44,7 @@ class LinkedInScanner(BaseScanner):
         except LinkedInSessionExpiredError:
             raise  # propaga sem engolir
         except PlaywrightTimeout:
+            logger.warning("LinkedIn scan: timeout aguardando resultados")
             return []
 
         # Scroll to load more results (LinkedIn lazy-loads)
@@ -80,6 +85,7 @@ class LinkedInScanner(BaseScanner):
             except Exception:
                 continue
 
+        logger.info("LinkedIn: found %d jobs", len(jobs))
         return jobs
 
     async def _fetch_description(self, card_item) -> Optional[str]:
