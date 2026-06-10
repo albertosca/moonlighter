@@ -1,5 +1,6 @@
 import pytest
 import httpx
+import logging
 from datetime import datetime
 from unittest.mock import AsyncMock, patch, MagicMock
 from candidatador.scanner.http_sources import GreenhouseScanner, LeverScanner, AshbyScanner
@@ -436,3 +437,34 @@ async def test_ashby_null_job_postings_returns_empty():
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
+
+
+# --- logging tests ---
+
+@pytest.mark.asyncio
+async def test_greenhouse_logs_scan_start_and_fetched(caplog):
+    scanner = GreenhouseScanner()
+    payload = {"jobs": [
+        {"title": "SWE", "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
+         "location": {"name": "Remote"}, "updated_at": None, "content": ""}
+    ]}
+    mock_client = _make_mock_client(payload)
+    with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
+        with caplog.at_level(logging.INFO, logger="candidatador.scanner.http_sources"):
+            await scanner.scan(["co"])
+    assert "greenhouse" in caplog.text
+    assert "scanning" in caplog.text
+    assert "fetched" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_lever_logs_scan_fetched(caplog):
+    scanner = LeverScanner()
+    payload = [{"text": "Eng", "hostedUrl": "https://jobs.lever.co/co/1",
+                "categories": {"location": "Remote"}, "createdAt": 0}]
+    mock_client = _make_mock_client(payload)
+    with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
+        with caplog.at_level(logging.INFO, logger="candidatador.scanner.http_sources"):
+            await scanner.scan(["co"])
+    assert "lever" in caplog.text
+    assert "fetched" in caplog.text

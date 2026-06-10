@@ -4,12 +4,16 @@ from datetime import datetime, timezone
 from typing import Optional
 import httpx
 from candidatador.scanner.base import BaseScanner, RawJob, normalize_remote_type
+from candidatador.log import get_logger
+
+logger = get_logger(__name__)
 
 class GreenhouseScanner(BaseScanner):
     BASE = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
     HEADERS = {"User-Agent": "candidatador/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs) -> list[RawJob]:
+        logger.info("[greenhouse] scanning %d companies", len(company_slugs))
         jobs = []
         async with httpx.AsyncClient(timeout=15) as client:
             tasks = [self._fetch(client, slug) for slug in company_slugs]
@@ -17,6 +21,7 @@ class GreenhouseScanner(BaseScanner):
         for result in results:
             if isinstance(result, list):
                 jobs.extend(result)
+        logger.info("[greenhouse] %d raw jobs fetched", len(jobs))
         return jobs
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
@@ -63,6 +68,7 @@ class LeverScanner(BaseScanner):
     HEADERS = {"User-Agent": "candidatador/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs) -> list[RawJob]:
+        logger.info("[lever] scanning %d companies", len(company_slugs))
         jobs = []
         async with httpx.AsyncClient(timeout=15) as client:
             tasks = [self._fetch(client, slug) for slug in company_slugs]
@@ -70,6 +76,7 @@ class LeverScanner(BaseScanner):
         for result in results:
             if isinstance(result, list):
                 jobs.extend(result)
+        logger.info("[lever] %d raw jobs fetched", len(jobs))
         return jobs
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
@@ -120,6 +127,7 @@ class AshbyScanner(BaseScanner):
     """
 
     async def scan(self, company_slugs: list[str], **kwargs) -> list[RawJob]:
+        logger.info("[ashby] scanning %d companies", len(company_slugs))
         jobs = []
         async with httpx.AsyncClient(timeout=15) as client:
             tasks = [self._fetch(client, slug) for slug in company_slugs]
@@ -127,6 +135,7 @@ class AshbyScanner(BaseScanner):
         for result in results:
             if isinstance(result, list):
                 jobs.extend(result)
+        logger.info("[ashby] %d raw jobs fetched", len(jobs))
         return jobs
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
