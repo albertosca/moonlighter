@@ -46,12 +46,13 @@ async def test_call_cli_returns_stdout():
         result = await _call_cli("my prompt", "ignored-model")
 
     assert result == "hello from claude\n"
-    mock_exec.assert_called_once_with(
-        "claude", "-p", "my prompt",
-        stdin=asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+    args, kwargs = mock_exec.call_args
+    assert args == ("claude", "-p", "my prompt")
+    assert kwargs["stdin"] == asyncio.subprocess.DEVNULL
+    assert kwargs["stdout"] == asyncio.subprocess.PIPE
+    assert kwargs["stderr"] == asyncio.subprocess.PIPE
+    # ANTHROPIC_API_KEY must be stripped so the CLI uses the claude.ai session
+    assert "ANTHROPIC_API_KEY" not in kwargs["env"]
 
 
 async def test_call_cli_ignores_model_param():

@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import Callable, Awaitable
 import anthropic
 
@@ -25,17 +26,20 @@ async def _call_cli(prompt: str, model: str) -> str:
     Uses the active Claude Code session — no API key needed.
     The `model` parameter is ignored (CLI uses whichever model the session provides).
     """
+    # Strip ANTHROPIC_API_KEY so the CLI uses the claude.ai session (subscription)
+    # instead of the API key (which requires separate API credits).
+    env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     proc = await asyncio.create_subprocess_exec(
         "claude", "-p", prompt,
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        env=env,
     )
     stdout, stderr = await proc.communicate()
     if proc.returncode != 0:
-        raise RuntimeError(
-            f"claude CLI exited with code {proc.returncode}: {stderr.decode()[:300]}"
-        )
+        detail = stderr.decode().strip() or stdout.decode().strip()
+        raise RuntimeError(f"claude CLI exited with code {proc.returncode}: {detail[:300]}")
     return stdout.decode()
 
 
