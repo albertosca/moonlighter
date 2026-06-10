@@ -1,6 +1,7 @@
 import pytest
 import json
-from unittest.mock import patch
+import logging
+from unittest.mock import patch, AsyncMock
 from candidatador.evaluator import evaluate_job, EvaluationResult
 
 MOCK_LLM_RESPONSE = json.dumps({
@@ -207,3 +208,30 @@ async def test_eval_injection_in_description_stays_inside_xml():
     start = captured["p"].index("<job_posting>")
     end = captured["p"].index("</job_posting>")
     assert start < captured["p"].index(injection) < end
+
+
+@pytest.mark.asyncio
+async def test_evaluate_job_logs_score(caplog):
+    good_response = json.dumps({
+        "score": 8.5,
+        "score_notes": "Good match",
+        "caveats": [],
+        "salary_min": 100000,
+        "salary_max": 150000,
+        "salary_currency": "USD",
+        "salary_source": "stated",
+    })
+    mock_caller = AsyncMock(return_value=good_response)
+
+    with caplog.at_level(logging.DEBUG, logger="candidatador.evaluator"):
+        result = await evaluate_job(
+            company="Stripe",
+            title="Backend Engineer",
+            description="Python, distributed systems",
+            profile={"name": "Alberto"},
+            _caller=mock_caller,
+        )
+
+    assert "Stripe" in caplog.text
+    assert "Backend Engineer" in caplog.text
+    assert "8.5" in caplog.text

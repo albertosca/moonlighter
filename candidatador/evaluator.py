@@ -6,6 +6,9 @@ from typing import Optional
 
 from candidatador.parsing import _extract_json
 from candidatador.llm import LLMCaller, _make_api_caller
+from candidatador.log import get_logger
+
+logger = get_logger(__name__)
 
 EVAL_PROMPT = """You are evaluating a job posting for a senior software engineer.
 
@@ -53,6 +56,7 @@ async def evaluate_job(
 ) -> EvaluationResult:
     if _caller is None:
         _caller = _make_api_caller()
+    logger.debug("evaluating %s/%s", company, title)
     prompt = EVAL_PROMPT.format(
         profile_yaml=yaml.dump(profile, allow_unicode=True),
         company=company,
@@ -63,7 +67,7 @@ async def evaluate_job(
         raw_text = await _caller(prompt, model)
         raw = _extract_json(raw_text)
         data = json.loads(raw)
-        return EvaluationResult(
+        result = EvaluationResult(
             score=float(data.get("score", 0.0)),
             score_notes=data.get("score_notes", ""),
             caveats=data.get("caveats") or [],
@@ -72,7 +76,11 @@ async def evaluate_job(
             salary_currency=data.get("salary_currency"),
             salary_source=data.get("salary_source"),
         )
+        logger.debug("→ score %.1f (%s)", result.score, company)
+        return result
     except json.JSONDecodeError:
+        logger.warning("evaluator: parse error para %s/%s", company, title)
         return EvaluationResult(score=0.0, score_notes="parse error: LLM returned non-JSON")
     except Exception as e:
+        logger.warning("evaluator: erro para %s/%s — %s", company, title, e)
         return EvaluationResult(score=0.0, score_notes=f"evaluation error: {e}")
