@@ -6,6 +6,9 @@ from typing import Optional
 
 from candidatador.parsing import _extract_json
 from candidatador.llm import LLMCaller, _make_api_caller
+from candidatador.log import get_logger
+
+logger = get_logger(__name__)
 
 async def _query_labels_with_fallback(page, selectors: list[str]) -> list:
     """
@@ -167,6 +170,7 @@ async def generate_answers(
 ) -> ApplicationDraft:
     if _caller is None:
         _caller = _make_api_caller(max_tokens=2048)
+    logger.info("generating answers: %s/%s (%d fields)", company, title, len(fields))
     prompt = ANSWER_PROMPT.format(
         profile_yaml=yaml.dump(profile, allow_unicode=True),
         company=company,
@@ -178,6 +182,8 @@ async def generate_answers(
         raw_text = await _caller(prompt, model)
         raw = _extract_json(raw_text)
         answers = json.loads(raw)
+        logger.info("→ answers ok (%d respostas)", len(answers))
         return ApplicationDraft(job_id=job_id, answers=answers, form_fields=fields)
     except Exception as e:
+        logger.warning("→ answers error: %s", e)
         return ApplicationDraft(job_id=job_id, answers={}, form_fields=fields, error=str(e))

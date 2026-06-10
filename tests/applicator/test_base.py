@@ -274,3 +274,46 @@ class TestFillField:
         field.is_checked = AsyncMock(return_value=False)
         await _fill_field(field, "true")
         field.click.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_generate_answers_logs_start_and_ok(caplog):
+    import logging
+    from candidatador.applicator.base import generate_answers
+
+    mock_caller = AsyncMock(return_value=json.dumps({"Por que a Stripe?": "Porque é top"}))
+
+    with caplog.at_level(logging.INFO, logger="candidatador.applicator.base"):
+        result = await generate_answers(
+            company="Stripe",
+            title="SRE",
+            description="infra stuff",
+            fields=["Por que a Stripe?"],
+            profile={"name": "Alberto"},
+            _caller=mock_caller,
+        )
+
+    assert "Stripe" in caplog.text
+    assert "SRE" in caplog.text
+    assert "answers ok" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_generate_answers_logs_error(caplog):
+    import logging
+    from candidatador.applicator.base import generate_answers
+
+    mock_caller = AsyncMock(side_effect=Exception("timeout"))
+
+    with caplog.at_level(logging.INFO, logger="candidatador.applicator.base"):
+        result = await generate_answers(
+            company="Nubank",
+            title="Dev",
+            description="",
+            fields=["Q1"],
+            profile={},
+            _caller=mock_caller,
+        )
+
+    assert result.error is not None
+    assert "error" in caplog.text
