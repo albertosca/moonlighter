@@ -1,10 +1,16 @@
 import asyncio
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 from candidatador.applicator.base import BaseApplier
+from candidatador.log import get_logger
+
+logger = get_logger(__name__)
 
 class GreenhouseApplier(BaseApplier):
     async def detect(self) -> bool:
-        return "greenhouse.io" in self.page.url or "boards.greenhouse.io" in self.page.url
+        match = "greenhouse.io" in self.page.url or "boards.greenhouse.io" in self.page.url
+        if match:
+            logger.debug("detect: greenhouse ✓ (%s)", self.page.url)
+        return match
 
     async def extract_fields(self) -> list[str]:
         """Navigate to the application form and extract all field labels."""
@@ -27,9 +33,11 @@ class GreenhouseApplier(BaseApplier):
             text = (await el.inner_text()).strip()
             if text and text not in ("Resume/CV", "Cover Letter"):
                 labels.append(text)
+        logger.debug("extract_fields: %d campos", len(labels))
         return labels
 
     async def fill_form(self, answers: dict[str, str], cv_path: str) -> None:
+        logger.info("fill_form: start (%d respostas)", len(answers))
         for label_text, answer in answers.items():
             try:
                 label = await self.page.query_selector(f"label:text-is('{label_text}')")
@@ -54,12 +62,17 @@ class GreenhouseApplier(BaseApplier):
 
     async def submit(self) -> str:
         from candidatador.applicator.base import _confirm_submitted
+        logger.info("submit: click")
         try:
             submit_btn = await self.page.query_selector("input[type='submit'], button[type='submit']")
             if not submit_btn:
+                logger.warning("submit: botão não encontrado")
                 return "failed"
             await submit_btn.click()
             await self.page.wait_for_load_state("networkidle", timeout=15000)
-            return "submitted" if await _confirm_submitted(self.page) else "unverified"
-        except Exception:
+            outcome = "submitted" if await _confirm_submitted(self.page) else "unverified"
+            logger.info("submit: outcome=%s", outcome)
+            return outcome
+        except Exception as e:
+            logger.warning("submit: exception — %s", e)
             return "failed"

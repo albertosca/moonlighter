@@ -355,3 +355,30 @@ async def test_extract_fields_falls_back_when_primary_selector_empty():
     fields = await applier.extract_fields()
     assert "Portfolio URL" in fields
     assert call_count[0] >= 2  # tentou mais de um seletor
+
+
+@pytest.mark.asyncio
+async def test_greenhouse_detect_logs_match(caplog):
+    import logging
+    applier = make_applier("https://boards.greenhouse.io/stripe/jobs/1")
+    with caplog.at_level(logging.DEBUG, logger="candidatador.applicator.greenhouse"):
+        await applier.detect()
+    assert "detect: greenhouse" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_greenhouse_submit_logs_outcome(caplog):
+    import logging
+    applier = make_applier("https://boards.greenhouse.io/stripe/jobs/1")
+    submit_btn = AsyncMock()
+    applier.page.query_selector = AsyncMock(return_value=submit_btn)
+    applier.page.wait_for_load_state = AsyncMock()
+    # simula página de confirmação
+    applier.page.inner_text = AsyncMock(return_value="application submitted successfully")
+    applier.page.url = "https://boards.greenhouse.io/confirmation"
+
+    with caplog.at_level(logging.INFO, logger="candidatador.applicator.greenhouse"):
+        outcome = await applier.submit()
+
+    assert "submit" in caplog.text
+    assert outcome in ("submitted", "unverified")
