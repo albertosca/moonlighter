@@ -1252,3 +1252,10 @@ async def test_sync_email_responses_empty_inbox(tmp_db):
         result = await sync_email_responses()
 
     assert "nenhum" in result.lower() or "0" in result or "vazio" in result.lower()
+
+
+def test_mcp_server_initializes_logging():
+    """Importar o mcp_server não deve explodir e deve ter setup de logging configurado."""
+    import candidatador.log as log_mod
+    # se o módulo já foi importado, _initialized deve ser True
+    assert log_mod._initialized is True
