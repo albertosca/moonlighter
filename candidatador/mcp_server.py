@@ -35,6 +35,18 @@ from candidatador.log import setup as _setup_logging, get_logger as _get_logger
 _setup_logging()
 _log = _get_logger(__name__)
 
+_SPEND_LIMIT_MARKERS = (
+    "spend limit", "quota", "rate limit", "too many requests",
+    "overloaded", "429", "usage limit",
+)
+
+
+def _is_spend_limit(exc: Exception) -> bool:
+    """True se a exceção indica esgotamento de cota/limite de gasto do LLM."""
+    msg = str(exc).lower()
+    return any(m in msg for m in _SPEND_LIMIT_MARKERS)
+
+
 mcp = FastMCP("candidatador")
 _config = load_config()
 try:
@@ -173,7 +185,13 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
         BATCH_SIZE = 10
         results = []
 
-        async def _eval_and_save(raw) -> Job | None:
+        # Sentinela retornada por uma coroutine que detectou spend limit.
+        class _StopScan:
+            pass
+
+        stop_event = asyncio.Event()
+
+        async def _eval_and_save(raw) -> "Job | None | _StopScan":
             # Claim the URL in ScanLog before any work. ScanLog.create is synchronous
             # (no await), so asyncio won't context-switch between the insert and its
             # return — the UNIQUE constraint on job_url makes this the atomic guard
@@ -183,17 +201,21 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
             except IntegrityError:
                 return None  # already claimed or processed by a concurrent call
 
+            # Se uma irmã já bateu o limite, libera o claim e sai sem gastar token.
+            if stop_event.is_set():
+                ScanLog.delete().where(ScanLog.job_url == raw.url).execute()
+                return _StopScan()
+
             matched_pattern = should_skip_by_title(raw.title, blocklist)
             if matched_pattern:
                 try:
-                    job = Job.create(
+                    return Job.create(
                         source=raw.source, company=raw.company, title=raw.title,
                         url=raw.url, location=raw.location, remote_type=raw.remote_type,
                         description=raw.description, posted_at=raw.posted_at,
                         score=0.0, score_notes=f"title filtered: {matched_pattern!r}",
                         caveats="[]", status="archived",
                     )
-                    return job
                 except IntegrityError:
                     return None
 
@@ -206,14 +228,19 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
                     model=model,
                     _caller=_llm_caller,
                 )
-            except Exception:
-                # LLM failed (spend limit, network, etc.) — release the claim so
-                # this URL can be retried on the next scan.
+            except Exception as e:
+                # Falhou: libera o claim para retry num scan futuro (nunca órfão).
                 ScanLog.delete().where(ScanLog.job_url == raw.url).execute()
+                if _is_spend_limit(e):
+                    stop_event.set()
+                    return _StopScan()
+                # Erro inesperado: NÃO silenciar — loga e devolve como exceção.
+                _log.error("scan: erro inesperado avaliando %s/%s — %s",
+                           raw.company, raw.title, e)
                 raise
 
             try:
-                job = Job.create(
+                return Job.create(
                     source=raw.source, company=raw.company, title=raw.title,
                     url=raw.url, location=raw.location, remote_type=raw.remote_type,
                     description=raw.description, posted_at=raw.posted_at,
@@ -226,14 +253,33 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
                     salary_source=eval_result.salary_source,
                     status="new" if eval_result.score >= threshold else "archived",
                 )
-                return job
             except IntegrityError:
                 return None
 
+        spend_hit = False
         for i in range(0, len(new_raw), BATCH_SIZE):
+            if stop_event.is_set():
+                spend_hit = True
+                break
             batch = new_raw[i:i + BATCH_SIZE]
-            batch_results = await asyncio.gather(*[_eval_and_save(raw) for raw in batch])
-            results.extend([j for j in batch_results if j is not None])
+            # return_exceptions=True: nenhuma coroutine é cancelada — cada uma roda
+            # até o fim e limpa o próprio claim. Isso elimina claims órfãos.
+            batch_results = await asyncio.gather(
+                *[_eval_and_save(raw) for raw in batch], return_exceptions=True
+            )
+            for r in batch_results:
+                if isinstance(r, _StopScan):
+                    spend_hit = True
+                elif isinstance(r, Exception):
+                    _log.error("scan: coroutine falhou — %s", r)
+                    spend_hit = True  # para conservadoramente em erro inesperado
+                elif r is not None:
+                    results.append(r)
+            if spend_hit:
+                break
+
+        if spend_hit:
+            _log.warning("scan_and_evaluate: interrompido por spend limit após %d vagas", len(results))
 
         above = [j for j in results if j.status == "new"]
         title_filtered = sum(
@@ -241,11 +287,15 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
             if j.score_notes and j.score_notes.startswith("title filtered:")
         )
         below = len(results) - len(above) - title_filtered
+        spend_note = (
+            "\n\n⚠️  Spend limit atingido — scan interrompido (vagas restantes ficam para o próximo scan)."
+            if spend_hit else ""
+        )
 
         if not above:
             return _with_li_warning(
                 f"{len(results)} vagas processadas. Nenhuma passou o threshold de {threshold}. "
-                f"({title_filtered} descartadas por título, {below} abaixo do score)"
+                f"({title_filtered} descartadas por título, {below} abaixo do score){spend_note}"
             )
 
         table = _render_table(above)
@@ -253,7 +303,7 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
             f"\n∗ = salário estimado pelo LLM  |  "
             f"{below} abaixo do threshold  |  {title_filtered} descartadas por título"
         )
-        return _with_li_warning(f"{len(results)} vagas processadas. {len(above)} acima do threshold:\n\n{table}{footer}")
+        return _with_li_warning(f"{len(results)} vagas processadas. {len(above)} acima do threshold:\n\n{table}{footer}{spend_note}")
 
 
 @mcp.tool()

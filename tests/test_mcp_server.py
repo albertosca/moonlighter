@@ -681,6 +681,77 @@ async def test_scan_concurrent_batch_all_processed(tmp_db):
     assert Job.select().count() == 15
 
 
+async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
+    """INVARIANTE: ao bater spend limit no meio de um batch, nenhum ScanLog
+    pode ficar sem Job correspondente (senão a vaga some para sempre)."""
+    init_db()
+    from candidatador.mcp_server import scan_and_evaluate
+    from candidatador.scanner.base import RawJob
+
+    raws = [
+        RawJob(source="greenhouse", company=f"Co{i}", title="Eng",
+               url=f"https://x.com/orphan/{i}", description="desc")
+        for i in range(8)
+    ]
+
+    call = [0]
+    async def eval_side(**kwargs):
+        call[0] += 1
+        if call[0] == 3:
+            raise Exception("Claude API: spend limit exceeded")
+        return make_eval_result(score=7.0)
+
+    with patch("candidatador.mcp_server.GreenhouseScanner") as MockGH, \
+         patch("candidatador.mcp_server.LeverScanner") as MockLV, \
+         patch("candidatador.mcp_server.AshbyScanner") as MockAB, \
+         patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server.evaluate_job", side_effect=eval_side):
+        MockGH.return_value.scan = AsyncMock(return_value=raws)
+        MockLV.return_value.scan = AsyncMock(return_value=[])
+        MockAB.return_value.scan = AsyncMock(return_value=[])
+        mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
+        await scan_and_evaluate()
+
+    job_urls = {j.url for j in Job.select()}
+    orphans = [sl.job_url for sl in ScanLog.select() if sl.job_url not in job_urls]
+    assert orphans == [], f"claims órfãos (claim sem Job): {orphans}"
+
+
+async def test_scan_spend_limit_stops_further_batches(tmp_db):
+    """Ao bater spend limit no batch 1, o batch 2 não deve nem ser tentado."""
+    init_db()
+    from candidatador.mcp_server import scan_and_evaluate
+    from candidatador.scanner.base import RawJob
+
+    raws = [
+        RawJob(source="greenhouse", company=f"Co{i}", title="Eng",
+               url=f"https://x.com/stop/{i}", description="desc")
+        for i in range(15)  # 2 batches: 10 + 5
+    ]
+
+    evaluated_urls = []
+    async def eval_side(**kwargs):
+        evaluated_urls.append(kwargs["title"])
+        raise Exception("usage limit reached")  # spend limit já no 1º
+
+    with patch("candidatador.mcp_server.GreenhouseScanner") as MockGH, \
+         patch("candidatador.mcp_server.LeverScanner") as MockLV, \
+         patch("candidatador.mcp_server.AshbyScanner") as MockAB, \
+         patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server.evaluate_job", side_effect=eval_side):
+        MockGH.return_value.scan = AsyncMock(return_value=raws)
+        MockLV.return_value.scan = AsyncMock(return_value=[])
+        MockAB.return_value.scan = AsyncMock(return_value=[])
+        mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
+        await scan_and_evaluate()
+
+    # no máximo o 1º batch (10) pode ter chamado o LLM; o 2º batch (5) nunca.
+    assert len(evaluated_urls) <= 10
+    # e nenhum claim órfão sobrou
+    job_urls = {j.url for j in Job.select()}
+    assert all(sl.job_url in job_urls for sl in ScanLog.select())
+
+
 # ── apply_jobs: missing scenarios ─────────────────────────────────────────────
 
 async def test_apply_jobs_linkedin_not_easy_apply(tmp_db):
@@ -1381,8 +1452,9 @@ async def test_scan_concurrent_calls_evaluate_same_url_only_once(tmp_db):
 
 
 async def test_scan_spend_limit_releases_scan_log_claim(tmp_db):
-    """When evaluate_job raises (spend limit), the ScanLog claim is released
-    so the URL can be retried on the next scan."""
+    """Quando evaluate_job bate o spend limit, o scan PARA LIMPO (não crasha):
+    libera o claim no ScanLog (URL re-tentável no próximo scan), não cria Job, e
+    avisa no retorno. Contrato conservador — sem exceção propagando para o tool."""
     init_db()
     from candidatador.mcp_server import scan_and_evaluate
     from candidatador.scanner.base import RawJob
@@ -1393,12 +1465,13 @@ async def test_scan_spend_limit_releases_scan_log_claim(tmp_db):
     failing_eval = AsyncMock(side_effect=spend_limit_err)
 
     with _scan_patches([raw], failing_eval):
-        with pytest.raises(Exception, match="spend limit"):
-            await scan_and_evaluate()
+        result = await scan_and_evaluate()
 
-    # Claim must be released — ScanLog should be empty so next scan retries the URL
+    # Não levanta — reporta o limite no texto de retorno.
+    assert "spend limit" in result.lower() or "interrompido" in result.lower()
+    # Claim liberado — ScanLog vazio para o próximo scan re-tentar o URL.
     assert ScanLog.select().where(ScanLog.job_url == url).count() == 0
-    # No Job was created
+    # Nenhum Job criado.
     assert Job.select().where(Job.url == url).count() == 0
 
 
