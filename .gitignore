@@ -12,3 +12,8 @@ profile/*.out
 ~/.candidatador/
 .superpowers/
 pytest_output.txt
+candidatador.db
+profile/**/*.aux
+profile/**/*.log
+profile/**/*.out
+profile/nubank/test-color.*
