@@ -10,6 +10,18 @@ from candidatador.log import get_logger
 
 logger = get_logger(__name__)
 
+
+def should_skip_by_title(title: str, blocklist: list[str]) -> str | None:
+    """Retorna o padrão que deu match se o título deve ser descartado, ou None.
+
+    Matching case-insensitive por substring. Custo zero — sem LLM.
+    """
+    lower = title.lower()
+    for pattern in blocklist:
+        if pattern.lower() in lower:
+            return pattern
+    return None
+
 EVAL_PROMPT = """You are evaluating a job posting for a senior software engineer.
 
 ## Candidate Profile
@@ -82,5 +94,8 @@ async def evaluate_job(
         logger.warning("evaluator: parse error para %s/%s", company, title)
         return EvaluationResult(score=0.0, score_notes="parse error: LLM returned non-JSON")
     except Exception as e:
+        err_str = str(e).lower()
+        if any(m in err_str for m in ("spend limit", "quota", "rate limit", "too many requests", "overloaded", "429", "usage limit")):
+            raise
         logger.warning("evaluator: erro para %s/%s — %s", company, title, e)
         return EvaluationResult(score=0.0, score_notes=f"evaluation error: {e}")

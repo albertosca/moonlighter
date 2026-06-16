@@ -2,7 +2,7 @@ import pytest
 import json
 import logging
 from unittest.mock import patch, AsyncMock
-from candidatador.evaluator import evaluate_job, EvaluationResult
+from candidatador.evaluator import evaluate_job, EvaluationResult, should_skip_by_title
 
 MOCK_LLM_RESPONSE = json.dumps({
     "score": 8.5,
@@ -95,6 +95,24 @@ async def test_evaluate_job_llm_exception_returns_zero():
     result = await evaluate_job(company="Co", title="Eng", description="desc", profile=PROFILE, model="test", _caller=failing_caller)
     assert result.score == 0.0
     assert "evaluation error" in result.score_notes.lower()
+
+
+async def test_evaluate_job_spend_limit_propagates():
+    """Spend limit error must propagate — caller must not swallow it."""
+    async def spend_limit_caller(prompt, model):
+        raise Exception("You've hit your monthly spend limit · raise it at claude.ai/settings/usage")
+
+    with pytest.raises(Exception, match="spend limit"):
+        await evaluate_job(company="Co", title="Eng", description="desc", profile=PROFILE, model="test", _caller=spend_limit_caller)
+
+
+async def test_evaluate_job_rate_limit_propagates():
+    """Rate limit / quota errors must also propagate."""
+    async def quota_caller(prompt, model):
+        raise Exception("429 Too Many Requests: quota exceeded")
+
+    with pytest.raises(Exception, match="429"):
+        await evaluate_job(company="Co", title="Eng", description="desc", profile=PROFILE, model="test", _caller=quota_caller)
 
 
 async def test_evaluate_job_description_capped_at_8000():
@@ -209,6 +227,40 @@ async def test_eval_injection_in_description_stays_inside_xml():
     end = captured["p"].index("</job_posting>")
     assert start < captured["p"].index(injection) < end
 
+
+# ── should_skip_by_title ─────────────────────────────────────────────────────
+
+BLOCKLIST = ["sales", "account executive", "customer success", "marketing", "data center"]
+
+def test_skip_exact_match():
+    assert should_skip_by_title("Sales Manager", BLOCKLIST) == "sales"
+
+def test_skip_case_insensitive():
+    assert should_skip_by_title("MARKETING LEAD", BLOCKLIST) == "marketing"
+
+def test_skip_substring_in_longer_title():
+    assert should_skip_by_title("Senior Account Executive, EMEA", BLOCKLIST) == "account executive"
+
+def test_skip_returns_none_for_tech_title():
+    assert should_skip_by_title("Senior Software Engineer", BLOCKLIST) is None
+
+def test_skip_returns_none_for_engineering_manager():
+    assert should_skip_by_title("Engineering Manager, Platform", BLOCKLIST) is None
+
+def test_skip_returns_none_empty_blocklist():
+    assert should_skip_by_title("Sales Manager", []) is None
+
+def test_skip_data_center_not_data_science():
+    assert should_skip_by_title("Data Scientist, GTM", BLOCKLIST) is None
+    assert should_skip_by_title("Data Center Electrical Engineer", BLOCKLIST) == "data center"
+
+def test_skip_returns_first_matching_pattern():
+    # título contém dois padrões — retorna o primeiro que der match
+    result = should_skip_by_title("Sales Customer Success Specialist", BLOCKLIST)
+    assert result in BLOCKLIST
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_evaluate_job_logs_score(caplog):

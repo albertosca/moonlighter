@@ -1,13 +1,20 @@
 """Re-avalia vagas que foram archivadas pelo bug do stdin (score_notes começa com
 'evaluation error: claude CLI exited with code 1').
 
+Usa eval_model do config (padrão: Haiku) para reduzir custo.
+Aplica title_blocklist do config antes de chamar o LLM — custo zero.
+
 Uso:
-    python scripts/reevaluate_bug_victims.py [--dry-run] [--company SLUG] [--limit N]
+    python scripts/reevaluate_bug_victims.py [--dry-run] [--company SLUG] [--limit N] [--model MODEL] [--title-only] [--concurrency N]
 
 Flags:
-    --dry-run     Mostra o que seria feito, sem gravar no banco.
-    --company     Filtra por empresa (ex: --company nubank).
-    --limit       Processa no máximo N vagas (útil para testar).
+    --dry-run       Mostra o que seria feito, sem gravar no banco.
+    --company       Filtra por empresa (ex: --company nubank).
+    --limit         Processa no máximo N vagas (útil para testar).
+    --model         Sobrescreve o eval_model do config.
+    --title-only    Envia só o título pro LLM (sem a descrição completa). Muito mais barato.
+    --concurrency N Quantas avaliações rodar em paralelo (padrão: 5).
+                    Ao primeiro spend limit, para tudo imediatamente.
 """
 import argparse
 import asyncio
@@ -19,12 +26,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from candidatador.config import load_config, load_profile
 from candidatador.db import Job, init_db
-from candidatador.evaluator import evaluate_job
+from candidatador.evaluator import evaluate_job, should_skip_by_title
 from candidatador.llm import make_caller
 from candidatador.log import setup as setup_logging
 
 BUG_MARKER = "evaluation error: claude CLI exited with code 1"
-BATCH_SIZE = 1  # serial: o CLI claude não suporta múltiplas instâncias concorrentes
+
+QUOTA_MARKERS = ("quota", "rate limit", "too many requests", "overloaded", "429", "usage limit", "spend limit")
 
 
 def _fetch_victims(company: str | None, limit: int | None) -> list[Job]:
@@ -41,58 +49,105 @@ def _fetch_victims(company: str | None, limit: int | None) -> list[Job]:
     return list(query)
 
 
-async def _reevaluate(jobs: list[Job], config: dict, profile: dict, dry_run: bool) -> None:
+async def _reevaluate(
+    jobs: list[Job], config: dict, profile: dict, dry_run: bool, model: str,
+    title_only: bool = False, concurrency: int = 5,
+) -> None:
     caller = make_caller(config)
-    model = config.get("llm_model", "claude-sonnet-4-6")
     threshold = config.get("score_threshold", 6.5)
+    blocklist: list[str] = config.get("title_blocklist", [])
 
     total = len(jobs)
     promoted = 0
     stayed_archived = 0
+    title_skipped = 0
     errors = 0
+    quota_hit = False
 
-    for idx, job in enumerate(jobs, 1):
-        print(f"[{idx:4d}/{total}] [{job.company}] {job.title[:55]:55s}", end=" ", flush=True)
+    sem = asyncio.Semaphore(concurrency)
+    stop = asyncio.Event()
+    print_lock = asyncio.Lock()
 
-        try:
-            result = await evaluate_job(
-                company=job.company,
-                title=job.title,
-                description=job.description or f"{job.title} at {job.company}",
-                profile=profile,
-                model=model,
-                _caller=caller,
-            )
-        except Exception as e:
-            print(f"✗ ERRO: {e}")
-            errors += 1
-            continue
+    async def _process(idx: int, job: Job) -> None:
+        nonlocal promoted, stayed_archived, title_skipped, errors, quota_hit
 
-        new_status = "new" if result.score >= threshold else "archived"
-        icon = "↑ NEW" if new_status == "new" else "  arq"
-        print(f"{icon} score={result.score:.1f}")
+        label = f"[{idx:4d}/{total}] [{job.company}] {job.title[:55]:55s}"
 
-        if not dry_run:
-            Job.update(
-                score=result.score,
-                score_notes=result.score_notes,
-                caveats=json.dumps(result.caveats),
-                salary_min=result.salary_min,
-                salary_max=result.salary_max,
-                salary_currency=result.salary_currency,
-                salary_source=result.salary_source,
-                status=new_status,
-            ).where(Job.id == job.id).execute()
+        matched_pattern = should_skip_by_title(job.title, blocklist)
+        if matched_pattern:
+            async with print_lock:
+                print(f"{label} -- skip título ({matched_pattern!r})")
+                title_skipped += 1
+            return
 
-        if new_status == "new":
-            promoted += 1
-        else:
-            stayed_archived += 1
+        if stop.is_set():
+            return
 
-    print(f"\n{'[DRY RUN] ' if dry_run else ''}Resultado: {total} vagas processadas")
-    print(f"  ↑ promovidas para 'new':  {promoted}")
-    print(f"    continuam archived:      {stayed_archived}")
-    print(f"  ✗ erros:                  {errors}")
+        async with sem:
+            if stop.is_set():
+                return
+
+            try:
+                description = job.title if title_only else (job.description or f"{job.title} at {job.company}")
+                result = await evaluate_job(
+                    company=job.company,
+                    title=job.title,
+                    description=description,
+                    profile=profile,
+                    model=model,
+                    _caller=caller,
+                )
+            except Exception as e:
+                err_str = str(e).lower()
+                if any(m in err_str for m in QUOTA_MARKERS):
+                    stop.set()
+                    quota_hit = True
+                    async with print_lock:
+                        print(f"{label} 🚫 COTA ATINGIDA — parando. Erro: {e}")
+                    return
+                async with print_lock:
+                    print(f"{label} ✗ ERRO: {e}")
+                    errors += 1
+                if not dry_run:
+                    Job.update(score_notes=f"reevaluate_error: {str(e)[:200]}").where(Job.id == job.id).execute()
+                return
+
+            new_status = "new" if result.score >= threshold else "archived"
+            icon = "↑ NEW" if new_status == "new" else "  arq"
+            async with print_lock:
+                print(f"{label} {icon} score={result.score:.1f}")
+
+            if not dry_run:
+                Job.update(
+                    score=result.score,
+                    score_notes=result.score_notes,
+                    caveats=json.dumps(result.caveats),
+                    salary_min=result.salary_min,
+                    salary_max=result.salary_max,
+                    salary_currency=result.salary_currency,
+                    salary_source=result.salary_source,
+                    status=new_status,
+                ).where(Job.id == job.id).execute()
+
+            if new_status == "new":
+                promoted += 1
+            else:
+                stayed_archived += 1
+
+    await asyncio.gather(*[_process(idx, job) for idx, job in enumerate(jobs, 1)])
+
+    if quota_hit:
+        print("\n🚫 Re-avaliação interrompida por spend limit.")
+
+    llm_attempted = total - title_skipped
+    mode = "título-only" if title_only else "descrição completa"
+    prefix = "[DRY RUN] " if dry_run else ""
+    print(f"\n{prefix}Resultado: {total} vagas encontradas  [{mode}] concorrência={concurrency}")
+    print(f"  -- ignoradas por título:   {title_skipped}")
+    print(f"  ↑ promovidas para 'new':   {promoted}")
+    print(f"     continuam archived:      {stayed_archived}")
+    print(f"  ✗ erros:                   {errors}")
+    print(f"  Chamadas LLM ({model}): {llm_attempted}")
 
 
 def main() -> None:
@@ -100,6 +155,9 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Não grava no banco")
     parser.add_argument("--company", help="Filtra por empresa")
     parser.add_argument("--limit", type=int, help="Máximo de vagas a processar")
+    parser.add_argument("--model", help="Sobrescreve eval_model do config")
+    parser.add_argument("--title-only", action="store_true", help="Usa só o título (sem descrição) — muito mais barato")
+    parser.add_argument("--concurrency", type=int, default=5, help="Avaliações em paralelo (padrão: 5)")
     args = parser.parse_args()
 
     setup_logging()
@@ -109,12 +167,14 @@ def main() -> None:
     os.environ["CANDIDATADOR_DB"] = db_path
     init_db()
 
+    model = args.model or config.get("eval_model", config.get("llm_model", "claude-haiku-4-5-20251001"))
+
     victims = _fetch_victims(args.company, args.limit)
     if not victims:
         print("Nenhuma vaga com assinatura do bug encontrada.")
         return
 
-    print(f"Vagas a reavaliar: {len(victims)}")
+    print(f"Vagas encontradas: {len(victims)}  |  modelo: {model}")
     by_company: dict[str, int] = {}
     for j in victims:
         by_company[j.company] = by_company.get(j.company, 0) + 1
@@ -124,7 +184,7 @@ def main() -> None:
     if args.dry_run:
         print("\n⚠️  DRY RUN — nenhuma alteração será gravada.\n")
 
-    asyncio.run(_reevaluate(victims, config, profile, dry_run=args.dry_run))
+    asyncio.run(_reevaluate(victims, config, profile, dry_run=args.dry_run, model=model, title_only=args.title_only, concurrency=args.concurrency))
 
 
 if __name__ == "__main__":
