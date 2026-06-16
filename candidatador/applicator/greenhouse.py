@@ -47,7 +47,7 @@ class GreenhouseApplier(BaseApplier):
         logger.info("fill_form: start (%d respostas)", len(answers))
 
         for label_text, answer in answers.items():
-            if not answer or answer in ("__SKIP__", "__MANUAL_UPLOAD_REQUIRED__"):
+            if not answer or answer in ("__SKIP__", "__MANUAL_UPLOAD_REQUIRED__", "__NEEDS_REVIEW__"):
                 status[label_text] = "skipped"
                 continue
             try:

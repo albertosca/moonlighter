@@ -23,6 +23,15 @@ DEFAULTS = {
             "airbnb": "profile/airbnb/cv-airbnb.pdf",
         },
     },
+    # Autorização de trabalho país-dependente. O candidato é autorizado a trabalhar
+    # apenas no país de cidadania. Quando o país da vaga não é inferível com
+    # confiança, o campo vira __NEEDS_REVIEW__ (decisão manual — nunca um chute).
+    "work_authorization": {
+        "citizenship_country": "brazil",
+        "authorized_answer": "Yes",
+        "not_authorized_answer": "No",
+        "needs_review_sentinel": "__NEEDS_REVIEW__",
+    },
 }
 
 _PATH_KEYS = ("browser_session_dir", "screenshots_dir", "db_path")

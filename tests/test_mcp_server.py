@@ -1562,3 +1562,15 @@ async def test_confirm_apply_aborts_when_cv_missing(tmp_db):
     assert "CV" in result and ("não" in result or "nao" in result)
     job_fresh = Job.get_by_id(job.id)
     assert job_fresh.status != "applied"
+
+
+async def test_confirm_apply_aborts_on_pending_needs_review(tmp_db, tmp_path):
+    """Se um campo __NEEDS_REVIEW__ continua sem resposta, confirm_apply NÃO submete."""
+    init_db()
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/nr-pend",
+                     status="applying", company="stripe")
+    create_application(job, form_data='{"Authorized to work?": "__NEEDS_REVIEW__"}')
+    from candidatador.mcp_server import confirm_apply
+    result = await confirm_apply(job_id=job.id)
+    assert "NÃO submetida" in result or "decisão" in result.lower()
+    assert Job.get_by_id(job.id).status != "applied"

@@ -540,6 +540,9 @@ async def apply_jobs(ids: list[int]) -> str:
                     model=_config["llm_model"],
                     job_id=job_id,
                     _caller=_llm_caller,
+                    config=_config,
+                    job_location=job.location,
+                    job_remote_type=job.remote_type,
                 )
 
                 # Save draft to DB
@@ -558,7 +561,21 @@ async def apply_jobs(ids: list[int]) -> str:
                 lines = [f"\n## Rascunho — Vaga #{job_id}: {job.company} / {job.title}"]
                 if draft.error:
                     lines.append(f"⚠️ Erro ao gerar respostas: {draft.error}")
+                needs_review = [f for f, a in draft.answers.items() if a == "__NEEDS_REVIEW__"]
+                if needs_review:
+                    lines.append(
+                        "\n🚫 PRECISAM DA SUA DECISÃO (não preenchidos — autorização de "
+                        "trabalho/visto, país da vaga indefinido):"
+                    )
+                    for f in needs_review:
+                        lines.append(f"  - {f}")
+                    lines.append(
+                        f"Responda no confirm_apply: "
+                        f"`confirm_apply(job_id={job_id}, answers={{\"<campo>\": \"Yes/No\"}})`"
+                    )
                 for field, answer in draft.answers.items():
+                    if answer == "__NEEDS_REVIEW__":
+                        continue
                     lines.append(f"\n**{field}**\n{answer}")
                 lines.append(f"\nPara aprovar e candidatar: `confirm_apply(job_id={job_id})`")
                 lines.append(f"Para editar: passe `answers={{\"campo\": \"nova resposta\"}}` no confirm_apply")
@@ -605,6 +622,16 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
         stored_answers = app.get_form_data()
         if answers:
             stored_answers.update(answers)
+
+        pending = [k for k, v in stored_answers.items() if v == "__NEEDS_REVIEW__"]
+        if pending:
+            return (
+                f"🚫 Candidatura #{job_id} NÃO submetida — campos de autorização de "
+                f"trabalho aguardando sua decisão (país da vaga indefinido):\n"
+                + "\n".join(f"  - {k}" for k in pending)
+                + f"\nResponda e re-rode: "
+                f"`confirm_apply(job_id={job_id}, answers={{\"{pending[0]}\": \"Yes\"}})`"
+            )
 
         # Gera o ref e injeta o alias +ref no campo de email ANTES de preencher, para que
         # a empresa responda em candidaturas+<ref>@gmail.com (conta monitorada).

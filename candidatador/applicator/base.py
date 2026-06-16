@@ -210,6 +210,9 @@ async def generate_answers(
     model: str = "claude-sonnet-4-6",
     job_id: int = 0,
     _caller: LLMCaller | None = None,
+    config: dict | None = None,
+    job_location: str | None = None,
+    job_remote_type: str | None = None,
 ) -> ApplicationDraft:
     from candidatador.applicator.field_map import pre_populate_answers
     if _caller is None:
@@ -218,7 +221,10 @@ async def generate_answers(
 
     # Pré-populamos campos de contato e respostas padronizadas diretamente do perfil.
     # O LLM só recebe os campos que ele realmente precisa responder.
-    pre_populated = pre_populate_answers(fields, profile)
+    pre_populated = pre_populate_answers(
+        fields, profile, config=config,
+        job_location=job_location, job_remote_type=job_remote_type,
+    )
     remaining_fields = [f for f in fields if f not in pre_populated]
     logger.info("→ pre-populated %d campos, LLM responde %d", len(pre_populated), len(remaining_fields))
 

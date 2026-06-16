@@ -50,9 +50,15 @@ def test_country():
     assert r["Country"] == "Brazil"
 
 
-def test_visa_support():
+def test_visa_field_unknown_country_needs_review():
     fields = ["Will you now or in the future require visa support to work in the role's location?"]
-    r = pre_populate_answers(fields, PROFILE)
+    r = pre_populate_answers(fields, PROFILE)  # sem job_location → país desconhecido
+    assert r[fields[0]] == "__NEEDS_REVIEW__"
+
+
+def test_visa_field_brazil_location_answers_no():
+    fields = ["Will you require visa sponsorship?"]
+    r = pre_populate_answers(fields, PROFILE, job_location="São Paulo, Brazil")
     assert r[fields[0]] == "No"
 
 

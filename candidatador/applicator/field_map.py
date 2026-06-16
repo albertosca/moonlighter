@@ -42,10 +42,8 @@ _RULES: list[tuple[str, object]] = [
     (r"location\s*\(?city", _city),
     (r"^city$", _city),
     (r"^country$", lambda p: "Brazil"),
-    # Autorização de trabalho / visto — sempre negativo pra BR
-    (r"visa\s+support|require.*visa|visa.*sponsor", lambda p: "No"),
-    (r"authorized.*work|work.*authorized|work\s+permit|eligible.*work", lambda p: "Yes"),
-    (r"require\s+sponsorship|need.*sponsorship|sponsorship.*required", lambda p: "No"),
+    # Autorização de trabalho / visto / sponsorship: NÃO ficam aqui — são tratados
+    # de forma país-dependente em work_auth (resposta fixa seria mentira p/ vaga US).
     # Idiomas
     (r"english\s+level|english\s+proficiency|profici.*english", lambda p: "Fluent"),
     # Disponibilidade para escritório (Nubank pede 2-3x/semana)
@@ -60,14 +58,34 @@ _COMPILED: list[tuple[re.Pattern, object]] = [
 ]
 
 
-def pre_populate_answers(fields: list[str], profile: dict) -> dict[str, str]:
+def pre_populate_answers(
+    fields: list[str],
+    profile: dict,
+    config: dict | None = None,
+    job_location: str | None = None,
+    job_remote_type: str | None = None,
+) -> dict[str, str]:
     """
-    Retorna respostas conhecidas para os campos que batem com as regras.
-    Campos sem match são ignorados (o LLM os preenche).
+    Retorna respostas conhecidas para os campos que batem com as regras estáticas
+    (contato, localização, idioma). Campos de autorização de trabalho são tratados
+    à parte, de forma país-dependente (ver work_auth). Campos sem match são
+    ignorados (o LLM os preenche).
     """
+    from candidatador.applicator.work_auth import infer_country, resolve_work_auth
+    cfg = config or {}
+    country = infer_country(job_location, job_remote_type)
+
     result: dict[str, str] = {}
     for field_label in fields:
         clean = field_label.strip().rstrip("*").strip()
+
+        # 1) Autorização de trabalho (país-dependente, conservador)
+        wa = resolve_work_auth(clean, country, cfg)
+        if wa is not None:
+            result[field_label] = wa
+            continue
+
+        # 2) Regras estáticas
         for pattern, fn in _COMPILED:
             if pattern.search(clean):
                 value = fn(profile)
