@@ -54,6 +54,49 @@ async def _confirm_submitted(page, extra_text_markers: tuple = ()) -> bool:
     url = (getattr(page, "url", "") or "").lower()
     return any(u in url for u in SUCCESS_URL_MARKERS)
 
+
+# JS reaproveitado entre ATS para classificar o pós-submit de forma conservadora.
+_SUBMIT_VISIBLE_JS = (
+    "() => !!document.querySelector("
+    "'form input[type=\"submit\"], form button[type=\"submit\"]')"
+)
+_ERROR_MESSAGES_JS = """() => {
+    const msgs = [];
+    for (const el of document.querySelectorAll(
+        '[aria-invalid="true"], .error, .field-error, [data-error], .invalid-feedback'
+    )) {
+        if (el.innerText.trim()) msgs.push(el.innerText.trim());
+    }
+    return msgs.slice(0, 10);
+}"""
+
+
+async def classify_submit_outcome(
+    page, form_visible_js: str = _SUBMIT_VISIBLE_JS, extra_text_markers: tuple = ()
+) -> str:
+    """
+    Classifica o resultado de um clique de submit de forma CONSERVADORA:
+      - "submitted": página/URL contém marcador de confirmação.
+      - "failed:validation_errors:[...]": o form ainda está visível (a validação
+        client-side barrou o envio) — é re-tentável.
+      - "unverified": clicou, a página mudou, mas não há nem confirmação nem form
+        visível. Caso ambíguo — quem chama decide (NÃO presumir enviado).
+    Nunca levanta exceção.
+    """
+    if await _confirm_submitted(page, extra_text_markers):
+        return "submitted"
+    try:
+        still_visible = await page.evaluate(form_visible_js)
+    except Exception:
+        still_visible = False
+    if still_visible:
+        try:
+            errors = await page.evaluate(_ERROR_MESSAGES_JS)
+        except Exception:
+            errors = []
+        return f"failed:validation_errors:{errors}"
+    return "unverified"
+
 async def _fill_field(field, answer: str) -> None:
     """
     Preenche um campo de formulário conforme o tipo do elemento.

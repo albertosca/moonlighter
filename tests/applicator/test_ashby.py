@@ -116,6 +116,7 @@ async def test_submit_unverified_without_confirmation():
     applier.page.query_selector = AsyncMock(return_value=btn)
     applier.page.wait_for_load_state = AsyncMock()
     applier.page.inner_text = AsyncMock(return_value="Why this role? Full Name Apply")
+    applier.page.evaluate = AsyncMock(return_value=False)  # form não está mais visível
     assert await applier.submit() == "unverified"
 
 

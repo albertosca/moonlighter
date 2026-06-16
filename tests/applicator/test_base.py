@@ -410,3 +410,35 @@ async def test_generate_answers_logs_error(caplog):
 
     assert result.error is not None
     assert "error" in caplog.text
+
+
+# ── classify_submit_outcome ───────────────────────────────────────────────────
+
+async def test_classify_submit_outcome_confirmed():
+    from candidatador.applicator.base import classify_submit_outcome
+    page = MagicMock()
+    page.inner_text = AsyncMock(return_value="Thank you for applying!")
+    page.url = "https://jobs.lever.co/x/123"
+    page.evaluate = AsyncMock(return_value=False)
+    assert await classify_submit_outcome(page) == "submitted"
+
+
+async def test_classify_submit_outcome_validation_failed_when_form_visible():
+    from candidatador.applicator.base import classify_submit_outcome
+    page = MagicMock()
+    page.inner_text = AsyncMock(return_value="sem confirmação aqui")
+    page.url = "https://jobs.lever.co/x/123"
+    # 1ª evaluate: form ainda visível = True; 2ª: mensagens de erro
+    page.evaluate = AsyncMock(side_effect=[True, ["Email is required"]])
+    result = await classify_submit_outcome(page)
+    assert result.startswith("failed:validation_errors")
+    assert "Email is required" in result
+
+
+async def test_classify_submit_outcome_unverified_when_ambiguous():
+    from candidatador.applicator.base import classify_submit_outcome
+    page = MagicMock()
+    page.inner_text = AsyncMock(return_value="página qualquer sem marcador")
+    page.url = "https://jobs.lever.co/x/some-page"
+    page.evaluate = AsyncMock(return_value=False)  # form não está mais visível
+    assert await classify_submit_outcome(page) == "unverified"

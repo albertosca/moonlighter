@@ -70,7 +70,6 @@ class LinkedInApplier(BaseApplier):
 
     async def submit(self) -> str:
         """Click through multi-step Easy Apply and submit."""
-        from candidatador.applicator.base import _confirm_submitted
         for _ in range(10):  # max 10 steps
             try:
                 submit_btn = await self.page.query_selector(
@@ -79,7 +78,13 @@ class LinkedInApplier(BaseApplier):
                 if submit_btn:
                     await submit_btn.click()
                     await asyncio.sleep(2)
-                    return "submitted" if await _confirm_submitted(self.page) else "unverified"
+                    from candidatador.applicator.base import classify_submit_outcome
+                    # Para o LinkedIn, "form ainda visível" = modal Easy Apply aberto.
+                    return await classify_submit_outcome(
+                        self.page,
+                        form_visible_js="() => !!document.querySelector('.jobs-easy-apply-modal')",
+                        extra_text_markers=("application sent", "your application was sent"),
+                    )
                 next_btn = await self.page.query_selector(
                     "button[aria-label='Continue to next step'], button:text('Next'), button:text('Review')"
                 )

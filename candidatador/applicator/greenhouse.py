@@ -252,7 +252,6 @@ class GreenhouseApplier(BaseApplier):
             return f"failed:{type(e).__name__}"
 
     async def submit(self) -> str:
-        from candidatador.applicator.base import _confirm_submitted
         logger.info("submit: verificando campos obrigatórios")
 
         # Verifica se há campos obrigatórios visivelmente vazios antes de submeter
@@ -285,31 +284,13 @@ class GreenhouseApplier(BaseApplier):
             await submit_btn.click()
             await self.page.wait_for_load_state("networkidle", timeout=15000)
 
-            # Detecta sucesso pela URL/texto de confirmação
-            if await _confirm_submitted(self.page):
-                logger.info("submit: outcome=submitted")
-                return "submitted"
-
-            # Detecta se o form ainda está visível (= validação falhou)
-            form_still_visible = await self.page.evaluate(
-                "() => !!document.querySelector('form input[type=\"submit\"], form button[type=\"submit\"]')"
-            )
-            if form_still_visible:
-                # Coleta mensagens de erro visíveis
-                error_messages = await self.page.evaluate("""() => {
-                    const msgs = [];
-                    for (const el of document.querySelectorAll(
-                        '[aria-invalid="true"], .error, .field-error, [data-error], .invalid-feedback'
-                    )) {
-                        if (el.innerText.trim()) msgs.push(el.innerText.trim());
-                    }
-                    return msgs.slice(0, 10);
-                }""")
-                logger.warning("submit: form ainda visível após submit — erros de validação: %s", error_messages)
-                return f"failed:validation_errors:{error_messages}"
-
-            logger.info("submit: outcome=unverified")
-            return "unverified"
+            from candidatador.applicator.base import classify_submit_outcome
+            outcome = await classify_submit_outcome(self.page)
+            if outcome.startswith("failed:validation_errors"):
+                logger.warning("submit: form ainda visível após submit — %s", outcome)
+            else:
+                logger.info("submit: outcome=%s", outcome)
+            return outcome
         except Exception as e:
             logger.warning("submit: exception — %s", e)
             return "failed"

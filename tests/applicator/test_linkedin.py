@@ -267,6 +267,7 @@ async def test_submit_unverified_without_confirmation():
     submit_btn.click = AsyncMock()
     applier.page.query_selector = AsyncMock(return_value=submit_btn)
     applier.page.inner_text = AsyncMock(return_value="Phone Number Years of Experience")
+    applier.page.evaluate = AsyncMock(return_value=False)  # modal não está mais visível
 
     with patch("asyncio.sleep", new=AsyncMock()):
         result = await applier.submit()

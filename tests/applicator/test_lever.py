@@ -136,14 +136,28 @@ async def test_submit_template_btn():
 
 
 async def test_submit_unverified_without_confirmation():
-    """RELIABILITY-01: clicou mas sem marcador de confirmação → 'unverified'."""
+    """RELIABILITY-01: clicou, sem confirmação E sem form visível → 'unverified'."""
     applier = make_applier()
     btn = MagicMock()
     btn.click = AsyncMock()
     applier.page.query_selector = AsyncMock(return_value=btn)
     applier.page.wait_for_load_state = AsyncMock()
     applier.page.inner_text = AsyncMock(return_value="Name Email Submit")
+    applier.page.evaluate = AsyncMock(return_value=False)  # form não está mais visível
     assert await applier.submit() == "unverified"
+
+
+async def test_submit_validation_failure_when_form_visible():
+    """RELIABILITY: form ainda visível após click → failed:validation_errors (re-tentável)."""
+    applier = make_applier()
+    btn = MagicMock()
+    btn.click = AsyncMock()
+    applier.page.query_selector = AsyncMock(return_value=btn)
+    applier.page.wait_for_load_state = AsyncMock()
+    applier.page.inner_text = AsyncMock(return_value="sem confirmação")
+    applier.page.evaluate = AsyncMock(side_effect=[True, ["Campo obrigatório"]])
+    result = await applier.submit()
+    assert result.startswith("failed:validation_errors")
 
 
 async def test_submit_no_button_returns_failed():
