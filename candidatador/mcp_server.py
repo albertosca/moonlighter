@@ -47,6 +47,34 @@ def _is_spend_limit(exc: Exception) -> bool:
     return any(m in msg for m in _SPEND_LIMIT_MARKERS)
 
 
+class CVNotFoundError(Exception):
+    """O arquivo de CV resolvido para a empresa não existe no disco."""
+
+
+def _resolve_cv_path(company: str, config: dict) -> str:
+    """
+    Resolve o caminho do CV para a empresa a partir de config['cv'].
+    Match por empresa é case-insensitive. Cai no 'default' quando não há
+    mapeamento. Caminhos relativos são resolvidos a partir da raiz do projeto.
+    Levanta CVNotFoundError se o arquivo escolhido não existir (nunca sobe
+    um CV errado em silêncio).
+    """
+    cv_cfg = config.get("cv", {}) or {}
+    by_company = {k.lower(): v for k, v in (cv_cfg.get("by_company", {}) or {}).items()}
+    rel = by_company.get((company or "").lower(), cv_cfg.get("default"))
+    if not rel:
+        raise CVNotFoundError(
+            f"Sem CV mapeado para '{company}' e sem 'cv.default' em config. Verifique config.yaml/config.py."
+        )
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = rel if os.path.isabs(rel) else os.path.join(project_root, rel)
+    if not os.path.exists(path):
+        raise CVNotFoundError(
+            f"CV para '{company}' não encontrado em {path}. Verifique o mapeamento 'cv' na config."
+        )
+    return path
+
+
 mcp = FastMCP("candidatador")
 _config = load_config()
 try:
@@ -585,9 +613,10 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
         if base_address:
             _inject_email_alias(stored_answers, _build_email_alias(base_address, ref))
 
-        cv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "profile", "cv.pdf")
-        if not os.path.exists(cv_path):
-            return f"⚠️  CV não encontrado em {cv_path}. Coloque seu CV em profile/cv.pdf."
+        try:
+            cv_path = _resolve_cv_path(job.company, _config)
+        except CVNotFoundError as e:
+            return f"⚠️  {e}\n🚫 Não submeti — não vou subir um CV errado."
 
         page = await _browser_mod.new_page(_config)
         try:

@@ -13,6 +13,16 @@ DEFAULTS = {
     "eval_model": "claude-haiku-4-5-20251001",
     "slow_mo_ms": 300,
     "title_blocklist": [],
+    # CV por empresa. Caminhos relativos à raiz do projeto; match case-insensitive.
+    # 'default' usado quando a empresa não tem entrada. Pode ser sobrescrito no
+    # config.yaml local. Se o arquivo escolhido não existir, confirm_apply aborta.
+    "cv": {
+        "default": "profile/general/CV-updated.pdf",
+        "by_company": {
+            "nubank": "profile/nubank/cv-nu-staff.pdf",
+            "airbnb": "profile/airbnb/cv-airbnb.pdf",
+        },
+    },
 }
 
 _PATH_KEYS = ("browser_session_dir", "screenshots_dir", "db_path")

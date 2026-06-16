@@ -424,7 +424,9 @@ async def test_confirm_apply_cv_not_found(tmp_db):
     with patch("candidatador.mcp_server.os.path.exists", return_value=False):
         from candidatador.mcp_server import confirm_apply
         result = await confirm_apply(job_id=job.id)
-    assert "CV não encontrado" in result
+    assert "CV" in result and "não encontrado" in result
+    # não submeteu — status não vira applied
+    assert Job.get_by_id(job.id).status != "applied"
 
 
 async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
@@ -1513,3 +1515,50 @@ async def test_scan_already_in_scan_log_skips_llm(tmp_db):
 
     eval_mock.assert_not_called()
 
+
+
+# ── _resolve_cv_path: CV por empresa ──────────────────────────────────────────
+
+def test_resolve_cv_path_uses_company_specific(tmp_path):
+    from candidatador.mcp_server import _resolve_cv_path
+    nubank_cv = tmp_path / "nu.pdf"; nubank_cv.write_bytes(b"x")
+    default_cv = tmp_path / "def.pdf"; default_cv.write_bytes(b"x")
+    config = {"cv": {"default": str(default_cv), "by_company": {"nubank": str(nubank_cv)}}}
+    assert _resolve_cv_path("nubank", config) == str(nubank_cv)
+
+
+def test_resolve_cv_path_falls_back_to_default(tmp_path):
+    from candidatador.mcp_server import _resolve_cv_path
+    default_cv = tmp_path / "def.pdf"; default_cv.write_bytes(b"x")
+    config = {"cv": {"default": str(default_cv), "by_company": {"nubank": "x.pdf"}}}
+    assert _resolve_cv_path("stripe", config) == str(default_cv)
+
+
+def test_resolve_cv_path_company_match_is_case_insensitive(tmp_path):
+    from candidatador.mcp_server import _resolve_cv_path
+    cv = tmp_path / "nu.pdf"; cv.write_bytes(b"x")
+    default_cv = tmp_path / "def.pdf"; default_cv.write_bytes(b"x")
+    config = {"cv": {"default": str(default_cv), "by_company": {"nubank": str(cv)}}}
+    assert _resolve_cv_path("Nubank", config) == str(cv)
+
+
+def test_resolve_cv_path_raises_when_mapped_file_missing(tmp_path):
+    from candidatador.mcp_server import _resolve_cv_path, CVNotFoundError
+    config = {"cv": {"default": str(tmp_path / "missing.pdf"), "by_company": {}}}
+    with pytest.raises(CVNotFoundError):
+        _resolve_cv_path("stripe", config)
+
+
+async def test_confirm_apply_aborts_when_cv_missing(tmp_db):
+    """Se o CV resolvido não existe, confirm_apply NÃO submete (não sobe CV errado)."""
+    init_db()
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/cvmiss",
+                     status="applying", company="stripe")
+    create_application(job)
+    import candidatador.mcp_server as srv
+    with patch("candidatador.mcp_server._resolve_cv_path",
+               side_effect=srv.CVNotFoundError("nao achei")):
+        result = await srv.confirm_apply(job_id=job.id)
+    assert "CV" in result and ("não" in result or "nao" in result)
+    job_fresh = Job.get_by_id(job.id)
+    assert job_fresh.status != "applied"
