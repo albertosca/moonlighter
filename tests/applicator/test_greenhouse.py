@@ -709,3 +709,25 @@ async def test_greenhouse_submit_logs_outcome(caplog):
 
     assert "submit" in caplog.text
     assert outcome in ("submitted", "unverified")
+
+
+# ── extract_fields: exclui campos de upload-alternativo ───────────────────────
+
+async def test_extract_fields_excludes_upload_alternatives():
+    """Attach/Anexar/Enter manually/Informe manualmente são da área de upload de CV
+    (tratada por _upload_cv) — não devem ir pro LLM como campos de texto."""
+    applier = make_applier()
+    applier.page.query_selector = AsyncMock(return_value=None)
+    labels = []
+    for text in ["Attach", "Anexar", "Enter manually", "Informe manualmente",
+                 "First Name", "Telefone"]:
+        m = MagicMock()
+        m.inner_text = AsyncMock(return_value=text)
+        labels.append(m)
+    applier.page.query_selector_all = AsyncMock(return_value=labels)
+
+    fields = await applier.extract_fields()
+    for excluded in ("Attach", "Anexar", "Enter manually", "Informe manualmente"):
+        assert excluded not in fields
+    assert "First Name" in fields
+    assert "Telefone" in fields

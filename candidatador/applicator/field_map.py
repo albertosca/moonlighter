@@ -55,8 +55,9 @@ _RULES: list[tuple[str, object]] = [
     (r"english\s+level|english\s+proficiency|profici.*english", lambda p: "Fluent"),
     # Disponibilidade para escritório (Nubank pede 2-3x/semana)
     (r"work\s+from\s+the\s+office|office\s+at\s+least", lambda p: "Yes"),
-    # Localização atual
-    (r"currently\s+based|where\s+are\s+you\s+based|current\s+location", _city),
+    # Localização atual — ancorado no início p/ não casar frases de confirmação que
+    # contêm "currently based" no meio (ex: "...require you to be currently based...").
+    (r"^where\s+are\s+you\s+(currently\s+)?based|^current\s+location|^currently\s+based", _city),
 ]
 
 _COMPILED: list[tuple[re.Pattern, object]] = [

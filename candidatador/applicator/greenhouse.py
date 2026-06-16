@@ -28,10 +28,16 @@ class GreenhouseApplier(BaseApplier):
             ".application-question label",
             "[data-field-label]",
         ])
+        # Campos da área de upload de CV/currículo — o anexo é tratado por _upload_cv,
+        # então não devem ir pro LLM como campos de texto (senão recebem resposta-lixo).
+        _UPLOAD_LABELS = {
+            "resume/cv", "cover letter", "attach", "anexar",
+            "enter manually", "informe manualmente",
+        }
         labels = []
         for el in label_els:
             text = (await el.inner_text()).strip()
-            if text and text not in ("Resume/CV", "Cover Letter"):
+            if text and text.lower() not in _UPLOAD_LABELS:
                 labels.append(text)
         logger.debug("extract_fields: %d campos", len(labels))
         return labels

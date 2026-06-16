@@ -142,3 +142,18 @@ def test_ptbr_strips_asterisk():
     assert r["Telefone*"] == "11912345678"
     assert r["Nome*"] == "Alberto"
     assert r["Sobrenome*"] == "de Sá Cavalcanti de Albuquerque"
+
+
+def test_currently_based_question_fills_city():
+    """'Where are you currently based?' continua pré-populando a cidade."""
+    r = pre_populate_answers(["Where are you currently based?"], PROFILE)
+    assert r["Where are you currently based?"] == "Belo Horizonte"
+
+
+def test_currently_based_midsentence_confirmation_not_prepopulated():
+    """Campo de confirmação que CONTÉM 'currently based' no meio NÃO é tratado como
+    cidade (deixa pro LLM responder 'Yes, I am aware')."""
+    label = ('You are aware that this is a hybrid position and we require you to be '
+             'currently based in one of the job post locations. Type "Yes, I am aware" if you confirm.')
+    r = pre_populate_answers([label], PROFILE)
+    assert label not in r
