@@ -817,13 +817,15 @@ def _build_email_alias(address: str, ref: str) -> str:
 def _inject_email_alias(answers: dict, alias: str) -> bool:
     """
     Sobrescreve o campo de email do formulário com o alias +ref de rastreamento.
-    Procura qualquer label contendo 'email' (case-insensitive). Se não houver,
-    adiciona uma chave 'Email' como fallback (label mais comum nos ATS).
+    Procura qualquer label que contenha 'email' ignorando hífen/espaço — assim
+    casa tanto 'Email' quanto 'E-mail' (PT). Se não houver, adiciona uma chave
+    'Email' como fallback (label mais comum nos ATS).
     Retorna True se algum campo existente foi sobrescrito.
     """
     injected = False
     for key in list(answers.keys()):
-        if "email" in key.lower():
+        normalized = key.lower().replace("-", "").replace(" ", "")
+        if "email" in normalized:
             answers[key] = alias
             injected = True
     if not injected:
