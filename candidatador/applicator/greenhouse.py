@@ -65,7 +65,22 @@ class GreenhouseApplier(BaseApplier):
 
                 tag = await field.evaluate("el => el.tagName.toLowerCase()")
 
-                if tag in ("input", "textarea", "select"):
+                # react-select e afins expõem um <input role=combobox aria-haspopup>
+                # (class select__input). Tratar como text input só DIGITA no campo de
+                # busca sem selecionar a opção — e ainda reportaria 'filled' (falso
+                # positivo). Roteamos esses para o handler de dropdown custom.
+                is_custom_combobox = await field.evaluate(
+                    "el => el.getAttribute('role') === 'combobox'"
+                    " || el.getAttribute('aria-haspopup') === 'true'"
+                    " || (el.className || '').toLowerCase().includes('select__input')"
+                )
+
+                if is_custom_combobox:
+                    # fill_form já sabe que é combobox — vai direto pro handler de
+                    # react-select (digita/filtra/verifica), sem re-detectar o tipo.
+                    filled = await self._select_custom_option(field, label_text, answer)
+                    status[label_text] = "filled" if filled else "failed:custom_dropdown"
+                elif tag in ("input", "textarea", "select"):
                     await _fill_field(field, answer)
                     await asyncio.sleep(0.2)
                     status[label_text] = "filled"
@@ -185,47 +200,110 @@ class GreenhouseApplier(BaseApplier):
             return False
 
     async def _select_custom_option(self, element, label_text: str, answer: str) -> bool:
-        """Clica no custom dropdown e seleciona a opção pelo texto."""
+        """
+        Seleciona uma opção num react-select / dropdown custom de forma robusta:
+        abre, DIGITA para filtrar (essencial p/ selects async/typeahead como cidade),
+        clica na opção que casa (clique via DOM, evita interceptação de pointer) com
+        fallback para Enter, e por fim VERIFICA que um valor foi de fato selecionado
+        (.select__single-value). Sem verificação não há 'filled' — nunca falso-positivo.
+        """
         try:
-            await element.click()
+            try:
+                await element.scroll_into_view_if_needed()
+            except Exception:
+                pass
+            # Abre o menu. Em caso de clique interceptado por overlay, foca via JS.
+            try:
+                await element.click()
+            except Exception:
+                try:
+                    await element.evaluate("el => el.focus()")
+                except Exception:
+                    pass
             await asyncio.sleep(0.4)
-            # Coleta todas as opções visíveis e tenta clicar na que bate
-            result = await self.page.evaluate(
-                """(answer) => {
-                    const a = answer.toLowerCase().trim();
-                    const selectors = [
-                        '[role="option"]', '[role="listbox"] li',
-                        '.select__option', '.dropdown__item',
-                        'ul[role="listbox"] li', '[data-testid*="option"]',
-                    ];
-                    const visible = [];
-                    for (const sel of selectors) {
-                        for (const el of document.querySelectorAll(sel)) {
-                            const t = el.innerText.trim();
-                            if (t) visible.push(t);
-                            const tl = t.toLowerCase();
-                            if (tl === a || tl.startsWith(a) || a.startsWith(tl)) {
-                                el.click();
-                                return {clicked: true, options: visible};
+
+            async def _click_matching() -> None:
+                await self.page.evaluate(
+                    """(answer) => {
+                        const a = answer.toLowerCase().trim();
+                        const sels = ['.select__option', '[role="option"]',
+                                      '[role="listbox"] li', 'ul[role="listbox"] li',
+                                      '[data-testid*="option"]'];
+                        for (const sel of sels) {
+                            for (const el of document.querySelectorAll(sel)) {
+                                const t = (el.innerText || '').trim().toLowerCase();
+                                if (!t) continue;
+                                if (t === a || t.startsWith(a) || a.startsWith(t)) {
+                                    el.click();
+                                    return true;
+                                }
                             }
                         }
-                    }
-                    return {clicked: false, options: visible};
-                }""",
-                answer,
-            )
-            if result.get("clicked"):
+                        return false;
+                    }""",
+                    answer,
+                )
+
+            # Tentativa 1: clicar a opção SEM digitar (selects estáticos — digitar
+            # fecharia o menu). Verifica que um valor foi de fato selecionado.
+            await _click_matching()
+            await asyncio.sleep(0.2)
+            if await self._selected_value(element):
                 return True
-            options = result.get("options", [])
-            logger.warning(
-                "_select_custom_option: '%s' não achou '%s'. Opções disponíveis: %s",
-                label_text, answer, options or "(nenhuma — dropdown não abriu?)"
+
+            # Tentativa 2: digitar para filtrar/carregar (selects async/searchable).
+            try:
+                await element.type(answer, delay=30)
+                await asyncio.sleep(0.7)
+            except Exception:
+                pass
+            await _click_matching()
+            await asyncio.sleep(0.2)
+            if await self._selected_value(element):
+                return True
+
+            # Tentativa 3: Enter na opção destacada pelo filtro.
+            try:
+                await element.press("Enter")
+                await asyncio.sleep(0.3)
+            except Exception:
+                pass
+            if await self._selected_value(element):
+                return True
+
+            options = await self.page.evaluate(
+                """() => Array.from(document.querySelectorAll('.select__option,[role="option"]'))
+                          .map(e => (e.innerText||'').trim()).filter(Boolean).slice(0, 15)"""
             )
-            await self.page.keyboard.press("Escape")
+            logger.warning(
+                "_select_custom_option: '%s' não selecionou '%s'. Opções: %s",
+                label_text, answer, options or "(nenhuma — dropdown não abriu/carregou?)"
+            )
+            try:
+                await self.page.keyboard.press("Escape")
+            except Exception:
+                pass
             return False
         except Exception as e:
             logger.warning("_select_custom_option: '%s' exception — %s", label_text, e)
             return False
+
+    async def _selected_value(self, element) -> str:
+        """Lê o valor exibido pelo react-select (.select__single-value) subindo a árvore."""
+        try:
+            return await element.evaluate(
+                """el => {
+                    let c = el;
+                    for (let i = 0; i < 6 && c; i++) {
+                        if (c.querySelector && c.querySelector('.select__single-value')) break;
+                        c = c.parentElement;
+                    }
+                    const sv = c && c.querySelector ? c.querySelector('.select__single-value') : null;
+                    return sv ? sv.innerText.trim() : '';
+                }"""
+            )
+        except Exception:
+            return ""
 
     async def _upload_cv(self, cv_path: str) -> str:
         """

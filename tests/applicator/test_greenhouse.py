@@ -27,6 +27,20 @@ def make_applier(url="https://boards.greenhouse.io/stripe/jobs/123"):
     return GreenhouseApplier(page, config, profile)
 
 
+def make_evaluate(tag, combobox=False, selected=""):
+    """Stub de field.evaluate robusto à ordem/contagem de chamadas: devolve o valor
+    selecionado (single-value), o flag de combobox e o tag conforme o JS chamado."""
+    async def _ev(js, *args):
+        if "single-value" in js:
+            return selected
+        if "aria-haspopup" in js or "combobox" in js or "select__input" in js:
+            return combobox
+        if "tagName" in js:
+            return tag
+        return None
+    return _ev
+
+
 # ── detect() ─────────────────────────────────────────────────────────────────
 
 async def test_detect_greenhouse_board_url():
@@ -145,7 +159,7 @@ async def test_fill_form_fills_text_inputs():
     applier = make_applier()
 
     field = MagicMock()
-    field.evaluate = AsyncMock(return_value="input")
+    field.evaluate = make_evaluate("input")
     field.get_attribute = AsyncMock(return_value="text")
     field.fill = AsyncMock()
 
@@ -162,7 +176,7 @@ async def test_fill_form_selects_dropdown_option():
     applier = make_applier()
 
     field = MagicMock()
-    field.evaluate = AsyncMock(return_value="select")
+    field.evaluate = make_evaluate("select")
     field.fill = AsyncMock()
     field.select_option = AsyncMock()
 
@@ -180,7 +194,7 @@ async def test_fill_form_fills_textareas():
     applier = make_applier()
 
     field = MagicMock()
-    field.evaluate = AsyncMock(return_value="textarea")
+    field.evaluate = make_evaluate("textarea")
     field.fill = AsyncMock()
 
     applier.page.get_by_label = MagicMock(return_value=make_label_locator(field))
@@ -242,7 +256,7 @@ async def test_fill_form_exception_in_field_continues():
     fill_calls = []
 
     field2 = MagicMock()
-    field2.evaluate = AsyncMock(return_value="input")
+    field2.evaluate = make_evaluate("input")
     field2.get_attribute = AsyncMock(return_value="text")
     async def do_fill(val):
         fill_calls.append(val)
@@ -347,7 +361,7 @@ async def test_find_field_uses_get_by_label_exact_first():
     """_find_field tenta get_by_label exact=True antes de exact=False."""
     applier = make_applier()
     field = MagicMock()
-    field.evaluate = AsyncMock(return_value="input")
+    field.evaluate = make_evaluate("input")
     exact_locator = make_label_locator(field)
     call_args = []
 
@@ -427,7 +441,7 @@ async def test_fill_form_returns_status_dict():
     """fill_form retorna dict com status por campo."""
     applier = make_applier()
     field = MagicMock()
-    field.evaluate = AsyncMock(return_value="input")
+    field.evaluate = make_evaluate("input")
     field.get_attribute = AsyncMock(return_value="text")
     field.fill = AsyncMock()
     applier.page.get_by_label = MagicMock(return_value=make_label_locator(field))
@@ -513,11 +527,14 @@ async def test_upload_cv_returns_failed_when_no_input_found():
 # ── _select_custom_option() ───────────────────────────────────────────────────
 
 async def test_select_custom_option_clicks_and_selects():
-    """_select_custom_option abre o dropdown e seleciona a opção via JS."""
+    """_select_custom_option abre, seleciona e VERIFICA o valor (single-value='Yes')."""
     applier = make_applier()
     element = MagicMock()
     element.click = AsyncMock()
-    applier.page.evaluate = AsyncMock(return_value={"clicked": True, "options": ["Yes", "No"]})
+    element.type = AsyncMock()
+    element.press = AsyncMock()
+    element.evaluate = AsyncMock(return_value="Yes")  # single-value confirmado
+    applier.page.evaluate = AsyncMock(return_value=True)  # opção clicada via DOM
     applier.page.keyboard = MagicMock()
     applier.page.keyboard.press = AsyncMock()
 
@@ -564,9 +581,12 @@ async def test_fill_custom_element_combobox_delegates_to_select():
     """_fill_custom_element com role=combobox delega para _select_custom_option."""
     applier = make_applier()
     element = MagicMock()
-    element.evaluate = AsyncMock(side_effect=["combobox", False])  # role, classList check
+    # 1ª evaluate: role=combobox; 2ª (em _select_custom_option): single-value confirmado
+    element.evaluate = AsyncMock(side_effect=["combobox", "Yes"])
     element.click = AsyncMock()
-    applier.page.evaluate = AsyncMock(return_value={"clicked": True, "options": ["Yes", "No"]})
+    element.type = AsyncMock()
+    element.press = AsyncMock()
+    applier.page.evaluate = AsyncMock(return_value=True)
     applier.page.keyboard = MagicMock()
     applier.page.keyboard.press = AsyncMock()
 
@@ -731,3 +751,52 @@ async def test_extract_fields_excludes_upload_alternatives():
         assert excluded not in fields
     assert "First Name" in fields
     assert "Telefone" in fields
+
+
+# ── fill_form: react-select (input role=combobox) ─────────────────────────────
+
+async def test_fill_form_routes_combobox_input_to_custom_dropdown():
+    """react-select: <input role=combobox> deve ir pro handler de dropdown custom,
+    não ser tratado como text input (senão digita no busca e mente 'filled')."""
+    applier = make_applier()
+    field = MagicMock()
+    # tagName=input; combobox-check=True; single-value confirmado='Yes'
+    field.evaluate = make_evaluate("input", combobox=True, selected="Yes")
+    field.click = AsyncMock()
+    field.type = AsyncMock()
+    field.press = AsyncMock()
+    field.fill = AsyncMock()
+    applier.page.get_by_label = MagicMock(return_value=make_label_locator(field))
+    applier.page.locator = MagicMock(return_value=MagicMock(first=MagicMock(count=AsyncMock(return_value=0))))
+    applier.page.evaluate = AsyncMock(return_value=True)
+    applier.page.keyboard = MagicMock()
+    applier.page.keyboard.press = AsyncMock()
+
+    with patch("asyncio.sleep", new=AsyncMock()):
+        result = await applier.fill_form({"Are you able to work from the office?": "Yes"}, cv_path="")
+
+    assert result["Are you able to work from the office?"] == "filled"
+    field.click.assert_called()       # abriu o dropdown
+    field.fill.assert_not_called()    # NÃO tratou como text input
+
+
+async def test_fill_form_combobox_no_match_marks_failed_not_filled():
+    """Se a opção não é encontrada no react-select, status é failed — nunca 'filled'."""
+    applier = make_applier()
+    field = MagicMock()
+    # combobox, mas single-value continua vazio → nada foi selecionado → failed
+    field.evaluate = make_evaluate("input", combobox=True, selected="")
+    field.click = AsyncMock()
+    field.type = AsyncMock()
+    field.press = AsyncMock()
+    field.fill = AsyncMock()
+    applier.page.get_by_label = MagicMock(return_value=make_label_locator(field))
+    applier.page.locator = MagicMock(return_value=MagicMock(first=MagicMock(count=AsyncMock(return_value=0))))
+    applier.page.evaluate = AsyncMock(return_value=False)  # nenhuma opção casou
+    applier.page.keyboard = MagicMock()
+    applier.page.keyboard.press = AsyncMock()
+
+    with patch("asyncio.sleep", new=AsyncMock()):
+        result = await applier.fill_form({"English level": "Fluent"}, cv_path="")
+
+    assert result["English level"].startswith("failed")
