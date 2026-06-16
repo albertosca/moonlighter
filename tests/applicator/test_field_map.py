@@ -98,3 +98,47 @@ def test_multiple_fields():
     r = pre_populate_answers(fields, PROFILE)
     assert len(r) == 4
     assert "Why do you want to work here?" not in r
+
+
+# ── PT-BR labels (forms em português, ex: Nubank Investments) ──────────────────
+
+def test_ptbr_nome_first_name():
+    r = pre_populate_answers(["Nome"], PROFILE)
+    assert r["Nome"] == "Alberto"
+
+
+def test_ptbr_sobrenome_last_name():
+    r = pre_populate_answers(["Sobrenome"], PROFILE)
+    assert r["Sobrenome"] == "de Sá Cavalcanti de Albuquerque"
+
+
+def test_ptbr_nome_de_preferencia():
+    r = pre_populate_answers(["Nome de preferência"], PROFILE)
+    assert r["Nome de preferência"] == "Alberto"
+
+
+def test_ptbr_email():
+    r = pre_populate_answers(["E-mail"], PROFILE)
+    assert r["E-mail"] == "maria.pereira@example.com"
+
+
+def test_ptbr_telefone():
+    r = pre_populate_answers(["Telefone"], PROFILE)
+    assert r["Telefone"] == "11912345678"
+
+
+def test_ptbr_pais_brasil():
+    r = pre_populate_answers(["País"], PROFILE)
+    assert r["País"] == "Brasil"
+
+
+def test_ptbr_localizacao_cidade():
+    r = pre_populate_answers(["Localização (Cidade)"], PROFILE)
+    assert r["Localização (Cidade)"] == "Belo Horizonte"
+
+
+def test_ptbr_strips_asterisk():
+    r = pre_populate_answers(["Telefone*", "Nome*", "Sobrenome*"], PROFILE)
+    assert r["Telefone*"] == "11912345678"
+    assert r["Nome*"] == "Alberto"
+    assert r["Sobrenome*"] == "de Sá Cavalcanti de Albuquerque"

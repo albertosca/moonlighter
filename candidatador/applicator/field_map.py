@@ -30,18 +30,25 @@ def _city(profile: dict) -> str:
 # Cada entrada: (padrão regex no label, callable(profile) -> str)
 # Os padrões são case-insensitive e combinam substring.
 _RULES: list[tuple[str, object]] = [
-    # Contato
+    # Contato (EN)
     (r"^first\s+name", _first_name),
     (r"^last\s+name", _last_name),
     (r"preferred\s+(first\s+)?name", _first_name),
     (r"^(phone|telephone|mobile|cel)", lambda p: p.get("phone") or ""),
-    (r"^email", lambda p: p.get("email") or ""),
+    (r"^e-?mail", lambda p: p.get("email") or ""),
     (r"linkedin", lambda p: p.get("linkedin") or ""),
     (r"^(website|portfolio|personal\s+site)", lambda p: p.get("website") or ""),
+    # Contato (PT-BR) — "preferência" e "sobrenome" ANTES de "^nome" (ordem importa)
+    (r"nome\s+de\s+prefer|prefer.*nome", _first_name),
+    (r"^sobrenome", _last_name),
+    (r"^nome", _first_name),
+    (r"^(telefone|celular)", lambda p: p.get("phone") or ""),
     # Localização
     (r"location\s*\(?city", _city),
+    (r"localiza|^cidade", _city),
     (r"^city$", _city),
     (r"^country$", lambda p: "Brazil"),
+    (r"^pa[ií]s", lambda p: "Brasil"),
     # Autorização de trabalho / visto / sponsorship: NÃO ficam aqui — são tratados
     # de forma país-dependente em work_auth (resposta fixa seria mentira p/ vaga US).
     # Idiomas
