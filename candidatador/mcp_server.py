@@ -629,28 +629,42 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
                     f"Confira {shot} e rode retry_apply({job_id}) após corrigir."
                 )
 
-            # outcome == "submitted" ou "unverified": em ambos o clique ocorreu, então
-            # tratamos como ENVIADA e NÃO re-submetemos (evita candidatura duplicada).
+            if outcome == "unverified":
+                # CONSERVADOR: clicou mas não deu para confirmar envio NEM detectar
+                # erro de validação. Não marcamos como enviada (evita falso positivo)
+                # e não permitimos retry cego (evita duplicar se de fato enviou).
+                app.status = "needs_review"
+                app.applied_at = None
+                app.form_data = json.dumps(stored_answers)
+                app.email_ref = ref
+                app.updated_at = datetime.now()
+                note = (
+                    f"[{datetime.now().strftime('%Y-%m-%d')}] submit NÃO confirmado — "
+                    f"conferir {shot}. Se foi enviada: update_status({job_id}, 'submitted'). "
+                    f"Se NÃO foi: update_status({job_id}, 'draft') e retry_apply({job_id})."
+                )
+                app.notes = f"{app.notes}\n{note}" if app.notes else note
+                app.save()
+                Job.update(status="needs_review").where(Job.id == job_id).execute()
+                return (
+                    f"⚠️  Candidatura #{job_id} ({job.company} / {job.title}): NÃO consegui "
+                    f"confirmar o envio.\n"
+                    f"🚫 NÃO marquei como enviada e NÃO vou re-submeter sozinho (evita duplicar).\n"
+                    f"Confira o screenshot: {shot}\n"
+                    f"→ Se foi enviada: `update_status({job_id}, 'submitted')`\n"
+                    f"→ Se não foi: `update_status({job_id}, 'draft')` e `retry_apply({job_id})`"
+                )
+
+            # outcome == "submitted": confirmado.
             app.status = "submitted"
             app.applied_at = datetime.now()
             app.form_data = json.dumps(stored_answers)
             app.updated_at = datetime.now()
             app.email_ref = ref
-            if outcome == "unverified":
-                note = f"[{datetime.now().strftime('%Y-%m-%d')}] enviada sem confirmação automática — verificar manualmente"
-                app.notes = f"{app.notes}\n{note}" if app.notes else note
             app.save()
             Job.update(status="applied").where(Job.id == job_id).execute()
-
-            if outcome == "submitted":
-                _archive_screenshots(job_id, _config)
-                return f"✓ Candidatura #{job_id} submetida e confirmada: {job.company} / {job.title}"
-            return (
-                f"⚠️  Candidatura #{job_id} ({job.company} / {job.title}) foi ENVIADA, mas não consegui "
-                f"confirmar o sucesso automaticamente.\n"
-                f"Confira na mão o screenshot: {shot}\n"
-                f"🚫 NÃO rode retry_apply — registrei como enviada para evitar candidatura duplicada."
-            )
+            _archive_screenshots(job_id, _config)
+            return f"✓ Candidatura #{job_id} submetida e confirmada: {job.company} / {job.title}"
         except Exception as e:
             app.status = "draft"
             app.save()
@@ -665,9 +679,16 @@ async def retry_apply(job_id: int) -> str:
     """Retry a failed application. Reuses stored draft answers."""
     async with _log_tool("retry_apply"):
         try:
-            Application.get(Application.job == Job.get_by_id(job_id))
+            app = Application.get(Application.job == Job.get_by_id(job_id))
         except (Job.DoesNotExist, Application.DoesNotExist):
             return f"Vaga #{job_id} não tem rascunho salvo. Rode apply_jobs(ids=[{job_id}]) primeiro."
+        if app.status == "needs_review":
+            return (
+                f"🚫 Vaga #{job_id} está em needs_review — pode ter sido enviada. "
+                f"NÃO vou re-submeter cegamente (evita candidatura duplicada).\n"
+                f"→ Se foi enviada: `update_status({job_id}, 'submitted')`\n"
+                f"→ Se não foi: `update_status({job_id}, 'draft')` e então `retry_apply({job_id})`"
+            )
         return await confirm_apply(job_id)
 
 
@@ -675,7 +696,7 @@ async def retry_apply(job_id: int) -> str:
 async def get_pipeline() -> str:
     """Show full application funnel: counts and list by status."""
     async with _log_tool("get_pipeline"):
-        statuses = ["draft", "submitted", "screening", "interviews", "offer", "rejected"]
+        statuses = ["draft", "needs_review", "submitted", "screening", "interviews", "offer", "rejected"]
         lines = ["# Pipeline de Candidaturas\n"]
         for status in statuses:
             apps = list(

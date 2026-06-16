@@ -883,9 +883,10 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
     assert Application.get_by_id(app.id).status == "draft"
 
 
-async def test_confirm_apply_unverified_marks_submitted_and_warns(tmp_db, tmp_path):
-    """RELIABILITY: submit 'unverified' (clicou mas sem confirmação) → registra como
-    ENVIADA (não re-submeter, evita duplicar) e avisa para conferir na mão."""
+async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db, tmp_path):
+    """RELIABILITY: submit 'unverified' (clicou, sem confirmar nem detectar erro)
+    → NUNCA marca como enviada. Vira needs_review, salva screenshot e ref, e pede
+    conferência manual. Conservador: zero falso 'enviado'."""
     init_db()
     job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/uv1", status="applying")
     app = create_application(job)
@@ -909,12 +910,34 @@ async def test_confirm_apply_unverified_marks_submitted_and_warns(tmp_db, tmp_pa
         result = await confirm_apply(job_id=job.id)
 
     app_fresh = Application.get_by_id(app.id)
-    assert app_fresh.status == "submitted"          # registrada como enviada
-    assert app_fresh.email_ref                       # ref de rastreamento gravado
-    assert Job.get_by_id(job.id).status == "applied"
-    assert "verificar manualmente" in (app_fresh.notes or "")
+    assert app_fresh.status == "needs_review"        # NÃO submitted
+    assert app_fresh.applied_at is None              # não conta como enviada
+    assert app_fresh.email_ref                       # ref salvo p/ rastrear se respondeu
+    assert Job.get_by_id(job.id).status == "needs_review"
     assert "04-submitted" in result                  # aponta o screenshot
-    assert "retry" in result.lower()                 # avisa para NÃO re-submeter
+    assert "update_status" in result                 # instrui o próximo passo humano
+
+
+async def test_retry_apply_refuses_needs_review(tmp_db):
+    """retry_apply NÃO re-submete uma candidatura em needs_review (pode ter ido →
+    duplicaria). Instrui o humano a decidir via update_status."""
+    init_db()
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/nr1",
+                     status="needs_review")
+    create_application(job, status="needs_review")
+    from candidatador.mcp_server import retry_apply
+    result = await retry_apply(job_id=job.id)
+    assert "needs_review" in result or "revis" in result.lower()
+    assert "update_status" in result
+
+
+async def test_get_pipeline_shows_needs_review(tmp_db):
+    init_db()
+    job = create_job(tmp_db, url="https://x.com/pl-nr", company="Stripe")
+    create_application(job, status="needs_review")
+    from candidatador.mcp_server import get_pipeline
+    result = await get_pipeline()
+    assert "needs_review" in result.lower() or "revis" in result.lower()
 
 
 async def test_confirm_apply_unknown_ats(tmp_db, tmp_path):
