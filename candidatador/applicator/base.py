@@ -168,22 +168,36 @@ async def generate_answers(
     job_id: int = 0,
     _caller: LLMCaller | None = None,
 ) -> ApplicationDraft:
+    from candidatador.applicator.field_map import pre_populate_answers
     if _caller is None:
         _caller = _make_api_caller(max_tokens=2048)
     logger.info("generating answers: %s/%s (%d fields)", company, title, len(fields))
-    prompt = ANSWER_PROMPT.format(
-        profile_yaml=yaml.dump(profile, allow_unicode=True),
-        company=company,
-        title=title,
-        description=description[:4000],
-        fields_list="\n".join(f"- {f}" for f in fields),
-    )
-    try:
-        raw_text = await _caller(prompt, model)
-        raw = _extract_json(raw_text)
-        answers = json.loads(raw)
-        logger.info("→ answers ok (%d respostas)", len(answers))
-        return ApplicationDraft(job_id=job_id, answers=answers, form_fields=fields)
-    except Exception as e:
-        logger.warning("→ answers error: %s", e)
-        return ApplicationDraft(job_id=job_id, answers={}, form_fields=fields, error=str(e))
+
+    # Pré-populamos campos de contato e respostas padronizadas diretamente do perfil.
+    # O LLM só recebe os campos que ele realmente precisa responder.
+    pre_populated = pre_populate_answers(fields, profile)
+    remaining_fields = [f for f in fields if f not in pre_populated]
+    logger.info("→ pre-populated %d campos, LLM responde %d", len(pre_populated), len(remaining_fields))
+
+    llm_answers: dict = {}
+    llm_error: str | None = None
+    if remaining_fields:
+        prompt = ANSWER_PROMPT.format(
+            profile_yaml=yaml.dump(profile, allow_unicode=True),
+            company=company,
+            title=title,
+            description=description[:4000],
+            fields_list="\n".join(f"- {f}" for f in remaining_fields),
+        )
+        try:
+            raw_text = await _caller(prompt, model)
+            raw = _extract_json(raw_text)
+            llm_answers = json.loads(raw)
+            logger.info("→ LLM answers ok (%d respostas)", len(llm_answers))
+        except Exception as e:
+            llm_error = str(e)
+            logger.warning("→ LLM answers error: %s", e)
+
+    # Pre-populated tem prioridade sobre LLM para campos de contato
+    answers = {**llm_answers, **pre_populated}
+    return ApplicationDraft(job_id=job_id, answers=answers, form_fields=fields, error=llm_error)

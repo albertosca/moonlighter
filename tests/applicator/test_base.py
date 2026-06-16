@@ -276,6 +276,99 @@ class TestFillField:
         field.click.assert_called_once()
 
 
+# ── generate_answers: pré-população via field_map ─────────────────────────────
+
+PROFILE_WITH_CONTACT = {
+    "name": "Maria de Souza",
+    "phone": "11912345678",
+    "email": "maria@example.com",
+    "linkedin": "https://www.linkedin.com/in/mariapereira/",
+    "location": "Belo Horizonte, MG, Brasil",
+}
+
+
+async def test_generate_answers_prepopulates_contact_fields():
+    """Campos de contato são pré-populados sem chamar o LLM."""
+    llm_called_with = []
+
+    async def capture_caller(prompt, model):
+        llm_called_with.append(prompt)
+        return json.dumps({"Why here?": "Because it's great"})
+
+    result = await generate_answers(
+        company="Co", title="Eng", description="desc",
+        fields=["First Name", "Phone", "Email", "Why here?"],
+        profile=PROFILE_WITH_CONTACT,
+        model="test",
+        _caller=capture_caller,
+    )
+
+    assert result.answers["First Name"] == "Alberto"
+    assert result.answers["Phone"] == "11912345678"
+    assert result.answers["Email"] == "maria@example.com"
+    assert result.answers["Why here?"] == "Because it's great"
+
+
+async def test_generate_answers_contact_fields_not_in_llm_prompt():
+    """Campos de contato pré-populados NÃO aparecem no prompt do LLM."""
+    llm_prompts = []
+
+    async def capture_caller(prompt, model):
+        llm_prompts.append(prompt)
+        return json.dumps({"Why here?": "ans"})
+
+    await generate_answers(
+        company="Co", title="Eng", description="desc",
+        fields=["First Name", "Phone", "Why here?"],
+        profile=PROFILE_WITH_CONTACT,
+        model="test",
+        _caller=capture_caller,
+    )
+
+    assert "First Name" not in llm_prompts[0]
+    assert "Phone" not in llm_prompts[0]
+    assert "Why here?" in llm_prompts[0]
+
+
+async def test_generate_answers_all_prepopulated_skips_llm():
+    """Quando todos os campos são pré-populados, o LLM não é chamado."""
+    llm_calls = []
+
+    async def capture_caller(prompt, model):
+        llm_calls.append(prompt)
+        return json.dumps({})
+
+    result = await generate_answers(
+        company="Co", title="Eng", description="desc",
+        fields=["First Name", "Phone", "Email"],
+        profile=PROFILE_WITH_CONTACT,
+        model="test",
+        _caller=capture_caller,
+    )
+
+    assert len(llm_calls) == 0
+    assert result.answers["First Name"] == "Alberto"
+    assert result.error is None
+
+
+async def test_generate_answers_prepopulated_overrides_llm():
+    """Campo pré-populado tem prioridade sobre resposta do LLM para o mesmo campo."""
+    async def caller(prompt, model):
+        # LLM tenta responder Phone com valor errado
+        return json.dumps({"Phone": "+5511912345678", "Why here?": "ans"})
+
+    result = await generate_answers(
+        company="Co", title="Eng", description="desc",
+        fields=["Phone", "Why here?"],
+        profile=PROFILE_WITH_CONTACT,
+        model="test",
+        _caller=caller,
+    )
+
+    # Pre-populated (sem +55) deve vencer o LLM
+    assert result.answers["Phone"] == "11912345678"
+
+
 @pytest.mark.asyncio
 async def test_generate_answers_logs_start_and_ok(caplog):
     import logging
