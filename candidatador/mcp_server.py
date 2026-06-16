@@ -1,9 +1,12 @@
 import asyncio
 import contextlib
 import json
+import re
 import secrets
+import shutil
 import time as _time
 from datetime import datetime
+from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from peewee import IntegrityError
 from rich.table import Table
@@ -14,7 +17,7 @@ import io
 from candidatador.db import init_db, Job, ScanLog, Application
 from candidatador.config import load_config, load_profile, load_company_list
 from candidatador.scanner.http_sources import GreenhouseScanner, LeverScanner, AshbyScanner
-from candidatador.evaluator import evaluate_job
+from candidatador.evaluator import evaluate_job, should_skip_by_title
 from candidatador import browser as _browser_mod
 import os
 from candidatador.applicator.greenhouse import GreenhouseApplier
@@ -106,11 +109,24 @@ async def _detect_applier(page, config, profile):
 
 
 @mcp.tool()
-async def scan_and_evaluate(keywords: str = "") -> str:
-    """Scan all configured job boards, evaluate with LLM, return new jobs above threshold."""
+async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
+    """Scan job boards, evaluate with LLM, return new jobs above threshold.
+
+    Por padrão escaneia só a fase 1 (empresas BR prioritárias) para economizar tokens.
+    Use phase='phase2', 'phase3', ou 'all' para escanear mais empresas explicitamente.
+
+    Args:
+        keywords: palavras-chave para o scanner LinkedIn (opcional)
+        phase: "phase1" (padrão/BR), "phase2" (remote-first global),
+               "phase3" (big techs), ou "all" (tudo)
+    """
     async with _log_tool("scan_and_evaluate"):
         threshold = _config["score_threshold"]
-        model = _config["llm_model"]
+        model = _config.get("eval_model", _config.get("llm_model", "claude-haiku-4-5-20251001"))
+        blocklist: list[str] = _config.get("title_blocklist", [])
+
+        effective_phase = None if phase == "all" else phase
+        companies = load_company_list(phase=effective_phase)
 
         # Fetch raw jobs from HTTP sources
         scanners = {
@@ -120,7 +136,7 @@ async def scan_and_evaluate(keywords: str = "") -> str:
         }
         all_raw = []
         for source, scanner in scanners.items():
-            slugs = _companies.get(source, [])
+            slugs = companies.get(source, [])
             if slugs:
                 raw = await scanner.scan(slugs)
                 all_raw.extend(raw)
@@ -158,14 +174,44 @@ async def scan_and_evaluate(keywords: str = "") -> str:
         results = []
 
         async def _eval_and_save(raw) -> Job | None:
-            eval_result = await evaluate_job(
-                company=raw.company,
-                title=raw.title,
-                description=raw.description or f"{raw.title} at {raw.company}",
-                profile=_profile,
-                model=model,
-                _caller=_llm_caller,
-            )
+            # Claim the URL in ScanLog before any work. ScanLog.create is synchronous
+            # (no await), so asyncio won't context-switch between the insert and its
+            # return — the UNIQUE constraint on job_url makes this the atomic guard
+            # against concurrent scan_and_evaluate calls evaluating the same URL twice.
+            try:
+                ScanLog.create(job_url=raw.url, source=raw.source)
+            except IntegrityError:
+                return None  # already claimed or processed by a concurrent call
+
+            matched_pattern = should_skip_by_title(raw.title, blocklist)
+            if matched_pattern:
+                try:
+                    job = Job.create(
+                        source=raw.source, company=raw.company, title=raw.title,
+                        url=raw.url, location=raw.location, remote_type=raw.remote_type,
+                        description=raw.description, posted_at=raw.posted_at,
+                        score=0.0, score_notes=f"title filtered: {matched_pattern!r}",
+                        caveats="[]", status="archived",
+                    )
+                    return job
+                except IntegrityError:
+                    return None
+
+            try:
+                eval_result = await evaluate_job(
+                    company=raw.company,
+                    title=raw.title,
+                    description=raw.description or f"{raw.title} at {raw.company}",
+                    profile=_profile,
+                    model=model,
+                    _caller=_llm_caller,
+                )
+            except Exception:
+                # LLM failed (spend limit, network, etc.) — release the claim so
+                # this URL can be retried on the next scan.
+                ScanLog.delete().where(ScanLog.job_url == raw.url).execute()
+                raise
+
             try:
                 job = Job.create(
                     source=raw.source, company=raw.company, title=raw.title,
@@ -180,7 +226,6 @@ async def scan_and_evaluate(keywords: str = "") -> str:
                     salary_source=eval_result.salary_source,
                     status="new" if eval_result.score >= threshold else "archived",
                 )
-                ScanLog.create(job_url=raw.url, source=raw.source)
                 return job
             except IntegrityError:
                 return None
@@ -191,14 +236,131 @@ async def scan_and_evaluate(keywords: str = "") -> str:
             results.extend([j for j in batch_results if j is not None])
 
         above = [j for j in results if j.status == "new"]
-        below = len(results) - len(above)
+        title_filtered = sum(
+            1 for j in results
+            if j.score_notes and j.score_notes.startswith("title filtered:")
+        )
+        below = len(results) - len(above) - title_filtered
 
         if not above:
-            return _with_li_warning(f"{len(results)} vagas processadas. Nenhuma passou o threshold de {threshold}.")
+            return _with_li_warning(
+                f"{len(results)} vagas processadas. Nenhuma passou o threshold de {threshold}. "
+                f"({title_filtered} descartadas por título, {below} abaixo do score)"
+            )
 
         table = _render_table(above)
-        footer = f"\n∗ = salário estimado pelo LLM  |  {below} vagas abaixo do threshold arquivadas"
-        return _with_li_warning(f"{len(results)} vagas novas processadas. {len(above)} acima do threshold:\n\n{table}{footer}")
+        footer = (
+            f"\n∗ = salário estimado pelo LLM  |  "
+            f"{below} abaixo do threshold  |  {title_filtered} descartadas por título"
+        )
+        return _with_li_warning(f"{len(results)} vagas processadas. {len(above)} acima do threshold:\n\n{table}{footer}")
+
+
+@mcp.tool()
+async def add_job(url: str, company: str = "", title: str = "", description: str = "") -> str:
+    """Avalia uma vaga fornecida manualmente e salva no banco.
+
+    Útil para vagas do LinkedIn, posts de emprego, ou qualquer fonte não suportada
+    pelo scanner automático. Se 'description' não for fornecida, tenta buscar a
+    URL via HTTP (não funciona para páginas que requerem autenticação, como LinkedIn).
+
+    Args:
+        url: URL da vaga (obrigatório, usado como identificador único)
+        company: Nome da empresa (ex: "ifood")
+        title: Título da vaga (ex: "Senior Software Engineer")
+        description: Texto da descrição da vaga. Se vazio, tenta buscar automaticamente.
+    """
+    async with _log_tool("add_job"):
+        threshold = _config["score_threshold"]
+        model = _config.get("eval_model", _config.get("llm_model", "claude-haiku-4-5-20251001"))
+        blocklist: list[str] = _config.get("title_blocklist", [])
+
+        # Tenta buscar descrição automaticamente se não foi fornecida
+        if not description:
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+                    r = await client.get(url, headers={"User-Agent": "candidatador/0.1"})
+                if r.status_code == 200:
+                    description = re.sub(r'<[^>]+>', ' ', r.text).strip()
+                    description = re.sub(r'\s+', ' ', description)[:8000]
+                else:
+                    return (
+                        f"Não consegui buscar a URL (HTTP {r.status_code}). "
+                        f"Forneça 'description' manualmente."
+                    )
+            except Exception as e:
+                return (
+                    f"Erro ao buscar URL: {e}\n"
+                    f"Para páginas que requerem login (LinkedIn, etc.), forneça "
+                    f"'company', 'title' e 'description' manualmente."
+                )
+
+        if not company or not title:
+            return "Forneça pelo menos 'company' e 'title' junto com a URL."
+
+        # Verifica duplicata
+        if ScanLog.select().where(ScanLog.job_url == url).exists():
+            try:
+                job = Job.get(Job.url == url)
+                return f"Vaga já existe no banco (id={job.id}, score={job.score:.1f}, status={job.status})."
+            except Job.DoesNotExist:
+                pass
+
+        # Filtro de título
+        matched_pattern = should_skip_by_title(title, blocklist)
+        if matched_pattern:
+            try:
+                job = Job.create(
+                    source="manual", company=company, title=title,
+                    url=url, location=None, remote_type=None,
+                    description=description, posted_at=None,
+                    score=0.0, score_notes=f"title filtered: {matched_pattern!r}",
+                    caveats="[]", status="archived",
+                )
+                ScanLog.create(job_url=url, source="manual")
+            except IntegrityError:
+                pass
+            return f"Vaga descartada pelo filtro de título (padrão: {matched_pattern!r})."
+
+        # Avaliação LLM
+        eval_result = await evaluate_job(
+            company=company,
+            title=title,
+            description=description,
+            profile=_profile,
+            model=model,
+            _caller=_llm_caller,
+        )
+
+        status = "new" if eval_result.score >= threshold else "archived"
+        try:
+            job = Job.create(
+                source="manual", company=company, title=title,
+                url=url, location=None, remote_type=None,
+                description=description, posted_at=None,
+                score=eval_result.score,
+                score_notes=eval_result.score_notes,
+                caveats=json.dumps(eval_result.caveats),
+                salary_min=eval_result.salary_min,
+                salary_max=eval_result.salary_max,
+                salary_currency=eval_result.salary_currency,
+                salary_source=eval_result.salary_source,
+                status=status,
+            )
+            ScanLog.create(job_url=url, source="manual")
+        except IntegrityError:
+            return "Vaga já existe no banco (conflito de URL)."
+
+        icon = "✓ NEW" if status == "new" else "arquivada"
+        caveats_str = "\n".join(f"  ⚠ {c}" for c in eval_result.caveats) if eval_result.caveats else "  nenhum"
+        return (
+            f"{icon} — {company} / {title}\n"
+            f"Score: {eval_result.score:.1f}/10  (threshold: {threshold})\n"
+            f"Notas: {eval_result.score_notes}\n"
+            f"Caveats:\n{caveats_str}\n"
+            f"id={job.id}"
+        )
 
 
 @mcp.tool()
@@ -332,6 +494,22 @@ async def apply_jobs(ids: list[int]) -> str:
         return "\n\n---\n".join(drafts_output)
 
 
+def _archive_screenshots(job_id: int, config: dict) -> None:
+    """Move screenshots de candidatura concluída para subdir 'done/', liberando espaço."""
+    try:
+        src = Path(config["screenshots_dir"]) / str(job_id)
+        if not src.exists():
+            return
+        dst = Path(config["screenshots_dir"]) / "done" / str(job_id)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.move(str(src), str(dst))
+        _log.info("_archive_screenshots: #%d → done/", job_id)
+    except Exception as e:
+        _log.debug("_archive_screenshots: falha (não crítico) — %s", e)
+
+
 @mcp.tool()
 async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
     """
@@ -373,21 +551,32 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
             if isinstance(applier, LinkedInApplier):
                 await applier.extract_fields()  # opens the modal
 
-            await applier.fill_form(stored_answers, cv_path)
+            fill_status = await applier.fill_form(stored_answers, cv_path)
+            if isinstance(fill_status, dict):
+                failed_fields = [k for k, s in fill_status.items() if s.startswith("failed")]
+                if failed_fields:
+                    _log.warning("confirm_apply #%d: campos com falha no preenchimento: %s", job_id, failed_fields)
+            else:
+                fill_status = {}
             await _browser_mod.save_screenshot(page, job_id, "03-filled", _config)
 
             outcome = await applier.submit()
             await _browser_mod.save_screenshot(page, job_id, "04-submitted", _config)
             shot = f"~/.candidatador/screenshots/{job_id}/04-submitted.png"
 
-            if outcome == "failed":
-                # Nem conseguiu clicar em enviar — seguro re-tentar.
+            if isinstance(outcome, str) and outcome.startswith("failed"):
+                # Falha ao submeter (botão não encontrado, erro, ou validação falhou)
                 app.status = "draft"
                 app.save()
                 Job.update(status="reviewed").where(Job.id == job_id).execute()
+                fill_summary = (
+                    ", ".join(f"{k}={s}" for k, s in fill_status.items() if s != "filled")
+                    or "todos preenchidos"
+                )
                 return (
-                    f"⚠️  Não consegui submeter a vaga #{job_id} (botão não encontrado ou erro). "
-                    f"Confira {shot} e rode retry_apply({job_id}) se quiser tentar de novo."
+                    f"⚠️  Candidatura #{job_id} NÃO foi submetida ({outcome}).\n"
+                    f"Campos problemáticos: {fill_summary}\n"
+                    f"Confira {shot} e rode retry_apply({job_id}) após corrigir."
                 )
 
             # outcome == "submitted" ou "unverified": em ambos o clique ocorreu, então
@@ -404,6 +593,7 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
             Job.update(status="applied").where(Job.id == job_id).execute()
 
             if outcome == "submitted":
+                _archive_screenshots(job_id, _config)
                 return f"✓ Candidatura #{job_id} submetida e confirmada: {job.company} / {job.title}"
             return (
                 f"⚠️  Candidatura #{job_id} ({job.company} / {job.title}) foi ENVIADA, mas não consegui "

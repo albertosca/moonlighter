@@ -1259,3 +1259,161 @@ def test_mcp_server_initializes_logging():
     import candidatador.log as log_mod
     # se o módulo já foi importado, _initialized deve ser True
     assert log_mod._initialized is True
+
+
+# ── _archive_screenshots ──────────────────────────────────────────────────────
+
+def test_archive_screenshots_moves_dir(tmp_path):
+    """_archive_screenshots move o dir de screenshots para done/<job_id>/."""
+    from candidatador.mcp_server import _archive_screenshots
+
+    job_dir = tmp_path / "42"
+    job_dir.mkdir()
+    (job_dir / "01-job-page.png").write_bytes(b"img")
+    (job_dir / "04-submitted.png").write_bytes(b"img")
+
+    config = {"screenshots_dir": str(tmp_path)}
+    _archive_screenshots(42, config)
+
+    assert not job_dir.exists()
+    done_dir = tmp_path / "done" / "42"
+    assert done_dir.exists()
+    assert (done_dir / "04-submitted.png").exists()
+
+
+def test_archive_screenshots_no_dir_is_noop(tmp_path):
+    """_archive_screenshots não falha quando o dir ainda não existe."""
+    from candidatador.mcp_server import _archive_screenshots
+    config = {"screenshots_dir": str(tmp_path)}
+    _archive_screenshots(999, config)  # não deve levantar
+
+
+def test_archive_screenshots_overwrites_existing_done(tmp_path):
+    """_archive_screenshots substitui done/<job_id>/ se já existe."""
+    from candidatador.mcp_server import _archive_screenshots
+
+    job_dir = tmp_path / "7"
+    job_dir.mkdir()
+    (job_dir / "new.png").write_bytes(b"new")
+
+    done_dir = tmp_path / "done" / "7"
+    done_dir.mkdir(parents=True)
+    (done_dir / "old.png").write_bytes(b"old")
+
+    config = {"screenshots_dir": str(tmp_path)}
+    _archive_screenshots(7, config)
+
+    assert (done_dir / "new.png").exists()
+    assert not (done_dir / "old.png").exists()
+
+
+async def test_confirm_apply_archives_on_success(tmp_db, tmp_path):
+    """confirm_apply chama _archive_screenshots quando outcome='submitted'."""
+    init_db()
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/arch1", status="applying")
+    create_application(job)
+    cv_path = tmp_path / "cv.pdf"
+    cv_path.write_bytes(b"fake")
+    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/arch1")
+
+    with patch("candidatador.mcp_server._browser_mod") as mock_browser, \
+         patch("candidatador.mcp_server._detect_applier") as mock_detect, \
+         patch("candidatador.mcp_server.os.path.exists", return_value=True), \
+         patch("candidatador.mcp_server.os.path.join", return_value=str(cv_path)), \
+         patch("candidatador.mcp_server.os.path.dirname"), \
+         patch("candidatador.mcp_server.os.path.abspath"), \
+         patch("candidatador.mcp_server._archive_screenshots") as mock_archive:
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        mock_applier = AsyncMock()
+        mock_applier.fill_form = AsyncMock()
+        mock_applier.submit = AsyncMock(return_value="submitted")
+        mock_detect.return_value = mock_applier
+        from candidatador.mcp_server import confirm_apply
+        await confirm_apply(job_id=job.id)
+
+    mock_archive.assert_called_once_with(job.id, mock_archive.call_args[0][1])
+
+
+# ── scan race condition (duplicate LLM calls) ─────────────────────────────────
+
+def _scan_patches(raw_jobs, eval_mock):
+    """Context manager stack shared by race condition tests."""
+    from unittest.mock import patch, AsyncMock
+    from contextlib import ExitStack
+    stack = ExitStack()
+    stack.enter_context(patch("candidatador.mcp_server.GreenhouseScanner",
+        **{"return_value.scan": AsyncMock(return_value=raw_jobs)}))
+    stack.enter_context(patch("candidatador.mcp_server.LeverScanner",
+        **{"return_value.scan": AsyncMock(return_value=[])}))
+    stack.enter_context(patch("candidatador.mcp_server.AshbyScanner",
+        **{"return_value.scan": AsyncMock(return_value=[])}))
+    stack.enter_context(patch("candidatador.mcp_server._browser_mod",
+        **{"new_page": AsyncMock(side_effect=Exception("no browser"))}))
+    stack.enter_context(patch("candidatador.mcp_server.evaluate_job", new=eval_mock))
+    return stack
+
+
+async def test_scan_concurrent_calls_evaluate_same_url_only_once(tmp_db):
+    """Concurrent scan_and_evaluate calls must not call evaluate_job twice for the same URL.
+
+    Reproduces the race condition where 11 parallel MCP tool invocations each saw
+    the same empty ScanLog snapshot and fired 11 LLM calls per job.
+    """
+    import asyncio
+    init_db()
+    from candidatador.mcp_server import scan_and_evaluate
+    from candidatador.scanner.base import RawJob
+
+    url = "https://x.com/race-1"
+    raw = RawJob(source="greenhouse", company="Co", title="Eng", url=url, description="desc")
+    eval_mock = AsyncMock(return_value=make_eval_result(score=8.0))
+
+    with _scan_patches([raw], eval_mock):
+        # Fire 5 concurrent scans for the same job
+        await asyncio.gather(*[scan_and_evaluate() for _ in range(5)])
+
+    # LLM must have been called exactly once despite 5 concurrent scans
+    assert eval_mock.call_count == 1
+    # Exactly one Job and one ScanLog entry
+    assert Job.select().where(Job.url == url).count() == 1
+    assert ScanLog.select().where(ScanLog.job_url == url).count() == 1
+
+
+async def test_scan_spend_limit_releases_scan_log_claim(tmp_db):
+    """When evaluate_job raises (spend limit), the ScanLog claim is released
+    so the URL can be retried on the next scan."""
+    init_db()
+    from candidatador.mcp_server import scan_and_evaluate
+    from candidatador.scanner.base import RawJob
+
+    url = "https://x.com/spend-limit-1"
+    raw = RawJob(source="greenhouse", company="Co", title="Eng", url=url, description="desc")
+    spend_limit_err = Exception("claude CLI exited with code 1: You've hit your monthly spend limit")
+    failing_eval = AsyncMock(side_effect=spend_limit_err)
+
+    with _scan_patches([raw], failing_eval):
+        with pytest.raises(Exception, match="spend limit"):
+            await scan_and_evaluate()
+
+    # Claim must be released — ScanLog should be empty so next scan retries the URL
+    assert ScanLog.select().where(ScanLog.job_url == url).count() == 0
+    # No Job was created
+    assert Job.select().where(Job.url == url).count() == 0
+
+
+async def test_scan_already_in_scan_log_skips_llm(tmp_db):
+    """URL already in ScanLog at scan start → evaluate_job not called (existing dedup)."""
+    init_db()
+    ScanLog.create(job_url="https://x.com/already-seen", source="greenhouse")
+    from candidatador.mcp_server import scan_and_evaluate
+    from candidatador.scanner.base import RawJob
+
+    raw = RawJob(source="greenhouse", company="Co", title="Eng", url="https://x.com/already-seen")
+    eval_mock = AsyncMock(return_value=make_eval_result(score=8.0))
+
+    with _scan_patches([raw], eval_mock):
+        await scan_and_evaluate()
+
+    eval_mock.assert_not_called()
+
