@@ -549,21 +549,24 @@ async def test_select_custom_option_clicks_and_selects():
 
 
 async def test_select_custom_option_uses_llm_for_descriptive_options():
-    """Quando o match local falha (opções em frase) o LLM escolhe entre as opções REAIS."""
+    """Quando o match local falha (opções em frase) o LLM escolhe entre as opções REAIS,
+    SEM digitar (regressão: digitar 'Fluent' filtraria p/ 'not able to speak fluently' e
+    o Enter cego pegaria a negativa)."""
     applier = make_applier()
     element = MagicMock()
     element.click = AsyncMock()
     element.type = AsyncMock()
     element.press = AsyncMock()
     element.scroll_into_view_if_needed = AsyncMock()
-    cefr = ["I can read simple texts", "Native or bilingual proficiency"]
+    cefr = [
+        "I can read simple texts",
+        "I can understand e-mails but I'm not able to speak fluently",
+        "Native or bilingual proficiency",
+    ]
     applier._visible_options = AsyncMock(return_value=cefr)
     applier._click_option_exact = AsyncMock(return_value=True)
-    # local falha (answer 'Fluent' não casa as frases): Enter não seleciona ("");
-    # depois do LLM escolher e clicar, a verificação confirma.
-    applier._selected_value = AsyncMock(side_effect=["", "Native or bilingual proficiency"])
+    applier._selected_value = AsyncMock(return_value="Native or bilingual proficiency")
     applier._llm_pick = AsyncMock(return_value="Native or bilingual proficiency")
-    applier._reopen_clean = AsyncMock()
     applier.page.keyboard = MagicMock()
     applier.page.keyboard.press = AsyncMock()
 
@@ -573,6 +576,33 @@ async def test_select_custom_option_uses_llm_for_descriptive_options():
     assert result is True
     applier._llm_pick.assert_awaited_once()
     applier._click_option_exact.assert_awaited_with("Native or bilingual proficiency")
+    element.type.assert_not_called()    # NÃO digitou (select estático) — sem Enter cego
+    element.press.assert_not_called()   # NÃO deu Enter cego
+
+
+async def test_select_custom_option_async_typeahead_types_then_matches():
+    """Select async (sem opções estáticas, ex: cidade): digita p/ carregar, então
+    casa a opção e clica a exata."""
+    applier = make_applier()
+    element = MagicMock()
+    element.click = AsyncMock()
+    element.type = AsyncMock()
+    element.scroll_into_view_if_needed = AsyncMock()
+    # 1ª leitura (estática) vazia → digita → 2ª leitura traz as cidades carregadas
+    applier._visible_options = AsyncMock(side_effect=[[], ["Belo Horizonte, Brazil", "Recife, Brazil"]])
+    applier._click_option_exact = AsyncMock(return_value=True)
+    applier._selected_value = AsyncMock(return_value="Belo Horizonte, Brazil")
+    applier._llm_pick = AsyncMock(return_value=None)
+    applier.page.keyboard = MagicMock()
+    applier.page.keyboard.press = AsyncMock()
+
+    with patch("asyncio.sleep", new=AsyncMock()):
+        result = await applier._select_custom_option(element, "Where are you based?", "Belo Horizonte")
+
+    assert result is True
+    element.type.assert_awaited()  # digitou para carregar (async)
+    applier._click_option_exact.assert_awaited_with("Belo Horizonte, Brazil")
+    applier._llm_pick.assert_not_called()  # match local resolveu, sem LLM
 
 
 async def test_select_custom_option_presses_escape_when_no_match():
@@ -657,14 +687,17 @@ async def test_fill_custom_element_typeahead_logs_options_on_miss(caplog):
 
 
 async def test_select_custom_option_logs_options_on_miss(caplog):
-    """_select_custom_option loga as opções disponíveis quando não encontra match."""
+    """_select_custom_option loga as opções disponíveis quando não encontra match
+    (nem local nem LLM)."""
     import logging
     applier = make_applier()
     element = MagicMock()
     element.click = AsyncMock()
-    applier.page.evaluate = AsyncMock(
-        return_value={"clicked": False, "options": ["Yes", "No", "Prefer not to say"]}
-    )
+    element.scroll_into_view_if_needed = AsyncMock()
+    applier._visible_options = AsyncMock(return_value=["Yes", "No", "Prefer not to say"])
+    applier._click_option_exact = AsyncMock(return_value=False)
+    applier._selected_value = AsyncMock(return_value="")
+    applier._llm_pick = AsyncMock(return_value=None)
     applier.page.keyboard = MagicMock()
     applier.page.keyboard.press = AsyncMock()
 

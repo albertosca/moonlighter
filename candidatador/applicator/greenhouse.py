@@ -1,4 +1,5 @@
 import asyncio
+import re
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 from candidatador.applicator.base import BaseApplier
 from candidatador.log import get_logger
@@ -201,13 +202,14 @@ class GreenhouseApplier(BaseApplier):
 
     async def _select_custom_option(self, element, label_text: str, answer: str) -> bool:
         """
-        Seleciona uma opção num react-select / dropdown custom de forma robusta:
-        abre, DIGITA para filtrar (essencial p/ selects async/typeahead como cidade),
-        clica na opção que casa (clique via DOM, evita interceptação de pointer) com
-        fallback para Enter, e por fim VERIFICA que um valor foi de fato selecionado
-        (.select__single-value). Sem verificação não há 'filled' — nunca falso-positivo.
+        Seleciona uma opção num react-select / dropdown custom escolhendo SEMPRE pelo
+        TEXTO REAL da opção (match local ou LLM) e clicando a opção exata, com
+        verificação via .select__single-value. NUNCA dá Enter cego (Enter na lista
+        filtrada selecionaria a opção destacada — pode ser a errada, ex: digitar
+        'Fluent' filtra para 'not able to speak fluently' e o Enter pegaria a negativa).
+        Em selects ESTÁTICOS escolhe pela lista completa SEM digitar; só digita quando
+        não há opções estáticas (select async/typeahead que carrega ao digitar).
         """
-        from candidatador.applicator.option_matcher import match_option_locally
         try:
             try:
                 await element.scroll_into_view_if_needed()
@@ -223,52 +225,27 @@ class GreenhouseApplier(BaseApplier):
                     pass
             await asyncio.sleep(0.4)
 
-            # Tentativa 1: opções estáticas → match local → clicar a opção EXATA → verificar
-            # (selects estáticos Yes/No — digitar fecharia o menu).
             static_opts = await self._visible_options()
-            choice = match_option_locally(answer, static_opts)
-            if choice and await self._click_option_exact(choice):
-                await asyncio.sleep(0.2)
-                if await self._selected_value(element):
+            if static_opts:
+                # Select estático/descritivo: escolher pela LISTA COMPLETA, sem digitar.
+                if await self._choose_and_click(element, label_text, answer, static_opts):
                     return True
-
-            # Tentativa 2: digitar para filtrar/carregar (selects async/searchable, ex:
-            # cidade) → match local na lista filtrada → clicar exato.
-            try:
-                await element.type(answer, delay=30)
-                await asyncio.sleep(0.7)
-            except Exception:
-                pass
-            filtered_opts = await self._visible_options()
-            choice = match_option_locally(answer, filtered_opts)
-            if choice and await self._click_option_exact(choice):
-                await asyncio.sleep(0.2)
-                if await self._selected_value(element):
+                shown = static_opts
+            else:
+                # Sem opções estáticas → async/typeahead (ex: cidade): digitar carrega.
+                try:
+                    await element.type(answer, delay=30)
+                    await asyncio.sleep(0.7)
+                except Exception:
+                    pass
+                loaded_opts = await self._visible_options()
+                if loaded_opts and await self._choose_and_click(element, label_text, answer, loaded_opts):
                     return True
-
-            # Tentativa 3: Enter na opção destacada pelo filtro.
-            try:
-                await element.press("Enter")
-                await asyncio.sleep(0.3)
-            except Exception:
-                pass
-            if await self._selected_value(element):
-                return True
-
-            # Tentativa 4: LLM desambigua entre as opções REAIS (ex: "English level"
-            # com opções em frase descritiva onde 'Fluent' não casa textualmente).
-            real_opts = static_opts or filtered_opts
-            chosen = await self._llm_pick(label_text, answer, real_opts)
-            if chosen:
-                await self._reopen_clean(element)  # limpa filtro digitado, reabre lista cheia
-                if await self._click_option_exact(chosen):
-                    await asyncio.sleep(0.2)
-                    if await self._selected_value(element):
-                        return True
+                shown = loaded_opts
 
             logger.warning(
                 "_select_custom_option: '%s' não selecionou '%s'. Opções: %s",
-                label_text, answer, real_opts or "(nenhuma — dropdown não abriu/carregou?)"
+                label_text, answer, shown or "(nenhuma — dropdown não abriu/carregou?)"
             )
             try:
                 await self.page.keyboard.press("Escape")
@@ -279,45 +256,50 @@ class GreenhouseApplier(BaseApplier):
             logger.warning("_select_custom_option: '%s' exception — %s", label_text, e)
             return False
 
+    async def _choose_and_click(self, element, label_text: str, answer: str, options: list[str]) -> bool:
+        """Escolhe a opção (match local; senão LLM entre as opções reais), clica a
+        EXATA e verifica a seleção. Sem escolha confirmada → False."""
+        from candidatador.applicator.option_matcher import match_option_locally
+        choice = match_option_locally(answer, options)
+        if not choice:
+            choice = await self._llm_pick(label_text, answer, options)
+        if choice and await self._click_option_exact(choice):
+            await asyncio.sleep(0.2)
+            if await self._selected_value(element):
+                return True
+        return False
+
+    _OPTION_SELECTOR = '.select__option, [role="option"], [role="listbox"] li'
+
     async def _visible_options(self) -> list[str]:
-        """Lista os textos das opções visíveis do dropdown aberto."""
+        """Lista os textos das opções do dropdown aberto. Usa locator com auto-wait
+        (as opções do react-select renderizam com delay) — um querySelectorAll único
+        pegaria a lista ainda vazia."""
         try:
-            return await self.page.evaluate(
-                """() => Array.from(document.querySelectorAll(
-                        '.select__option,[role="option"],[role="listbox"] li'))
-                      .map(e => (e.innerText||'').replace(/\\s+/g,' ').trim())
-                      .filter(Boolean).slice(0, 60)"""
-            )
+            loc = self.page.locator(self._OPTION_SELECTOR)
+            try:
+                await loc.first.wait_for(state="visible", timeout=2000)
+            except Exception:
+                return []
+            texts = await loc.all_inner_texts()
+            return [re.sub(r"\s+", " ", t).strip() for t in texts if t and t.strip()][:300]
         except Exception:
             return []
 
     async def _click_option_exact(self, text: str) -> bool:
-        """Clica (via DOM) na opção cujo texto normalizado é EXATAMENTE `text`."""
+        """Clica na opção cujo texto normalizado é EXATAMENTE `text` (via locator)."""
         try:
-            return bool(await self.page.evaluate(
-                """(want) => {
-                    const w = (want||'').replace(/\\s+/g,' ').trim().toLowerCase();
-                    const sels = ['.select__option','[role="option"]','[role="listbox"] li'];
-                    for (const sel of sels) for (const el of document.querySelectorAll(sel)) {
-                        const t = (el.innerText||'').replace(/\\s+/g,' ').trim().toLowerCase();
-                        if (t === w) { el.click(); return true; }
-                    }
-                    return false;
-                }""",
-                text,
-            ))
+            want = re.sub(r"\s+", " ", text or "").strip().lower()
+            loc = self.page.locator(self._OPTION_SELECTOR)
+            n = await loc.count()
+            for i in range(n):
+                t = re.sub(r"\s+", " ", await loc.nth(i).inner_text()).strip().lower()
+                if t == want:
+                    await loc.nth(i).click()
+                    return True
+            return False
         except Exception:
             return False
-
-    async def _reopen_clean(self, element) -> None:
-        """Fecha (limpa o filtro digitado) e reabre o menu para ter a lista completa."""
-        try:
-            await self.page.keyboard.press("Escape")
-            await asyncio.sleep(0.2)
-            await element.click()
-            await asyncio.sleep(0.4)
-        except Exception:
-            pass
 
     async def _llm_pick(self, label_text: str, answer: str, options: list[str]) -> str | None:
         """Desambigua via LLM entre as opções reais. Sem opções ou erro → None."""
