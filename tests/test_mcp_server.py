@@ -422,9 +422,12 @@ async def test_apply_jobs_creates_draft(tmp_db):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/apply1")
     draft = ApplicationDraft(job_id=job.id, answers={"Q": "A"}, form_fields=["Q"])
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server.generate_answers", new=AsyncMock(return_value=draft)),
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch(
+            "candidatador.services.apply_service.generate_answers",
+            new=AsyncMock(return_value=draft),
+        ),
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -452,8 +455,10 @@ async def test_apply_jobs_unknown_ats(tmp_db):
     job = create_job(tmp_db, url="https://unknownats.com/jobs/1")
     page = make_mock_page(url="https://unknownats.com/jobs/1")
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier", new=AsyncMock(return_value=None)),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch(
+            "candidatador.services.apply_service.detect_applier", new=AsyncMock(return_value=None)
+        ),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -469,9 +474,12 @@ async def test_apply_jobs_updates_job_status(tmp_db):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/apply2")
     draft = ApplicationDraft(job_id=job.id, answers={"Q": "A"}, form_fields=["Q"])
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server.generate_answers", new=AsyncMock(return_value=draft)),
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch(
+            "candidatador.services.apply_service.generate_answers",
+            new=AsyncMock(return_value=draft),
+        ),
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -498,9 +506,9 @@ async def test_confirm_apply_success(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ca1")
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
-        patch("candidatador.mcp_server.resolve_cv_path", return_value=str(cv_path)),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -542,7 +550,7 @@ async def test_confirm_apply_cv_not_found(tmp_db):
     job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca3", status="applying")
     create_application(job)
     with patch(
-        "candidatador.mcp_server.resolve_cv_path",
+        "candidatador.services.apply_service.resolve_cv_path",
         side_effect=CVNotFoundError("CV não encontrado"),
     ):
         from candidatador.mcp_server import confirm_apply
@@ -567,9 +575,9 @@ async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
         fill_calls.append(answers.copy())
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
-        patch("candidatador.mcp_server.resolve_cv_path", return_value=str(cv_path)),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -604,9 +612,9 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
         fill_calls.append(answers.copy())
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
-        patch("candidatador.mcp_server.resolve_cv_path", return_value=str(cv_path)),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -635,9 +643,9 @@ async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ca5")
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
-        patch("candidatador.mcp_server.resolve_cv_path", return_value=str(cv_path)),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -676,9 +684,9 @@ async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ra2")
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
-        patch("candidatador.mcp_server.resolve_cv_path", return_value=str(cv_path)),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -938,8 +946,11 @@ async def test_apply_jobs_linkedin_not_easy_apply(tmp_db):
     li_applier = LinkedInApplier(page, {}, {})
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier", new=AsyncMock(return_value=li_applier)),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch(
+            "candidatador.services.apply_service.detect_applier",
+            new=AsyncMock(return_value=li_applier),
+        ),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -958,9 +969,12 @@ async def test_apply_jobs_llm_error_still_creates_draft(tmp_db):
     error_draft = ApplicationDraft(job_id=job.id, answers={}, form_fields=[], error="LLM timeout")
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server.generate_answers", new=AsyncMock(return_value=error_draft)),
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch(
+            "candidatador.services.apply_service.generate_answers",
+            new=AsyncMock(return_value=error_draft),
+        ),
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -985,9 +999,12 @@ async def test_apply_jobs_updates_existing_draft(tmp_db):
     new_draft = ApplicationDraft(job_id=job.id, answers={"NewQ": "NewA"}, form_fields=["NewQ"])
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server.generate_answers", new=AsyncMock(return_value=new_draft)),
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch(
+            "candidatador.services.apply_service.generate_answers",
+            new=AsyncMock(return_value=new_draft),
+        ),
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1023,9 +1040,12 @@ async def test_apply_jobs_exception_continues_to_next(tmp_db):
         return mock_applier
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server.generate_answers", new=AsyncMock(return_value=draft)),
-        patch("candidatador.mcp_server._detect_applier", side_effect=detect_side_effect),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch(
+            "candidatador.services.apply_service.generate_answers",
+            new=AsyncMock(return_value=draft),
+        ),
+        patch("candidatador.services.apply_service.detect_applier", side_effect=detect_side_effect),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1051,9 +1071,9 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/sf1")
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
-        patch("candidatador.mcp_server.resolve_cv_path", return_value=str(cv_path)),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1083,9 +1103,9 @@ async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db,
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/uv1")
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
-        patch("candidatador.mcp_server.resolve_cv_path", return_value=str(cv_path)),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1141,9 +1161,11 @@ async def test_confirm_apply_unknown_ats(tmp_db, tmp_path):
     page = make_mock_page(url="https://unknownats.com/jobs/ca99")
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier", new=AsyncMock(return_value=None)),
-        patch("candidatador.mcp_server.resolve_cv_path", return_value=str(cv_path)),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch(
+            "candidatador.services.apply_service.detect_applier", new=AsyncMock(return_value=None)
+        ),
+        patch("candidatador.services.apply_service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1179,9 +1201,12 @@ async def test_confirm_apply_linkedin_calls_extract_fields(tmp_db, tmp_path):
     li_applier = TrackingLinkedInApplier(page, {}, {})
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier", new=AsyncMock(return_value=li_applier)),
-        patch("candidatador.mcp_server.resolve_cv_path", return_value=str(cv_path)),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch(
+            "candidatador.services.apply_service.detect_applier",
+            new=AsyncMock(return_value=li_applier),
+        ),
+        patch("candidatador.services.apply_service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1394,9 +1419,9 @@ async def test_confirm_apply_generates_6_char_ref(tmp_db, tmp_path):
     from candidatador.mcp_server import confirm_apply
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
-        patch("candidatador.mcp_server.resolve_cv_path", return_value=str(cv_path)),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1427,9 +1452,9 @@ async def test_confirm_apply_ref_is_url_safe(tmp_db, tmp_path):
     from candidatador.mcp_server import confirm_apply
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
-        patch("candidatador.mcp_server.resolve_cv_path", return_value=str(cv_path)),
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1460,8 +1485,8 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
         page = make_mock_page(url=job.url)
 
         with (
-            patch("candidatador.mcp_server._browser_mod") as mock_browser,
-            patch("candidatador.mcp_server._detect_applier") as mock_detect,
+            patch("candidatador.services.apply_service.browser") as mock_browser,
+            patch("candidatador.services.apply_service.detect_applier") as mock_detect,
             patch("candidatador.mcp_server.os.path.exists", return_value=True),
             patch("candidatador.mcp_server.os.path.join", return_value=str(cv_path)),
             patch("candidatador.mcp_server.os.path.dirname"),
@@ -1616,7 +1641,7 @@ def test_mcp_server_initializes_logging():
 
 def test_archive_screenshots_moves_dir(tmp_path):
     """_archive_screenshots move o dir de screenshots para done/<job_id>/."""
-    from candidatador.mcp_server import _archive_screenshots
+    from candidatador.services.apply_service import archive_screenshots
 
     job_dir = tmp_path / "42"
     job_dir.mkdir()
@@ -1624,7 +1649,7 @@ def test_archive_screenshots_moves_dir(tmp_path):
     (job_dir / "04-submitted.png").write_bytes(b"img")
 
     config = {"screenshots_dir": str(tmp_path)}
-    _archive_screenshots(42, config)
+    archive_screenshots(42, config)
 
     assert not job_dir.exists()
     done_dir = tmp_path / "done" / "42"
@@ -1634,15 +1659,15 @@ def test_archive_screenshots_moves_dir(tmp_path):
 
 def test_archive_screenshots_no_dir_is_noop(tmp_path):
     """_archive_screenshots não falha quando o dir ainda não existe."""
-    from candidatador.mcp_server import _archive_screenshots
+    from candidatador.services.apply_service import archive_screenshots
 
     config = {"screenshots_dir": str(tmp_path)}
-    _archive_screenshots(999, config)  # não deve levantar
+    archive_screenshots(999, config)  # não deve levantar
 
 
 def test_archive_screenshots_overwrites_existing_done(tmp_path):
     """_archive_screenshots substitui done/<job_id>/ se já existe."""
-    from candidatador.mcp_server import _archive_screenshots
+    from candidatador.services.apply_service import archive_screenshots
 
     job_dir = tmp_path / "7"
     job_dir.mkdir()
@@ -1653,7 +1678,7 @@ def test_archive_screenshots_overwrites_existing_done(tmp_path):
     (done_dir / "old.png").write_bytes(b"old")
 
     config = {"screenshots_dir": str(tmp_path)}
-    _archive_screenshots(7, config)
+    archive_screenshots(7, config)
 
     assert (done_dir / "new.png").exists()
     assert not (done_dir / "old.png").exists()
@@ -1671,10 +1696,10 @@ async def test_confirm_apply_archives_on_success(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/arch1")
 
     with (
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server._detect_applier") as mock_detect,
-        patch("candidatador.mcp_server.resolve_cv_path", return_value=str(cv_path)),
-        patch("candidatador.mcp_server._archive_screenshots") as mock_archive,
+        patch("candidatador.services.apply_service.browser") as mock_browser,
+        patch("candidatador.services.apply_service.detect_applier") as mock_detect,
+        patch("candidatador.services.apply_service.resolve_cv_path", return_value=str(cv_path)),
+        patch("candidatador.services.apply_service.archive_screenshots") as mock_archive,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1805,7 +1830,10 @@ async def test_confirm_apply_aborts_when_cv_missing(tmp_db):
         company="stripe",
     )
     create_application(job)
-    with patch("candidatador.mcp_server.resolve_cv_path", side_effect=CVNotFoundError("nao achei")):
+    with patch(
+        "candidatador.services.apply_service.resolve_cv_path",
+        side_effect=CVNotFoundError("nao achei"),
+    ):
         from candidatador.mcp_server import confirm_apply
 
         result = await confirm_apply(job_id=job.id)
