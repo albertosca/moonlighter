@@ -1,8 +1,6 @@
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from candidatador.applicator.base import ApplicationDraft
 from candidatador.applicator.cv import CVNotFoundError
 from candidatador.applicator.linkedin import LinkedInApplier
@@ -52,10 +50,10 @@ async def test_scan_no_new_jobs(tmp_db):
     from candidatador.mcp_server import scan_and_evaluate
 
     with (
-        patch("candidatador.mcp_server.GreenhouseScanner") as MockGH,
-        patch("candidatador.mcp_server.LeverScanner") as MockLV,
-        patch("candidatador.mcp_server.AshbyScanner") as MockAB,
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
+        patch("candidatador.services.scan_service.GreenhouseScanner") as MockGH,
+        patch("candidatador.services.scan_service.LeverScanner") as MockLV,
+        patch("candidatador.services.scan_service.AshbyScanner") as MockAB,
+        patch("candidatador.services.scan_service.browser") as mock_browser,
     ):
         for M in (MockGH, MockLV, MockAB):
             instance = AsyncMock()
@@ -75,12 +73,12 @@ async def test_scan_all_below_threshold(tmp_db):
         source="greenhouse", company="co", title="Eng", url="https://x.com/1", description="desc"
     )
     with (
-        patch("candidatador.mcp_server.GreenhouseScanner") as MockGH,
-        patch("candidatador.mcp_server.LeverScanner") as MockLV,
-        patch("candidatador.mcp_server.AshbyScanner") as MockAB,
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
+        patch("candidatador.services.scan_service.GreenhouseScanner") as MockGH,
+        patch("candidatador.services.scan_service.LeverScanner") as MockLV,
+        patch("candidatador.services.scan_service.AshbyScanner") as MockAB,
+        patch("candidatador.services.scan_service.browser") as mock_browser,
         patch(
-            "candidatador.mcp_server.evaluate_job",
+            "candidatador.services.scan_service.evaluate_job",
             new=AsyncMock(return_value=make_eval_result(score=4.0)),
         ),
     ):
@@ -108,12 +106,12 @@ async def test_scan_above_threshold_shows_table(tmp_db):
         description="desc",
     )
     with (
-        patch("candidatador.mcp_server.GreenhouseScanner") as MockGH,
-        patch("candidatador.mcp_server.LeverScanner") as MockLV,
-        patch("candidatador.mcp_server.AshbyScanner") as MockAB,
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
+        patch("candidatador.services.scan_service.GreenhouseScanner") as MockGH,
+        patch("candidatador.services.scan_service.LeverScanner") as MockLV,
+        patch("candidatador.services.scan_service.AshbyScanner") as MockAB,
+        patch("candidatador.services.scan_service.browser") as mock_browser,
         patch(
-            "candidatador.mcp_server.evaluate_job",
+            "candidatador.services.scan_service.evaluate_job",
             new=AsyncMock(return_value=make_eval_result(score=8.0)),
         ),
     ):
@@ -134,11 +132,11 @@ async def test_scan_dedup_against_scan_log(tmp_db):
 
     raw = RawJob(source="greenhouse", company="co", title="Eng", url="https://x.com/3")
     with (
-        patch("candidatador.mcp_server.GreenhouseScanner") as MockGH,
-        patch("candidatador.mcp_server.LeverScanner") as MockLV,
-        patch("candidatador.mcp_server.AshbyScanner") as MockAB,
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server.evaluate_job") as mock_eval,
+        patch("candidatador.services.scan_service.GreenhouseScanner") as MockGH,
+        patch("candidatador.services.scan_service.LeverScanner") as MockLV,
+        patch("candidatador.services.scan_service.AshbyScanner") as MockAB,
+        patch("candidatador.services.scan_service.browser") as mock_browser,
+        patch("candidatador.services.scan_service.evaluate_job") as mock_eval,
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -158,12 +156,12 @@ async def test_scan_linkedin_failure_doesnt_block(tmp_db):
         source="greenhouse", company="co", title="Eng", url="https://x.com/4", description="desc"
     )
     with (
-        patch("candidatador.mcp_server.GreenhouseScanner") as MockGH,
-        patch("candidatador.mcp_server.LeverScanner") as MockLV,
-        patch("candidatador.mcp_server.AshbyScanner") as MockAB,
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
+        patch("candidatador.services.scan_service.GreenhouseScanner") as MockGH,
+        patch("candidatador.services.scan_service.LeverScanner") as MockLV,
+        patch("candidatador.services.scan_service.AshbyScanner") as MockAB,
+        patch("candidatador.services.scan_service.browser") as mock_browser,
         patch(
-            "candidatador.mcp_server.evaluate_job",
+            "candidatador.services.scan_service.evaluate_job",
             new=AsyncMock(return_value=make_eval_result(score=8.0)),
         ),
     ):
@@ -198,11 +196,14 @@ async def test_scan_saves_salary_fields(tmp_db):
         salary_source="stated",
     )
     with (
-        patch("candidatador.mcp_server.GreenhouseScanner") as MockGH,
-        patch("candidatador.mcp_server.LeverScanner") as MockLV,
-        patch("candidatador.mcp_server.AshbyScanner") as MockAB,
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server.evaluate_job", new=AsyncMock(return_value=eval_result)),
+        patch("candidatador.services.scan_service.GreenhouseScanner") as MockGH,
+        patch("candidatador.services.scan_service.LeverScanner") as MockLV,
+        patch("candidatador.services.scan_service.AshbyScanner") as MockAB,
+        patch("candidatador.services.scan_service.browser") as mock_browser,
+        patch(
+            "candidatador.services.scan_service.evaluate_job",
+            new=AsyncMock(return_value=eval_result),
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -227,11 +228,14 @@ async def test_scan_saves_caveats_as_json(tmp_db):
         score=7.0, score_notes="ok", caveats=["US only", "requires visa"]
     )
     with (
-        patch("candidatador.mcp_server.GreenhouseScanner") as MockGH,
-        patch("candidatador.mcp_server.LeverScanner") as MockLV,
-        patch("candidatador.mcp_server.AshbyScanner") as MockAB,
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server.evaluate_job", new=AsyncMock(return_value=eval_result)),
+        patch("candidatador.services.scan_service.GreenhouseScanner") as MockGH,
+        patch("candidatador.services.scan_service.LeverScanner") as MockLV,
+        patch("candidatador.services.scan_service.AshbyScanner") as MockAB,
+        patch("candidatador.services.scan_service.browser") as mock_browser,
+        patch(
+            "candidatador.services.scan_service.evaluate_job",
+            new=AsyncMock(return_value=eval_result),
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -253,12 +257,12 @@ async def test_scan_status_archived_if_below_threshold(tmp_db):
         source="greenhouse", company="co", title="Eng", url="https://x.com/7", description="desc"
     )
     with (
-        patch("candidatador.mcp_server.GreenhouseScanner") as MockGH,
-        patch("candidatador.mcp_server.LeverScanner") as MockLV,
-        patch("candidatador.mcp_server.AshbyScanner") as MockAB,
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
+        patch("candidatador.services.scan_service.GreenhouseScanner") as MockGH,
+        patch("candidatador.services.scan_service.LeverScanner") as MockLV,
+        patch("candidatador.services.scan_service.AshbyScanner") as MockAB,
+        patch("candidatador.services.scan_service.browser") as mock_browser,
         patch(
-            "candidatador.mcp_server.evaluate_job",
+            "candidatador.services.scan_service.evaluate_job",
             new=AsyncMock(return_value=make_eval_result(score=3.0)),
         ),
     ):
@@ -817,12 +821,12 @@ async def test_scan_concurrent_batch_all_processed(tmp_db):
         for i in range(15)
     ]
     with (
-        patch("candidatador.mcp_server.GreenhouseScanner") as MockGH,
-        patch("candidatador.mcp_server.LeverScanner") as MockLV,
-        patch("candidatador.mcp_server.AshbyScanner") as MockAB,
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
+        patch("candidatador.services.scan_service.GreenhouseScanner") as MockGH,
+        patch("candidatador.services.scan_service.LeverScanner") as MockLV,
+        patch("candidatador.services.scan_service.AshbyScanner") as MockAB,
+        patch("candidatador.services.scan_service.browser") as mock_browser,
         patch(
-            "candidatador.mcp_server.evaluate_job",
+            "candidatador.services.scan_service.evaluate_job",
             new=AsyncMock(return_value=make_eval_result(score=7.0)),
         ),
     ):
@@ -861,11 +865,11 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
         return make_eval_result(score=7.0)
 
     with (
-        patch("candidatador.mcp_server.GreenhouseScanner") as MockGH,
-        patch("candidatador.mcp_server.LeverScanner") as MockLV,
-        patch("candidatador.mcp_server.AshbyScanner") as MockAB,
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server.evaluate_job", side_effect=eval_side),
+        patch("candidatador.services.scan_service.GreenhouseScanner") as MockGH,
+        patch("candidatador.services.scan_service.LeverScanner") as MockLV,
+        patch("candidatador.services.scan_service.AshbyScanner") as MockAB,
+        patch("candidatador.services.scan_service.browser") as mock_browser,
+        patch("candidatador.services.scan_service.evaluate_job", side_effect=eval_side),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -902,11 +906,11 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
         raise Exception("usage limit reached")  # spend limit já no 1º
 
     with (
-        patch("candidatador.mcp_server.GreenhouseScanner") as MockGH,
-        patch("candidatador.mcp_server.LeverScanner") as MockLV,
-        patch("candidatador.mcp_server.AshbyScanner") as MockAB,
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
-        patch("candidatador.mcp_server.evaluate_job", side_effect=eval_side),
+        patch("candidatador.services.scan_service.GreenhouseScanner") as MockGH,
+        patch("candidatador.services.scan_service.LeverScanner") as MockLV,
+        patch("candidatador.services.scan_service.AshbyScanner") as MockAB,
+        patch("candidatador.services.scan_service.browser") as mock_browser,
+        patch("candidatador.services.scan_service.evaluate_job", side_effect=eval_side),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1315,10 +1319,10 @@ async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
     from candidatador.scanner.playwright_sources import LinkedInSessionExpiredError
 
     with (
-        patch("candidatador.mcp_server.GreenhouseScanner") as MockGH,
-        patch("candidatador.mcp_server.LeverScanner") as MockLV,
-        patch("candidatador.mcp_server.AshbyScanner") as MockAB,
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
+        patch("candidatador.services.scan_service.GreenhouseScanner") as MockGH,
+        patch("candidatador.services.scan_service.LeverScanner") as MockLV,
+        patch("candidatador.services.scan_service.AshbyScanner") as MockAB,
+        patch("candidatador.services.scan_service.browser") as mock_browser,
         patch("candidatador.scanner.playwright_sources.LinkedInScanner") as MockLI,
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[])
@@ -1350,13 +1354,13 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
     )
 
     with (
-        patch("candidatador.mcp_server.GreenhouseScanner") as MockGH,
-        patch("candidatador.mcp_server.LeverScanner") as MockLV,
-        patch("candidatador.mcp_server.AshbyScanner") as MockAB,
-        patch("candidatador.mcp_server._browser_mod") as mock_browser,
+        patch("candidatador.services.scan_service.GreenhouseScanner") as MockGH,
+        patch("candidatador.services.scan_service.LeverScanner") as MockLV,
+        patch("candidatador.services.scan_service.AshbyScanner") as MockAB,
+        patch("candidatador.services.scan_service.browser") as mock_browser,
         patch("candidatador.scanner.playwright_sources.LinkedInScanner") as MockLI,
         patch(
-            "candidatador.mcp_server.evaluate_job",
+            "candidatador.services.scan_service.evaluate_job",
             new=AsyncMock(return_value=make_eval_result(score=8.0)),
         ),
     ):
@@ -1696,29 +1700,29 @@ def _scan_patches(raw_jobs, eval_mock):
     stack = ExitStack()
     stack.enter_context(
         patch(
-            "candidatador.mcp_server.GreenhouseScanner",
+            "candidatador.services.scan_service.GreenhouseScanner",
             **{"return_value.scan": AsyncMock(return_value=raw_jobs)},
         )
     )
     stack.enter_context(
         patch(
-            "candidatador.mcp_server.LeverScanner",
+            "candidatador.services.scan_service.LeverScanner",
             **{"return_value.scan": AsyncMock(return_value=[])},
         )
     )
     stack.enter_context(
         patch(
-            "candidatador.mcp_server.AshbyScanner",
+            "candidatador.services.scan_service.AshbyScanner",
             **{"return_value.scan": AsyncMock(return_value=[])},
         )
     )
     stack.enter_context(
         patch(
-            "candidatador.mcp_server._browser_mod",
+            "candidatador.services.scan_service.browser",
             **{"new_page": AsyncMock(side_effect=Exception("no browser"))},
         )
     )
-    stack.enter_context(patch("candidatador.mcp_server.evaluate_job", new=eval_mock))
+    stack.enter_context(patch("candidatador.services.scan_service.evaluate_job", new=eval_mock))
     return stack
 
 
