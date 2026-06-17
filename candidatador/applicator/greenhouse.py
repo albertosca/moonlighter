@@ -207,6 +207,7 @@ class GreenhouseApplier(BaseApplier):
         fallback para Enter, e por fim VERIFICA que um valor foi de fato selecionado
         (.select__single-value). Sem verificação não há 'filled' — nunca falso-positivo.
         """
+        from candidatador.applicator.option_matcher import match_option_locally
         try:
             try:
                 await element.scroll_into_view_if_needed()
@@ -222,45 +223,28 @@ class GreenhouseApplier(BaseApplier):
                     pass
             await asyncio.sleep(0.4)
 
-            async def _click_matching() -> None:
-                await self.page.evaluate(
-                    """(answer) => {
-                        const a = answer.toLowerCase().trim();
-                        const sels = ['.select__option', '[role="option"]',
-                                      '[role="listbox"] li', 'ul[role="listbox"] li',
-                                      '[data-testid*="option"]'];
-                        for (const sel of sels) {
-                            for (const el of document.querySelectorAll(sel)) {
-                                const t = (el.innerText || '').trim().toLowerCase();
-                                if (!t) continue;
-                                if (t === a || t.startsWith(a) || a.startsWith(t)) {
-                                    el.click();
-                                    return true;
-                                }
-                            }
-                        }
-                        return false;
-                    }""",
-                    answer,
-                )
+            # Tentativa 1: opções estáticas → match local → clicar a opção EXATA → verificar
+            # (selects estáticos Yes/No — digitar fecharia o menu).
+            static_opts = await self._visible_options()
+            choice = match_option_locally(answer, static_opts)
+            if choice and await self._click_option_exact(choice):
+                await asyncio.sleep(0.2)
+                if await self._selected_value(element):
+                    return True
 
-            # Tentativa 1: clicar a opção SEM digitar (selects estáticos — digitar
-            # fecharia o menu). Verifica que um valor foi de fato selecionado.
-            await _click_matching()
-            await asyncio.sleep(0.2)
-            if await self._selected_value(element):
-                return True
-
-            # Tentativa 2: digitar para filtrar/carregar (selects async/searchable).
+            # Tentativa 2: digitar para filtrar/carregar (selects async/searchable, ex:
+            # cidade) → match local na lista filtrada → clicar exato.
             try:
                 await element.type(answer, delay=30)
                 await asyncio.sleep(0.7)
             except Exception:
                 pass
-            await _click_matching()
-            await asyncio.sleep(0.2)
-            if await self._selected_value(element):
-                return True
+            filtered_opts = await self._visible_options()
+            choice = match_option_locally(answer, filtered_opts)
+            if choice and await self._click_option_exact(choice):
+                await asyncio.sleep(0.2)
+                if await self._selected_value(element):
+                    return True
 
             # Tentativa 3: Enter na opção destacada pelo filtro.
             try:
@@ -271,13 +255,20 @@ class GreenhouseApplier(BaseApplier):
             if await self._selected_value(element):
                 return True
 
-            options = await self.page.evaluate(
-                """() => Array.from(document.querySelectorAll('.select__option,[role="option"]'))
-                          .map(e => (e.innerText||'').trim()).filter(Boolean).slice(0, 15)"""
-            )
+            # Tentativa 4: LLM desambigua entre as opções REAIS (ex: "English level"
+            # com opções em frase descritiva onde 'Fluent' não casa textualmente).
+            real_opts = static_opts or filtered_opts
+            chosen = await self._llm_pick(label_text, answer, real_opts)
+            if chosen:
+                await self._reopen_clean(element)  # limpa filtro digitado, reabre lista cheia
+                if await self._click_option_exact(chosen):
+                    await asyncio.sleep(0.2)
+                    if await self._selected_value(element):
+                        return True
+
             logger.warning(
                 "_select_custom_option: '%s' não selecionou '%s'. Opções: %s",
-                label_text, answer, options or "(nenhuma — dropdown não abriu/carregou?)"
+                label_text, answer, real_opts or "(nenhuma — dropdown não abriu/carregou?)"
             )
             try:
                 await self.page.keyboard.press("Escape")
@@ -287,6 +278,62 @@ class GreenhouseApplier(BaseApplier):
         except Exception as e:
             logger.warning("_select_custom_option: '%s' exception — %s", label_text, e)
             return False
+
+    async def _visible_options(self) -> list[str]:
+        """Lista os textos das opções visíveis do dropdown aberto."""
+        try:
+            return await self.page.evaluate(
+                """() => Array.from(document.querySelectorAll(
+                        '.select__option,[role="option"],[role="listbox"] li'))
+                      .map(e => (e.innerText||'').replace(/\\s+/g,' ').trim())
+                      .filter(Boolean).slice(0, 60)"""
+            )
+        except Exception:
+            return []
+
+    async def _click_option_exact(self, text: str) -> bool:
+        """Clica (via DOM) na opção cujo texto normalizado é EXATAMENTE `text`."""
+        try:
+            return bool(await self.page.evaluate(
+                """(want) => {
+                    const w = (want||'').replace(/\\s+/g,' ').trim().toLowerCase();
+                    const sels = ['.select__option','[role="option"]','[role="listbox"] li'];
+                    for (const sel of sels) for (const el of document.querySelectorAll(sel)) {
+                        const t = (el.innerText||'').replace(/\\s+/g,' ').trim().toLowerCase();
+                        if (t === w) { el.click(); return true; }
+                    }
+                    return false;
+                }""",
+                text,
+            ))
+        except Exception:
+            return False
+
+    async def _reopen_clean(self, element) -> None:
+        """Fecha (limpa o filtro digitado) e reabre o menu para ter a lista completa."""
+        try:
+            await self.page.keyboard.press("Escape")
+            await asyncio.sleep(0.2)
+            await element.click()
+            await asyncio.sleep(0.4)
+        except Exception:
+            pass
+
+    async def _llm_pick(self, label_text: str, answer: str, options: list[str]) -> str | None:
+        """Desambigua via LLM entre as opções reais. Sem opções ou erro → None."""
+        if not options:
+            return None
+        try:
+            from candidatador.llm import make_caller
+            from candidatador.applicator.option_matcher import pick_option_with_llm
+            caller = make_caller(self.config)
+            model = (self.config.get("eval_model") or self.config.get("llm_model")
+                     or "claude-haiku-4-5-20251001")
+            return await pick_option_with_llm(
+                label_text, answer, options, self.profile, caller, model
+            )
+        except Exception:
+            return None
 
     async def _selected_value(self, element) -> str:
         """Lê o valor exibido pelo react-select (.select__single-value) subindo a árvore."""

@@ -527,14 +527,16 @@ async def test_upload_cv_returns_failed_when_no_input_found():
 # ── _select_custom_option() ───────────────────────────────────────────────────
 
 async def test_select_custom_option_clicks_and_selects():
-    """_select_custom_option abre, seleciona e VERIFICA o valor (single-value='Yes')."""
+    """_select_custom_option: match local na opção estática, clica a exata e VERIFICA."""
     applier = make_applier()
     element = MagicMock()
     element.click = AsyncMock()
     element.type = AsyncMock()
     element.press = AsyncMock()
-    element.evaluate = AsyncMock(return_value="Yes")  # single-value confirmado
-    applier.page.evaluate = AsyncMock(return_value=True)  # opção clicada via DOM
+    element.scroll_into_view_if_needed = AsyncMock()
+    applier._visible_options = AsyncMock(return_value=["Yes", "No"])
+    applier._click_option_exact = AsyncMock(return_value=True)
+    applier._selected_value = AsyncMock(return_value="Yes")
     applier.page.keyboard = MagicMock()
     applier.page.keyboard.press = AsyncMock()
 
@@ -542,8 +544,35 @@ async def test_select_custom_option_clicks_and_selects():
         result = await applier._select_custom_option(element, "Status", "Yes")
 
     assert result is True
-    element.click.assert_called_once()
+    applier._click_option_exact.assert_awaited_with("Yes")  # clicou a opção exata
     applier.page.keyboard.press.assert_not_called()
+
+
+async def test_select_custom_option_uses_llm_for_descriptive_options():
+    """Quando o match local falha (opções em frase) o LLM escolhe entre as opções REAIS."""
+    applier = make_applier()
+    element = MagicMock()
+    element.click = AsyncMock()
+    element.type = AsyncMock()
+    element.press = AsyncMock()
+    element.scroll_into_view_if_needed = AsyncMock()
+    cefr = ["I can read simple texts", "Native or bilingual proficiency"]
+    applier._visible_options = AsyncMock(return_value=cefr)
+    applier._click_option_exact = AsyncMock(return_value=True)
+    # local falha (answer 'Fluent' não casa as frases): Enter não seleciona ("");
+    # depois do LLM escolher e clicar, a verificação confirma.
+    applier._selected_value = AsyncMock(side_effect=["", "Native or bilingual proficiency"])
+    applier._llm_pick = AsyncMock(return_value="Native or bilingual proficiency")
+    applier._reopen_clean = AsyncMock()
+    applier.page.keyboard = MagicMock()
+    applier.page.keyboard.press = AsyncMock()
+
+    with patch("asyncio.sleep", new=AsyncMock()):
+        result = await applier._select_custom_option(element, "English level", "Fluent")
+
+    assert result is True
+    applier._llm_pick.assert_awaited_once()
+    applier._click_option_exact.assert_awaited_with("Native or bilingual proficiency")
 
 
 async def test_select_custom_option_presses_escape_when_no_match():
@@ -581,19 +610,14 @@ async def test_fill_custom_element_combobox_delegates_to_select():
     """_fill_custom_element com role=combobox delega para _select_custom_option."""
     applier = make_applier()
     element = MagicMock()
-    # 1ª evaluate: role=combobox; 2ª (em _select_custom_option): single-value confirmado
-    element.evaluate = AsyncMock(side_effect=["combobox", "Yes"])
-    element.click = AsyncMock()
-    element.type = AsyncMock()
-    element.press = AsyncMock()
-    applier.page.evaluate = AsyncMock(return_value=True)
-    applier.page.keyboard = MagicMock()
-    applier.page.keyboard.press = AsyncMock()
+    element.evaluate = AsyncMock(return_value="combobox")  # role
+    applier._select_custom_option = AsyncMock(return_value=True)
 
     with patch("asyncio.sleep", new=AsyncMock()):
         result = await applier._fill_custom_element(element, "Status", "Yes")
 
     assert result is True
+    applier._select_custom_option.assert_awaited_once()
 
 
 async def test_fill_custom_element_typeahead_types_and_clicks():
@@ -760,24 +784,18 @@ async def test_fill_form_routes_combobox_input_to_custom_dropdown():
     não ser tratado como text input (senão digita no busca e mente 'filled')."""
     applier = make_applier()
     field = MagicMock()
-    # tagName=input; combobox-check=True; single-value confirmado='Yes'
-    field.evaluate = make_evaluate("input", combobox=True, selected="Yes")
-    field.click = AsyncMock()
-    field.type = AsyncMock()
-    field.press = AsyncMock()
+    field.evaluate = make_evaluate("input", combobox=True)  # tagName + combobox-check
     field.fill = AsyncMock()
     applier.page.get_by_label = MagicMock(return_value=make_label_locator(field))
     applier.page.locator = MagicMock(return_value=MagicMock(first=MagicMock(count=AsyncMock(return_value=0))))
-    applier.page.evaluate = AsyncMock(return_value=True)
-    applier.page.keyboard = MagicMock()
-    applier.page.keyboard.press = AsyncMock()
+    applier._select_custom_option = AsyncMock(return_value=True)  # handler de dropdown
 
     with patch("asyncio.sleep", new=AsyncMock()):
         result = await applier.fill_form({"Are you able to work from the office?": "Yes"}, cv_path="")
 
     assert result["Are you able to work from the office?"] == "filled"
-    field.click.assert_called()       # abriu o dropdown
-    field.fill.assert_not_called()    # NÃO tratou como text input
+    applier._select_custom_option.assert_awaited_once()  # roteou pro handler de dropdown
+    field.fill.assert_not_called()                        # NÃO tratou como text input
 
 
 async def test_fill_form_combobox_no_match_marks_failed_not_filled():
