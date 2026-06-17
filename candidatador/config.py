@@ -39,7 +39,7 @@ _PATH_KEYS = ("browser_session_dir", "screenshots_dir", "db_path")
 _LEARNED_BLOCKLIST_PATH = os.path.join(_PROJECT_ROOT, "blocklist_learned.yaml")
 
 
-def load_config(config_path: str = None) -> dict:
+def load_config(config_path: str | None = None) -> dict:
     """
     Load configuration from YAML file, merging with defaults.
 
@@ -74,7 +74,7 @@ def load_config(config_path: str = None) -> dict:
     return config
 
 
-def load_profile(profile_path: str = None) -> dict:
+def load_profile(profile_path: str | None = None) -> dict:
     """
     Load profile from YAML file.
 
@@ -90,7 +90,7 @@ def load_profile(profile_path: str = None) -> dict:
         return yaml.safe_load(f) or {}
 
 
-def load_company_list(path: str = None, phase: str | None = None) -> dict:
+def load_company_list(path: str | None = None, phase: str | None = None) -> dict:
     """Load company list from YAML file, optionally filtered by phase.
 
     O company_list.yaml organiza slugs por ATS e fase:

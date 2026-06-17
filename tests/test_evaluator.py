@@ -544,7 +544,7 @@ async def test_evaluate_job_logs_score(caplog):
     mock_caller = AsyncMock(return_value=good_response)
 
     with caplog.at_level(logging.DEBUG, logger="candidatador.evaluator"):
-        result = await evaluate_job(
+        await evaluate_job(
             company="Stripe",
             title="Backend Engineer",
             description="Python, distributed systems",

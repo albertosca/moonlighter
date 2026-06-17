@@ -341,7 +341,6 @@ async def test_submit_max_10_steps():
     next_btn = MagicMock()
     next_btn.click = AsyncMock()
 
-    submit_calls = [0]
     next_calls = [0]
 
     async def qs(selector):

@@ -520,7 +520,7 @@ async def test_generate_answers_logs_start_and_ok(caplog):
     mock_caller = AsyncMock(return_value=json.dumps({"Por que a Stripe?": "Porque é top"}))
 
     with caplog.at_level(logging.INFO, logger="candidatador.applicator.base"):
-        result = await generate_answers(
+        await generate_answers(
             company="Stripe",
             title="SRE",
             description="infra stuff",

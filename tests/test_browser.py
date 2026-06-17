@@ -56,7 +56,7 @@ def _make_cdp_mocks():
 
 
 async def test_get_context_launches_brave_when_devtools_not_ready():
-    mock_pw, mock_playwright, mock_browser, mock_context, mock_proc = _make_cdp_mocks()
+    mock_pw, mock_playwright, _mock_browser, mock_context, mock_proc = _make_cdp_mocks()
     with (
         patch("candidatador.browser.async_playwright", return_value=mock_pw),
         patch("candidatador.browser.subprocess.Popen", return_value=mock_proc) as popen,
@@ -70,7 +70,7 @@ async def test_get_context_launches_brave_when_devtools_not_ready():
 
 
 async def test_get_context_skips_launch_when_devtools_already_ready():
-    mock_pw, mock_playwright, mock_browser, mock_context, mock_proc = _make_cdp_mocks()
+    mock_pw, mock_playwright, _mock_browser, mock_context, mock_proc = _make_cdp_mocks()
     with (
         patch("candidatador.browser.async_playwright", return_value=mock_pw),
         patch("candidatador.browser.subprocess.Popen", return_value=mock_proc) as popen,
@@ -206,7 +206,7 @@ async def test_get_context_logs_cdp_connected(caplog):
     """get_context() deve logar 'CDP connected' quando conecta com sucesso."""
     import logging
 
-    mock_pw, mock_playwright, mock_browser, mock_context, mock_proc = _make_cdp_mocks()
+    mock_pw, _mock_playwright, _mock_browser, _mock_context, mock_proc = _make_cdp_mocks()
 
     with (
         patch("candidatador.browser.async_playwright", return_value=mock_pw),

@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import re
 from datetime import UTC, datetime
 
@@ -46,10 +47,8 @@ class GreenhouseScanner(BaseScanner):
             location = item.get("location", {}).get("name")
             posted_at = None
             if item.get("updated_at"):
-                try:
+                with contextlib.suppress(ValueError):
                     posted_at = datetime.fromisoformat(item["updated_at"].replace("Z", "+00:00"))
-                except ValueError:
-                    pass
             raw_content = item.get("content", "") or ""
             description = re.sub(r"<[^>]+>", " ", raw_content).strip() if raw_content else None
             jobs.append(
@@ -179,10 +178,8 @@ class AshbyScanner(BaseScanner):
             )
             posted_at = None
             if item.get("publishedDate"):
-                try:
+                with contextlib.suppress(ValueError):
                     posted_at = datetime.fromisoformat(item["publishedDate"])
-                except ValueError:
-                    pass
             jobs.append(
                 RawJob(
                     source="ashby",

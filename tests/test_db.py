@@ -10,12 +10,12 @@ from candidatador.db import Application, Job, ScanLog, init_db
 
 def _make_job(**kwargs):
     """Helper: cria um Job com defaults mínimos, sobrescrito por kwargs."""
-    defaults = dict(
-        source="greenhouse",
-        company="Stripe",
-        title="Senior Engineer",
-        url="https://boards.greenhouse.io/stripe/jobs/123",
-    )
+    defaults = {
+        "source": "greenhouse",
+        "company": "Stripe",
+        "title": "Senior Engineer",
+        "url": "https://boards.greenhouse.io/stripe/jobs/123",
+    }
     defaults.update(kwargs)
     return Job.create(**defaults)
 

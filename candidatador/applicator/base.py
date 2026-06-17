@@ -1,3 +1,4 @@
+import contextlib
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -111,10 +112,8 @@ async def _fill_field(field, answer: str) -> None:
         try:
             await field.select_option(label=answer)
         except Exception:
-            try:
+            with contextlib.suppress(Exception):
                 await field.select_option(value=answer)
-            except Exception:
-                pass
     elif tag == "input":
         input_type = ((await field.get_attribute("type")) or "text").lower()
         if input_type == "radio":

@@ -222,7 +222,7 @@ def test_make_api_caller_reuses_client_across_calls():
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
     with patch("candidatador.llm.anthropic", mock_anthropic):
-        caller = _make_api_caller()
+        _make_api_caller()
 
     assert mock_anthropic.AsyncAnthropic.call_count == 1
 

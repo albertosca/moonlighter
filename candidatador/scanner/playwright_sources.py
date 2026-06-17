@@ -29,7 +29,7 @@ class LinkedInScanner(BaseScanner):
 
     async def scan(
         self,
-        company_slugs: list[str] = None,
+        company_slugs: list[str] | None = None,
         keywords: str = "",
         location: str = "Worldwide",
         **kwargs,

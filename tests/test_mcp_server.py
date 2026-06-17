@@ -25,20 +25,20 @@ def make_eval_result(score=8.0):
 
 def create_job(tmp_db, **kwargs):
     """Helper: creates a job in the temp DB. Call init_db() first."""
-    defaults = dict(
-        source="greenhouse",
-        company="Stripe",
-        title="Engineer",
-        url="https://boards.greenhouse.io/stripe/jobs/1",
-        score=8.0,
-        status="new",
-    )
+    defaults = {
+        "source": "greenhouse",
+        "company": "Stripe",
+        "title": "Engineer",
+        "url": "https://boards.greenhouse.io/stripe/jobs/1",
+        "score": 8.0,
+        "status": "new",
+    }
     defaults.update(kwargs)
     return Job.create(**defaults)
 
 
 def create_application(job, **kwargs):
-    defaults = dict(status="draft", form_data='{"Q": "A"}')
+    defaults = {"status": "draft", "form_data": '{"Q": "A"}'}
     defaults.update(kwargs)
     return Application.create(job=job, **defaults)
 
@@ -538,7 +538,7 @@ async def test_confirm_apply_job_not_found(tmp_db):
 async def test_confirm_apply_cv_not_found(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca3", status="applying")
-    app = create_application(job)
+    create_application(job)
     with patch("candidatador.mcp_server.os.path.exists", return_value=False):
         from candidatador.mcp_server import confirm_apply
 
@@ -551,7 +551,7 @@ async def test_confirm_apply_cv_not_found(tmp_db):
 async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
     init_db()
     job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca4", status="applying")
-    app = create_application(job, form_data='{"Q1": "original", "Q2": "original2"}')
+    create_application(job, form_data='{"Q1": "original", "Q2": "original2"}')
     cv_path = tmp_path / "cv.pdf"
     cv_path.write_bytes(b"fake pdf")
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ca4")

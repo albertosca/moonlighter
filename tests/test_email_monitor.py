@@ -78,18 +78,18 @@ def _build_gmail_message(
 
 
 def _make_job(tmp_db, **kwargs):
-    defaults = dict(
-        source="greenhouse",
-        company="Anthropic",
-        title="Senior Engineer",
-        url="https://boards.greenhouse.io/anthropic/jobs/1",
-    )
+    defaults = {
+        "source": "greenhouse",
+        "company": "Anthropic",
+        "title": "Senior Engineer",
+        "url": "https://boards.greenhouse.io/anthropic/jobs/1",
+    }
     defaults.update(kwargs)
     return Job.create(**defaults)
 
 
 def _make_application(job, **kwargs):
-    defaults = dict(status="submitted")
+    defaults = {"status": "submitted"}
     defaults.update(kwargs)
     return Application.create(job=job, **defaults)
 
@@ -737,7 +737,7 @@ class TestSetupGmailService:
 
         with (
             patch("candidatador.email_monitor.Credentials") as MockCreds,
-            patch("candidatador.email_monitor.Request") as MockRequest,
+            patch("candidatador.email_monitor.Request"),
             patch("candidatador.email_monitor.build") as mock_build,
             patch("os.path.exists", return_value=True),
             patch("builtins.open", MagicMock()),
@@ -879,8 +879,8 @@ class TestSyncResponses:
         init_db()
         job1 = _make_job(tmp_db, company="Stripe", title="Engineer", url="https://x.com/1")
         job2 = _make_job(tmp_db, company="Stripe", title="Engineer", url="https://x.com/2")
-        app1 = _make_application(job1, status="submitted", email_ref=None)
-        app2 = _make_application(job2, status="submitted", email_ref=None)
+        _make_application(job1, status="submitted", email_ref=None)
+        _make_application(job2, status="submitted", email_ref=None)
 
         message = {
             "to": BASE_EMAIL,

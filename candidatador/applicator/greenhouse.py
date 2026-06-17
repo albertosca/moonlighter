@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import re
 
 from playwright.async_api import TimeoutError as PlaywrightTimeout
@@ -234,18 +235,14 @@ class GreenhouseApplier(BaseApplier):
         não há opções estáticas (select async/typeahead que carrega ao digitar).
         """
         try:
-            try:
+            with contextlib.suppress(Exception):
                 await element.scroll_into_view_if_needed()
-            except Exception:
-                pass
             # Abre o menu. Em caso de clique interceptado por overlay, foca via JS.
             try:
                 await element.click()
             except Exception:
-                try:
+                with contextlib.suppress(Exception):
                     await element.evaluate("el => el.focus()")
-                except Exception:
-                    pass
             await asyncio.sleep(0.4)
 
             static_opts = await self._visible_options()
@@ -274,10 +271,8 @@ class GreenhouseApplier(BaseApplier):
                 answer,
                 shown or "(nenhuma — dropdown não abriu/carregou?)",
             )
-            try:
+            with contextlib.suppress(Exception):
                 await self.page.keyboard.press("Escape")
-            except Exception:
-                pass
             return False
         except Exception as e:
             logger.warning("_select_custom_option: '%s' exception — %s", label_text, e)

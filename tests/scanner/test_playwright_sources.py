@@ -175,7 +175,7 @@ class TestFetchDescription:
         assert result is None
 
     async def test_returns_none_when_click_raises(self):
-        scanner, page = self._make_scanner()
+        scanner, _page = self._make_scanner()
         card = MagicMock()
         card.click = AsyncMock(side_effect=Exception("element detached"))
 
@@ -237,7 +237,7 @@ async def test_linkedin_scanner_logs_start_and_found(caplog):
 
     scanner = LinkedInScanner(page)
     with caplog.at_level(logging.INFO, logger="candidatador.scanner.playwright_sources"):
-        result = await scanner.scan(keywords="eng")
+        await scanner.scan(keywords="eng")
 
     assert "LinkedIn scan: starting" in caplog.text
     assert "LinkedIn: found" in caplog.text
