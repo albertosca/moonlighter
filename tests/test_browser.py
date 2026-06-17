@@ -128,9 +128,9 @@ async def test_get_context_raises_when_brave_never_ready():
         patch("candidatador.browser.subprocess.Popen", return_value=mock_proc),
         patch("candidatador.browser._devtools_ready", return_value=False),
         patch("candidatador.browser.asyncio.sleep", new=AsyncMock()),
+        pytest.raises(RuntimeError, match="Brave"),
     ):
-        with pytest.raises(RuntimeError, match="Brave"):
-            await browser_mod.get_context(_CONFIG)
+        await browser_mod.get_context(_CONFIG)
     mock_proc.kill.assert_called_once()  # cleanup do processo travado
 
 

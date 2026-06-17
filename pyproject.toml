@@ -41,6 +41,9 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RET", "PTH", "RUF"]
+# RUF001-003: caracteres "ambíguos" são tipografia PT-BR intencional no output
+# (en-dash em faixas salariais "$150–200k", ∗ de footnote). Não são bugs.
+ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 python_version = "3.14"

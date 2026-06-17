@@ -14,7 +14,8 @@ Cobertura:
 import base64
 import datetime
 import json
-import os
+from pathlib import Path
+from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -709,15 +710,13 @@ class TestSetupGmailService:
         mock_flow = MagicMock()
         mock_flow.run_local_server.return_value = mock_creds
 
-        with (
-            patch("candidatador.email_monitor.InstalledAppFlow") as MockFlow,
-            patch("os.chmod") as mock_chmod,
-        ):
+        with patch("candidatador.email_monitor.InstalledAppFlow") as MockFlow:
             MockFlow.from_client_secrets_file.return_value = mock_flow
             _run_gmail_oauth(creds_path, token_path)
 
-        expanded = os.path.expanduser(token_path)
-        mock_chmod.assert_called_once_with(expanded, 0o600)
+        written = Path(token_path)
+        assert written.read_text() == '{"token": "abc"}'
+        assert written.stat().st_mode & 0o777 == 0o600
 
     def test_refreshes_expired_token(self, tmp_path):
         from candidatador.email_monitor import setup_gmail_service
@@ -730,17 +729,18 @@ class TestSetupGmailService:
             }
         }
 
+        Path(token_path).write_text("{}")  # token precisa existir
+
         mock_creds = MagicMock()
         mock_creds.valid = False
         mock_creds.expired = True
         mock_creds.refresh_token = "some-refresh-token"
+        mock_creds.to_json.return_value = '{"token": "refreshed"}'
 
         with (
             patch("candidatador.email_monitor.Credentials") as MockCreds,
             patch("candidatador.email_monitor.Request"),
             patch("candidatador.email_monitor.build") as mock_build,
-            patch("os.path.exists", return_value=True),
-            patch("builtins.open", MagicMock()),
         ):
             MockCreds.from_authorized_user_file.return_value = mock_creds
             mock_build.return_value = MagicMock()
@@ -748,6 +748,7 @@ class TestSetupGmailService:
             setup_gmail_service(config)
 
         mock_creds.refresh.assert_called_once()
+        assert Path(token_path).read_text() == '{"token": "refreshed"}'
 
 
 # ── sync_responses (integração real com banco) ────────────────────────────────
@@ -759,7 +760,7 @@ class TestSyncResponses:
     Cada test cria vagas/candidaturas necessárias.
     """
 
-    CONFIG = {
+    CONFIG: ClassVar[dict] = {
         "email": {
             "address": BASE_EMAIL,
             "credentials_path": "~/.candidatador/gmail-client.json",

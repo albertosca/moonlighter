@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+from pathlib import Path
 
 from peewee import (
     CharField,
@@ -16,7 +17,7 @@ from peewee import (
 
 def _db_path() -> str:
     return os.environ.get(
-        "CANDIDATADOR_DB_PATH", os.path.expanduser("~/.candidatador/candidatador.db")
+        "CANDIDATADOR_DB_PATH", str(Path("~/.candidatador/candidatador.db").expanduser())
     )
 
 
@@ -85,7 +86,7 @@ class ProcessedEmail(BaseModel):
 
 def init_db():
     path = _db_path()
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
     db.init(path)
     db.connect(reuse_if_open=True)
     db.create_tables([Job, Application, ScanLog, ProcessedEmail], safe=True)

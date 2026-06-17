@@ -1,5 +1,3 @@
-import os
-
 import pytest
 
 from candidatador.config import _PROJECT_ROOT, load_company_list, load_config, load_profile
@@ -156,8 +154,8 @@ ashby:
 
 
 def test_project_root_is_absolute():
-    assert os.path.isabs(_PROJECT_ROOT), "_PROJECT_ROOT is not an absolute path"
-    assert ".." not in _PROJECT_ROOT, "_PROJECT_ROOT contains '..'"
+    assert _PROJECT_ROOT.is_absolute(), "_PROJECT_ROOT is not an absolute path"
+    assert ".." not in _PROJECT_ROOT.parts, "_PROJECT_ROOT contains '..'"
 
 
 # --- load_config default path ---

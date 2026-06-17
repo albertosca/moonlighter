@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 
 def test_get_logger_returns_logger_with_correct_name():
@@ -59,5 +60,5 @@ def test_log_message_reaches_file(tmp_path):
     for h in root.handlers:
         h.flush()
 
-    content = open(log_path).read()
+    content = Path(log_path).read_text()
     assert "mensagem de teste xyz" in content

@@ -630,9 +630,11 @@ async def test_greenhouse_logs_scan_start_and_fetched(caplog):
         ]
     }
     mock_client = _make_mock_client(payload)
-    with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
-        with caplog.at_level(logging.INFO, logger="candidatador.scanner.http_sources"):
-            await scanner.scan(["co"])
+    with (
+        patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client),
+        caplog.at_level(logging.INFO, logger="candidatador.scanner.http_sources"),
+    ):
+        await scanner.scan(["co"])
     assert "greenhouse" in caplog.text
     assert "scanning" in caplog.text
     assert "fetched" in caplog.text
@@ -650,8 +652,10 @@ async def test_lever_logs_scan_fetched(caplog):
         }
     ]
     mock_client = _make_mock_client(payload)
-    with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
-        with caplog.at_level(logging.INFO, logger="candidatador.scanner.http_sources"):
-            await scanner.scan(["co"])
+    with (
+        patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client),
+        caplog.at_level(logging.INFO, logger="candidatador.scanner.http_sources"),
+    ):
+        await scanner.scan(["co"])
     assert "lever" in caplog.text
     assert "fetched" in caplog.text

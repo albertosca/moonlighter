@@ -41,7 +41,7 @@ def test_scan_log_dedup(tmp_db):
     urls = {row.job_url for row in ScanLog.select()}
     assert "https://example.com/job/1" in urls
     # Second insert with same URL should raise IntegrityError
-    with pytest.raises(Exception):
+    with pytest.raises(IntegrityError):
         ScanLog.create(job_url="https://example.com/job/1", source="greenhouse")
 
 
@@ -211,7 +211,7 @@ def test_scanlog_same_url_different_source_raises(tmp_db):
     """ScanLog.job_url is UNIQUE regardless of source — same URL with different source raises."""
     init_db()
     ScanLog.create(job_url="https://example.com/job/dup-src", source="greenhouse")
-    with pytest.raises(Exception):
+    with pytest.raises(IntegrityError):
         ScanLog.create(job_url="https://example.com/job/dup-src", source="lever")
 
 

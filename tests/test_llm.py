@@ -79,9 +79,11 @@ async def test_call_cli_raises_on_nonzero_exit():
     mock_proc.returncode = 1
     mock_proc.communicate = AsyncMock(return_value=(b"", b"some error message"))
 
-    with patch("candidatador.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
-        with pytest.raises(RuntimeError) as exc_info:
-            await _call_cli("prompt", "model")
+    with (
+        patch("candidatador.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
+        pytest.raises(RuntimeError) as exc_info,
+    ):
+        await _call_cli("prompt", "model")
 
     assert "code 1" in str(exc_info.value)
     assert "some error message" in str(exc_info.value)
@@ -94,9 +96,11 @@ async def test_call_cli_stderr_truncated_to_300_chars():
     mock_proc.returncode = 2
     mock_proc.communicate = AsyncMock(return_value=(b"", long_stderr))
 
-    with patch("candidatador.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
-        with pytest.raises(RuntimeError) as exc_info:
-            await _call_cli("p", "m")
+    with (
+        patch("candidatador.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
+        pytest.raises(RuntimeError) as exc_info,
+    ):
+        await _call_cli("p", "m")
 
     error_msg = str(exc_info.value)
     assert "E" * 300 in error_msg

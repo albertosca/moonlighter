@@ -1,8 +1,8 @@
-import os
+from pathlib import Path
 
 import yaml
 
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 DEFAULTS = {
     "brave_path": "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
@@ -36,10 +36,10 @@ DEFAULTS = {
 }
 
 _PATH_KEYS = ("browser_session_dir", "screenshots_dir", "db_path")
-_LEARNED_BLOCKLIST_PATH = os.path.join(_PROJECT_ROOT, "blocklist_learned.yaml")
+_LEARNED_BLOCKLIST_PATH = _PROJECT_ROOT / "blocklist_learned.yaml"
 
 
-def load_config(config_path: str | None = None) -> dict:
+def load_config(config_path: str | Path | None = None) -> dict:
     """
     Load configuration from YAML file, merging with defaults.
 
@@ -51,20 +51,17 @@ def load_config(config_path: str | None = None) -> dict:
     Returns:
         dict with merged config (defaults + overrides)
     """
-    if config_path is None:
-        config_path = os.path.join(_PROJECT_ROOT, "config.yaml")
+    config_path = Path(config_path) if config_path is not None else _PROJECT_ROOT / "config.yaml"
     config = dict(DEFAULTS)
-    if os.path.exists(config_path):
-        with open(config_path) as f:
-            user = yaml.safe_load(f) or {}
-            config.update(user)
+    if config_path.exists():
+        user = yaml.safe_load(config_path.read_text()) or {}
+        config.update(user)
     for key in _PATH_KEYS:
-        config[key] = os.path.expanduser(str(config[key]))
+        config[key] = str(Path(config[key]).expanduser())
 
     # Merge learned blocklist (blocklist_learned.yaml) into title_blocklist
-    if os.path.exists(_LEARNED_BLOCKLIST_PATH):
-        with open(_LEARNED_BLOCKLIST_PATH) as f:
-            learned = yaml.safe_load(f) or {}
+    if _LEARNED_BLOCKLIST_PATH.exists():
+        learned = yaml.safe_load(_LEARNED_BLOCKLIST_PATH.read_text()) or {}
         learned_patterns = learned.get("title_blocklist", [])
         if learned_patterns:
             manual = config.get("title_blocklist", [])
@@ -74,7 +71,7 @@ def load_config(config_path: str | None = None) -> dict:
     return config
 
 
-def load_profile(profile_path: str | None = None) -> dict:
+def load_profile(profile_path: str | Path | None = None) -> dict:
     """
     Load profile from YAML file.
 
@@ -84,13 +81,15 @@ def load_profile(profile_path: str | None = None) -> dict:
     Returns:
         dict with profile data (skills, experience, preferences, criteria, etc.)
     """
-    if profile_path is None:
-        profile_path = os.path.join(_PROJECT_ROOT, "profile", "profile.yaml")
-    with open(profile_path) as f:
-        return yaml.safe_load(f) or {}
+    profile_path = (
+        Path(profile_path)
+        if profile_path is not None
+        else _PROJECT_ROOT / "profile" / "profile.yaml"
+    )
+    return yaml.safe_load(profile_path.read_text()) or {}
 
 
-def load_company_list(path: str | None = None, phase: str | None = None) -> dict:
+def load_company_list(path: str | Path | None = None, phase: str | None = None) -> dict:
     """Load company list from YAML file, optionally filtered by phase.
 
     O company_list.yaml organiza slugs por ATS e fase:
@@ -105,12 +104,10 @@ def load_company_list(path: str | None = None, phase: str | None = None) -> dict
     Returns:
         dict: {source: [slug, ...]} (e.g., {"greenhouse": ["nubank", "ifoodcarreiras"]})
     """
-    if path is None:
-        path = os.path.join(_PROJECT_ROOT, "company_list.yaml")
-    if not os.path.exists(path):
+    path = Path(path) if path is not None else _PROJECT_ROOT / "company_list.yaml"
+    if not path.exists():
         return {}
-    with open(path) as f:
-        raw = yaml.safe_load(f) or {}
+    raw = yaml.safe_load(path.read_text()) or {}
 
     result = {}
     for source, value in raw.items():

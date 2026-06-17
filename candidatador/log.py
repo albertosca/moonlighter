@@ -1,9 +1,8 @@
 import logging
-import os
 from pathlib import Path
 
 _initialized = False
-_DEFAULT_LOG_PATH = os.path.expanduser("~/.candidatador/app.log")
+_DEFAULT_LOG_PATH = str(Path("~/.candidatador/app.log").expanduser())
 
 
 def setup(log_path: str | None = None) -> None:

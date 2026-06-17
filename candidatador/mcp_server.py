@@ -580,13 +580,12 @@ async def apply_jobs(ids: list[int]) -> str:
                     drafts_output.append(f"⚠️  Vaga #{job_id}: ATS não reconhecido. URL: {job.url}")
                     continue
 
-                if isinstance(applier, LinkedInApplier):
-                    if not await applier.is_easy_apply():
-                        drafts_output.append(
-                            f"⚠️  Vaga #{job_id} ({job.company}/{job.title}): não tem Easy Apply. "
-                            f"Candidatura manual necessária: {job.url}"
-                        )
-                        continue
+                if isinstance(applier, LinkedInApplier) and not await applier.is_easy_apply():
+                    drafts_output.append(
+                        f"⚠️  Vaga #{job_id} ({job.company}/{job.title}): não tem Easy Apply. "
+                        f"Candidatura manual necessária: {job.url}"
+                    )
+                    continue
 
                 fields = await applier.extract_fields()
                 await _browser_mod.save_screenshot(page, job_id, "02-form", _config)

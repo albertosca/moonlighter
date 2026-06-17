@@ -711,9 +711,11 @@ async def test_fill_custom_element_typeahead_logs_options_on_miss(caplog):
         return_value={"clicked": False, "options": ["São Paulo", "Rio de Janeiro"]}
     )
 
-    with patch("asyncio.sleep", new=AsyncMock()):
-        with caplog.at_level(logging.WARNING, logger="candidatador.applicator.greenhouse"):
-            result = await applier._fill_custom_element(element, "City", "Belo Horizonte")
+    with (
+        patch("asyncio.sleep", new=AsyncMock()),
+        caplog.at_level(logging.WARNING, logger="candidatador.applicator.greenhouse"),
+    ):
+        result = await applier._fill_custom_element(element, "City", "Belo Horizonte")
 
     assert result is False
     assert "São Paulo" in caplog.text or "Rio de Janeiro" in caplog.text
@@ -735,9 +737,11 @@ async def test_select_custom_option_logs_options_on_miss(caplog):
     applier.page.keyboard = MagicMock()
     applier.page.keyboard.press = AsyncMock()
 
-    with patch("asyncio.sleep", new=AsyncMock()):
-        with caplog.at_level(logging.WARNING, logger="candidatador.applicator.greenhouse"):
-            result = await applier._select_custom_option(element, "Work auth", "Maybe")
+    with (
+        patch("asyncio.sleep", new=AsyncMock()),
+        caplog.at_level(logging.WARNING, logger="candidatador.applicator.greenhouse"),
+    ):
+        result = await applier._select_custom_option(element, "Work auth", "Maybe")
 
     assert result is False
     assert "Yes" in caplog.text or "No" in caplog.text

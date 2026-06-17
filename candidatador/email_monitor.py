@@ -9,8 +9,8 @@ import base64
 import datetime
 import json
 import logging
-import os
 import re
+from pathlib import Path
 
 from candidatador.parsing import _extract_json
 
@@ -99,19 +99,18 @@ def setup_gmail_service(config: dict):
             " e depois setup_email() para autorizar o acesso."
         )
 
-    token_path = os.path.expanduser(config["email"]["token_path"])
+    token_path = Path(config["email"]["token_path"]).expanduser()
 
-    if not os.path.exists(token_path):
+    if not token_path.exists():
         raise GmailAuthError(
             "Token Gmail não encontrado. Rode setup_email() primeiro para autorizar o acesso."
         )
 
-    creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+    creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
 
     if not creds.valid and creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        with open(token_path, "w") as f:
-            f.write(creds.to_json())
+        token_path.write_text(creds.to_json())
 
     return build("gmail", "v1", credentials=creds)
 
@@ -451,11 +450,10 @@ def _run_gmail_oauth(credentials_path: str, token_path: str) -> None:
         )
     flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
     creds = flow.run_local_server(port=0)
-    os.makedirs(os.path.dirname(os.path.expanduser(token_path)), exist_ok=True)
-    expanded = os.path.expanduser(token_path)
-    with open(expanded, "w") as f:
-        f.write(creds.to_json())
-    os.chmod(expanded, 0o600)
+    expanded = Path(token_path).expanduser()
+    expanded.parent.mkdir(parents=True, exist_ok=True)
+    expanded.write_text(creds.to_json())
+    expanded.chmod(0o600)
 
 
 # ── Entry point standalone ────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import re
 from datetime import UTC, datetime
+from typing import ClassVar
 
 import httpx
 
@@ -13,7 +14,7 @@ logger = get_logger(__name__)
 
 class GreenhouseScanner(BaseScanner):
     BASE = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
-    HEADERS = {"User-Agent": "candidatador/0.1"}
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "candidatador/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs) -> list[RawJob]:
         logger.info("[greenhouse] scanning %d companies", len(company_slugs))
@@ -68,7 +69,7 @@ class GreenhouseScanner(BaseScanner):
 
 class LeverScanner(BaseScanner):
     BASE = "https://api.lever.co/v0/postings/{slug}"
-    HEADERS = {"User-Agent": "candidatador/0.1"}
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "candidatador/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs) -> list[RawJob]:
         logger.info("[lever] scanning %d companies", len(company_slugs))
@@ -122,7 +123,10 @@ class AshbyScanner(BaseScanner):
     """Ashby public job board API."""
 
     BASE = "https://jobs.ashbyhq.com/api/non-user-graphql"
-    HEADERS = {"User-Agent": "candidatador/0.1", "Content-Type": "application/json"}
+    HEADERS: ClassVar[dict[str, str]] = {
+        "User-Agent": "candidatador/0.1",
+        "Content-Type": "application/json",
+    }
     QUERY = """
     query jobPostings($organizationHostedJobsPageName: String!) {
       jobPostings(organizationHostedJobsPageName: $organizationHostedJobsPageName) {
