@@ -17,3 +17,4 @@ profile/**/*.aux
 profile/**/*.log
 profile/**/*.out
 profile/nubank/test-color.*
+.venv314/
