@@ -1487,10 +1487,7 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
         with (
             patch("candidatador.services.apply_service.browser") as mock_browser,
             patch("candidatador.services.apply_service.detect_applier") as mock_detect,
-            patch("candidatador.mcp_server.os.path.exists", return_value=True),
-            patch("candidatador.mcp_server.os.path.join", return_value=str(cv_path)),
-            patch("candidatador.mcp_server.os.path.dirname"),
-            patch("candidatador.mcp_server.os.path.abspath"),
+            patch("candidatador.services.apply_service.resolve_cv_path", return_value=str(cv_path)),
         ):
             mock_browser.new_page = AsyncMock(return_value=page)
             mock_browser.save_screenshot = AsyncMock()

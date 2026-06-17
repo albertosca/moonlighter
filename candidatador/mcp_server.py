@@ -1,7 +1,7 @@
 import contextlib
-import os
 import time as _time
 from datetime import datetime
+from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
@@ -259,10 +259,10 @@ async def setup_email() -> str:
     async with _log_tool("setup_email"):
         config = load_config()
         email_cfg = config.get("email", {})
-        creds_path = os.path.expanduser(email_cfg.get("credentials_path", ""))
-        token_path = os.path.expanduser(email_cfg.get("token_path", ""))
+        creds_path = str(Path(email_cfg.get("credentials_path", "")).expanduser())
+        token_path = str(Path(email_cfg.get("token_path", "")).expanduser())
 
-        if not os.path.exists(creds_path):
+        if not Path(creds_path).exists():
             return (
                 f"⚠️  Arquivo de credenciais não encontrado: {creds_path}\n"
                 "Baixe o client_secret.json do Google Cloud Console e salve em "
