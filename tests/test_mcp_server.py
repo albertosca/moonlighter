@@ -610,13 +610,14 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
         mock_applier.fill_form = fake_fill
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
-        from candidatador.mcp_server import _build_email_alias, _config, confirm_apply
+        from candidatador.applicator.email_alias import build_email_alias
+        from candidatador.mcp_server import _config, confirm_apply
 
         await confirm_apply(job_id=job.id)
 
     app_fresh = Application.get_by_id(app.id)
     assert app_fresh.email_ref  # ref foi gerado
-    expected = _build_email_alias(_config["email"]["address"], app_fresh.email_ref)
+    expected = build_email_alias(_config["email"]["address"], app_fresh.email_ref)
     assert fill_calls[0]["Email"] == expected
     assert "+" in fill_calls[0]["Email"]
 
@@ -1370,52 +1371,6 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
 
     assert "Stripe" in result  # vaga HTTP aparece
     assert "LinkedIn" in result  # aviso aparece também
-
-
-# ── email: _build_email_alias ─────────────────────────────────────────────────
-
-
-def test_build_email_alias_formats_correctly():
-    from candidatador.mcp_server import _build_email_alias
-
-    result = _build_email_alias("candidaturas@gmail.com", "x7k2mp")
-    assert result == "candidaturas+x7k2mp@gmail.com"
-
-
-def test_build_email_alias_different_refs():
-    from candidatador.mcp_server import _build_email_alias
-
-    assert _build_email_alias("a@b.com", "abc") == "a+abc@b.com"
-    assert _build_email_alias("a@b.com", "xyz") == "a+xyz@b.com"
-
-
-def test_inject_email_alias_matches_ptbr_e_mail_label():
-    """Label 'E-mail' (PT, com hífen) deve receber o alias — sem o hífen quebrar o
-    match nem criar um campo fantasma 'Email'."""
-    from candidatador.mcp_server import _inject_email_alias
-
-    answers = {"E-mail*": "pessoal@gmail.com", "Nome*": "Alberto"}
-    injected = _inject_email_alias(answers, "candidaturas+abc123@gmail.com")
-    assert injected is True
-    assert answers["E-mail*"] == "candidaturas+abc123@gmail.com"
-    assert "Email" not in answers  # não cria campo fantasma
-
-
-def test_inject_email_alias_matches_plain_email_label():
-    from candidatador.mcp_server import _inject_email_alias
-
-    answers = {"Email": "pessoal@gmail.com"}
-    _inject_email_alias(answers, "x+ref@y.com")
-    assert answers["Email"] == "x+ref@y.com"
-
-
-def test_inject_email_alias_fallback_when_no_email_field():
-    from candidatador.mcp_server import _inject_email_alias
-
-    answers = {"Nome*": "Alberto"}
-    injected = _inject_email_alias(answers, "x+ref@y.com")
-    assert injected is False
-    assert answers["Email"] == "x+ref@y.com"  # fallback
 
 
 # ── email: confirm_apply gera ref e salva ─────────────────────────────────────

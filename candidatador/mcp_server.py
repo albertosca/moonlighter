@@ -1,6 +1,5 @@
 import asyncio
 import contextlib
-import io
 import json
 import os
 import re
@@ -12,14 +11,12 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 from peewee import IntegrityError
-from rich import box
-from rich.console import Console
-from rich.table import Table
 
 from candidatador import browser as _browser_mod
 from candidatador.applicator.ashby import AshbyApplier
 from candidatador.applicator.base import generate_answers
 from candidatador.applicator.cv import CVNotFoundError, resolve_cv_path
+from candidatador.applicator.email_alias import build_email_alias, inject_email_alias
 from candidatador.applicator.greenhouse import GreenhouseApplier
 from candidatador.applicator.lever import LeverApplier
 from candidatador.applicator.linkedin import LinkedInApplier
@@ -37,6 +34,7 @@ from candidatador.log import get_logger as _get_logger
 from candidatador.log import setup as _setup_logging
 from candidatador.scanner.http_sources import AshbyScanner, GreenhouseScanner, LeverScanner
 from candidatador.startup import validate_startup
+from candidatador.views import render_jobs_table
 
 _setup_logging()
 _log = _get_logger(__name__)
@@ -88,44 +86,6 @@ _startup_warnings = validate_startup(_config, _profile)
 for _w in _startup_warnings:
     _prefix = "🚫" if _w.level == "error" else "⚠️ "
     print(f"{_prefix} {_w.message}", flush=True)
-
-
-def _render_table(jobs: list[Job]) -> str:
-    buf = io.StringIO()
-    console = Console(file=buf, width=120)
-    table = Table(box=box.SIMPLE_HEAVY, show_lines=False)
-    table.add_column("#", style="dim", width=4)
-    table.add_column("Empresa / Cargo", min_width=28)
-    table.add_column("Score", width=7)
-    table.add_column("Salário", width=14)
-    table.add_column("Publicada", width=11)
-    table.add_column("Remoto", width=8)
-    table.add_column("Caveats", min_width=20)
-
-    for job in jobs:
-        score_str = f"{job.score:.1f}" if job.score is not None else "—"
-        if job.salary_min and job.salary_max:
-            sal = f"${job.salary_min // 1000}–{job.salary_max // 1000}k"
-            if job.salary_source == "llm_estimate":
-                sal += " *"
-        elif job.salary_min:
-            sal = f"${job.salary_min // 1000}k+"
-        else:
-            sal = "n/d"
-        posted = job.posted_at.strftime("%d/%m") if job.posted_at else "—"
-        caveats_list = job.get_caveats()
-        caveat_str = caveats_list[0][:30] if caveats_list else "—"
-        table.add_row(
-            str(job.id),
-            f"{job.company} / {job.title}",
-            score_str,
-            sal,
-            posted,
-            job.remote_type or "—",
-            caveat_str,
-        )
-    console.print(table)
-    return buf.getvalue()
 
 
 _APPLIER_CLASSES = [LinkedInApplier, GreenhouseApplier, LeverApplier, AshbyApplier]
@@ -334,7 +294,7 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
                 f"({title_filtered} descartadas por título, {below} abaixo do score){spend_note}"
             )
 
-        table = _render_table(above)
+        table = render_jobs_table(above)
         footer = (
             f"\n∗ = salário estimado pelo LLM  |  "
             f"{below} abaixo do threshold  |  {title_filtered} descartadas por título"
@@ -477,7 +437,7 @@ async def list_jobs(status: str = "new", limit: int = 20) -> str:
         )
         if not jobs:
             return f"Nenhuma vaga com status='{status}'."
-        return _render_table(jobs)
+        return render_jobs_table(jobs)
 
 
 @mcp.tool()
@@ -671,7 +631,7 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
         ref = secrets.token_urlsafe(4)[:6]
         base_address = _config.get("email", {}).get("address")
         if base_address:
-            _inject_email_alias(stored_answers, _build_email_alias(base_address, ref))
+            inject_email_alias(stored_answers, build_email_alias(base_address, ref))
 
         try:
             cv_path = resolve_cv_path(job.company, _config)
@@ -855,31 +815,6 @@ async def update_status(job_id: int, status: str, notes: str = "", next_action: 
         if next_action:
             result += f"\n  Próxima ação: {next_action}"
         return result
-
-
-def _build_email_alias(address: str, ref: str) -> str:
-    """'candidaturas@gmail.com' + 'x7k2mp' → 'candidaturas+x7k2mp@gmail.com'"""
-    local, _, domain = address.partition("@")
-    return f"{local}+{ref}@{domain}"
-
-
-def _inject_email_alias(answers: dict, alias: str) -> bool:
-    """
-    Sobrescreve o campo de email do formulário com o alias +ref de rastreamento.
-    Procura qualquer label que contenha 'email' ignorando hífen/espaço — assim
-    casa tanto 'Email' quanto 'E-mail' (PT). Se não houver, adiciona uma chave
-    'Email' como fallback (label mais comum nos ATS).
-    Retorna True se algum campo existente foi sobrescrito.
-    """
-    injected = False
-    for key in list(answers.keys()):
-        normalized = key.lower().replace("-", "").replace(" ", "")
-        if "email" in normalized:
-            answers[key] = alias
-            injected = True
-    if not injected:
-        answers["Email"] = alias
-    return injected
 
 
 @mcp.tool()
