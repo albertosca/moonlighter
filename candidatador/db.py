@@ -1,16 +1,22 @@
 import datetime
 import json
 import os
+
 from peewee import (
-    SqliteDatabase, Model, CharField, TextField, FloatField,
-    IntegerField, DateTimeField, ForeignKeyField
+    CharField,
+    DateTimeField,
+    FloatField,
+    ForeignKeyField,
+    IntegerField,
+    Model,
+    SqliteDatabase,
+    TextField,
 )
 
 
 def _db_path() -> str:
     return os.environ.get(
-        "CANDIDATADOR_DB_PATH",
-        os.path.expanduser("~/.candidatador/candidatador.db")
+        "CANDIDATADOR_DB_PATH", os.path.expanduser("~/.candidatador/candidatador.db")
     )
 
 
@@ -28,18 +34,18 @@ class Job(BaseModel):
     title = CharField()
     url = CharField(unique=True)
     location = CharField(null=True)
-    remote_type = CharField(null=True)   # 'remote' | 'hybrid' | 'onsite'
+    remote_type = CharField(null=True)  # 'remote' | 'hybrid' | 'onsite'
     description = TextField(null=True)
     posted_at = DateTimeField(null=True)
     score = FloatField(null=True)
     score_notes = TextField(null=True)
-    caveats = TextField(null=True)       # JSON array string
+    caveats = TextField(null=True)  # JSON array string
     salary_min = IntegerField(null=True)
     salary_max = IntegerField(null=True)
     salary_currency = CharField(null=True)
-    salary_source = CharField(null=True) # 'stated' | 'llm_estimate' | 'third_party'
+    salary_source = CharField(null=True)  # 'stated' | 'llm_estimate' | 'third_party'
     salary_notes = TextField(null=True)
-    status = CharField(default="new")    # 'new'|'reviewed'|'applying'|'applied'|'rejected'|'archived'
+    status = CharField(default="new")  # 'new'|'reviewed'|'applying'|'applied'|'rejected'|'archived'
     found_at = DateTimeField(default=datetime.datetime.now)
 
     def get_caveats(self) -> list[str]:
@@ -49,9 +55,11 @@ class Job(BaseModel):
 class Application(BaseModel):
     job = ForeignKeyField(Job, backref="applications")
     applied_at = DateTimeField(null=True)
-    form_data = TextField(null=True)     # JSON dict: field_name -> answer
+    form_data = TextField(null=True)  # JSON dict: field_name -> answer
     notes = TextField(null=True)
-    status = CharField(default="draft")  # 'draft'|'submitted'|'screening'|'interviews'|'offer'|'rejected'
+    status = CharField(
+        default="draft"
+    )  # 'draft'|'submitted'|'screening'|'interviews'|'offer'|'rejected'
     next_action = TextField(null=True)
     updated_at = DateTimeField(default=datetime.datetime.now)
     email_ref = CharField(max_length=8, null=True, unique=True)
@@ -70,6 +78,7 @@ class ScanLog(BaseModel):
 class ProcessedEmail(BaseModel):
     """Dedup local de emails já processados pelo sync, para que o monitor não
     precise marcar o email no Gmail (mantém o sync autônomo 100% leitura)."""
+
     message_id = CharField(unique=True)
     processed_at = DateTimeField(default=datetime.datetime.now)
 
@@ -85,7 +94,9 @@ def init_db():
     existing = {row[1] for row in cursor.fetchall()}
     if "email_ref" not in existing:
         db.execute_sql("ALTER TABLE application ADD COLUMN email_ref VARCHAR(8) NULL")
-        db.execute_sql("CREATE UNIQUE INDEX IF NOT EXISTS application_email_ref "
-                       "ON application (email_ref) WHERE email_ref IS NOT NULL")
+        db.execute_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS application_email_ref "
+            "ON application (email_ref) WHERE email_ref IS NOT NULL"
+        )
     if "current_stage" not in existing:
         db.execute_sql("ALTER TABLE application ADD COLUMN current_stage VARCHAR(255) NULL")

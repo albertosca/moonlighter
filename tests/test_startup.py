@@ -1,9 +1,7 @@
-import os
-import pytest
-from candidatador.startup import validate_startup, StartupWarning
-
+from candidatador.startup import StartupWarning, validate_startup
 
 # ── profile ───────────────────────────────────────────────────────────────────
+
 
 def test_validate_startup_empty_profile_produces_warn():
     warnings = validate_startup(config={}, profile={})
@@ -16,6 +14,7 @@ def test_validate_startup_non_empty_profile_no_profile_warning():
 
 
 # ── ANTHROPIC_API_KEY ─────────────────────────────────────────────────────────
+
 
 def test_validate_startup_missing_api_key_produces_error(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
@@ -39,9 +38,11 @@ def test_validate_startup_cli_backend_skips_api_key_error(monkeypatch):
 
 # ── cv.pdf ────────────────────────────────────────────────────────────────────
 
+
 def test_validate_startup_missing_cv_produces_warn(tmp_path):
     warnings = validate_startup(
-        config={}, profile={"skills": []},
+        config={},
+        profile={"skills": []},
         cv_path=str(tmp_path / "nonexistent.pdf"),
     )
     assert any(w.level == "warn" and "cv" in w.message.lower() for w in warnings)
@@ -51,13 +52,15 @@ def test_validate_startup_cv_present_no_cv_warning(tmp_path):
     cv = tmp_path / "cv.pdf"
     cv.touch()
     warnings = validate_startup(
-        config={}, profile={"skills": []},
+        config={},
+        profile={"skills": []},
         cv_path=str(cv),
     )
     assert not any("cv" in w.message.lower() for w in warnings)
 
 
 # ── brave path ────────────────────────────────────────────────────────────────
+
 
 def test_validate_startup_missing_brave_produces_warn():
     warnings = validate_startup(
@@ -79,6 +82,7 @@ def test_validate_startup_brave_exists_no_brave_warning(tmp_path):
 
 # ── all clear ─────────────────────────────────────────────────────────────────
 
+
 def test_validate_startup_all_ok_returns_no_errors(monkeypatch, tmp_path):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     brave = tmp_path / "brave"
@@ -94,6 +98,7 @@ def test_validate_startup_all_ok_returns_no_errors(monkeypatch, tmp_path):
 
 
 # ── return type ───────────────────────────────────────────────────────────────
+
 
 def test_validate_startup_returns_list_of_startup_warnings():
     result = validate_startup(config={}, profile={})

@@ -30,6 +30,7 @@ def setup(log_path: str | None = None) -> None:
 
     try:
         from rich.logging import RichHandler
+
         rh = RichHandler(level=logging.INFO, show_path=False, rich_tracebacks=False)
         root.addHandler(rh)
     except ImportError:

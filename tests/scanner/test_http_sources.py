@@ -1,9 +1,11 @@
-import pytest
-import httpx
 import logging
 from datetime import datetime
-from unittest.mock import AsyncMock, patch, MagicMock
-from candidatador.scanner.http_sources import GreenhouseScanner, LeverScanner, AshbyScanner
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import httpx
+import pytest
+
+from candidatador.scanner.http_sources import AshbyScanner, GreenhouseScanner, LeverScanner
 
 GREENHOUSE_RESPONSE = {
     "jobs": [
@@ -28,6 +30,7 @@ LEVER_RESPONSE = [
     }
 ]
 
+
 @pytest.mark.asyncio
 async def test_greenhouse_scan():
     with patch("httpx.AsyncClient") as mock_client_cls:
@@ -47,6 +50,7 @@ async def test_greenhouse_scan():
     assert jobs[0].title == "Senior Software Engineer"
     assert jobs[0].remote_type == "remote"
     assert jobs[0].source == "greenhouse"
+
 
 @pytest.mark.asyncio
 async def test_lever_scan():
@@ -69,6 +73,7 @@ async def test_lever_scan():
     assert jobs[0].source == "lever"
     assert "Elixir" in jobs[0].description  # QUALITY-01: descrição extraída
 
+
 @pytest.mark.asyncio
 async def test_greenhouse_404_skips_company():
     with patch("httpx.AsyncClient") as mock_client_cls:
@@ -86,6 +91,7 @@ async def test_greenhouse_404_skips_company():
 
 
 # --- helper ---
+
 
 def _make_mock_client(response_json=None, status_code=200, raise_exc=None):
     mock_client = MagicMock()
@@ -108,10 +114,20 @@ def _make_mock_client(response_json=None, status_code=200, raise_exc=None):
 
 # --- GreenhouseScanner new tests ---
 
+
 async def test_greenhouse_html_stripped_from_description():
-    response = {"jobs": [{"id": 1, "title": "Eng", "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
-                           "location": {"name": "Remote"}, "updated_at": "2026-05-20T12:00:00Z",
-                           "content": "<p>Hello</p><br/>World"}]}
+    response = {
+        "jobs": [
+            {
+                "id": 1,
+                "title": "Eng",
+                "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
+                "location": {"name": "Remote"},
+                "updated_at": "2026-05-20T12:00:00Z",
+                "content": "<p>Hello</p><br/>World",
+            }
+        ]
+    }
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
@@ -120,31 +136,61 @@ async def test_greenhouse_html_stripped_from_description():
     assert ">" not in jobs[0].description
     assert "Hello" in jobs[0].description
 
+
 async def test_greenhouse_posted_at_parsed():
-    response = {"jobs": [{"id": 1, "title": "Eng", "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
-                           "location": {"name": "Remote"}, "updated_at": "2026-05-20T12:00:00Z"}]}
+    response = {
+        "jobs": [
+            {
+                "id": 1,
+                "title": "Eng",
+                "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
+                "location": {"name": "Remote"},
+                "updated_at": "2026-05-20T12:00:00Z",
+            }
+        ]
+    }
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].posted_at is not None
     assert isinstance(jobs[0].posted_at, datetime)
 
+
 async def test_greenhouse_posted_at_invalid_format():
-    response = {"jobs": [{"id": 1, "title": "Eng", "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
-                           "location": {"name": "Remote"}, "updated_at": "not-a-date"}]}
+    response = {
+        "jobs": [
+            {
+                "id": 1,
+                "title": "Eng",
+                "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
+                "location": {"name": "Remote"},
+                "updated_at": "not-a-date",
+            }
+        ]
+    }
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].posted_at is None
 
+
 async def test_greenhouse_missing_location():
-    response = {"jobs": [{"id": 1, "title": "Eng", "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
-                           "updated_at": "2026-05-20T12:00:00Z"}]}
+    response = {
+        "jobs": [
+            {
+                "id": 1,
+                "title": "Eng",
+                "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
+                "updated_at": "2026-05-20T12:00:00Z",
+            }
+        ]
+    }
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].location is None
     assert jobs[0].remote_type is None
+
 
 async def test_greenhouse_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
@@ -152,15 +198,26 @@ async def test_greenhouse_network_exception_skips_company():
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
+
 async def test_greenhouse_empty_jobs_list():
     mock_client = _make_mock_client({"jobs": []})
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
+
 async def test_greenhouse_multiple_companies():
-    response = {"jobs": [{"id": 1, "title": "Eng", "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
-                           "location": {"name": "Remote"}, "updated_at": "2026-05-20T12:00:00Z"}]}
+    response = {
+        "jobs": [
+            {
+                "id": 1,
+                "title": "Eng",
+                "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
+                "location": {"name": "Remote"},
+                "updated_at": "2026-05-20T12:00:00Z",
+            }
+        ]
+    }
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["stripe", "linear"])
@@ -169,38 +226,70 @@ async def test_greenhouse_multiple_companies():
 
 # --- LeverScanner new tests ---
 
+
 async def test_lever_skips_entry_without_title():
-    response = [{"id": "1", "text": "", "hostedUrl": "https://jobs.lever.co/co/1",
-                  "categories": {"location": "Remote"}, "createdAt": 1716220800000}]
+    response = [
+        {
+            "id": "1",
+            "text": "",
+            "hostedUrl": "https://jobs.lever.co/co/1",
+            "categories": {"location": "Remote"},
+            "createdAt": 1716220800000,
+        }
+    ]
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
+
 
 async def test_lever_skips_entry_without_url():
-    response = [{"id": "1", "text": "Eng", "hostedUrl": "",
-                  "categories": {"location": "Remote"}, "createdAt": 1716220800000}]
+    response = [
+        {
+            "id": "1",
+            "text": "Eng",
+            "hostedUrl": "",
+            "categories": {"location": "Remote"},
+            "createdAt": 1716220800000,
+        }
+    ]
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
+
 async def test_lever_timestamp_is_utc_aware():
-    response = [{"id": "1", "text": "Eng", "hostedUrl": "https://jobs.lever.co/co/1",
-                  "categories": {"location": "Remote"}, "createdAt": 1716220800000}]
+    response = [
+        {
+            "id": "1",
+            "text": "Eng",
+            "hostedUrl": "https://jobs.lever.co/co/1",
+            "categories": {"location": "Remote"},
+            "createdAt": 1716220800000,
+        }
+    ]
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs[0].posted_at is not None
     assert jobs[0].posted_at.tzinfo is not None
 
+
 async def test_lever_missing_created_at():
-    response = [{"id": "1", "text": "Eng", "hostedUrl": "https://jobs.lever.co/co/1",
-                  "categories": {"location": "Remote"}}]
+    response = [
+        {
+            "id": "1",
+            "text": "Eng",
+            "hostedUrl": "https://jobs.lever.co/co/1",
+            "categories": {"location": "Remote"},
+        }
+    ]
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs[0].posted_at is None
+
 
 async def test_lever_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
@@ -208,11 +297,13 @@ async def test_lever_network_exception_skips_company():
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
+
 async def test_lever_500_response_skips_company():
     mock_client = _make_mock_client([], status_code=500)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
+
 
 async def test_lever_empty_array_response():
     mock_client = _make_mock_client([])
@@ -223,12 +314,22 @@ async def test_lever_empty_array_response():
 
 # --- AshbyScanner tests ---
 
-ASHBY_RESPONSE = {"data": {"jobPostings": [
-    {"id": "1", "title": "ML Engineer", "locationName": "Remote",
-     "isRemote": True, "publishedDate": "2026-05-01",
-     "descriptionPlain": "Train and serve large language models.",
-     "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/openai/1"}
-]}}
+ASHBY_RESPONSE = {
+    "data": {
+        "jobPostings": [
+            {
+                "id": "1",
+                "title": "ML Engineer",
+                "locationName": "Remote",
+                "isRemote": True,
+                "publishedDate": "2026-05-01",
+                "descriptionPlain": "Train and serve large language models.",
+                "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/openai/1",
+            }
+        ]
+    }
+}
+
 
 async def test_ashby_scan_success():
     mock_client = _make_mock_client(ASHBY_RESPONSE)
@@ -240,28 +341,41 @@ async def test_ashby_scan_success():
     assert jobs[0].source == "ashby"
     assert "language models" in jobs[0].description  # QUALITY-01: descrição extraída
 
+
 async def test_ashby_is_remote_flag_true():
     mock_client = _make_mock_client(ASHBY_RESPONSE)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["openai"])
     assert jobs[0].remote_type == "remote"
 
+
 async def test_ashby_is_remote_flag_false_uses_location():
-    response = {"data": {"jobPostings": [
-        {"id": "2", "title": "Eng", "locationName": "São Paulo, Brazil",
-         "isRemote": False, "publishedDate": "2026-05-01",
-         "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/co/2"}
-    ]}}
+    response = {
+        "data": {
+            "jobPostings": [
+                {
+                    "id": "2",
+                    "title": "Eng",
+                    "locationName": "São Paulo, Brazil",
+                    "isRemote": False,
+                    "publishedDate": "2026-05-01",
+                    "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/co/2",
+                }
+            ]
+        }
+    }
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs[0].remote_type == "onsite"
+
 
 async def test_ashby_500_response_skips_company():
     mock_client = _make_mock_client({}, status_code=500)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
+
 
 async def test_ashby_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
@@ -281,10 +395,19 @@ async def test_ashby_graphql_error_returns_empty():
 
 async def test_ashby_missing_published_date_returns_none():
     """publishedDate absent from response → posted_at is None."""
-    response = {"data": {"jobPostings": [
-        {"id": "5", "title": "Eng", "locationName": "NYC",
-         "isRemote": False, "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/co/5"}
-    ]}}
+    response = {
+        "data": {
+            "jobPostings": [
+                {
+                    "id": "5",
+                    "title": "Eng",
+                    "locationName": "NYC",
+                    "isRemote": False,
+                    "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/co/5",
+                }
+            ]
+        }
+    }
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
@@ -294,11 +417,20 @@ async def test_ashby_missing_published_date_returns_none():
 
 async def test_ashby_published_date_parsed_as_datetime():
     """publishedDate '2026-05-01' is parsed into a datetime object."""
-    response = {"data": {"jobPostings": [
-        {"id": "6", "title": "Eng", "locationName": "Remote",
-         "isRemote": True, "publishedDate": "2026-05-01",
-         "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/co/6"}
-    ]}}
+    response = {
+        "data": {
+            "jobPostings": [
+                {
+                    "id": "6",
+                    "title": "Eng",
+                    "locationName": "Remote",
+                    "isRemote": True,
+                    "publishedDate": "2026-05-01",
+                    "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/co/6",
+                }
+            ]
+        }
+    }
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
@@ -317,9 +449,19 @@ async def test_ashby_empty_job_postings_returns_empty():
 
 async def test_greenhouse_partial_failure_continues():
     """1 of 3 companies returns 500; the other 2 succeed → jobs from 2 companies returned."""
-    success_response = {"jobs": [{"id": 1, "title": "Eng", "absolute_url": "https://boards.greenhouse.io/ok/jobs/1",
-                                   "location": {"name": "Remote"}, "updated_at": "2026-05-20T12:00:00Z"}]}
+    success_response = {
+        "jobs": [
+            {
+                "id": 1,
+                "title": "Eng",
+                "absolute_url": "https://boards.greenhouse.io/ok/jobs/1",
+                "location": {"name": "Remote"},
+                "updated_at": "2026-05-20T12:00:00Z",
+            }
+        ]
+    }
     call_count = [0]
+
     async def get_with_partial_failure(url, **kwargs):
         call_count[0] += 1
         resp = MagicMock()
@@ -342,8 +484,15 @@ async def test_greenhouse_partial_failure_continues():
 
 async def test_lever_multiple_companies_returns_all():
     """2 Lever companies each with 1 job → 2 jobs total."""
-    response = [{"id": "1", "text": "Eng", "hostedUrl": "https://jobs.lever.co/co/1",
-                  "categories": {"location": "Remote"}, "createdAt": 1716220800000}]
+    response = [
+        {
+            "id": "1",
+            "text": "Eng",
+            "hostedUrl": "https://jobs.lever.co/co/1",
+            "categories": {"location": "Remote"},
+            "createdAt": 1716220800000,
+        }
+    ]
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["stripe", "linear"])
@@ -354,12 +503,19 @@ async def test_lever_multiple_companies_returns_all():
 
 # ── Greenhouse: validação de schema ───────────────────────────────────────────
 
+
 async def test_greenhouse_missing_title_skips_job():
     """Item sem 'title' é ignorado — não gera KeyError."""
-    response = {"jobs": [
-        {"id": 1, "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
-         "location": {"name": "Remote"}, "updated_at": "2026-05-20T12:00:00Z"},
-    ]}
+    response = {
+        "jobs": [
+            {
+                "id": 1,
+                "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
+                "location": {"name": "Remote"},
+                "updated_at": "2026-05-20T12:00:00Z",
+            },
+        ]
+    }
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
@@ -368,10 +524,16 @@ async def test_greenhouse_missing_title_skips_job():
 
 async def test_greenhouse_missing_absolute_url_skips_job():
     """Item sem 'absolute_url' é ignorado."""
-    response = {"jobs": [
-        {"id": 1, "title": "Eng",
-         "location": {"name": "Remote"}, "updated_at": "2026-05-20T12:00:00Z"},
-    ]}
+    response = {
+        "jobs": [
+            {
+                "id": 1,
+                "title": "Eng",
+                "location": {"name": "Remote"},
+                "updated_at": "2026-05-20T12:00:00Z",
+            },
+        ]
+    }
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
@@ -396,6 +558,7 @@ async def test_greenhouse_jobs_key_missing_returns_empty():
 
 # ── Lever: validação de schema ────────────────────────────────────────────────
 
+
 async def test_lever_non_list_response_returns_empty():
     """API retorna dict (ex: erro) em vez de lista → retorna [] sem crash."""
     mock_client = _make_mock_client({"error": "rate limited"})
@@ -406,12 +569,21 @@ async def test_lever_non_list_response_returns_empty():
 
 # ── Ashby: validação de schema ────────────────────────────────────────────────
 
+
 async def test_ashby_missing_title_skips_job():
     """Item sem 'title' é ignorado."""
-    response = {"data": {"jobPostings": [
-        {"id": "1", "locationName": "Remote", "isRemote": True,
-         "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/co/1"}
-    ]}}
+    response = {
+        "data": {
+            "jobPostings": [
+                {
+                    "id": "1",
+                    "locationName": "Remote",
+                    "isRemote": True,
+                    "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/co/1",
+                }
+            ]
+        }
+    }
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
@@ -420,10 +592,11 @@ async def test_ashby_missing_title_skips_job():
 
 async def test_ashby_missing_url_skips_job():
     """Item sem 'jobPostingAbsoluteUrl' é ignorado."""
-    response = {"data": {"jobPostings": [
-        {"id": "1", "title": "Eng", "locationName": "Remote",
-         "isRemote": True}
-    ]}}
+    response = {
+        "data": {
+            "jobPostings": [{"id": "1", "title": "Eng", "locationName": "Remote", "isRemote": True}]
+        }
+    }
     mock_client = _make_mock_client(response)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
@@ -441,13 +614,21 @@ async def test_ashby_null_job_postings_returns_empty():
 
 # --- logging tests ---
 
+
 @pytest.mark.asyncio
 async def test_greenhouse_logs_scan_start_and_fetched(caplog):
     scanner = GreenhouseScanner()
-    payload = {"jobs": [
-        {"title": "SWE", "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
-         "location": {"name": "Remote"}, "updated_at": None, "content": ""}
-    ]}
+    payload = {
+        "jobs": [
+            {
+                "title": "SWE",
+                "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
+                "location": {"name": "Remote"},
+                "updated_at": None,
+                "content": "",
+            }
+        ]
+    }
     mock_client = _make_mock_client(payload)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         with caplog.at_level(logging.INFO, logger="candidatador.scanner.http_sources"):
@@ -460,8 +641,14 @@ async def test_greenhouse_logs_scan_start_and_fetched(caplog):
 @pytest.mark.asyncio
 async def test_lever_logs_scan_fetched(caplog):
     scanner = LeverScanner()
-    payload = [{"text": "Eng", "hostedUrl": "https://jobs.lever.co/co/1",
-                "categories": {"location": "Remote"}, "createdAt": 0}]
+    payload = [
+        {
+            "text": "Eng",
+            "hostedUrl": "https://jobs.lever.co/co/1",
+            "categories": {"location": "Remote"},
+            "createdAt": 0,
+        }
+    ]
     mock_client = _make_mock_client(payload)
     with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
         with caplog.at_level(logging.INFO, logger="candidatador.scanner.http_sources"):

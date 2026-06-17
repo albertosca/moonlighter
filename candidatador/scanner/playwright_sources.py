@@ -1,18 +1,19 @@
 import asyncio
-from typing import Optional
-from playwright.async_api import Page, TimeoutError as PlaywrightTimeout
-from candidatador.scanner.base import BaseScanner, RawJob, normalize_remote_type
+
+from playwright.async_api import Page
+from playwright.async_api import TimeoutError as PlaywrightTimeout
+
 from candidatador.log import get_logger
+from candidatador.scanner.base import BaseScanner, RawJob, normalize_remote_type
 
 logger = get_logger(__name__)
 
-_DESCRIPTION_SELECTORS = (
-    ".jobs-description-content__text, .show-more-less-html__markup"
-)
+_DESCRIPTION_SELECTORS = ".jobs-description-content__text, .show-more-less-html__markup"
 
 
 class LinkedInSessionExpiredError(Exception):
     """Levantada quando o LinkedIn redireciona para login após goto()."""
+
     pass
 
 
@@ -26,7 +27,13 @@ class LinkedInScanner(BaseScanner):
     def __init__(self, page: Page):
         self.page = page
 
-    async def scan(self, company_slugs: list[str] = None, keywords: str = "", location: str = "Worldwide", **kwargs) -> list[RawJob]:
+    async def scan(
+        self,
+        company_slugs: list[str] = None,
+        keywords: str = "",
+        location: str = "Worldwide",
+        **kwargs,
+    ) -> list[RawJob]:
         url = self.SEARCH_URL.format(
             keywords=keywords.replace(" ", "%20") or "software+engineer",
             location=location.replace(" ", "%20"),
@@ -73,28 +80,28 @@ class LinkedInScanner(BaseScanner):
 
                 description = await self._fetch_description(item)
 
-                jobs.append(RawJob(
-                    source="linkedin",
-                    company=company,
-                    title=title,
-                    url=url_val,
-                    location=location_text,
-                    remote_type=normalize_remote_type(location_text) or "remote",
-                    description=description,
-                ))
+                jobs.append(
+                    RawJob(
+                        source="linkedin",
+                        company=company,
+                        title=title,
+                        url=url_val,
+                        location=location_text,
+                        remote_type=normalize_remote_type(location_text) or "remote",
+                        description=description,
+                    )
+                )
             except Exception:
                 continue
 
         logger.info("LinkedIn: found %d jobs", len(jobs))
         return jobs
 
-    async def _fetch_description(self, card_item) -> Optional[str]:
+    async def _fetch_description(self, card_item) -> str | None:
         """Clica no card e extrai a descrição do painel lateral. Retorna None se falhar."""
         try:
             await card_item.click()
-            desc_el = await self.page.wait_for_selector(
-                _DESCRIPTION_SELECTORS, timeout=5000
-            )
+            desc_el = await self.page.wait_for_selector(_DESCRIPTION_SELECTORS, timeout=5000)
             if desc_el:
                 text = (await desc_el.inner_text()).strip()
                 return text or None

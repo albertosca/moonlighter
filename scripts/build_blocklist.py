@@ -16,6 +16,7 @@ Flags:
     --dry-run    Mostra o que seria adicionado sem gravar no arquivo
     --company    Processa só uma empresa
 """
+
 import argparse
 import asyncio
 import json
@@ -75,7 +76,15 @@ Return a JSON array (no markdown):
 Return [] if no safe patterns can be identified.\
 """
 
-QUOTA_MARKERS = ("spend limit", "quota", "rate limit", "too many requests", "overloaded", "429", "usage limit")
+QUOTA_MARKERS = (
+    "spend limit",
+    "quota",
+    "rate limit",
+    "too many requests",
+    "overloaded",
+    "429",
+    "usage limit",
+)
 
 
 def _load_learned() -> list[str]:
@@ -95,15 +104,19 @@ def _save_learned(patterns: list[str]) -> None:
 
 def _fetch_low_scorers(threshold: float, company: str | None) -> dict[str, list[str]]:
     """Returns {company: [title, ...]} for archived jobs with 0 < score <= threshold."""
-    query = Job.select(Job.company, Job.title).where(
-        Job.score > 0,
-        Job.score <= threshold,
-        Job.status == "archived",
-        Job.score_notes.is_null(False),
-        ~Job.score_notes.startswith("evaluation error"),
-        ~Job.score_notes.startswith("title filtered"),
-        ~Job.score_notes.startswith("reevaluate_error"),
-    ).order_by(Job.company, Job.title)
+    query = (
+        Job.select(Job.company, Job.title)
+        .where(
+            Job.score > 0,
+            Job.score <= threshold,
+            Job.status == "archived",
+            Job.score_notes.is_null(False),
+            ~Job.score_notes.startswith("evaluation error"),
+            ~Job.score_notes.startswith("title filtered"),
+            ~Job.score_notes.startswith("reevaluate_error"),
+        )
+        .order_by(Job.company, Job.title)
+    )
     if company:
         query = query.where(Job.company == company)
 
@@ -128,7 +141,11 @@ async def _propose_for_company(
         proposals = json.loads(extracted)
         if not isinstance(proposals, list):
             return []
-        return [p for p in proposals if isinstance(p, dict) and p.get("safe") is True and p.get("pattern")]
+        return [
+            p
+            for p in proposals
+            if isinstance(p, dict) and p.get("safe") is True and p.get("pattern")
+        ]
     except Exception as e:
         err = str(e).lower()
         if any(m in err for m in QUOTA_MARKERS):
@@ -137,7 +154,9 @@ async def _propose_for_company(
         return []
 
 
-async def _run(threshold: float, company_filter: str | None, dry_run: bool, model: str, config: dict) -> None:
+async def _run(
+    threshold: float, company_filter: str | None, dry_run: bool, model: str, config: dict
+) -> None:
     caller = make_caller(config)
     grouped = _fetch_low_scorers(threshold, company_filter)
 
@@ -146,7 +165,9 @@ async def _run(threshold: float, company_filter: str | None, dry_run: bool, mode
         return
 
     total_titles = sum(len(v) for v in grouped.values())
-    print(f"Vagas para análise: {total_titles} em {len(grouped)} empresa(s)  [threshold={threshold}]")
+    print(
+        f"Vagas para análise: {total_titles} em {len(grouped)} empresa(s)  [threshold={threshold}]"
+    )
     print()
 
     existing = set(_load_learned())
@@ -169,7 +190,9 @@ async def _run(threshold: float, company_filter: str | None, dry_run: bool, mode
 
         for p in proposals:
             pattern = p["pattern"].lower().strip()
-            status = "JÁ EXISTE" if pattern in existing else ("DRY RUN" if dry_run else "ADICIONADO")
+            status = (
+                "JÁ EXISTE" if pattern in existing else ("DRY RUN" if dry_run else "ADICIONADO")
+            )
             print(f"  + {pattern!r:40s} [{status}]")
             print(f"    → {p.get('reasoning', '')}")
             if pattern not in existing and not dry_run:
@@ -187,8 +210,12 @@ async def _run(threshold: float, company_filter: str | None, dry_run: bool, mode
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--threshold", type=float, default=3.0, help="Score máximo para considerar (padrão: 3.0)")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--threshold", type=float, default=3.0, help="Score máximo para considerar (padrão: 3.0)"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Não grava no arquivo")
     parser.add_argument("--company", help="Processa só uma empresa")
     args = parser.parse_args()

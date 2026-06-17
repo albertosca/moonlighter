@@ -1,10 +1,9 @@
-import time
 import asyncio
-import pytest
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
-
 # ── Scan concorrente ──────────────────────────────────────────────────────────
+
 
 async def test_greenhouse_scan_20_companies_concurrent():
     """
@@ -90,6 +89,7 @@ async def test_ashby_scan_10_companies_concurrent():
 
 # ── Avaliação LLM em batch ────────────────────────────────────────────────────
 
+
 async def test_evaluate_10_jobs_concurrent_faster_than_sequential():
     """
     10 LLM evaluations in asyncio.gather should be much faster than sequential.
@@ -97,14 +97,21 @@ async def test_evaluate_10_jobs_concurrent_faster_than_sequential():
     Sequential: ~0.5s. Concurrent: ~0.05s.
     """
     import json
+
     from candidatador.evaluator import evaluate_job
 
     call_count = [0]
-    _response = json.dumps({
-        "score": 7.0, "score_notes": "ok", "caveats": [],
-        "salary_min": None, "salary_max": None,
-        "salary_currency": None, "salary_source": None,
-    })
+    _response = json.dumps(
+        {
+            "score": 7.0,
+            "score_notes": "ok",
+            "caveats": [],
+            "salary_min": None,
+            "salary_max": None,
+            "salary_currency": None,
+            "salary_source": None,
+        }
+    )
 
     async def slow_caller(prompt, model):
         await asyncio.sleep(0.05)
@@ -115,22 +122,35 @@ async def test_evaluate_10_jobs_concurrent_faster_than_sequential():
     jobs = [(f"Co{i}", f"Eng {i}", f"Job description {i}") for i in range(10)]
 
     t0 = time.perf_counter()
-    await asyncio.gather(*[
-        evaluate_job(company=c, title=t, description=d, profile=profile, model="test", _caller=slow_caller)
-        for c, t, d in jobs
-    ])
+    await asyncio.gather(
+        *[
+            evaluate_job(
+                company=c,
+                title=t,
+                description=d,
+                profile=profile,
+                model="test",
+                _caller=slow_caller,
+            )
+            for c, t, d in jobs
+        ]
+    )
     concurrent_elapsed = time.perf_counter() - t0
 
     # Sequential baseline (just measure)
     t0 = time.perf_counter()
     for c, t, d in jobs:
-        await evaluate_job(company=c, title=t, description=d, profile=profile, model="test", _caller=slow_caller)
+        await evaluate_job(
+            company=c, title=t, description=d, profile=profile, model="test", _caller=slow_caller
+        )
     sequential_elapsed = time.perf_counter() - t0
 
     assert concurrent_elapsed < sequential_elapsed * 0.5, (
         f"Concurrent ({concurrent_elapsed:.3f}s) should be at least 2x faster than sequential ({sequential_elapsed:.3f}s)"
     )
-    assert concurrent_elapsed < 0.2, f"Concurrent should finish in < 0.2s, got {concurrent_elapsed:.3f}s"
+    assert concurrent_elapsed < 0.2, (
+        f"Concurrent should finish in < 0.2s, got {concurrent_elapsed:.3f}s"
+    )
 
 
 async def test_evaluate_batch_size_10_processes_all():
@@ -138,13 +158,20 @@ async def test_evaluate_batch_size_10_processes_all():
     25 jobs processed in batches of 10 (as scan_and_evaluate does) — all 25 processed.
     """
     import json
+
     from candidatador.evaluator import evaluate_job
 
-    _response = json.dumps({
-        "score": 7.0, "score_notes": "ok", "caveats": [],
-        "salary_min": None, "salary_max": None,
-        "salary_currency": None, "salary_source": None,
-    })
+    _response = json.dumps(
+        {
+            "score": 7.0,
+            "score_notes": "ok",
+            "caveats": [],
+            "salary_min": None,
+            "salary_max": None,
+            "salary_currency": None,
+            "salary_source": None,
+        }
+    )
 
     async def fast_caller(prompt, model):
         return _response
@@ -155,11 +182,20 @@ async def test_evaluate_batch_size_10_processes_all():
     results = []
 
     for i in range(0, len(all_jobs), BATCH_SIZE):
-        batch = all_jobs[i:i + BATCH_SIZE]
-        batch_results = await asyncio.gather(*[
-            evaluate_job(company=c, title=t, description=d, profile=profile, model="test", _caller=fast_caller)
-            for c, t, d in batch
-        ])
+        batch = all_jobs[i : i + BATCH_SIZE]
+        batch_results = await asyncio.gather(
+            *[
+                evaluate_job(
+                    company=c,
+                    title=t,
+                    description=d,
+                    profile=profile,
+                    model="test",
+                    _caller=fast_caller,
+                )
+                for c, t, d in batch
+            ]
+        )
         results.extend(batch_results)
 
     assert len(results) == 25
@@ -168,9 +204,11 @@ async def test_evaluate_batch_size_10_processes_all():
 
 # ── Queries no DB ─────────────────────────────────────────────────────────────
 
+
 async def test_list_jobs_1000_records_fast(tmp_db):
     """list_jobs with 1000 records in DB returns in < 500ms."""
-    from candidatador.db import init_db, Job
+    from candidatador.db import Job, init_db
+
     init_db()
 
     # Insert 1000 jobs
@@ -186,6 +224,7 @@ async def test_list_jobs_1000_records_fast(tmp_db):
             )
 
     from candidatador.mcp_server import list_jobs
+
     t0 = time.perf_counter()
     result = await list_jobs(status="new", limit=20)
     elapsed = time.perf_counter() - t0
@@ -196,7 +235,8 @@ async def test_list_jobs_1000_records_fast(tmp_db):
 
 async def test_scan_log_dedup_1000_urls_fast(tmp_db):
     """Dedup check against ScanLog with 1000 entries completes in < 200ms."""
-    from candidatador.db import init_db, ScanLog
+    from candidatador.db import ScanLog, init_db
+
     init_db()
 
     with ScanLog._meta.database.atomic():
@@ -217,6 +257,7 @@ async def test_generate_answers_concurrent_faster_than_sequential():
     Each mock call has 0.05s delay. Sequential: ~0.5s. Concurrent: ~0.05s.
     """
     import json
+
     from candidatador.applicator.base import generate_answers
 
     async def slow_caller(prompt, model):
@@ -226,8 +267,15 @@ async def test_generate_answers_concurrent_faster_than_sequential():
     profile = {}
     fields = ["Why this role?"]
     calls = [
-        generate_answers(company=f"Co{i}", title="Eng", description="desc",
-                         fields=fields, profile=profile, model="test", _caller=slow_caller)
+        generate_answers(
+            company=f"Co{i}",
+            title="Eng",
+            description="desc",
+            fields=fields,
+            profile=profile,
+            model="test",
+            _caller=slow_caller,
+        )
         for i in range(10)
     ]
 

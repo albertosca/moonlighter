@@ -1,6 +1,7 @@
 import asyncio
 import os
-from typing import Callable, Awaitable
+from collections.abc import Awaitable, Callable
+
 import anthropic
 
 # (prompt: str, model: str) -> raw_text: str
@@ -30,7 +31,9 @@ async def _call_cli(prompt: str, model: str) -> str:
     # instead of the API key (which requires separate API credits).
     env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     proc = await asyncio.create_subprocess_exec(
-        "claude", "-p", prompt,
+        "claude",
+        "-p",
+        prompt,
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,

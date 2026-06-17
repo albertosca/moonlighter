@@ -92,6 +92,7 @@ async def pick_option_with_llm(
         return None
     try:
         import yaml
+
         options_text = "\n".join(f"{i}: {o}" for i, o in enumerate(options))
         prompt = _PICK_PROMPT.format(
             label=label,

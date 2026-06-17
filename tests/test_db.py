@@ -1,9 +1,11 @@
 import datetime
 import json
 import os
+
 import pytest
 from peewee import IntegrityError
-from candidatador.db import init_db, Job, Application, ScanLog
+
+from candidatador.db import Application, Job, ScanLog, init_db
 
 
 def _make_job(**kwargs):
@@ -45,6 +47,7 @@ def test_scan_log_dedup(tmp_db):
 
 # --- Job: salary fields ---
 
+
 def test_job_salary_fields(tmp_db):
     init_db()
     job = _make_job(
@@ -62,6 +65,7 @@ def test_job_salary_fields(tmp_db):
 
 # --- Job: nullable fields ---
 
+
 def test_job_nullable_fields_default_none(tmp_db):
     init_db()
     job = _make_job()
@@ -74,6 +78,7 @@ def test_job_nullable_fields_default_none(tmp_db):
 
 # --- Job: status default ---
 
+
 def test_job_status_default(tmp_db):
     init_db()
     job = _make_job()
@@ -81,6 +86,7 @@ def test_job_status_default(tmp_db):
 
 
 # --- Job: unique URL ---
+
 
 def test_job_url_unique_raises(tmp_db):
     init_db()
@@ -90,6 +96,7 @@ def test_job_url_unique_raises(tmp_db):
 
 
 # --- Job: get_caveats ---
+
 
 def test_job_get_caveats_valid_json(tmp_db):
     init_db()
@@ -118,12 +125,17 @@ def test_job_get_caveats_invalid_json(tmp_db):
 
 # --- Job: timestamps ---
 
+
 def test_job_found_at_is_recent(tmp_db):
     init_db()
     before = datetime.datetime.now()
     job = _make_job()
     after = datetime.datetime.now()
-    assert before - datetime.timedelta(seconds=5) <= job.found_at <= after + datetime.timedelta(seconds=5)
+    assert (
+        before - datetime.timedelta(seconds=5)
+        <= job.found_at
+        <= after + datetime.timedelta(seconds=5)
+    )
 
 
 def test_job_posted_at_nullable(tmp_db):
@@ -134,6 +146,7 @@ def test_job_posted_at_nullable(tmp_db):
 
 
 # --- Application ---
+
 
 def test_application_create_default_status(tmp_db):
     init_db()
@@ -181,12 +194,17 @@ def test_application_notes_accumulation(tmp_db):
 
 # --- ScanLog: timestamp ---
 
+
 def test_scanlog_scanned_at_is_recent(tmp_db):
     init_db()
     before = datetime.datetime.now()
     log = ScanLog.create(job_url="https://example.com/job/ts", source="greenhouse")
     after = datetime.datetime.now()
-    assert before - datetime.timedelta(seconds=5) <= log.scanned_at <= after + datetime.timedelta(seconds=5)
+    assert (
+        before - datetime.timedelta(seconds=5)
+        <= log.scanned_at
+        <= after + datetime.timedelta(seconds=5)
+    )
 
 
 def test_scanlog_same_url_different_source_raises(tmp_db):
@@ -226,10 +244,12 @@ def test_job_salary_notes_field(tmp_db):
 def test_db_path_reads_env_var(tmp_db):
     """_db_path() returns value of CANDIDATADOR_DB_PATH env var when set."""
     from candidatador.db import _db_path
+
     assert _db_path() == tmp_db
 
 
 # ── Application: campos email (email_ref + current_stage) ─────────────────────
+
 
 def test_application_email_ref_stored_and_retrieved(tmp_db):
     init_db()
@@ -250,6 +270,7 @@ def test_application_email_ref_is_null_by_default(tmp_db):
 def test_application_email_ref_unique_constraint(tmp_db):
     """email_ref é UNIQUE — dois apps com mesmo ref levantam IntegrityError."""
     from peewee import IntegrityError
+
     init_db()
     job = _make_job()
     Application.create(job=job, email_ref="abc123")

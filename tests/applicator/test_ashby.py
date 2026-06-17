@@ -1,6 +1,7 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
 from playwright.async_api import TimeoutError as PlaywrightTimeout
+
 from candidatador.applicator.ashby import AshbyApplier
 
 
@@ -16,6 +17,7 @@ def make_applier(url="https://jobs.ashbyhq.com/openai/123"):
 
 
 # ── detect() ─────────────────────────────────────────────────────────────────
+
 
 async def test_detect_ashby_jobs_url():
     applier = make_applier("https://jobs.ashbyhq.com/openai/123")
@@ -33,6 +35,7 @@ async def test_detect_non_ashby_url():
 
 
 # ── extract_fields() ──────────────────────────────────────────────────────────
+
 
 async def test_extract_fields_waits_for_form():
     applier = make_applier()
@@ -61,6 +64,7 @@ async def test_extract_fields_filters_long_labels():
 
 # ── fill_form() ───────────────────────────────────────────────────────────────
 
+
 async def test_fill_form_fills_inputs():
     applier = make_applier()
     label = MagicMock()
@@ -73,6 +77,7 @@ async def test_fill_form_fills_inputs():
         if "label" in selector:
             return label
         return field
+
     applier.page.query_selector = qs
 
     with patch("asyncio.sleep", new=AsyncMock()):
@@ -89,6 +94,7 @@ async def test_fill_form_uploads_cv():
         if "file" in selector:
             return file_input
         return None
+
     applier.page.query_selector = qs
 
     with patch("asyncio.sleep", new=AsyncMock()):
@@ -98,13 +104,16 @@ async def test_fill_form_uploads_cv():
 
 # ── submit() ──────────────────────────────────────────────────────────────────
 
+
 async def test_submit_button_click_returns_submitted():
     applier = make_applier()
     btn = MagicMock()
     btn.click = AsyncMock()
     applier.page.query_selector = AsyncMock(return_value=btn)
     applier.page.wait_for_load_state = AsyncMock()
-    applier.page.inner_text = AsyncMock(return_value="Application submitted. Thank you for applying!")
+    applier.page.inner_text = AsyncMock(
+        return_value="Application submitted. Thank you for applying!"
+    )
     assert await applier.submit() == "submitted"
 
 
@@ -150,6 +159,7 @@ async def test_fill_form_skips_label_without_for_attr():
         if "label" in selector:
             return label
         return field
+
     applier.page.query_selector = qs
     with patch("asyncio.sleep", new=AsyncMock()):
         await applier.fill_form({"Q": "A"}, cv_path="")
@@ -173,6 +183,7 @@ async def test_extract_fields_falls_back_when_primary_selector_empty():
     fallback_label.inner_text = AsyncMock(return_value="Why Ashby?")
 
     call_count = [0]
+
     async def qs_all(selector):
         call_count[0] += 1
         if call_count[0] == 1:

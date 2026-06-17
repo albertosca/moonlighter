@@ -1,6 +1,9 @@
 import asyncio
+
 from playwright.async_api import TimeoutError as PlaywrightTimeout
+
 from candidatador.applicator.base import BaseApplier
+
 
 class LinkedInApplier(BaseApplier):
     async def detect(self) -> bool:
@@ -27,11 +30,15 @@ class LinkedInApplier(BaseApplier):
         try:
             await self.page.wait_for_selector(".jobs-easy-apply-modal", timeout=10000)
             from candidatador.applicator.base import _query_labels_with_fallback
-            label_els = await _query_labels_with_fallback(self.page, [
-                ".jobs-easy-apply-modal label, .jobs-easy-apply-modal .fb-dash-form-element__label",
-                ".jobs-easy-apply-content label",
-                "[data-easy-apply-form] label",
-            ])
+
+            label_els = await _query_labels_with_fallback(
+                self.page,
+                [
+                    ".jobs-easy-apply-modal label, .jobs-easy-apply-modal .fb-dash-form-element__label",
+                    ".jobs-easy-apply-content label",
+                    "[data-easy-apply-form] label",
+                ],
+            )
             for el in label_els:
                 text = (await el.inner_text()).strip()
                 if text:
@@ -53,15 +60,14 @@ class LinkedInApplier(BaseApplier):
                     field = await self.page.query_selector(f"#{for_id}")
                     if field:
                         from candidatador.applicator.base import _fill_field
+
                         await _fill_field(field, answer)
                         await asyncio.sleep(0.4)
             except Exception:
                 continue
         # Upload CV if file input exists in the modal
         try:
-            file_input = await self.page.query_selector(
-                ".jobs-easy-apply-modal input[type='file']"
-            )
+            file_input = await self.page.query_selector(".jobs-easy-apply-modal input[type='file']")
             if file_input and cv_path:
                 await file_input.set_input_files(cv_path)
                 await asyncio.sleep(1)
@@ -79,6 +85,7 @@ class LinkedInApplier(BaseApplier):
                     await submit_btn.click()
                     await asyncio.sleep(2)
                     from candidatador.applicator.base import classify_submit_outcome
+
                     # Para o LinkedIn, "form ainda visível" = modal Easy Apply aberto.
                     return await classify_submit_outcome(
                         self.page,

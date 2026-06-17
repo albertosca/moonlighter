@@ -1,4 +1,3 @@
-import pytest
 from candidatador.applicator.field_map import pre_populate_answers
 
 PROFILE = {
@@ -102,6 +101,7 @@ def test_multiple_fields():
 
 # ── PT-BR labels (forms em português, ex: Nubank Investments) ──────────────────
 
+
 def test_ptbr_nome_first_name():
     r = pre_populate_answers(["Nome"], PROFILE)
     assert r["Nome"] == "Alberto"
@@ -153,7 +153,9 @@ def test_currently_based_question_fills_city():
 def test_currently_based_midsentence_confirmation_not_prepopulated():
     """Campo de confirmação que CONTÉM 'currently based' no meio NÃO é tratado como
     cidade (deixa pro LLM responder 'Yes, I am aware')."""
-    label = ('You are aware that this is a hybrid position and we require you to be '
-             'currently based in one of the job post locations. Type "Yes, I am aware" if you confirm.')
+    label = (
+        "You are aware that this is a hybrid position and we require you to be "
+        'currently based in one of the job post locations. Type "Yes, I am aware" if you confirm.'
+    )
     r = pre_populate_answers([label], PROFILE)
     assert label not in r

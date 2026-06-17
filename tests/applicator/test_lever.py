@@ -1,6 +1,7 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
 from playwright.async_api import TimeoutError as PlaywrightTimeout
+
 from candidatador.applicator.lever import LeverApplier
 
 
@@ -17,6 +18,7 @@ def make_applier(url="https://jobs.lever.co/gitlab/abc-123"):
 
 # ── detect() ─────────────────────────────────────────────────────────────────
 
+
 async def test_detect_lever_url():
     applier = make_applier("https://jobs.lever.co/gitlab/abc-123")
     assert await applier.detect() is True
@@ -28,6 +30,7 @@ async def test_detect_non_lever_url():
 
 
 # ── extract_fields() ──────────────────────────────────────────────────────────
+
 
 async def test_extract_fields_waits_for_application_form():
     applier = make_applier()
@@ -68,6 +71,7 @@ async def test_extract_fields_excludes_empty_labels():
 
 # ── fill_form() ───────────────────────────────────────────────────────────────
 
+
 async def test_fill_form_fills_labeled_fields():
     applier = make_applier()
     label = MagicMock()
@@ -81,6 +85,7 @@ async def test_fill_form_fills_labeled_fields():
         if "label" in selector:
             return label
         return field
+
     applier.page.query_selector = qs
 
     with patch("asyncio.sleep", new=AsyncMock()):
@@ -97,6 +102,7 @@ async def test_fill_form_uploads_cv():
         if "file" in selector:
             return file_input
         return None
+
     applier.page.query_selector = qs
 
     with patch("asyncio.sleep", new=AsyncMock()):
@@ -112,6 +118,7 @@ async def test_fill_form_skips_missing_label():
 
 
 # ── submit() ──────────────────────────────────────────────────────────────────
+
 
 async def test_submit_clicks_submit_button():
     applier = make_applier()
@@ -178,6 +185,7 @@ async def test_fill_form_skips_label_without_for_attr():
         if "label" in selector:
             return label
         return field
+
     applier.page.query_selector = qs
     await applier.fill_form({"Q": "A"}, cv_path="")
     field.fill.assert_not_called()
@@ -200,6 +208,7 @@ async def test_extract_fields_falls_back_when_primary_selector_empty():
     fallback_label.inner_text = AsyncMock(return_value="LinkedIn Profile")
 
     call_count = [0]
+
     async def qs_all(selector):
         call_count[0] += 1
         if call_count[0] == 1:

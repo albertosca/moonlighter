@@ -1,12 +1,12 @@
-import pytest
 from unittest.mock import patch
+
+from candidatador.applicator.ashby import AshbyApplier
 from candidatador.applicator.greenhouse import GreenhouseApplier
 from candidatador.applicator.lever import LeverApplier
-from candidatador.applicator.ashby import AshbyApplier
 from candidatador.applicator.linkedin import LinkedInApplier
 
-
 # ── Greenhouse E2E ────────────────────────────────────────────────────────────
+
 
 async def test_greenhouse_e2e_extract_fields(browser_page):
     page, base_url = browser_page
@@ -50,6 +50,7 @@ async def test_greenhouse_e2e_detect_false_for_local_url(browser_page):
 
 # ── Lever E2E ─────────────────────────────────────────────────────────────────
 
+
 async def test_lever_e2e_extract_fields(browser_page):
     page, base_url = browser_page
     await page.goto(f"{base_url}/lever_form.html")
@@ -80,6 +81,7 @@ async def test_lever_e2e_submit(browser_page):
 
 # ── Ashby E2E ─────────────────────────────────────────────────────────────────
 
+
 async def test_ashby_e2e_extract_fields(browser_page):
     page, base_url = browser_page
     await page.goto(f"{base_url}/ashby_form.html")
@@ -108,6 +110,7 @@ async def test_ashby_e2e_submit(browser_page):
 
 
 # ── LinkedIn E2E ──────────────────────────────────────────────────────────────
+
 
 async def test_linkedin_e2e_is_easy_apply(browser_page):
     page, base_url = browser_page

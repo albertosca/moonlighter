@@ -1,6 +1,7 @@
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
+
 from playwright.async_api import TimeoutError as PlaywrightTimeout
+
 from candidatador.applicator.linkedin import LinkedInApplier
 
 
@@ -16,6 +17,7 @@ def make_applier(url="https://www.linkedin.com/jobs/view/123"):
 
 
 # ── detect() ─────────────────────────────────────────────────────────────────
+
 
 async def test_detect_linkedin_jobs_url():
     applier = make_applier("https://www.linkedin.com/jobs/view/123")
@@ -33,6 +35,7 @@ async def test_detect_non_linkedin():
 
 
 # ── is_easy_apply() ──────────────────────────────────────────────────────────
+
 
 async def test_is_easy_apply_true():
     applier = make_applier()
@@ -65,6 +68,7 @@ async def test_is_easy_apply_case_insensitive():
 
 
 # ── extract_fields() ──────────────────────────────────────────────────────────
+
 
 async def test_extract_fields_clicks_apply_button():
     applier = make_applier()
@@ -138,6 +142,7 @@ async def test_extract_fields_no_apply_button_returns_empty():
 
 # ── fill_form() ───────────────────────────────────────────────────────────────
 
+
 async def test_fill_form_uses_modal_selector():
     """Query selector uses .jobs-easy-apply-modal prefix for labels."""
     applier = make_applier()
@@ -145,7 +150,8 @@ async def test_fill_form_uses_modal_selector():
 
     async def qs(selector):
         selectors_used.append(selector)
-        return None
+        return
+
     applier.page.query_selector = qs
 
     await applier.fill_form({"Phone": "555-1234"}, cv_path="")
@@ -165,6 +171,7 @@ async def test_fill_form_fills_input_fields():
         if "label" in selector:
             return label
         return field
+
     applier.page.query_selector = qs
 
     with patch("asyncio.sleep", new=AsyncMock()):
@@ -185,6 +192,7 @@ async def test_fill_form_fills_textarea_fields():
         if "label" in selector:
             return label
         return field
+
     applier.page.query_selector = qs
 
     with patch("asyncio.sleep", new=AsyncMock()):
@@ -200,11 +208,13 @@ async def test_fill_form_uploads_cv_via_modal_selector():
     file_input.set_input_files = AsyncMock()
 
     selectors_used = []
+
     async def qs(selector):
         selectors_used.append(selector)
         if "file" in selector:
             return file_input
         return None
+
     applier.page.query_selector = qs
 
     with patch("asyncio.sleep", new=AsyncMock()):
@@ -230,11 +240,14 @@ async def test_fill_form_exception_continues_to_next_field():
             field = MagicMock()
             field.evaluate = AsyncMock(return_value="input")
             field.get_attribute = AsyncMock(return_value="text")
+
             async def do_fill(val):
                 filled.append(val)
+
             field.fill = do_fill
             return field
         return None
+
     applier.page.query_selector = qs
 
     with patch("asyncio.sleep", new=AsyncMock()):
@@ -244,6 +257,7 @@ async def test_fill_form_exception_continues_to_next_field():
 
 
 # ── submit() — multi-step ─────────────────────────────────────────────────────
+
 
 async def test_submit_clicks_submit_button_directly():
     """Submit button present immediately + confirmação → True."""
@@ -284,6 +298,7 @@ async def test_submit_clicks_next_then_submit():
     next_btn.click = AsyncMock()
 
     call_count = [0]
+
     async def qs(selector):
         call_count[0] += 1
         # First call: no submit button (returns None)
@@ -291,12 +306,13 @@ async def test_submit_clicks_next_then_submit():
         # Third call: returns submit_btn
         # Fourth call (next btn again): won't be reached
         if call_count[0] == 1:
-            return None   # no submit btn first iteration
+            return None  # no submit btn first iteration
         if call_count[0] == 2:
             return next_btn  # next btn
         if call_count[0] == 3:
             return submit_btn  # submit btn found
         return None
+
     applier.page.query_selector = qs
     applier.page.inner_text = AsyncMock(return_value="Your application was sent")
 
@@ -335,6 +351,7 @@ async def test_submit_max_10_steps():
         # Always return next button (selector contains 'Continue to next step')
         next_calls[0] += 1
         return next_btn
+
     applier.page.query_selector = qs
 
     with patch("asyncio.sleep", new=AsyncMock()):
@@ -369,6 +386,7 @@ async def test_extract_fields_falls_back_when_primary_modal_selector_empty():
     fallback_label.inner_text = AsyncMock(return_value="Phone Number")
 
     call_count = [0]
+
     async def qs_all(selector):
         call_count[0] += 1
         if call_count[0] == 1:

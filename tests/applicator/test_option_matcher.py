@@ -14,6 +14,7 @@ CEFR = [
 
 # ---- match_option_locally (puro, sem LLM) ----
 
+
 def test_exact_match():
     assert match_option_locally("Yes", ["No", "Yes", "Maybe"]) == "Yes"
 
@@ -53,6 +54,7 @@ def test_empty_inputs_return_none():
 
 
 # ---- pick_option_with_llm (LLM, com caller fake) ----
+
 
 @pytest.mark.asyncio
 async def test_llm_picks_by_index():

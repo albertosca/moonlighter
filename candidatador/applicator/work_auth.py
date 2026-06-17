@@ -10,13 +10,33 @@ import re
 # Países/cidades que permitem inferência confiante. Lista curta de propósito:
 # preferimos __NEEDS_REVIEW__ a um falso positivo.
 _BRAZIL_MARKERS = (
-    "brazil", "brasil", "são paulo", "sao paulo", "rio de janeiro",
-    "belo horizonte", "porto alegre", "curitiba", "recife", "florianópolis",
-    "florianopolis", "campinas",
+    "brazil",
+    "brasil",
+    "são paulo",
+    "sao paulo",
+    "rio de janeiro",
+    "belo horizonte",
+    "porto alegre",
+    "curitiba",
+    "recife",
+    "florianópolis",
+    "florianopolis",
+    "campinas",
 )
 _US_MARKERS = (
-    "united states", "usa", "u.s.", "u.s.a", ", ca", ", ny", ", wa", ", tx",
-    "san francisco", "new york", "seattle", "austin", "boston",
+    "united states",
+    "usa",
+    "u.s.",
+    "u.s.a",
+    ", ca",
+    ", ny",
+    ", wa",
+    ", tx",
+    "san francisco",
+    "new york",
+    "seattle",
+    "austin",
+    "boston",
 )
 
 # Detecta o tipo de campo. authorization e sponsorship são respondidos de forma
@@ -61,7 +81,7 @@ def resolve_work_auth(field_label: str, country: str | None, config: dict) -> st
     if country is None:
         return review
 
-    authorized_here = (country == citizenship)
+    authorized_here = country == citizenship
     if is_auth:
         return yes if authorized_here else no
     # sponsorship: precisa de patrocínio exatamente quando NÃO é autorizado lá.

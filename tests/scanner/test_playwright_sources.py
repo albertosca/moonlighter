@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 
 def make_page(initial_url="https://www.linkedin.com/jobs/search/?keywords=engineer"):
@@ -15,6 +16,7 @@ def make_page(initial_url="https://www.linkedin.com/jobs/search/?keywords=engine
 
 # ── session detection ─────────────────────────────────────────────────────────
 
+
 async def test_linkedin_scanner_raises_on_login_redirect():
     """Após goto(), se page.url contém '/login', levanta LinkedInSessionExpiredError."""
     page = make_page()
@@ -25,6 +27,7 @@ async def test_linkedin_scanner_raises_on_login_redirect():
     page.goto = AsyncMock(side_effect=goto_side_effect)
 
     from candidatador.scanner.playwright_sources import LinkedInScanner, LinkedInSessionExpiredError
+
     scanner = LinkedInScanner(page)
     with pytest.raises(LinkedInSessionExpiredError):
         await scanner.scan(keywords="engineer")
@@ -40,6 +43,7 @@ async def test_linkedin_scanner_raises_on_checkpoint_redirect():
     page.goto = AsyncMock(side_effect=goto_side_effect)
 
     from candidatador.scanner.playwright_sources import LinkedInScanner, LinkedInSessionExpiredError
+
     scanner = LinkedInScanner(page)
     with pytest.raises(LinkedInSessionExpiredError):
         await scanner.scan(keywords="engineer")
@@ -55,6 +59,7 @@ async def test_linkedin_scanner_raises_on_authwall():
     page.goto = AsyncMock(side_effect=goto_side_effect)
 
     from candidatador.scanner.playwright_sources import LinkedInScanner, LinkedInSessionExpiredError
+
     scanner = LinkedInScanner(page)
     with pytest.raises(LinkedInSessionExpiredError):
         await scanner.scan(keywords="engineer")
@@ -66,6 +71,7 @@ async def test_linkedin_scanner_valid_session_no_exception():
     page.wait_for_selector = AsyncMock(side_effect=Exception("no results"))  # timeout ok
 
     from candidatador.scanner.playwright_sources import LinkedInScanner
+
     scanner = LinkedInScanner(page)
     # Não lança LinkedInSessionExpiredError, pode lançar outra coisa
     try:
@@ -88,17 +94,20 @@ async def test_linkedin_scanner_returns_jobs_on_success():
     location_el.inner_text = AsyncMock(return_value="Remote")
 
     listing = MagicMock()
-    listing.query_selector = AsyncMock(side_effect=lambda sel: {
-        ".base-search-card__title": title_el,
-        ".base-search-card__subtitle": company_el,
-        "a.base-card__full-link": link_el,
-        ".job-search-card__location": location_el,
-    }.get(sel))
+    listing.query_selector = AsyncMock(
+        side_effect=lambda sel: {
+            ".base-search-card__title": title_el,
+            ".base-search-card__subtitle": company_el,
+            "a.base-card__full-link": link_el,
+            ".job-search-card__location": location_el,
+        }.get(sel)
+    )
 
     page.query_selector_all = AsyncMock(return_value=[listing])
 
     with patch("asyncio.sleep", new=AsyncMock()):
         from candidatador.scanner.playwright_sources import LinkedInScanner
+
         scanner = LinkedInScanner(page)
         with patch.object(LinkedInScanner, "_fetch_description", new=AsyncMock(return_value=None)):
             jobs = await scanner.scan(keywords="engineer")
@@ -111,10 +120,12 @@ async def test_linkedin_scanner_returns_jobs_on_success():
 
 # ── _fetch_description ────────────────────────────────────────────────────────
 
+
 class TestFetchDescription:
     def _make_scanner(self):
         page = make_page()
         from candidatador.scanner.playwright_sources import LinkedInScanner
+
         return LinkedInScanner(page), page
 
     async def test_returns_description_when_panel_loads(self):
@@ -136,6 +147,7 @@ class TestFetchDescription:
         card.click = AsyncMock()
 
         from playwright.async_api import TimeoutError as PlaywrightTimeout
+
         page.wait_for_selector = AsyncMock(side_effect=PlaywrightTimeout("timeout"))
 
         result = await scanner._fetch_description(card)
@@ -184,19 +196,25 @@ class TestFetchDescription:
         location_el.inner_text = AsyncMock(return_value="Remote")
 
         listing = MagicMock()
-        listing.query_selector = AsyncMock(side_effect=lambda sel: {
-            ".base-search-card__title": title_el,
-            ".base-search-card__subtitle": company_el,
-            "a.base-card__full-link": link_el,
-            ".job-search-card__location": location_el,
-        }.get(sel))
+        listing.query_selector = AsyncMock(
+            side_effect=lambda sel: {
+                ".base-search-card__title": title_el,
+                ".base-search-card__subtitle": company_el,
+                "a.base-card__full-link": link_el,
+                ".job-search-card__location": location_el,
+            }.get(sel)
+        )
         page.query_selector_all = AsyncMock(return_value=[listing])
 
         with patch("asyncio.sleep", new=AsyncMock()):
             from candidatador.scanner.playwright_sources import LinkedInScanner
+
             scanner = LinkedInScanner(page)
-            with patch.object(LinkedInScanner, "_fetch_description",
-                               new=AsyncMock(return_value="Build Pix infra at Nubank.")):
+            with patch.object(
+                LinkedInScanner,
+                "_fetch_description",
+                new=AsyncMock(return_value="Build Pix infra at Nubank."),
+            ):
                 jobs = await scanner.scan(keywords="engineer")
 
         assert len(jobs) == 1
@@ -206,7 +224,9 @@ class TestFetchDescription:
 @pytest.mark.asyncio
 async def test_linkedin_scanner_logs_start_and_found(caplog):
     import logging
+
     from candidatador.scanner.playwright_sources import LinkedInScanner
+
     page = AsyncMock()
     page.url = "https://www.linkedin.com/jobs/search/?keywords=eng"
     page.goto = AsyncMock()

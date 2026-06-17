@@ -1,43 +1,53 @@
 import asyncio
 import contextlib
+import io
 import json
+import os
 import re
 import secrets
 import shutil
 import time as _time
 from datetime import datetime
 from pathlib import Path
+
 from mcp.server.fastmcp import FastMCP
 from peewee import IntegrityError
-from rich.table import Table
-from rich.console import Console
 from rich import box
-import io
+from rich.console import Console
+from rich.table import Table
 
-from candidatador.db import init_db, Job, ScanLog, Application
-from candidatador.config import load_config, load_profile, load_company_list
-from candidatador.scanner.http_sources import GreenhouseScanner, LeverScanner, AshbyScanner
-from candidatador.evaluator import evaluate_job, should_skip_by_title
 from candidatador import browser as _browser_mod
-import os
+from candidatador.applicator.ashby import AshbyApplier
+from candidatador.applicator.base import generate_answers
 from candidatador.applicator.greenhouse import GreenhouseApplier
 from candidatador.applicator.lever import LeverApplier
-from candidatador.applicator.ashby import AshbyApplier
 from candidatador.applicator.linkedin import LinkedInApplier
-from candidatador.applicator.base import generate_answers
-
-from candidatador.startup import validate_startup
-from candidatador.llm import make_caller
+from candidatador.config import load_company_list, load_config, load_profile
+from candidatador.db import Application, Job, ScanLog, init_db
 from candidatador.email_monitor import (
-    setup_gmail_service, sync_responses, _run_gmail_oauth, GmailAuthError
+    GmailAuthError,
+    _run_gmail_oauth,
+    setup_gmail_service,
+    sync_responses,
 )
-from candidatador.log import setup as _setup_logging, get_logger as _get_logger
+from candidatador.evaluator import evaluate_job, should_skip_by_title
+from candidatador.llm import make_caller
+from candidatador.log import get_logger as _get_logger
+from candidatador.log import setup as _setup_logging
+from candidatador.scanner.http_sources import AshbyScanner, GreenhouseScanner, LeverScanner
+from candidatador.startup import validate_startup
+
 _setup_logging()
 _log = _get_logger(__name__)
 
 _SPEND_LIMIT_MARKERS = (
-    "spend limit", "quota", "rate limit", "too many requests",
-    "overloaded", "429", "usage limit",
+    "spend limit",
+    "quota",
+    "rate limit",
+    "too many requests",
+    "overloaded",
+    "429",
+    "usage limit",
 )
 
 
@@ -88,6 +98,7 @@ _llm_caller = make_caller(_config)
 
 def _log_tool(name: str):
     """Context manager que loga start/end com elapsed de cada ferramenta MCP."""
+
     @contextlib.asynccontextmanager
     async def _ctx():
         _log.info("tool=%s start", name)
@@ -96,7 +107,9 @@ def _log_tool(name: str):
             yield
         finally:
             _log.info("tool=%s end elapsed=%.1fs", name, _time.monotonic() - t0)
+
     return _ctx()
+
 
 _startup_warnings = validate_startup(_config, _profile)
 for _w in _startup_warnings:
@@ -119,26 +132,31 @@ def _render_table(jobs: list[Job]) -> str:
     for job in jobs:
         score_str = f"{job.score:.1f}" if job.score is not None else "—"
         if job.salary_min and job.salary_max:
-            sal = f"${job.salary_min//1000}–{job.salary_max//1000}k"
+            sal = f"${job.salary_min // 1000}–{job.salary_max // 1000}k"
             if job.salary_source == "llm_estimate":
                 sal += " *"
         elif job.salary_min:
-            sal = f"${job.salary_min//1000}k+"
+            sal = f"${job.salary_min // 1000}k+"
         else:
             sal = "n/d"
         posted = job.posted_at.strftime("%d/%m") if job.posted_at else "—"
         caveats_list = job.get_caveats()
         caveat_str = caveats_list[0][:30] if caveats_list else "—"
         table.add_row(
-            str(job.id), f"{job.company} / {job.title}",
-            score_str, sal, posted,
-            job.remote_type or "—", caveat_str,
+            str(job.id),
+            f"{job.company} / {job.title}",
+            score_str,
+            sal,
+            posted,
+            job.remote_type or "—",
+            caveat_str,
         )
     console.print(table)
     return buf.getvalue()
 
 
 _APPLIER_CLASSES = [LinkedInApplier, GreenhouseApplier, LeverApplier, AshbyApplier]
+
 
 async def _detect_applier(page, config, profile):
     for cls in _APPLIER_CLASSES:
@@ -182,7 +200,11 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
                 all_raw.extend(raw)
 
         # LinkedIn scan (Playwright — requires prior login)
-        from candidatador.scanner.playwright_sources import LinkedInScanner, LinkedInSessionExpiredError
+        from candidatador.scanner.playwright_sources import (
+            LinkedInScanner,
+            LinkedInSessionExpiredError,
+        )
+
         _li_warning: str | None = None
         try:
             li_page = await _browser_mod.new_page(_config)
@@ -219,7 +241,7 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
 
         stop_event = asyncio.Event()
 
-        async def _eval_and_save(raw) -> "Job | None | _StopScan":
+        async def _eval_and_save(raw) -> Job | None | _StopScan:
             # Claim the URL in ScanLog before any work. ScanLog.create is synchronous
             # (no await), so asyncio won't context-switch between the insert and its
             # return — the UNIQUE constraint on job_url makes this the atomic guard
@@ -238,11 +260,18 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
             if matched_pattern:
                 try:
                     return Job.create(
-                        source=raw.source, company=raw.company, title=raw.title,
-                        url=raw.url, location=raw.location, remote_type=raw.remote_type,
-                        description=raw.description, posted_at=raw.posted_at,
-                        score=0.0, score_notes=f"title filtered: {matched_pattern!r}",
-                        caveats="[]", status="archived",
+                        source=raw.source,
+                        company=raw.company,
+                        title=raw.title,
+                        url=raw.url,
+                        location=raw.location,
+                        remote_type=raw.remote_type,
+                        description=raw.description,
+                        posted_at=raw.posted_at,
+                        score=0.0,
+                        score_notes=f"title filtered: {matched_pattern!r}",
+                        caveats="[]",
+                        status="archived",
                     )
                 except IntegrityError:
                     return None
@@ -263,15 +292,19 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
                     stop_event.set()
                     return _StopScan()
                 # Erro inesperado: NÃO silenciar — loga e devolve como exceção.
-                _log.error("scan: erro inesperado avaliando %s/%s — %s",
-                           raw.company, raw.title, e)
+                _log.error("scan: erro inesperado avaliando %s/%s — %s", raw.company, raw.title, e)
                 raise
 
             try:
                 return Job.create(
-                    source=raw.source, company=raw.company, title=raw.title,
-                    url=raw.url, location=raw.location, remote_type=raw.remote_type,
-                    description=raw.description, posted_at=raw.posted_at,
+                    source=raw.source,
+                    company=raw.company,
+                    title=raw.title,
+                    url=raw.url,
+                    location=raw.location,
+                    remote_type=raw.remote_type,
+                    description=raw.description,
+                    posted_at=raw.posted_at,
                     score=eval_result.score,
                     score_notes=eval_result.score_notes,
                     caveats=json.dumps(eval_result.caveats),
@@ -289,7 +322,7 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
             if stop_event.is_set():
                 spend_hit = True
                 break
-            batch = new_raw[i:i + BATCH_SIZE]
+            batch = new_raw[i : i + BATCH_SIZE]
             # return_exceptions=True: nenhuma coroutine é cancelada — cada uma roda
             # até o fim e limpa o próprio claim. Isso elimina claims órfãos.
             batch_results = await asyncio.gather(
@@ -307,17 +340,19 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
                 break
 
         if spend_hit:
-            _log.warning("scan_and_evaluate: interrompido por spend limit após %d vagas", len(results))
+            _log.warning(
+                "scan_and_evaluate: interrompido por spend limit após %d vagas", len(results)
+            )
 
         above = [j for j in results if j.status == "new"]
         title_filtered = sum(
-            1 for j in results
-            if j.score_notes and j.score_notes.startswith("title filtered:")
+            1 for j in results if j.score_notes and j.score_notes.startswith("title filtered:")
         )
         below = len(results) - len(above) - title_filtered
         spend_note = (
             "\n\n⚠️  Spend limit atingido — scan interrompido (vagas restantes ficam para o próximo scan)."
-            if spend_hit else ""
+            if spend_hit
+            else ""
         )
 
         if not above:
@@ -331,7 +366,9 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
             f"\n∗ = salário estimado pelo LLM  |  "
             f"{below} abaixo do threshold  |  {title_filtered} descartadas por título"
         )
-        return _with_li_warning(f"{len(results)} vagas processadas. {len(above)} acima do threshold:\n\n{table}{footer}{spend_note}")
+        return _with_li_warning(
+            f"{len(results)} vagas processadas. {len(above)} acima do threshold:\n\n{table}{footer}{spend_note}"
+        )
 
 
 @mcp.tool()
@@ -357,11 +394,12 @@ async def add_job(url: str, company: str = "", title: str = "", description: str
         if not description:
             try:
                 import httpx
+
                 async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
                     r = await client.get(url, headers={"User-Agent": "candidatador/0.1"})
                 if r.status_code == 200:
-                    description = re.sub(r'<[^>]+>', ' ', r.text).strip()
-                    description = re.sub(r'\s+', ' ', description)[:8000]
+                    description = re.sub(r"<[^>]+>", " ", r.text).strip()
+                    description = re.sub(r"\s+", " ", description)[:8000]
                 else:
                     return (
                         f"Não consegui buscar a URL (HTTP {r.status_code}). "
@@ -390,11 +428,18 @@ async def add_job(url: str, company: str = "", title: str = "", description: str
         if matched_pattern:
             try:
                 job = Job.create(
-                    source="manual", company=company, title=title,
-                    url=url, location=None, remote_type=None,
-                    description=description, posted_at=None,
-                    score=0.0, score_notes=f"title filtered: {matched_pattern!r}",
-                    caveats="[]", status="archived",
+                    source="manual",
+                    company=company,
+                    title=title,
+                    url=url,
+                    location=None,
+                    remote_type=None,
+                    description=description,
+                    posted_at=None,
+                    score=0.0,
+                    score_notes=f"title filtered: {matched_pattern!r}",
+                    caveats="[]",
+                    status="archived",
                 )
                 ScanLog.create(job_url=url, source="manual")
             except IntegrityError:
@@ -414,9 +459,14 @@ async def add_job(url: str, company: str = "", title: str = "", description: str
         status = "new" if eval_result.score >= threshold else "archived"
         try:
             job = Job.create(
-                source="manual", company=company, title=title,
-                url=url, location=None, remote_type=None,
-                description=description, posted_at=None,
+                source="manual",
+                company=company,
+                title=title,
+                url=url,
+                location=None,
+                remote_type=None,
+                description=description,
+                posted_at=None,
                 score=eval_result.score,
                 score_notes=eval_result.score_notes,
                 caveats=json.dumps(eval_result.caveats),
@@ -431,7 +481,11 @@ async def add_job(url: str, company: str = "", title: str = "", description: str
             return "Vaga já existe no banco (conflito de URL)."
 
         icon = "✓ NEW" if status == "new" else "arquivada"
-        caveats_str = "\n".join(f"  ⚠ {c}" for c in eval_result.caveats) if eval_result.caveats else "  nenhum"
+        caveats_str = (
+            "\n".join(f"  ⚠ {c}" for c in eval_result.caveats)
+            if eval_result.caveats
+            else "  nenhum"
+        )
         return (
             f"{icon} — {company} / {title}\n"
             f"Score: {eval_result.score:.1f}/10  (threshold: {threshold})\n"
@@ -445,7 +499,9 @@ async def add_job(url: str, company: str = "", title: str = "", description: str
 async def list_jobs(status: str = "new", limit: int = 20) -> str:
     """List jobs from DB filtered by status."""
     async with _log_tool("list_jobs"):
-        jobs = list(Job.select().where(Job.status == status).order_by(Job.score.desc()).limit(limit))
+        jobs = list(
+            Job.select().where(Job.status == status).order_by(Job.score.desc()).limit(limit)
+        )
         if not jobs:
             return f"Nenhuma vaga com status='{status}'."
         return _render_table(jobs)
@@ -469,7 +525,11 @@ async def get_job(id: int) -> str:
             f"**URL:** {job.url}",
         ]
         if job.salary_min:
-            sal = f"${job.salary_min:,}–${job.salary_max:,} {job.salary_currency}" if job.salary_max else f"${job.salary_min:,}+ {job.salary_currency}"
+            sal = (
+                f"${job.salary_min:,}–${job.salary_max:,} {job.salary_currency}"
+                if job.salary_max
+                else f"${job.salary_min:,}+ {job.salary_currency}"
+            )
             lines.append(f"**Salário:** {sal} ({job.salary_source})")
         if caveats:
             lines.append(f"**Caveats:** {', '.join(caveats)}")
@@ -547,8 +607,7 @@ async def apply_jobs(ids: list[int]) -> str:
 
                 # Save draft to DB
                 app, created = Application.get_or_create(
-                    job=job,
-                    defaults={"status": "draft", "form_data": json.dumps(draft.answers)}
+                    job=job, defaults={"status": "draft", "form_data": json.dumps(draft.answers)}
                 )
                 if not created:
                     app.form_data = json.dumps(draft.answers)
@@ -571,14 +630,16 @@ async def apply_jobs(ids: list[int]) -> str:
                         lines.append(f"  - {f}")
                     lines.append(
                         f"Responda no confirm_apply: "
-                        f"`confirm_apply(job_id={job_id}, answers={{\"<campo>\": \"Yes/No\"}})`"
+                        f'`confirm_apply(job_id={job_id}, answers={{"<campo>": "Yes/No"}})`'
                     )
                 for field, answer in draft.answers.items():
                     if answer == "__NEEDS_REVIEW__":
                         continue
                     lines.append(f"\n**{field}**\n{answer}")
                 lines.append(f"\nPara aprovar e candidatar: `confirm_apply(job_id={job_id})`")
-                lines.append(f"Para editar: passe `answers={{\"campo\": \"nova resposta\"}}` no confirm_apply")
+                lines.append(
+                    'Para editar: passe `answers={"campo": "nova resposta"}` no confirm_apply'
+                )
                 drafts_output.append("\n".join(lines))
 
             except Exception as e:
@@ -616,7 +677,7 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
         try:
             job = Job.get_by_id(job_id)
             app = Application.get(Application.job == job)
-        except (Job.DoesNotExist, Application.DoesNotExist):
+        except Job.DoesNotExist, Application.DoesNotExist:
             return f"⚠️  Vaga #{job_id} não encontrada ou sem rascunho. Rode apply_jobs primeiro."
 
         stored_answers = app.get_form_data()
@@ -630,7 +691,7 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
                 f"trabalho aguardando sua decisão (país da vaga indefinido):\n"
                 + "\n".join(f"  - {k}" for k in pending)
                 + f"\nResponda e re-rode: "
-                f"`confirm_apply(job_id={job_id}, answers={{\"{pending[0]}\": \"Yes\"}})`"
+                f'`confirm_apply(job_id={job_id}, answers={{"{pending[0]}": "Yes"}})`'
             )
 
         # Gera o ref e injeta o alias +ref no campo de email ANTES de preencher, para que
@@ -661,7 +722,11 @@ async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
             if isinstance(fill_status, dict):
                 failed_fields = [k for k, s in fill_status.items() if s.startswith("failed")]
                 if failed_fields:
-                    _log.warning("confirm_apply #%d: campos com falha no preenchimento: %s", job_id, failed_fields)
+                    _log.warning(
+                        "confirm_apply #%d: campos com falha no preenchimento: %s",
+                        job_id,
+                        failed_fields,
+                    )
             else:
                 fill_status = {}
             await _browser_mod.save_screenshot(page, job_id, "03-filled", _config)
@@ -736,8 +801,10 @@ async def retry_apply(job_id: int) -> str:
     async with _log_tool("retry_apply"):
         try:
             app = Application.get(Application.job == Job.get_by_id(job_id))
-        except (Job.DoesNotExist, Application.DoesNotExist):
-            return f"Vaga #{job_id} não tem rascunho salvo. Rode apply_jobs(ids=[{job_id}]) primeiro."
+        except Job.DoesNotExist, Application.DoesNotExist:
+            return (
+                f"Vaga #{job_id} não tem rascunho salvo. Rode apply_jobs(ids=[{job_id}]) primeiro."
+            )
         if app.status == "needs_review":
             return (
                 f"🚫 Vaga #{job_id} está em needs_review — pode ter sido enviada. "
@@ -752,7 +819,15 @@ async def retry_apply(job_id: int) -> str:
 async def get_pipeline() -> str:
     """Show full application funnel: counts and list by status."""
     async with _log_tool("get_pipeline"):
-        statuses = ["draft", "needs_review", "submitted", "screening", "interviews", "offer", "rejected"]
+        statuses = [
+            "draft",
+            "needs_review",
+            "submitted",
+            "screening",
+            "interviews",
+            "offer",
+            "rejected",
+        ]
         lines = ["# Pipeline de Candidaturas\n"]
         for status in statuses:
             apps = list(
@@ -767,7 +842,9 @@ async def get_pipeline() -> str:
             for app in apps:
                 date = app.applied_at.strftime("%d/%m") if app.applied_at else "—"
                 next_action = f" → {app.next_action}" if app.next_action else ""
-                lines.append(f"- #{app.job.id} {app.job.company}/{app.job.title} ({date}){next_action}")
+                lines.append(
+                    f"- #{app.job.id} {app.job.company}/{app.job.title} ({date}){next_action}"
+                )
             lines.append("")
 
         total = Application.select().count()
@@ -790,7 +867,7 @@ async def update_status(job_id: int, status: str, notes: str = "", next_action: 
         try:
             job = Job.get_by_id(job_id)
             app = Application.get(Application.job == job)
-        except (Job.DoesNotExist, Application.DoesNotExist):
+        except Job.DoesNotExist, Application.DoesNotExist:
             return f"Vaga #{job_id} não encontrada ou sem candidatura registrada."
 
         app.status = status

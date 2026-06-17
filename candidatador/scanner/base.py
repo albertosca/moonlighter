@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+
 
 @dataclass
 class RawJob:
@@ -9,16 +9,17 @@ class RawJob:
     company: str
     title: str
     url: str
-    location: Optional[str] = None
-    remote_type: Optional[str] = None    # 'remote' | 'hybrid' | 'onsite'
-    description: Optional[str] = None
-    posted_at: Optional[datetime] = None
-    salary_min: Optional[int] = None
-    salary_max: Optional[int] = None
-    salary_currency: Optional[str] = None
-    salary_source: Optional[str] = None  # 'stated' only (scanner doesn't infer)
+    location: str | None = None
+    remote_type: str | None = None  # 'remote' | 'hybrid' | 'onsite'
+    description: str | None = None
+    posted_at: datetime | None = None
+    salary_min: int | None = None
+    salary_max: int | None = None
+    salary_currency: str | None = None
+    salary_source: str | None = None  # 'stated' only (scanner doesn't infer)
 
-def normalize_remote_type(location: Optional[str]) -> Optional[str]:
+
+def normalize_remote_type(location: str | None) -> str | None:
     if not location:
         return None
     loc = location.lower()
@@ -27,6 +28,7 @@ def normalize_remote_type(location: Optional[str]) -> Optional[str]:
     if "remote" in loc:
         return "remote"
     return "onsite"
+
 
 class BaseScanner(ABC):
     @abstractmethod

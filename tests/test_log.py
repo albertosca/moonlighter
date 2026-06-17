@@ -1,15 +1,16 @@
 import logging
-import pytest
 
 
 def test_get_logger_returns_logger_with_correct_name():
     from candidatador.log import get_logger
+
     logger = get_logger("candidatador.foo")
     assert logger.name == "candidatador.foo"
 
 
 def test_setup_creates_file_handler(tmp_path):
     from candidatador import log as log_mod
+
     # reset estado do módulo para garantir setup limpo
     log_mod._initialized = False
     root = logging.getLogger("candidatador")
@@ -26,6 +27,7 @@ def test_setup_creates_file_handler(tmp_path):
 
 def test_setup_idempotent(tmp_path):
     from candidatador import log as log_mod
+
     log_mod._initialized = False
     root = logging.getLogger("candidatador")
     for h in root.handlers[:]:
@@ -41,6 +43,7 @@ def test_setup_idempotent(tmp_path):
 
 def test_log_message_reaches_file(tmp_path):
     from candidatador import log as log_mod
+
     log_mod._initialized = False
     root = logging.getLogger("candidatador")
     for h in root.handlers[:]:

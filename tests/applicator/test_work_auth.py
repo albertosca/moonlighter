@@ -1,4 +1,3 @@
-import pytest
 from candidatador.applicator.work_auth import infer_country, resolve_work_auth
 
 WA_CONFIG = {
@@ -12,6 +11,7 @@ WA_CONFIG = {
 
 
 # ── infer_country (conservador) ───────────────────────────────────────────────
+
 
 def test_infer_country_brazil_from_location():
     assert infer_country("São Paulo, Brazil", None) == "brazil"
@@ -32,6 +32,7 @@ def test_infer_country_unknown_returns_none():
 
 # ── resolve_work_auth ─────────────────────────────────────────────────────────
 
+
 def test_resolve_authorized_for_brazil():
     r = resolve_work_auth("Are you authorized to work in this location?", "brazil", WA_CONFIG)
     assert r == "Yes"
@@ -43,12 +44,16 @@ def test_resolve_sponsorship_for_brazil():
 
 
 def test_resolve_authorized_for_us_is_no():
-    r = resolve_work_auth("Are you legally authorized to work in the US?", "united states", WA_CONFIG)
+    r = resolve_work_auth(
+        "Are you legally authorized to work in the US?", "united states", WA_CONFIG
+    )
     assert r == "No"
 
 
 def test_resolve_sponsorship_for_us_is_yes():
-    r = resolve_work_auth("Do you require sponsorship now or in the future?", "united states", WA_CONFIG)
+    r = resolve_work_auth(
+        "Do you require sponsorship now or in the future?", "united states", WA_CONFIG
+    )
     assert r == "Yes"
 
 

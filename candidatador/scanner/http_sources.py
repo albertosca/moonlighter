@@ -1,12 +1,14 @@
 import asyncio
 import re
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
+
 import httpx
-from candidatador.scanner.base import BaseScanner, RawJob, normalize_remote_type
+
 from candidatador.log import get_logger
+from candidatador.scanner.base import BaseScanner, RawJob, normalize_remote_type
 
 logger = get_logger(__name__)
+
 
 class GreenhouseScanner(BaseScanner):
     BASE = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
@@ -49,17 +51,19 @@ class GreenhouseScanner(BaseScanner):
                 except ValueError:
                     pass
             raw_content = item.get("content", "") or ""
-            description = re.sub(r'<[^>]+>', ' ', raw_content).strip() if raw_content else None
-            jobs.append(RawJob(
-                source="greenhouse",
-                company=slug,
-                title=title,
-                url=url,
-                location=location,
-                remote_type=normalize_remote_type(location),
-                posted_at=posted_at,
-                description=description,
-            ))
+            description = re.sub(r"<[^>]+>", " ", raw_content).strip() if raw_content else None
+            jobs.append(
+                RawJob(
+                    source="greenhouse",
+                    company=slug,
+                    title=title,
+                    url=url,
+                    location=location,
+                    remote_type=normalize_remote_type(location),
+                    posted_at=posted_at,
+                    description=description,
+                )
+            )
         return jobs
 
 
@@ -99,22 +103,25 @@ class LeverScanner(BaseScanner):
             location = item.get("categories", {}).get("location")
             posted_at = None
             if item.get("createdAt"):
-                posted_at = datetime.fromtimestamp(item["createdAt"] / 1000, tz=timezone.utc)
-            jobs.append(RawJob(
-                source="lever",
-                company=slug,
-                title=title,
-                url=url,
-                location=location,
-                remote_type=normalize_remote_type(location),
-                posted_at=posted_at,
-                description=item.get("descriptionPlain") or None,
-            ))
+                posted_at = datetime.fromtimestamp(item["createdAt"] / 1000, tz=UTC)
+            jobs.append(
+                RawJob(
+                    source="lever",
+                    company=slug,
+                    title=title,
+                    url=url,
+                    location=location,
+                    remote_type=normalize_remote_type(location),
+                    posted_at=posted_at,
+                    description=item.get("descriptionPlain") or None,
+                )
+            )
         return jobs
 
 
 class AshbyScanner(BaseScanner):
     """Ashby public job board API."""
+
     BASE = "https://jobs.ashbyhq.com/api/non-user-graphql"
     HEADERS = {"User-Agent": "candidatador/0.1", "Content-Type": "application/json"}
     QUERY = """
@@ -140,11 +147,15 @@ class AshbyScanner(BaseScanner):
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
         try:
-            r = await client.post(self.BASE, headers=self.HEADERS, json={
-                "operationName": "jobPostings",
-                "query": self.QUERY,
-                "variables": {"organizationHostedJobsPageName": slug},
-            })
+            r = await client.post(
+                self.BASE,
+                headers=self.HEADERS,
+                json={
+                    "operationName": "jobPostings",
+                    "query": self.QUERY,
+                    "variables": {"organizationHostedJobsPageName": slug},
+                },
+            )
         except Exception:
             return []
         if r.status_code != 200:
@@ -161,21 +172,27 @@ class AshbyScanner(BaseScanner):
             url = item.get("jobPostingAbsoluteUrl")
             if not title or not url:
                 continue
-            remote_type = "remote" if item.get("isRemote") else normalize_remote_type(item.get("locationName"))
+            remote_type = (
+                "remote"
+                if item.get("isRemote")
+                else normalize_remote_type(item.get("locationName"))
+            )
             posted_at = None
             if item.get("publishedDate"):
                 try:
                     posted_at = datetime.fromisoformat(item["publishedDate"])
                 except ValueError:
                     pass
-            jobs.append(RawJob(
-                source="ashby",
-                company=slug,
-                title=title,
-                url=url,
-                location=item.get("locationName"),
-                remote_type=remote_type,
-                posted_at=posted_at,
-                description=item.get("descriptionPlain") or None,
-            ))
+            jobs.append(
+                RawJob(
+                    source="ashby",
+                    company=slug,
+                    title=title,
+                    url=url,
+                    location=item.get("locationName"),
+                    remote_type=remote_type,
+                    posted_at=posted_at,
+                    description=item.get("descriptionPlain") or None,
+                )
+            )
         return jobs

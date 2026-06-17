@@ -61,8 +61,7 @@ _RULES: list[tuple[str, object]] = [
 ]
 
 _COMPILED: list[tuple[re.Pattern, object]] = [
-    (re.compile(pattern, re.IGNORECASE), fn)
-    for pattern, fn in _RULES
+    (re.compile(pattern, re.IGNORECASE), fn) for pattern, fn in _RULES
 ]
 
 
@@ -80,6 +79,7 @@ def pre_populate_answers(
     ignorados (o LLM os preenche).
     """
     from candidatador.applicator.work_auth import infer_country, resolve_work_auth
+
     cfg = config or {}
     country = infer_country(job_location, job_remote_type)
 

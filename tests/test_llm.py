@@ -1,11 +1,12 @@
 import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from candidatador.llm import make_caller, _call_cli, _make_api_caller, LLMCaller
+import pytest
 
+from candidatador.llm import LLMCaller, _call_cli, _make_api_caller, make_caller
 
 # ── make_caller factory ───────────────────────────────────────────────────────
+
 
 def test_make_caller_cli_returns_call_cli():
     caller = make_caller({"llm_backend": "cli"})
@@ -37,12 +38,15 @@ def test_make_caller_unknown_backend_falls_back_to_api():
 
 # ── _call_cli ─────────────────────────────────────────────────────────────────
 
+
 async def test_call_cli_returns_stdout():
     mock_proc = MagicMock()
     mock_proc.returncode = 0
     mock_proc.communicate = AsyncMock(return_value=(b"hello from claude\n", b""))
 
-    with patch("candidatador.llm.asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+    with patch(
+        "candidatador.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+    ) as mock_exec:
         result = await _call_cli("my prompt", "ignored-model")
 
     assert result == "hello from claude\n"
@@ -61,7 +65,9 @@ async def test_call_cli_ignores_model_param():
     mock_proc.returncode = 0
     mock_proc.communicate = AsyncMock(return_value=(b"output", b""))
 
-    with patch("candidatador.llm.asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+    with patch(
+        "candidatador.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+    ) as mock_exec:
         await _call_cli("prompt", "claude-opus-99")
 
     call_args = mock_exec.call_args[0]
@@ -103,7 +109,9 @@ async def test_call_cli_empty_prompt_still_calls_subprocess():
     mock_proc.returncode = 0
     mock_proc.communicate = AsyncMock(return_value=(b"response", b""))
 
-    with patch("candidatador.llm.asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+    with patch(
+        "candidatador.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+    ) as mock_exec:
         result = await _call_cli("", "model")
 
     assert result == "response"
@@ -112,6 +120,7 @@ async def test_call_cli_empty_prompt_still_calls_subprocess():
 
 
 # ── _make_api_caller ──────────────────────────────────────────────────────────
+
 
 async def test_make_api_caller_calls_messages_create():
     mock_message = MagicMock()
@@ -220,9 +229,9 @@ def test_make_api_caller_reuses_client_across_calls():
 
 # ── LLMCaller type contract ───────────────────────────────────────────────────
 
+
 def test_llm_caller_type_is_exported():
     """LLMCaller is importable from candidatador.llm."""
-    from candidatador.llm import LLMCaller
     assert LLMCaller is not None
 
 

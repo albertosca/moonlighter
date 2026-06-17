@@ -16,6 +16,7 @@ Flags:
     --concurrency N Quantas avaliações rodar em paralelo (padrão: 5).
                     Ao primeiro spend limit, para tudo imediatamente.
 """
+
 import argparse
 import asyncio
 import json
@@ -32,7 +33,15 @@ from candidatador.log import setup as setup_logging
 
 BUG_MARKER = "evaluation error: claude CLI exited with code 1"
 
-QUOTA_MARKERS = ("quota", "rate limit", "too many requests", "overloaded", "429", "usage limit", "spend limit")
+QUOTA_MARKERS = (
+    "quota",
+    "rate limit",
+    "too many requests",
+    "overloaded",
+    "429",
+    "usage limit",
+    "spend limit",
+)
 
 
 def _fetch_victims(company: str | None, limit: int | None) -> list[Job]:
@@ -50,8 +59,13 @@ def _fetch_victims(company: str | None, limit: int | None) -> list[Job]:
 
 
 async def _reevaluate(
-    jobs: list[Job], config: dict, profile: dict, dry_run: bool, model: str,
-    title_only: bool = False, concurrency: int = 5,
+    jobs: list[Job],
+    config: dict,
+    profile: dict,
+    dry_run: bool,
+    model: str,
+    title_only: bool = False,
+    concurrency: int = 5,
 ) -> None:
     caller = make_caller(config)
     threshold = config.get("score_threshold", 6.5)
@@ -88,7 +102,11 @@ async def _reevaluate(
                 return
 
             try:
-                description = job.title if title_only else (job.description or f"{job.title} at {job.company}")
+                description = (
+                    job.title
+                    if title_only
+                    else (job.description or f"{job.title} at {job.company}")
+                )
                 result = await evaluate_job(
                     company=job.company,
                     title=job.title,
@@ -109,7 +127,9 @@ async def _reevaluate(
                     print(f"{label} ✗ ERRO: {e}")
                     errors += 1
                 if not dry_run:
-                    Job.update(score_notes=f"reevaluate_error: {str(e)[:200]}").where(Job.id == job.id).execute()
+                    Job.update(score_notes=f"reevaluate_error: {str(e)[:200]}").where(
+                        Job.id == job.id
+                    ).execute()
                 return
 
             new_status = "new" if result.score >= threshold else "archived"
@@ -151,13 +171,21 @@ async def _reevaluate(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--dry-run", action="store_true", help="Não grava no banco")
     parser.add_argument("--company", help="Filtra por empresa")
     parser.add_argument("--limit", type=int, help="Máximo de vagas a processar")
     parser.add_argument("--model", help="Sobrescreve eval_model do config")
-    parser.add_argument("--title-only", action="store_true", help="Usa só o título (sem descrição) — muito mais barato")
-    parser.add_argument("--concurrency", type=int, default=5, help="Avaliações em paralelo (padrão: 5)")
+    parser.add_argument(
+        "--title-only",
+        action="store_true",
+        help="Usa só o título (sem descrição) — muito mais barato",
+    )
+    parser.add_argument(
+        "--concurrency", type=int, default=5, help="Avaliações em paralelo (padrão: 5)"
+    )
     args = parser.parse_args()
 
     setup_logging()
@@ -167,7 +195,9 @@ def main() -> None:
     os.environ["CANDIDATADOR_DB"] = db_path
     init_db()
 
-    model = args.model or config.get("eval_model", config.get("llm_model", "claude-haiku-4-5-20251001"))
+    model = args.model or config.get(
+        "eval_model", config.get("llm_model", "claude-haiku-4-5-20251001")
+    )
 
     victims = _fetch_victims(args.company, args.limit)
     if not victims:
@@ -184,7 +214,17 @@ def main() -> None:
     if args.dry_run:
         print("\n⚠️  DRY RUN — nenhuma alteração será gravada.\n")
 
-    asyncio.run(_reevaluate(victims, config, profile, dry_run=args.dry_run, model=model, title_only=args.title_only, concurrency=args.concurrency))
+    asyncio.run(
+        _reevaluate(
+            victims,
+            config,
+            profile,
+            dry_run=args.dry_run,
+            model=model,
+            title_only=args.title_only,
+            concurrency=args.concurrency,
+        )
+    )
 
 
 if __name__ == "__main__":

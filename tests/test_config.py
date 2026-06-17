@@ -1,7 +1,8 @@
 import os
+
 import pytest
-import yaml
-from candidatador.config import load_config, load_profile, load_company_list, _PROJECT_ROOT
+
+from candidatador.config import _PROJECT_ROOT, load_company_list, load_config, load_profile
 
 
 def test_load_config_defaults(tmp_path):
@@ -18,7 +19,7 @@ def test_load_config_overrides(tmp_path):
     config = load_config(config_path=str(cfg_file))
     assert config["score_threshold"] == 7.5
     assert config["llm_model"] == "claude-opus-4-7"
-    assert config["slow_mo_ms"] == 300   # default still present
+    assert config["slow_mo_ms"] == 300  # default still present
 
 
 def test_load_profile(tmp_path):
@@ -59,6 +60,7 @@ def test_load_company_list_nonexistent():
 
 # --- load_config: path expansion ---
 
+
 def test_load_config_path_keys_expanded(tmp_path):
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
     assert "~" not in config["db_path"]
@@ -91,6 +93,7 @@ def test_load_config_all_path_keys_no_tilde(tmp_path):
 
 
 # --- load_profile ---
+
 
 def test_load_profile_missing_file_raises():
     with pytest.raises(FileNotFoundError):
@@ -126,6 +129,7 @@ criteria:
 
 # --- load_company_list ---
 
+
 def test_load_company_list_empty_yaml(tmp_path):
     company_file = tmp_path / "company_list.yaml"
     company_file.write_text("")
@@ -150,12 +154,14 @@ ashby:
 
 # --- _PROJECT_ROOT ---
 
+
 def test_project_root_is_absolute():
     assert os.path.isabs(_PROJECT_ROOT), "_PROJECT_ROOT is not an absolute path"
     assert ".." not in _PROJECT_ROOT, "_PROJECT_ROOT contains '..'"
 
 
 # --- load_config default path ---
+
 
 def test_load_config_default_path_finds_project_config():
     config = load_config()

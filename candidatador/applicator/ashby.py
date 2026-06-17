@@ -1,6 +1,9 @@
 import asyncio
+
 from playwright.async_api import TimeoutError as PlaywrightTimeout
+
 from candidatador.applicator.base import BaseApplier
+
 
 class AshbyApplier(BaseApplier):
     async def detect(self) -> bool:
@@ -13,11 +16,15 @@ class AshbyApplier(BaseApplier):
             return []
         labels = []
         from candidatador.applicator.base import _query_labels_with_fallback
-        label_els = await _query_labels_with_fallback(self.page, [
-            "label",
-            ".ashby-application-form label",
-            "[class*='label']:not(legend)",
-        ])
+
+        label_els = await _query_labels_with_fallback(
+            self.page,
+            [
+                "label",
+                ".ashby-application-form label",
+                "[class*='label']:not(legend)",
+            ],
+        )
         for el in label_els:
             text = (await el.inner_text()).strip()
             if text and len(text) < 200:
@@ -35,6 +42,7 @@ class AshbyApplier(BaseApplier):
                     field = await self.page.query_selector(f"#{for_id}")
                     if field:
                         from candidatador.applicator.base import _fill_field
+
                         await _fill_field(field, answer)
                         await asyncio.sleep(0.3)
             except Exception:
@@ -49,6 +57,7 @@ class AshbyApplier(BaseApplier):
 
     async def submit(self) -> str:
         from candidatador.applicator.base import classify_submit_outcome
+
         try:
             btn = await self.page.query_selector("button[type='submit']")
             if not btn:

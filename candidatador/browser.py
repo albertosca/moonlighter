@@ -2,25 +2,23 @@ import asyncio
 import subprocess
 import urllib.request
 from pathlib import Path
-from typing import Optional
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+
+from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
 from candidatador.log import get_logger
 
 logger = get_logger(__name__)
 
 _playwright = None
-_browser: Optional[Browser] = None
-_brave_process: Optional[subprocess.Popen] = None
+_browser: Browser | None = None
+_brave_process: subprocess.Popen | None = None
 
 _DEBUG_PORT = 9222
 
 
 def _devtools_ready() -> bool:
     try:
-        urllib.request.urlopen(
-            f"http://localhost:{_DEBUG_PORT}/json/version", timeout=1
-        )
+        urllib.request.urlopen(f"http://localhost:{_DEBUG_PORT}/json/version", timeout=1)
         return True
     except Exception:
         return False
@@ -56,9 +54,7 @@ async def get_context(config: dict) -> BrowserContext:
         else:
             _brave_process.kill()
             _brave_process = None
-            raise RuntimeError(
-                f"Brave não ficou disponível na porta {_DEBUG_PORT} em 30s"
-            )
+            raise RuntimeError(f"Brave não ficou disponível na porta {_DEBUG_PORT} em 30s")
 
     _playwright = await async_playwright().start()
     _browser = await _playwright.chromium.connect_over_cdp(

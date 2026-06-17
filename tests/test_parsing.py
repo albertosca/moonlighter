@@ -1,4 +1,5 @@
 import json
+
 from candidatador.parsing import _extract_json
 
 

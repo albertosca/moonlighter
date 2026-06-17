@@ -1,12 +1,11 @@
-import asyncio
 import json
-import yaml
 from dataclasses import dataclass, field
-from typing import Optional
 
-from candidatador.parsing import _extract_json
+import yaml
+
 from candidatador.llm import LLMCaller, _make_api_caller
 from candidatador.log import get_logger
+from candidatador.parsing import _extract_json
 
 logger = get_logger(__name__)
 
@@ -21,6 +20,7 @@ def should_skip_by_title(title: str, blocklist: list[str]) -> str | None:
         if pattern.lower() in lower:
             return pattern
     return None
+
 
 EVAL_PROMPT = """You are evaluating a job posting for a senior software engineer.
 
@@ -53,15 +53,17 @@ Return a JSON object with ONLY these keys (no markdown, no explanation):
 
 Return only valid JSON."""
 
+
 @dataclass
 class EvaluationResult:
     score: float
     score_notes: str
     caveats: list[str] = field(default_factory=list)
-    salary_min: Optional[int] = None
-    salary_max: Optional[int] = None
-    salary_currency: Optional[str] = None
-    salary_source: Optional[str] = None
+    salary_min: int | None = None
+    salary_max: int | None = None
+    salary_currency: str | None = None
+    salary_source: str | None = None
+
 
 async def evaluate_job(
     company: str,
@@ -100,7 +102,18 @@ async def evaluate_job(
         return EvaluationResult(score=0.0, score_notes="parse error: LLM returned non-JSON")
     except Exception as e:
         err_str = str(e).lower()
-        if any(m in err_str for m in ("spend limit", "quota", "rate limit", "too many requests", "overloaded", "429", "usage limit")):
+        if any(
+            m in err_str
+            for m in (
+                "spend limit",
+                "quota",
+                "rate limit",
+                "too many requests",
+                "overloaded",
+                "429",
+                "usage limit",
+            )
+        ):
             raise
         logger.warning("evaluator: erro para %s/%s — %s", company, title, e)
         return EvaluationResult(score=0.0, score_notes=f"evaluation error: {e}")

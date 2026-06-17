@@ -1,5 +1,6 @@
-import pytest
 import os
+
+import pytest
 from playwright.async_api import async_playwright
 
 from candidatador.config import load_config

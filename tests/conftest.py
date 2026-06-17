@@ -1,7 +1,5 @@
 import pytest
-import tempfile
-import os
-from peewee import SqliteDatabase
+
 
 @pytest.fixture
 def tmp_db(monkeypatch, tmp_path):

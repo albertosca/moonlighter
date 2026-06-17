@@ -1,7 +1,8 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-import candidatador.browser as browser_mod
 
+import pytest
+
+import candidatador.browser as browser_mod
 
 _CONFIG = {
     "browser_session_dir": "/tmp/test_browser_session",
@@ -53,12 +54,15 @@ def _make_cdp_mocks():
 
 # ── get_context ───────────────────────────────────────────────────────────────
 
+
 async def test_get_context_launches_brave_when_devtools_not_ready():
     mock_pw, mock_playwright, mock_browser, mock_context, mock_proc = _make_cdp_mocks()
-    with patch("candidatador.browser.async_playwright", return_value=mock_pw), \
-         patch("candidatador.browser.subprocess.Popen", return_value=mock_proc) as popen, \
-         patch("candidatador.browser._devtools_ready", side_effect=[False, True]), \
-         patch("candidatador.browser.asyncio.sleep", new=AsyncMock()):
+    with (
+        patch("candidatador.browser.async_playwright", return_value=mock_pw),
+        patch("candidatador.browser.subprocess.Popen", return_value=mock_proc) as popen,
+        patch("candidatador.browser._devtools_ready", side_effect=[False, True]),
+        patch("candidatador.browser.asyncio.sleep", new=AsyncMock()),
+    ):
         ctx = await browser_mod.get_context(_CONFIG)
     assert ctx is mock_context
     popen.assert_called_once()
@@ -67,9 +71,11 @@ async def test_get_context_launches_brave_when_devtools_not_ready():
 
 async def test_get_context_skips_launch_when_devtools_already_ready():
     mock_pw, mock_playwright, mock_browser, mock_context, mock_proc = _make_cdp_mocks()
-    with patch("candidatador.browser.async_playwright", return_value=mock_pw), \
-         patch("candidatador.browser.subprocess.Popen", return_value=mock_proc) as popen, \
-         patch("candidatador.browser._devtools_ready", return_value=True):
+    with (
+        patch("candidatador.browser.async_playwright", return_value=mock_pw),
+        patch("candidatador.browser.subprocess.Popen", return_value=mock_proc) as popen,
+        patch("candidatador.browser._devtools_ready", return_value=True),
+    ):
         ctx = await browser_mod.get_context(_CONFIG)
     assert ctx is mock_context
     popen.assert_not_called()  # Brave já estava de pé
@@ -79,8 +85,10 @@ async def test_get_context_skips_launch_when_devtools_already_ready():
 async def test_get_context_reuses_connected_browser():
     _, _, mock_browser, mock_context, _ = _make_cdp_mocks()
     browser_mod._browser = mock_browser
-    with patch("candidatador.browser.async_playwright") as pw, \
-         patch("candidatador.browser.subprocess.Popen") as popen:
+    with (
+        patch("candidatador.browser.async_playwright") as pw,
+        patch("candidatador.browser.subprocess.Popen") as popen,
+    ):
         ctx = await browser_mod.get_context(_CONFIG)
     assert ctx is mock_context
     pw.assert_not_called()
@@ -90,9 +98,11 @@ async def test_get_context_reuses_connected_browser():
 async def test_get_context_passes_cdp_url_and_slow_mo():
     mock_pw, mock_playwright, _, _, mock_proc = _make_cdp_mocks()
     config = {**_CONFIG, "slow_mo_ms": 123}
-    with patch("candidatador.browser.async_playwright", return_value=mock_pw), \
-         patch("candidatador.browser.subprocess.Popen", return_value=mock_proc), \
-         patch("candidatador.browser._devtools_ready", return_value=True):
+    with (
+        patch("candidatador.browser.async_playwright", return_value=mock_pw),
+        patch("candidatador.browser.subprocess.Popen", return_value=mock_proc),
+        patch("candidatador.browser._devtools_ready", return_value=True),
+    ):
         await browser_mod.get_context(config)
     call = mock_playwright.chromium.connect_over_cdp.call_args
     assert f"{browser_mod._DEBUG_PORT}" in call.args[0]
@@ -102,19 +112,23 @@ async def test_get_context_passes_cdp_url_and_slow_mo():
 async def test_get_context_creates_session_dir(tmp_path):
     config = {**_CONFIG, "browser_session_dir": str(tmp_path / "new_session")}
     mock_pw, _, _, _, mock_proc = _make_cdp_mocks()
-    with patch("candidatador.browser.async_playwright", return_value=mock_pw), \
-         patch("candidatador.browser.subprocess.Popen", return_value=mock_proc), \
-         patch("candidatador.browser._devtools_ready", return_value=True):
+    with (
+        patch("candidatador.browser.async_playwright", return_value=mock_pw),
+        patch("candidatador.browser.subprocess.Popen", return_value=mock_proc),
+        patch("candidatador.browser._devtools_ready", return_value=True),
+    ):
         await browser_mod.get_context(config)
     assert (tmp_path / "new_session").exists()
 
 
 async def test_get_context_raises_when_brave_never_ready():
     mock_pw, _, _, _, mock_proc = _make_cdp_mocks()
-    with patch("candidatador.browser.async_playwright", return_value=mock_pw), \
-         patch("candidatador.browser.subprocess.Popen", return_value=mock_proc), \
-         patch("candidatador.browser._devtools_ready", return_value=False), \
-         patch("candidatador.browser.asyncio.sleep", new=AsyncMock()):
+    with (
+        patch("candidatador.browser.async_playwright", return_value=mock_pw),
+        patch("candidatador.browser.subprocess.Popen", return_value=mock_proc),
+        patch("candidatador.browser._devtools_ready", return_value=False),
+        patch("candidatador.browser.asyncio.sleep", new=AsyncMock()),
+    ):
         with pytest.raises(RuntimeError, match="Brave"):
             await browser_mod.get_context(_CONFIG)
     mock_proc.kill.assert_called_once()  # cleanup do processo travado
@@ -122,18 +136,22 @@ async def test_get_context_raises_when_brave_never_ready():
 
 # ── new_page ──────────────────────────────────────────────────────────────────
 
+
 async def test_new_page_returns_page_from_context():
     mock_pw, _, _, mock_context, mock_proc = _make_cdp_mocks()
     mock_page = MagicMock()
     mock_context.new_page = AsyncMock(return_value=mock_page)
-    with patch("candidatador.browser.async_playwright", return_value=mock_pw), \
-         patch("candidatador.browser.subprocess.Popen", return_value=mock_proc), \
-         patch("candidatador.browser._devtools_ready", return_value=True):
+    with (
+        patch("candidatador.browser.async_playwright", return_value=mock_pw),
+        patch("candidatador.browser.subprocess.Popen", return_value=mock_proc),
+        patch("candidatador.browser._devtools_ready", return_value=True),
+    ):
         page = await browser_mod.new_page(_CONFIG)
     assert page is mock_page
 
 
 # ── save_screenshot ───────────────────────────────────────────────────────────
+
 
 async def test_save_screenshot_calls_page_screenshot(tmp_path):
     config = {**_CONFIG, "screenshots_dir": str(tmp_path)}
@@ -154,6 +172,7 @@ async def test_save_screenshot_creates_job_subdir(tmp_path):
 
 
 # ── close ─────────────────────────────────────────────────────────────────────
+
 
 async def test_close_stops_everything_and_clears_globals():
     mock_browser = MagicMock()
@@ -186,12 +205,15 @@ async def test_close_is_idempotent_when_already_closed():
 async def test_get_context_logs_cdp_connected(caplog):
     """get_context() deve logar 'CDP connected' quando conecta com sucesso."""
     import logging
+
     mock_pw, mock_playwright, mock_browser, mock_context, mock_proc = _make_cdp_mocks()
 
-    with patch("candidatador.browser.async_playwright", return_value=mock_pw), \
-         patch("candidatador.browser.subprocess.Popen", return_value=mock_proc), \
-         patch("candidatador.browser._devtools_ready", return_value=True), \
-         caplog.at_level(logging.INFO, logger="candidatador.browser"):
+    with (
+        patch("candidatador.browser.async_playwright", return_value=mock_pw),
+        patch("candidatador.browser.subprocess.Popen", return_value=mock_proc),
+        patch("candidatador.browser._devtools_ready", return_value=True),
+        caplog.at_level(logging.INFO, logger="candidatador.browser"),
+    ):
         await browser_mod.get_context(_CONFIG)
 
     assert "CDP connected" in caplog.text

@@ -1,6 +1,8 @@
 import asyncio
 import re
+
 from playwright.async_api import TimeoutError as PlaywrightTimeout
+
 from candidatador.applicator.base import BaseApplier
 from candidatador.log import get_logger
 
@@ -16,7 +18,9 @@ class GreenhouseApplier(BaseApplier):
 
     async def extract_fields(self) -> list[str]:
         try:
-            apply_btn = await self.page.query_selector("a#apply, button#apply, a[data-greenhouse-job-board-apply]")
+            apply_btn = await self.page.query_selector(
+                "a#apply, button#apply, a[data-greenhouse-job-board-apply]"
+            )
             if apply_btn:
                 await apply_btn.click()
                 await self.page.wait_for_load_state("networkidle", timeout=10000)
@@ -24,16 +28,24 @@ class GreenhouseApplier(BaseApplier):
             pass
 
         from candidatador.applicator.base import _query_labels_with_fallback
-        label_els = await _query_labels_with_fallback(self.page, [
-            "label, .field-label",
-            ".application-question label",
-            "[data-field-label]",
-        ])
+
+        label_els = await _query_labels_with_fallback(
+            self.page,
+            [
+                "label, .field-label",
+                ".application-question label",
+                "[data-field-label]",
+            ],
+        )
         # Campos da área de upload de CV/currículo — o anexo é tratado por _upload_cv,
         # então não devem ir pro LLM como campos de texto (senão recebem resposta-lixo).
         _UPLOAD_LABELS = {
-            "resume/cv", "cover letter", "attach", "anexar",
-            "enter manually", "informe manualmente",
+            "resume/cv",
+            "cover letter",
+            "attach",
+            "anexar",
+            "enter manually",
+            "informe manualmente",
         }
         labels = []
         for el in label_els:
@@ -50,11 +62,16 @@ class GreenhouseApplier(BaseApplier):
         Nunca levanta exceção — falhas são registradas no retorno e no log.
         """
         from candidatador.applicator.base import _fill_field
+
         status: dict[str, str] = {}
         logger.info("fill_form: start (%d respostas)", len(answers))
 
         for label_text, answer in answers.items():
-            if not answer or answer in ("__SKIP__", "__MANUAL_UPLOAD_REQUIRED__", "__NEEDS_REVIEW__"):
+            if not answer or answer in (
+                "__SKIP__",
+                "__MANUAL_UPLOAD_REQUIRED__",
+                "__NEEDS_REVIEW__",
+            ):
                 status[label_text] = "skipped"
                 continue
             try:
@@ -101,10 +118,12 @@ class GreenhouseApplier(BaseApplier):
 
         filled = sum(1 for s in status.values() if s == "filled")
         failed = [k for k, s in status.items() if s.startswith("failed")]
-        logger.info("fill_form: %d filled, %d failed, %d skipped",
-                    filled,
-                    sum(1 for s in status.values() if s.startswith("failed")),
-                    sum(1 for s in status.values() if s == "skipped"))
+        logger.info(
+            "fill_form: %d filled, %d failed, %d skipped",
+            filled,
+            sum(1 for s in status.values() if s.startswith("failed")),
+            sum(1 for s in status.values() if s == "skipped"),
+        )
         if failed:
             logger.warning("fill_form: campos com falha: %s", failed)
 
@@ -151,7 +170,9 @@ class GreenhouseApplier(BaseApplier):
         Trata elementos não-nativos: custom dropdowns (role=combobox/listbox)
         e typeaheads (autocomplete). Retorna True se conseguiu preencher.
         """
-        role = await element.evaluate("el => el.getAttribute('role') || el.getAttribute('aria-haspopup') || ''")
+        role = await element.evaluate(
+            "el => el.getAttribute('role') || el.getAttribute('aria-haspopup') || ''"
+        )
 
         # Custom dropdown / combobox
         if role in ("combobox", "listbox", "button") or await element.evaluate(
@@ -193,7 +214,9 @@ class GreenhouseApplier(BaseApplier):
             options = result.get("options", [])
             logger.warning(
                 "_fill_custom_element typeahead: '%s' não achou '%s'. Opções visíveis: %s",
-                label_text, answer, options or "(nenhuma)"
+                label_text,
+                answer,
+                options or "(nenhuma)",
             )
             return False
         except Exception as e:
@@ -239,13 +262,17 @@ class GreenhouseApplier(BaseApplier):
                 except Exception:
                     pass
                 loaded_opts = await self._visible_options()
-                if loaded_opts and await self._choose_and_click(element, label_text, answer, loaded_opts):
+                if loaded_opts and await self._choose_and_click(
+                    element, label_text, answer, loaded_opts
+                ):
                     return True
                 shown = loaded_opts
 
             logger.warning(
                 "_select_custom_option: '%s' não selecionou '%s'. Opções: %s",
-                label_text, answer, shown or "(nenhuma — dropdown não abriu/carregou?)"
+                label_text,
+                answer,
+                shown or "(nenhuma — dropdown não abriu/carregou?)",
             )
             try:
                 await self.page.keyboard.press("Escape")
@@ -256,10 +283,13 @@ class GreenhouseApplier(BaseApplier):
             logger.warning("_select_custom_option: '%s' exception — %s", label_text, e)
             return False
 
-    async def _choose_and_click(self, element, label_text: str, answer: str, options: list[str]) -> bool:
+    async def _choose_and_click(
+        self, element, label_text: str, answer: str, options: list[str]
+    ) -> bool:
         """Escolhe a opção (match local; senão LLM entre as opções reais), clica a
         EXATA e verifica a seleção. Sem escolha confirmada → False."""
         from candidatador.applicator.option_matcher import match_option_locally
+
         choice = match_option_locally(answer, options)
         if not choice:
             choice = await self._llm_pick(label_text, answer, options)
@@ -306,11 +336,15 @@ class GreenhouseApplier(BaseApplier):
         if not options:
             return None
         try:
-            from candidatador.llm import make_caller
             from candidatador.applicator.option_matcher import pick_option_with_llm
+            from candidatador.llm import make_caller
+
             caller = make_caller(self.config)
-            model = (self.config.get("eval_model") or self.config.get("llm_model")
-                     or "claude-haiku-4-5-20251001")
+            model = (
+                self.config.get("eval_model")
+                or self.config.get("llm_model")
+                or "claude-haiku-4-5-20251001"
+            )
             return await pick_option_with_llm(
                 label_text, answer, options, self.profile, caller, model
             )
@@ -386,11 +420,15 @@ class GreenhouseApplier(BaseApplier):
             return empty;
         }""")
         if empty_required:
-            logger.warning("submit: %d campo(s) obrigatório(s) vazios: %s", len(empty_required), empty_required)
+            logger.warning(
+                "submit: %d campo(s) obrigatório(s) vazios: %s", len(empty_required), empty_required
+            )
 
         logger.info("submit: click")
         try:
-            submit_btn = await self.page.query_selector("input[type='submit'], button[type='submit']")
+            submit_btn = await self.page.query_selector(
+                "input[type='submit'], button[type='submit']"
+            )
             if not submit_btn:
                 logger.warning("submit: botão não encontrado")
                 return "failed"
@@ -398,6 +436,7 @@ class GreenhouseApplier(BaseApplier):
             await self.page.wait_for_load_state("networkidle", timeout=15000)
 
             from candidatador.applicator.base import classify_submit_outcome
+
             outcome = await classify_submit_outcome(self.page)
             if outcome.startswith("failed:validation_errors"):
                 logger.warning("submit: form ainda visível após submit — %s", outcome)

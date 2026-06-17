@@ -1,14 +1,15 @@
 import json
-import yaml
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
-from candidatador.parsing import _extract_json
+import yaml
+
 from candidatador.llm import LLMCaller, _make_api_caller
 from candidatador.log import get_logger
+from candidatador.parsing import _extract_json
 
 logger = get_logger(__name__)
+
 
 async def _query_labels_with_fallback(page, selectors: list[str]) -> list:
     """
@@ -57,8 +58,7 @@ async def _confirm_submitted(page, extra_text_markers: tuple = ()) -> bool:
 
 # JS reaproveitado entre ATS para classificar o pós-submit de forma conservadora.
 _SUBMIT_VISIBLE_JS = (
-    "() => !!document.querySelector("
-    "'form input[type=\"submit\"], form button[type=\"submit\"]')"
+    '() => !!document.querySelector(\'form input[type="submit"], form button[type="submit"]\')'
 )
 _ERROR_MESSAGES_JS = """() => {
     const msgs = [];
@@ -96,6 +96,7 @@ async def classify_submit_outcome(
             errors = []
         return f"failed:validation_errors:{errors}"
     return "unverified"
+
 
 async def _fill_field(field, answer: str) -> None:
     """
@@ -168,12 +169,14 @@ Return a JSON object mapping each field label (exactly as given) to the candidat
 
 Return only valid JSON (no markdown)."""
 
+
 @dataclass
 class ApplicationDraft:
     job_id: int
     answers: dict[str, str]
     form_fields: list[str]
-    error: Optional[str] = None
+    error: str | None = None
+
 
 class BaseApplier(ABC):
     def __init__(self, page, config: dict, profile: dict):
@@ -201,6 +204,7 @@ class BaseApplier(ABC):
         """Submit the form. Return True on success."""
         ...
 
+
 async def generate_answers(
     company: str,
     title: str,
@@ -215,6 +219,7 @@ async def generate_answers(
     job_remote_type: str | None = None,
 ) -> ApplicationDraft:
     from candidatador.applicator.field_map import pre_populate_answers
+
     if _caller is None:
         _caller = _make_api_caller(max_tokens=2048)
     logger.info("generating answers: %s/%s (%d fields)", company, title, len(fields))
@@ -222,11 +227,16 @@ async def generate_answers(
     # Pré-populamos campos de contato e respostas padronizadas diretamente do perfil.
     # O LLM só recebe os campos que ele realmente precisa responder.
     pre_populated = pre_populate_answers(
-        fields, profile, config=config,
-        job_location=job_location, job_remote_type=job_remote_type,
+        fields,
+        profile,
+        config=config,
+        job_location=job_location,
+        job_remote_type=job_remote_type,
     )
     remaining_fields = [f for f in fields if f not in pre_populated]
-    logger.info("→ pre-populated %d campos, LLM responde %d", len(pre_populated), len(remaining_fields))
+    logger.info(
+        "→ pre-populated %d campos, LLM responde %d", len(pre_populated), len(remaining_fields)
+    )
 
     llm_answers: dict = {}
     llm_error: str | None = None
