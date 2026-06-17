@@ -22,10 +22,12 @@ import asyncio
 import json
 import os
 import sys
+from pathlib import Path
 
 import yaml
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))
 
 from candidatador.config import load_config
 from candidatador.db import Job, init_db
@@ -33,10 +35,7 @@ from candidatador.llm import make_caller
 from candidatador.log import setup as setup_logging
 from candidatador.parsing import _extract_json
 
-LEARNED_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "blocklist_learned.yaml",
-)
+LEARNED_PATH = _ROOT / "blocklist_learned.yaml"
 
 PROPOSAL_PROMPT = """\
 You are building a job title blocklist for Alberto, a senior software engineer (15+ years, \
@@ -88,18 +87,18 @@ QUOTA_MARKERS = (
 
 
 def _load_learned() -> list[str]:
-    if not os.path.exists(LEARNED_PATH):
+    if not LEARNED_PATH.exists():
         return []
-    with open(LEARNED_PATH) as f:
-        data = yaml.safe_load(f) or {}
+    data = yaml.safe_load(LEARNED_PATH.read_text()) or {}
     return data.get("title_blocklist", [])
 
 
 def _save_learned(patterns: list[str]) -> None:
     existing = _load_learned()
     merged = list(dict.fromkeys(existing + patterns))  # dedup, preserve order
-    with open(LEARNED_PATH, "w") as f:
-        yaml.dump({"title_blocklist": merged}, f, allow_unicode=True, default_flow_style=False)
+    LEARNED_PATH.write_text(
+        yaml.dump({"title_blocklist": merged}, allow_unicode=True, default_flow_style=False)
+    )
 
 
 def _fetch_low_scorers(threshold: float, company: str | None) -> dict[str, list[str]]:
@@ -222,7 +221,7 @@ def main() -> None:
 
     setup_logging()
     config = load_config()
-    db_path = os.path.expanduser(config.get("db_path", "~/.candidatador/candidatador.db"))
+    db_path = str(Path(config.get("db_path", "~/.candidatador/candidatador.db")).expanduser())
     os.environ["CANDIDATADOR_DB"] = db_path
     init_db()
 

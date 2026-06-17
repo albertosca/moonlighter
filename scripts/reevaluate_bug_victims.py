@@ -22,8 +22,9 @@ import asyncio
 import json
 import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from candidatador.config import load_config, load_profile
 from candidatador.db import Job, init_db
@@ -191,7 +192,7 @@ def main() -> None:
     setup_logging()
     config = load_config()
     profile = load_profile()
-    db_path = os.path.expanduser(config.get("db_path", "~/.candidatador/candidatador.db"))
+    db_path = str(Path(config.get("db_path", "~/.candidatador/candidatador.db")).expanduser())
     os.environ["CANDIDATADOR_DB"] = db_path
     init_db()
 

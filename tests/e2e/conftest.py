@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 
 import pytest
 from playwright.async_api import async_playwright
@@ -8,7 +8,7 @@ from candidatador.config import load_config
 
 @pytest.fixture(scope="module")
 def fixtures_dir():
-    return os.path.join(os.path.dirname(__file__), "fixtures")
+    return Path(__file__).parent / "fixtures"
 
 
 async def _launch(pw):
@@ -18,7 +18,7 @@ async def _launch(pw):
     se o Brave não existir. Perfil temporário e isolado — NÃO toca na sessão real.
     """
     brave_path = load_config().get("brave_path", "")
-    if brave_path and os.path.exists(brave_path):
+    if brave_path and Path(brave_path).exists():
         return await pw.chromium.launch(headless=True, executable_path=brave_path)
     # Fallback: Chromium bundled (exige `playwright install chromium`).
     return await pw.chromium.launch(headless=True)

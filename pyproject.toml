@@ -43,7 +43,14 @@ line-length = 100
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RET", "PTH", "RUF"]
 # RUF001-003: caracteres "ambíguos" são tipografia PT-BR intencional no output
 # (en-dash em faixas salariais "$150–200k", ∗ de footnote). Não são bugs.
-ignore = ["RUF001", "RUF002", "RUF003"]
+# E501: o `ruff format` já é dono do tamanho de linha do CÓDIGO (100); as linhas
+# longas restantes são conteúdo de string (JS/CSS embutido, regex, prompts) que o
+# formatter não toca e que picotar deixaria pior.
+ignore = ["RUF001", "RUF002", "RUF003", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Scripts inserem a raiz no sys.path ANTES de importar o pacote (E402 esperado).
+"scripts/*" = ["E402"]
 
 [tool.mypy]
 python_version = "3.14"
