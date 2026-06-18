@@ -37,3 +37,15 @@ def test_resolve_cv_path_raises_when_mapped_file_missing(tmp_path):
 def test_resolve_cv_path_raises_when_no_mapping_and_no_default():
     with pytest.raises(CVNotFoundError):
         resolve_cv_path("stripe", {"cv": {"by_company": {}}})
+
+
+def test_resolve_cv_path_relative_resolved_from_project_root():
+    """Caminho relativo é resolvido a partir da raiz do projeto (cv.py:31)."""
+    from pathlib import Path
+
+    from candidatador.applicator.cv import _PROJECT_ROOT
+
+    config = {"cv": {"default": "pyproject.toml"}}  # relativo, existe na raiz
+    result = resolve_cv_path("stripe", config)
+    assert result == str(_PROJECT_ROOT / "pyproject.toml")
+    assert Path(result).exists()

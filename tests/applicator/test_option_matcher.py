@@ -125,3 +125,23 @@ async def test_llm_not_called_when_no_options():
     )
     assert chosen is None
     assert called is False
+
+
+def test_starts_with_word_equal_strings_is_prefix():
+    """prefix == string inteira é word-boundary válido (option_matcher.py:28)."""
+    from candidatador.applicator.option_matcher import _starts_with_word
+
+    assert _starts_with_word("yes", "yes") is True
+
+
+@pytest.mark.asyncio
+async def test_llm_response_without_digit_returns_none():
+    """Resposta do LLM sem nenhum dígito e sem __NONE__ → None (option_matcher.py:115)."""
+
+    async def caller(prompt, model):
+        return "none of these really"
+
+    chosen = await pick_option_with_llm(
+        "English level", "Fluent", CEFR, profile={}, caller=caller, model="m"
+    )
+    assert chosen is None

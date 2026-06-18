@@ -399,3 +399,68 @@ async def test_extract_fields_falls_back_when_primary_modal_selector_empty():
 
     assert "Phone Number" in fields
     assert call_count[0] >= 2
+
+
+# ── branches de borda (cobertura) ──────────────────────────────────────────
+
+
+async def test_extract_fields_apply_click_exception_returns_empty():
+    """Clique no botão Apply lança → extract_fields devolve [] (26-27)."""
+    applier = make_applier()
+    btn = MagicMock()
+    btn.click = AsyncMock(side_effect=Exception("detached"))
+    applier.page.query_selector = AsyncMock(return_value=btn)
+    with patch("asyncio.sleep", new=AsyncMock()):
+        assert await applier.extract_fields() == []
+
+
+async def test_extract_fields_skips_empty_modal_label():
+    """Label com texto vazio no modal é ignorado (44->42)."""
+    applier = make_applier()
+    empty = MagicMock()
+    empty.inner_text = AsyncMock(return_value="   ")
+    real = MagicMock()
+    real.inner_text = AsyncMock(return_value="Phone")
+    applier.page.query_selector = AsyncMock(return_value=None)  # sem botão Apply
+    applier.page.query_selector_all = AsyncMock(return_value=[empty, real])
+    with patch("asyncio.sleep", new=AsyncMock()):
+        result = await applier.extract_fields()
+    assert result == ["Phone"]
+
+
+async def test_fill_form_skips_label_without_for():
+    """Label sem atributo for → campo não preenchido (59->51)."""
+    applier = make_applier()
+    label = MagicMock()
+    label.get_attribute = AsyncMock(return_value=None)
+    applier.page.query_selector = AsyncMock(return_value=label)
+    with patch("asyncio.sleep", new=AsyncMock()):
+        await applier.fill_form({"Q": "A"}, cv_path="")
+
+
+async def test_fill_form_skips_when_field_missing():
+    """for=fid mas #fid não existe → campo não preenchido (61->51)."""
+    applier = make_applier()
+    label = MagicMock()
+    label.get_attribute = AsyncMock(return_value="fid")
+
+    async def qs(selector):
+        return label if "label" in selector else None
+
+    applier.page.query_selector = qs
+    with patch("asyncio.sleep", new=AsyncMock()):
+        await applier.fill_form({"Q": "A"}, cv_path="")
+
+
+async def test_fill_form_swallows_cv_upload_exception():
+    """Exceção ao subir o CV é engolida (74-75)."""
+    applier = make_applier()
+    file_input = MagicMock()
+    file_input.set_input_files = AsyncMock(side_effect=Exception("io"))
+
+    async def qs(selector):
+        return file_input if "file" in selector else None
+
+    applier.page.query_selector = qs
+    with patch("asyncio.sleep", new=AsyncMock()):
+        await applier.fill_form({}, cv_path="/cv.pdf")

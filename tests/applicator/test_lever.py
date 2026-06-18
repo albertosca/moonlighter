@@ -219,3 +219,28 @@ async def test_extract_fields_falls_back_when_primary_selector_empty():
     result = await applier.extract_fields()
     assert "LinkedIn Profile" in result
     assert call_count[0] >= 2
+
+
+# ── fill_form: branches de borda ───────────────────────────────────────────
+
+
+async def test_fill_form_skips_when_field_missing():
+    """label com for=fid mas #fid não existe → campo não preenchido (43->loop)."""
+    applier = make_applier()
+    label = MagicMock()
+    label.get_attribute = AsyncMock(return_value="fid")
+
+    async def qs(selector):
+        return label if "label" in selector else None
+
+    applier.page.query_selector = qs
+    with patch("asyncio.sleep", new=AsyncMock()):
+        await applier.fill_form({"Q": "A"}, cv_path="")
+
+
+async def test_fill_form_swallows_exceptions():
+    """query_selector lança em todo o fluxo → fill e upload engolem a exceção."""
+    applier = make_applier()
+    applier.page.query_selector = AsyncMock(side_effect=Exception("boom"))
+    with patch("asyncio.sleep", new=AsyncMock()):
+        await applier.fill_form({"Q": "A"}, cv_path="/cv.pdf")

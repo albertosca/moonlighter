@@ -590,3 +590,62 @@ async def test_classify_submit_outcome_unverified_when_ambiguous():
     page.url = "https://jobs.lever.co/x/some-page"
     page.evaluate = AsyncMock(return_value=False)  # form não está mais visível
     assert await classify_submit_outcome(page) == "unverified"
+
+
+# ── branches defensivos (cobertura) ────────────────────────────────────────
+
+
+async def test_confirm_submitted_swallows_inner_text_exception():
+    """inner_text('body') lança → body vira '' e segue pela URL (53-54)."""
+    from candidatador.applicator.base import classify_submit_outcome
+
+    page = MagicMock()
+    page.inner_text = AsyncMock(side_effect=Exception("detached"))
+    page.url = "https://jobs.lever.co/x/thank-you"  # marcador de sucesso na URL
+    page.evaluate = AsyncMock(return_value=False)
+    # com body='' e URL de sucesso → submitted (confirma que não levantou)
+    assert await classify_submit_outcome(page) == "submitted"
+
+
+async def test_classify_form_visible_evaluate_exception_is_false():
+    """page.evaluate(form_visible) lança → trata como não-visível → unverified (93-94)."""
+    from candidatador.applicator.base import classify_submit_outcome
+
+    page = MagicMock()
+    page.inner_text = AsyncMock(return_value="sem marcador")
+    page.url = "https://jobs.lever.co/x/123"
+    page.evaluate = AsyncMock(side_effect=Exception("eval crash"))
+    assert await classify_submit_outcome(page) == "unverified"
+
+
+async def test_classify_error_messages_evaluate_exception_is_empty():
+    """form visível mas o 2º evaluate (mensagens de erro) lança → errors=[] (98-99)."""
+    from candidatador.applicator.base import classify_submit_outcome
+
+    page = MagicMock()
+    page.inner_text = AsyncMock(return_value="sem marcador")
+    page.url = "https://jobs.lever.co/x/123"
+    page.evaluate = AsyncMock(side_effect=[True, Exception("eval crash")])
+    result = await classify_submit_outcome(page)
+    assert result.startswith("failed:validation_errors")
+
+
+async def test_fill_field_unknown_tag_is_noop():
+    """tag fora de select/input/textarea (ex: div) → não faz nada (144->exit)."""
+    field = _make_field("div")
+    await _fill_field(field, "x")
+    field.fill.assert_not_called()
+    field.select_option.assert_not_called()
+
+
+async def test_generate_answers_builds_default_caller_when_none():
+    """_caller=None → usa _make_api_caller() como fallback (linha 225)."""
+    fake_caller = AsyncMock(return_value='{"Q": "A"}')
+    with patch(
+        "candidatador.applicator.base._make_api_caller", return_value=fake_caller
+    ) as mock_factory:
+        result = await generate_answers(
+            company="Co", title="Eng", description="d", fields=["Q"], profile={}, _caller=None
+        )
+    mock_factory.assert_called_once()
+    assert result.answers["Q"] == "A"
