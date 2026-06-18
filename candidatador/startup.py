@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 
 @dataclass
@@ -11,8 +11,8 @@ class StartupWarning:
 
 
 def validate_startup(
-    config: dict,
-    profile: dict,
+    config: dict[str, Any],
+    profile: dict[str, Any],
     cv_path: str | None = None,
 ) -> list[StartupWarning]:
     """

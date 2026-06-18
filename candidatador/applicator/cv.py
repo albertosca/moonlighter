@@ -1,6 +1,7 @@
 """Resolução do arquivo de CV por empresa (a partir de config['cv'])."""
 
 from pathlib import Path
+from typing import Any
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -9,7 +10,7 @@ class CVNotFoundError(Exception):
     """O arquivo de CV resolvido para a empresa não existe no disco."""
 
 
-def resolve_cv_path(company: str, config: dict) -> str:
+def resolve_cv_path(company: str, config: dict[str, Any]) -> str:
     """
     Resolve o caminho do CV para a empresa a partir de config['cv'].
     Match por empresa é case-insensitive. Cai no 'default' quando não há

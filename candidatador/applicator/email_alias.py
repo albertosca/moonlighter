@@ -11,7 +11,7 @@ def build_email_alias(address: str, ref: str) -> str:
     return f"{local}+{ref}@{domain}"
 
 
-def inject_email_alias(answers: dict, alias: str) -> bool:
+def inject_email_alias(answers: dict[str, str], alias: str) -> bool:
     """
     Sobrescreve o campo de email do formulário com o alias +ref de rastreamento.
     Procura qualquer label que contenha 'email' ignorando hífen/espaço — assim

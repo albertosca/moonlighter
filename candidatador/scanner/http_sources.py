@@ -2,7 +2,7 @@ import asyncio
 import contextlib
 import re
 from datetime import UTC, datetime
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import httpx
 
@@ -16,7 +16,7 @@ class GreenhouseScanner(BaseScanner):
     BASE = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
     HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "candidatador/0.1"}
 
-    async def scan(self, company_slugs: list[str], **kwargs) -> list[RawJob]:
+    async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
         logger.info("[greenhouse] scanning %d companies", len(company_slugs))
         jobs = []
         async with httpx.AsyncClient(timeout=15) as client:
@@ -71,7 +71,7 @@ class LeverScanner(BaseScanner):
     BASE = "https://api.lever.co/v0/postings/{slug}"
     HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "candidatador/0.1"}
 
-    async def scan(self, company_slugs: list[str], **kwargs) -> list[RawJob]:
+    async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
         logger.info("[lever] scanning %d companies", len(company_slugs))
         jobs = []
         async with httpx.AsyncClient(timeout=15) as client:
@@ -136,7 +136,7 @@ class AshbyScanner(BaseScanner):
     }
     """
 
-    async def scan(self, company_slugs: list[str], **kwargs) -> list[RawJob]:
+    async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
         logger.info("[ashby] scanning %d companies", len(company_slugs))
         jobs = []
         async with httpx.AsyncClient(timeout=15) as client:

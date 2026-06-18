@@ -6,6 +6,7 @@ um chute (responder errado sobre autorização é mentir).
 """
 
 import re
+from typing import Any
 
 # Países/cidades que permitem inferência confiante. Lista curta de propósito:
 # preferimos __NEEDS_REVIEW__ a um falso positivo.
@@ -61,17 +62,17 @@ def infer_country(location: str | None, remote_type: str | None) -> str | None:
     return None
 
 
-def resolve_work_auth(field_label: str, country: str | None, config: dict) -> str | None:
+def resolve_work_auth(field_label: str, country: str | None, config: dict[str, Any]) -> str | None:
     """
     Para campos de autorização/sponsorship retorna a resposta correta para o país,
     ou o sentinel de revisão quando o país é desconhecido. Retorna None se o campo
     não for de autorização (aí o LLM cuida).
     """
     wa = config.get("work_authorization", {}) or {}
-    citizenship = (wa.get("citizenship_country") or "brazil").lower()
-    yes = wa.get("authorized_answer", "Yes")
-    no = wa.get("not_authorized_answer", "No")
-    review = wa.get("needs_review_sentinel", "__NEEDS_REVIEW__")
+    citizenship: str = (wa.get("citizenship_country") or "brazil").lower()
+    yes: str = wa.get("authorized_answer", "Yes")
+    no: str = wa.get("not_authorized_answer", "No")
+    review: str = wa.get("needs_review_sentinel", "__NEEDS_REVIEW__")
 
     is_auth = bool(_AUTHORIZED_RE.search(field_label))
     is_sponsor = bool(_SPONSORSHIP_RE.search(field_label))

@@ -2,6 +2,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from anthropic.types import TextBlock
 
 from candidatador.llm import LLMCaller, _call_cli, _make_api_caller, make_caller
 
@@ -128,7 +129,7 @@ async def test_call_cli_empty_prompt_still_calls_subprocess():
 
 async def test_make_api_caller_calls_messages_create():
     mock_message = MagicMock()
-    mock_message.content = [MagicMock(text="api response")]
+    mock_message.content = [MagicMock(spec=TextBlock, text="api response")]
     mock_client = MagicMock()
     mock_client.messages.create = AsyncMock(return_value=mock_message)
 
@@ -149,7 +150,7 @@ async def test_make_api_caller_calls_messages_create():
 
 async def test_make_api_caller_custom_max_tokens():
     mock_message = MagicMock()
-    mock_message.content = [MagicMock(text="ok")]
+    mock_message.content = [MagicMock(spec=TextBlock, text="ok")]
     mock_client = MagicMock()
     mock_client.messages.create = AsyncMock(return_value=mock_message)
 
@@ -166,7 +167,7 @@ async def test_make_api_caller_custom_max_tokens():
 
 async def test_make_api_caller_forwards_model():
     mock_message = MagicMock()
-    mock_message.content = [MagicMock(text="ok")]
+    mock_message.content = [MagicMock(spec=TextBlock, text="ok")]
     mock_client = MagicMock()
     mock_client.messages.create = AsyncMock(return_value=mock_message)
 
@@ -185,8 +186,8 @@ async def test_make_api_caller_returns_first_content_text():
     """Returns text of first content block only."""
     mock_message = MagicMock()
     mock_message.content = [
-        MagicMock(text="first block"),
-        MagicMock(text="second block"),
+        MagicMock(spec=TextBlock, text="first block"),
+        MagicMock(spec=TextBlock, text="second block"),
     ]
     mock_client = MagicMock()
     mock_client.messages.create = AsyncMock(return_value=mock_message)
@@ -219,7 +220,7 @@ def test_make_api_caller_reuses_client_across_calls():
     """_make_api_caller() creates ONE AsyncAnthropic instance, not one per call."""
     mock_client = MagicMock()
     mock_message = MagicMock()
-    mock_message.content = [MagicMock(text="ok")]
+    mock_message.content = [MagicMock(spec=TextBlock, text="ok")]
     mock_client.messages.create = AsyncMock(return_value=mock_message)
 
     mock_anthropic = MagicMock()
@@ -254,7 +255,7 @@ async def test_cli_caller_satisfies_llm_caller_contract():
 async def test_api_caller_satisfies_llm_caller_contract():
     """api caller satisfies (prompt: str, model: str) -> str contract."""
     mock_message = MagicMock()
-    mock_message.content = [MagicMock(text="text result")]
+    mock_message.content = [MagicMock(spec=TextBlock, text="text result")]
     mock_client = MagicMock()
     mock_client.messages.create = AsyncMock(return_value=mock_message)
 

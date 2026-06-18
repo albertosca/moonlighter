@@ -2,6 +2,7 @@ import datetime
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 from peewee import (
     CharField,
@@ -24,7 +25,7 @@ def _db_path() -> str:
 db = SqliteDatabase(None)  # initialized in init_db()
 
 
-class BaseModel(Model):
+class BaseModel(Model):  # type: ignore[misc]  # peewee.Model é untyped (Any)
     class Meta:
         database = db
 
@@ -66,7 +67,7 @@ class Application(BaseModel):
     email_ref = CharField(max_length=8, null=True, unique=True)
     current_stage = CharField(null=True)
 
-    def get_form_data(self) -> dict:
+    def get_form_data(self) -> dict[str, Any]:
         return json.loads(self.form_data) if self.form_data else {}
 
 
@@ -84,7 +85,7 @@ class ProcessedEmail(BaseModel):
     processed_at = DateTimeField(default=datetime.datetime.now)
 
 
-def init_db():
+def init_db() -> None:
     path = _db_path()
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     db.init(path)

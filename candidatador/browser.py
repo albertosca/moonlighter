@@ -2,6 +2,7 @@ import asyncio
 import subprocess
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
@@ -9,9 +10,9 @@ from candidatador.log import get_logger
 
 logger = get_logger(__name__)
 
-_playwright = None
+_playwright: Any = None
 _browser: Browser | None = None
-_brave_process: subprocess.Popen | None = None
+_brave_process: subprocess.Popen[bytes] | None = None
 
 _DEBUG_PORT = 9222
 
@@ -24,7 +25,7 @@ def _devtools_ready() -> bool:
         return False
 
 
-async def get_context(config: dict) -> BrowserContext:
+async def get_context(config: dict[str, Any]) -> BrowserContext:
     """Return a Brave browser context via CDP. Launches Brave if not running."""
     global _playwright, _browser, _brave_process
 
@@ -67,14 +68,14 @@ async def get_context(config: dict) -> BrowserContext:
     return contexts[0] if contexts else await _browser.new_context()
 
 
-async def new_page(config: dict) -> Page:
+async def new_page(config: dict[str, Any]) -> Page:
     context = await get_context(config)
     page = await context.new_page()
     logger.debug("new_page created")
     return page
 
 
-async def save_screenshot(page: Page, job_id: int, step: str, config: dict) -> str:
+async def save_screenshot(page: Page, job_id: int, step: str, config: dict[str, Any]) -> str:
     screenshots_dir = Path(config["screenshots_dir"]) / str(job_id)
     screenshots_dir.mkdir(parents=True, exist_ok=True)
     path = str(screenshots_dir / f"{step}.png")
@@ -82,7 +83,7 @@ async def save_screenshot(page: Page, job_id: int, step: str, config: dict) -> s
     return path
 
 
-async def close():
+async def close() -> None:
     global _playwright, _browser, _brave_process
     if _browser:
         await _browser.close()

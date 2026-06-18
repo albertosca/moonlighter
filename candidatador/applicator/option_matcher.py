@@ -10,6 +10,9 @@ chamador trata como failed e o humano vê no screenshot. Nunca chuta.
 
 import re
 from difflib import SequenceMatcher
+from typing import Any
+
+from candidatador.llm import LLMCaller
 
 
 def _norm(s: str) -> str:
@@ -78,8 +81,8 @@ async def pick_option_with_llm(
     label: str,
     answer: str,
     options: list[str],
-    profile: dict,
-    caller,
+    profile: dict[str, Any],
+    caller: LLMCaller,
     model: str,
 ) -> str | None:
     """

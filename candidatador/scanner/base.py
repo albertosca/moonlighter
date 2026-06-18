@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 
 @dataclass
@@ -32,6 +33,6 @@ def normalize_remote_type(location: str | None) -> str | None:
 
 class BaseScanner(ABC):
     @abstractmethod
-    async def scan(self, company_slugs: list[str], **kwargs) -> list[RawJob]:
+    async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
         """Fetch raw job listings. Returns deduplicated list of RawJob."""
         ...

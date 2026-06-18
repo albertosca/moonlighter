@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -39,7 +40,7 @@ _PATH_KEYS = ("browser_session_dir", "screenshots_dir", "db_path")
 _LEARNED_BLOCKLIST_PATH = _PROJECT_ROOT / "blocklist_learned.yaml"
 
 
-def load_config(config_path: str | Path | None = None) -> dict:
+def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
     """
     Load configuration from YAML file, merging with defaults.
 
@@ -52,7 +53,7 @@ def load_config(config_path: str | Path | None = None) -> dict:
         dict with merged config (defaults + overrides)
     """
     config_path = Path(config_path) if config_path is not None else _PROJECT_ROOT / "config.yaml"
-    config = dict(DEFAULTS)
+    config: dict[str, Any] = dict(DEFAULTS)
     if config_path.exists():
         user = yaml.safe_load(config_path.read_text()) or {}
         config.update(user)
@@ -71,7 +72,7 @@ def load_config(config_path: str | Path | None = None) -> dict:
     return config
 
 
-def load_profile(profile_path: str | Path | None = None) -> dict:
+def load_profile(profile_path: str | Path | None = None) -> dict[str, Any]:
     """
     Load profile from YAML file.
 
@@ -89,7 +90,7 @@ def load_profile(profile_path: str | Path | None = None) -> dict:
     return yaml.safe_load(profile_path.read_text()) or {}
 
 
-def load_company_list(path: str | Path | None = None, phase: str | None = None) -> dict:
+def load_company_list(path: str | Path | None = None, phase: str | None = None) -> dict[str, Any]:
     """Load company list from YAML file, optionally filtered by phase.
 
     O company_list.yaml organiza slugs por ATS e fase:

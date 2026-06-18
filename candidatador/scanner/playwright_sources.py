@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 
 from playwright.async_api import Page
 from playwright.async_api import TimeoutError as PlaywrightTimeout
@@ -32,7 +33,7 @@ class LinkedInScanner(BaseScanner):
         company_slugs: list[str] | None = None,
         keywords: str = "",
         location: str = "Worldwide",
-        **kwargs,
+        **kwargs: Any,
     ) -> list[RawJob]:
         url = self.SEARCH_URL.format(
             keywords=keywords.replace(" ", "%20") or "software+engineer",
@@ -97,7 +98,7 @@ class LinkedInScanner(BaseScanner):
         logger.info("LinkedIn: found %d jobs", len(jobs))
         return jobs
 
-    async def _fetch_description(self, card_item) -> str | None:
+    async def _fetch_description(self, card_item: Any) -> str | None:
         """Clica no card e extrai a descrição do painel lateral. Retorna None se falhar."""
         try:
             await card_item.click()

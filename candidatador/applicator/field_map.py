@@ -11,25 +11,29 @@ contato ficam garantidos).
 """
 
 import re
+from collections.abc import Callable
+from typing import Any
+
+_RuleFn = Callable[[dict[str, Any]], str]
 
 
-def _first_name(profile: dict) -> str:
+def _first_name(profile: dict[str, Any]) -> str:
     return (profile.get("name") or "").split()[0]
 
 
-def _last_name(profile: dict) -> str:
+def _last_name(profile: dict[str, Any]) -> str:
     parts = (profile.get("name") or "").split()
     return " ".join(parts[1:]) if len(parts) > 1 else ""
 
 
-def _city(profile: dict) -> str:
+def _city(profile: dict[str, Any]) -> str:
     loc = profile.get("location") or ""
     return loc.split(",")[0].strip()
 
 
 # Cada entrada: (padrão regex no label, callable(profile) -> str)
 # Os padrões são case-insensitive e combinam substring.
-_RULES: list[tuple[str, object]] = [
+_RULES: list[tuple[str, _RuleFn]] = [
     # Contato (EN)
     (r"^first\s+name", _first_name),
     (r"^last\s+name", _last_name),
@@ -60,15 +64,15 @@ _RULES: list[tuple[str, object]] = [
     (r"^where\s+are\s+you\s+(currently\s+)?based|^current\s+location|^currently\s+based", _city),
 ]
 
-_COMPILED: list[tuple[re.Pattern, object]] = [
+_COMPILED: list[tuple[re.Pattern[str], _RuleFn]] = [
     (re.compile(pattern, re.IGNORECASE), fn) for pattern, fn in _RULES
 ]
 
 
 def pre_populate_answers(
     fields: list[str],
-    profile: dict,
-    config: dict | None = None,
+    profile: dict[str, Any],
+    config: dict[str, Any] | None = None,
     job_location: str | None = None,
     job_remote_type: str | None = None,
 ) -> dict[str, str]:

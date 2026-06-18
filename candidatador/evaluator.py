@@ -1,5 +1,6 @@
 import json
 from dataclasses import dataclass, field
+from typing import Any
 
 import yaml
 
@@ -69,7 +70,7 @@ async def evaluate_job(
     company: str,
     title: str,
     description: str,
-    profile: dict,
+    profile: dict[str, Any],
     model: str = "claude-sonnet-4-6",
     _caller: LLMCaller | None = None,
 ) -> EvaluationResult:

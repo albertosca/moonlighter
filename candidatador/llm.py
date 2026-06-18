@@ -1,14 +1,16 @@
 import asyncio
 import os
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 import anthropic
+from anthropic.types import TextBlock
 
 # (prompt: str, model: str) -> raw_text: str
 LLMCaller = Callable[[str, str], Awaitable[str]]
 
 
-def make_caller(config: dict) -> LLMCaller:
+def make_caller(config: dict[str, Any]) -> LLMCaller:
     """Return the appropriate LLM caller based on config['llm_backend'].
 
     llm_backend: "cli"  → uses the `claude -p` CLI (no API key required)
@@ -59,6 +61,9 @@ def _make_api_caller(max_tokens: int = 2048) -> LLMCaller:
             max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
-        return message.content[0].text
+        block = message.content[0]
+        if not isinstance(block, TextBlock):
+            raise RuntimeError("resposta inesperada do modelo (bloco não-texto)")
+        return block.text
 
     return _call
