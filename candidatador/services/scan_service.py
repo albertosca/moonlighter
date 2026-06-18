@@ -186,7 +186,10 @@ async def scan_and_evaluate(
 
     spend_hit = False
     for i in range(0, len(new_raw), BATCH_SIZE):
-        if stop_event.is_set():
+        # Guarda defensiva: na prática inalcançável — quem seta stop_event sempre
+        # devolve um _StopScan no MESMO batch, que já dispara o break em 'if
+        # spend_hit' abaixo antes de reentrar no loop. Mantida por segurança.
+        if stop_event.is_set():  # pragma: no cover
             spend_hit = True
             break
         batch = new_raw[i : i + BATCH_SIZE]

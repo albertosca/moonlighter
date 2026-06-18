@@ -18,3 +18,9 @@ profile/**/*.log
 profile/**/*.out
 profile/nubank/test-color.*
 .venv314/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
