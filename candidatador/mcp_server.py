@@ -1,5 +1,7 @@
 import contextlib
 import time as _time
+from collections.abc import AsyncIterator
+from contextlib import AbstractAsyncContextManager
 from datetime import datetime
 from pathlib import Path
 
@@ -35,11 +37,11 @@ init_db()
 _llm_caller = make_caller(_config)
 
 
-def _log_tool(name: str):
+def _log_tool(name: str) -> AbstractAsyncContextManager[None]:
     """Context manager que loga start/end com elapsed de cada ferramenta MCP."""
 
     @contextlib.asynccontextmanager
-    async def _ctx():
+    async def _ctx() -> AsyncIterator[None]:
         _log.info("tool=%s start", name)
         t0 = _time.monotonic()
         try:
@@ -162,7 +164,7 @@ async def apply_jobs(ids: list[int]) -> str:
 
 
 @mcp.tool()
-async def confirm_apply(job_id: int, answers: dict | None = None) -> str:
+async def confirm_apply(job_id: int, answers: dict[str, str] | None = None) -> str:
     """
     Submit the application for a job.
     job_id: ID of the job (must have a draft Application in DB)
@@ -308,7 +310,7 @@ async def sync_email_responses() -> str:
         return "\n".join(lines)
 
 
-def main():
+def main() -> None:
     mcp.run()
 
 

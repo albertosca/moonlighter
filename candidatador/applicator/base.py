@@ -2,8 +2,10 @@ import contextlib
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 import yaml
+from playwright.async_api import Page
 
 from candidatador.llm import LLMCaller, _make_api_caller
 from candidatador.log import get_logger
@@ -12,7 +14,7 @@ from candidatador.parsing import _extract_json
 logger = get_logger(__name__)
 
 
-async def _query_labels_with_fallback(page, selectors: list[str]) -> list:
+async def _query_labels_with_fallback(page: Page, selectors: list[str]) -> list[Any]:
     """
     Tenta cada seletor CSS em ordem até encontrar um que retorne elementos.
     Retorna a primeira lista não-vazia, ou [] se todos forem vazios.
@@ -41,7 +43,7 @@ SUCCESS_TEXT_MARKERS = (
 SUCCESS_URL_MARKERS = ("thank", "confirmation", "submitted", "success")
 
 
-async def _confirm_submitted(page, extra_text_markers: tuple = ()) -> bool:
+async def _confirm_submitted(page: Page, extra_text_markers: tuple[str, ...] = ()) -> bool:
     """
     Verifica se a submissão foi de fato confirmada, lendo o texto da página
     (marcador de sucesso) ou a URL (página de confirmação). Não levanta exceção.
@@ -73,7 +75,7 @@ _ERROR_MESSAGES_JS = """() => {
 
 
 async def classify_submit_outcome(
-    page, form_visible_js: str = _SUBMIT_VISIBLE_JS, extra_text_markers: tuple = ()
+    page: Page, form_visible_js: str = _SUBMIT_VISIBLE_JS, extra_text_markers: tuple[str, ...] = ()
 ) -> str:
     """
     Classifica o resultado de um clique de submit de forma CONSERVADORA:
@@ -99,7 +101,7 @@ async def classify_submit_outcome(
     return "unverified"
 
 
-async def _fill_field(field, answer: str) -> None:
+async def _fill_field(field: Any, answer: str) -> None:
     """
     Preenche um campo de formulário conforme o tipo do elemento.
     - <select>: opção por label visível; fallback por value.
@@ -178,7 +180,7 @@ class ApplicationDraft:
 
 
 class BaseApplier(ABC):
-    def __init__(self, page, config: dict, profile: dict):
+    def __init__(self, page: Page, config: dict[str, Any], profile: dict[str, Any]):
         self.page = page
         self.config = config
         self.profile = profile
@@ -194,12 +196,12 @@ class BaseApplier(ABC):
         ...
 
     @abstractmethod
-    async def fill_form(self, answers: dict[str, str], cv_path: str) -> None:
+    async def fill_form(self, answers: dict[str, str], cv_path: str) -> dict[str, str] | None:
         """Fill the form with the given answers and upload CV."""
         ...
 
     @abstractmethod
-    async def submit(self) -> bool:
+    async def submit(self) -> str:
         """Submit the form. Return True on success."""
         ...
 
@@ -209,11 +211,11 @@ async def generate_answers(
     title: str,
     description: str,
     fields: list[str],
-    profile: dict,
+    profile: dict[str, Any],
     model: str = "claude-sonnet-4-6",
     job_id: int = 0,
     _caller: LLMCaller | None = None,
-    config: dict | None = None,
+    config: dict[str, Any] | None = None,
     job_location: str | None = None,
     job_remote_type: str | None = None,
 ) -> ApplicationDraft:
@@ -237,7 +239,7 @@ async def generate_answers(
         "→ pre-populated %d campos, LLM responde %d", len(pre_populated), len(remaining_fields)
     )
 
-    llm_answers: dict = {}
+    llm_answers: dict[str, str] = {}
     llm_error: str | None = None
     if remaining_fields:
         prompt = ANSWER_PROMPT.format(

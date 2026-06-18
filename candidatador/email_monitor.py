@@ -11,7 +11,9 @@ import json
 import logging
 import re
 from pathlib import Path
+from typing import Any
 
+from candidatador.llm import LLMCaller
 from candidatador.parsing import _extract_json
 
 logger = logging.getLogger(__name__)
@@ -22,8 +24,8 @@ try:
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
 except ImportError:
-    Credentials = None
-    Request = None
+    Credentials = None  # type: ignore[assignment, misc]
+    Request = None  # type: ignore[assignment, misc]
     build = None
 
 try:
@@ -85,7 +87,7 @@ def extract_ref(to_field: str, base_address: str) -> str | None:
     return None
 
 
-def setup_gmail_service(config: dict):
+def setup_gmail_service(config: dict[str, Any]) -> Any:
     """
     Carrega credentials + token OAuth2 e retorna o resource do Gmail API.
 
@@ -106,7 +108,7 @@ def setup_gmail_service(config: dict):
             "Token Gmail não encontrado. Rode setup_email() primeiro para autorizar o acesso."
         )
 
-    creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+    creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)  # type: ignore[no-untyped-call]
 
     if not creds.valid and creds.expired and creds.refresh_token:
         creds.refresh(Request())
@@ -115,7 +117,7 @@ def setup_gmail_service(config: dict):
     return build("gmail", "v1", credentials=creds)
 
 
-def fetch_unread_messages(service, max_results: int = 50) -> list[dict]:
+def fetch_unread_messages(service: Any, max_results: int = 50) -> list[dict[str, Any]]:
     """
     Busca emails não lidos na inbox.
 
@@ -131,10 +133,11 @@ def fetch_unread_messages(service, max_results: int = 50) -> list[dict]:
         )
         .execute()
     )
-    return response.get("messages", [])
+    messages: list[dict[str, Any]] = response.get("messages", [])
+    return messages
 
 
-def parse_message(service, message_id: str) -> dict:
+def parse_message(service: Any, message_id: str) -> dict[str, Any]:
     """
     Extrai to, from_, subject, body de uma mensagem Gmail.
 
@@ -155,7 +158,7 @@ def parse_message(service, message_id: str) -> dict:
     }
 
 
-def _extract_body(payload: dict) -> str:
+def _extract_body(payload: dict[str, Any]) -> str:
     """Extrai corpo da mensagem, preferindo text/plain sobre text/html."""
     mime = payload.get("mimeType", "")
 
@@ -197,7 +200,7 @@ def _decode_data(data: str) -> str:
         return ""
 
 
-def mark_processed(service, message_id: str, label_id: str) -> None:
+def mark_processed(service: Any, message_id: str, label_id: str) -> None:
     """Marca como lido e aplica label 'candidatador/processado'."""
     service.users().messages().modify(
         userId="me",
@@ -210,8 +213,11 @@ def mark_processed(service, message_id: str, label_id: str) -> None:
 
 
 async def classify_response(
-    message: dict, stages: list[str], llm_caller, model: str = "claude-sonnet-4-6"
-) -> dict:
+    message: dict[str, Any],
+    stages: list[str],
+    llm_caller: LLMCaller,
+    model: str = "claude-sonnet-4-6",
+) -> dict[str, Any]:
     """
     Classifica uma resposta de email usando LLM.
 
@@ -268,12 +274,12 @@ Responda APENAS com o JSON, sem texto adicional."""
         }
 
 
-def _get_or_create_label(service, label_name: str) -> str:
+def _get_or_create_label(service: Any, label_name: str) -> str:
     """Retorna o ID do label, criando-o se necessário."""
     labels = service.users().labels().list(userId="me").execute()
     for label in labels.get("labels", []):
         if label["name"] == label_name:
-            return label["id"]
+            return str(label["id"])
     created = (
         service.users()
         .labels()
@@ -287,7 +293,7 @@ def _get_or_create_label(service, label_name: str) -> str:
         )
         .execute()
     )
-    return created["id"]
+    return str(created["id"])
 
 
 def _status_rank(status: str) -> int:
@@ -297,7 +303,7 @@ def _status_rank(status: str) -> int:
         return -1
 
 
-async def sync_responses(config: dict, llm_caller) -> list[dict]:
+async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[dict[str, Any]]:
     """
     Orquestra o fluxo completo: lê emails, classifica, atualiza banco.
 
@@ -399,7 +405,7 @@ async def sync_responses(config: dict, llm_caller) -> list[dict]:
     return updates
 
 
-def _resolve_application(ref: str | None, classification: dict):
+def _resolve_application(ref: str | None, classification: dict[str, Any]) -> Any:
     """
     Tenta encontrar a Application correspondente.
 

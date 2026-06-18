@@ -10,16 +10,20 @@ import secrets
 import shutil
 from datetime import datetime
 from pathlib import Path
+from typing import Any
+
+from playwright.async_api import Page
 
 from candidatador import browser
 from candidatador.applicator.ashby import AshbyApplier
-from candidatador.applicator.base import generate_answers
+from candidatador.applicator.base import BaseApplier, generate_answers
 from candidatador.applicator.cv import CVNotFoundError, resolve_cv_path
 from candidatador.applicator.email_alias import build_email_alias, inject_email_alias
 from candidatador.applicator.greenhouse import GreenhouseApplier
 from candidatador.applicator.lever import LeverApplier
 from candidatador.applicator.linkedin import LinkedInApplier
 from candidatador.db import Application, Job
+from candidatador.llm import LLMCaller
 from candidatador.log import get_logger
 
 logger = get_logger(__name__)
@@ -27,15 +31,17 @@ logger = get_logger(__name__)
 _APPLIER_CLASSES = [LinkedInApplier, GreenhouseApplier, LeverApplier, AshbyApplier]
 
 
-async def detect_applier(page, config, profile):
+async def detect_applier(
+    page: Page, config: dict[str, Any], profile: dict[str, Any]
+) -> BaseApplier | None:
     for cls in _APPLIER_CLASSES:
-        applier = cls(page, config, profile)
+        applier = cls(page, config, profile)  # type: ignore[abstract]
         if await applier.detect():
             return applier
     return None
 
 
-def archive_screenshots(job_id: int, config: dict) -> None:
+def archive_screenshots(job_id: int, config: dict[str, Any]) -> None:
     """Move screenshots de candidatura concluída para subdir 'done/', liberando espaço."""
     try:
         src = Path(config["screenshots_dir"]) / str(job_id)
@@ -51,7 +57,9 @@ def archive_screenshots(job_id: int, config: dict) -> None:
         logger.debug("archive_screenshots: falha (não crítico) — %s", e)
 
 
-async def apply_jobs(ids: list[int], config: dict, profile: dict, caller) -> str:
+async def apply_jobs(
+    ids: list[int], config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
+) -> str:
     drafts_output = []
     for job_id in ids:
         try:
@@ -138,7 +146,9 @@ async def apply_jobs(ids: list[int], config: dict, profile: dict, caller) -> str
     return "\n\n---\n".join(drafts_output)
 
 
-async def confirm_apply(job_id: int, answers: dict | None, config: dict, profile: dict) -> str:
+async def confirm_apply(
+    job_id: int, answers: dict[str, str] | None, config: dict[str, Any], profile: dict[str, Any]
+) -> str:
     try:
         job = Job.get_by_id(job_id)
         app = Application.get(Application.job == job)
@@ -260,7 +270,7 @@ async def confirm_apply(job_id: int, answers: dict | None, config: dict, profile
         await page.close()
 
 
-async def retry_apply(job_id: int, config: dict, profile: dict) -> str:
+async def retry_apply(job_id: int, config: dict[str, Any], profile: dict[str, Any]) -> str:
     try:
         app = Application.get(Application.job == Job.get_by_id(job_id))
     except Job.DoesNotExist, Application.DoesNotExist:

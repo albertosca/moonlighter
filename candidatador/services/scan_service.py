@@ -7,6 +7,7 @@ config/profile/caller. A lógica fica aqui, testável isolada.
 import asyncio
 import json
 import re
+from typing import Any
 
 import httpx
 from peewee import IntegrityError
@@ -15,7 +16,9 @@ from candidatador import browser
 from candidatador.config import load_company_list
 from candidatador.db import Job, ScanLog
 from candidatador.evaluator import evaluate_job, should_skip_by_title
+from candidatador.llm import LLMCaller
 from candidatador.log import get_logger
+from candidatador.scanner.base import RawJob
 from candidatador.scanner.http_sources import AshbyScanner, GreenhouseScanner, LeverScanner
 from candidatador.views import render_jobs_table
 
@@ -40,7 +43,9 @@ def _is_spend_limit(exc: Exception) -> bool:
     return any(m in msg for m in _SPEND_LIMIT_MARKERS)
 
 
-async def scan_and_evaluate(keywords: str, phase: str, config: dict, profile: dict, caller) -> str:
+async def scan_and_evaluate(
+    keywords: str, phase: str, config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
+) -> str:
     threshold = config["score_threshold"]
     model = config.get("eval_model", config.get("llm_model", "claude-haiku-4-5-20251001"))
     blocklist: list[str] = config.get("title_blocklist", [])
@@ -93,7 +98,7 @@ async def scan_and_evaluate(keywords: str, phase: str, config: dict, profile: di
     if not new_raw:
         return _with_li_warning("Nenhuma vaga nova encontrada.")
 
-    results = []
+    results: list[Job] = []
 
     # Sentinela retornada por uma coroutine que detectou spend limit.
     class _StopScan:
@@ -101,7 +106,7 @@ async def scan_and_evaluate(keywords: str, phase: str, config: dict, profile: di
 
     stop_event = asyncio.Event()
 
-    async def _eval_and_save(raw) -> Job | None | _StopScan:
+    async def _eval_and_save(raw: RawJob) -> Job | None | _StopScan:
         # Claim the URL in ScanLog before any work. ScanLog.create is synchronous
         # (no await), so asyncio won't context-switch between the insert and its
         # return — the UNIQUE constraint on job_url makes this the atomic guard
@@ -119,7 +124,7 @@ async def scan_and_evaluate(keywords: str, phase: str, config: dict, profile: di
         matched_pattern = should_skip_by_title(raw.title, blocklist)
         if matched_pattern:
             try:
-                return Job.create(
+                filtered: Job = Job.create(
                     source=raw.source,
                     company=raw.company,
                     title=raw.title,
@@ -133,6 +138,7 @@ async def scan_and_evaluate(keywords: str, phase: str, config: dict, profile: di
                     caveats="[]",
                     status="archived",
                 )
+                return filtered
             except IntegrityError:
                 return None
 
@@ -156,7 +162,7 @@ async def scan_and_evaluate(keywords: str, phase: str, config: dict, profile: di
             raise
 
         try:
-            return Job.create(
+            saved: Job = Job.create(
                 source=raw.source,
                 company=raw.company,
                 title=raw.title,
@@ -174,6 +180,7 @@ async def scan_and_evaluate(keywords: str, phase: str, config: dict, profile: di
                 salary_source=eval_result.salary_source,
                 status="new" if eval_result.score >= threshold else "archived",
             )
+            return saved
         except IntegrityError:
             return None
 
@@ -191,7 +198,7 @@ async def scan_and_evaluate(keywords: str, phase: str, config: dict, profile: di
         for r in batch_results:
             if isinstance(r, _StopScan):
                 spend_hit = True
-            elif isinstance(r, Exception):
+            elif isinstance(r, BaseException):
                 logger.error("scan: coroutine falhou — %s", r)
                 spend_hit = True  # para conservadoramente em erro inesperado
             elif r is not None:
@@ -232,7 +239,13 @@ async def scan_and_evaluate(keywords: str, phase: str, config: dict, profile: di
 
 
 async def add_job(
-    url: str, company: str, title: str, description: str, config: dict, profile: dict, caller
+    url: str,
+    company: str,
+    title: str,
+    description: str,
+    config: dict[str, Any],
+    profile: dict[str, Any],
+    caller: LLMCaller,
 ) -> str:
     threshold = config["score_threshold"]
     model = config.get("eval_model", config.get("llm_model", "claude-haiku-4-5-20251001"))

@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import re
+from typing import Any
 
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
@@ -117,11 +118,11 @@ class GreenhouseApplier(BaseApplier):
         if cv_path:
             status["__cv__"] = cv_status
 
-        filled = sum(1 for s in status.values() if s == "filled")
+        n_filled = sum(1 for s in status.values() if s == "filled")
         failed = [k for k, s in status.items() if s.startswith("failed")]
         logger.info(
             "fill_form: %d filled, %d failed, %d skipped",
-            filled,
+            n_filled,
             sum(1 for s in status.values() if s.startswith("failed")),
             sum(1 for s in status.values() if s == "skipped"),
         )
@@ -130,7 +131,7 @@ class GreenhouseApplier(BaseApplier):
 
         return status
 
-    async def _find_field(self, label_text: str):
+    async def _find_field(self, label_text: str) -> Any:
         """
         Estratégia em cascata para localizar o elemento de input associado a um label.
         Retorna o ElementHandle ou None.
@@ -166,7 +167,7 @@ class GreenhouseApplier(BaseApplier):
 
         return None
 
-    async def _fill_custom_element(self, element, label_text: str, answer: str) -> bool:
+    async def _fill_custom_element(self, element: Any, label_text: str, answer: str) -> bool:
         """
         Trata elementos não-nativos: custom dropdowns (role=combobox/listbox)
         e typeaheads (autocomplete). Retorna True se conseguiu preencher.
@@ -224,7 +225,7 @@ class GreenhouseApplier(BaseApplier):
             logger.warning("_fill_custom_element typeahead: '%s' exception — %s", label_text, e)
             return False
 
-    async def _select_custom_option(self, element, label_text: str, answer: str) -> bool:
+    async def _select_custom_option(self, element: Any, label_text: str, answer: str) -> bool:
         """
         Seleciona uma opção num react-select / dropdown custom escolhendo SEMPRE pelo
         TEXTO REAL da opção (match local ou LLM) e clicando a opção exata, com
@@ -279,7 +280,7 @@ class GreenhouseApplier(BaseApplier):
             return False
 
     async def _choose_and_click(
-        self, element, label_text: str, answer: str, options: list[str]
+        self, element: Any, label_text: str, answer: str, options: list[str]
     ) -> bool:
         """Escolhe a opção (match local; senão LLM entre as opções reais), clica a
         EXATA e verifica a seleção. Sem escolha confirmada → False."""
@@ -346,10 +347,10 @@ class GreenhouseApplier(BaseApplier):
         except Exception:
             return None
 
-    async def _selected_value(self, element) -> str:
+    async def _selected_value(self, element: Any) -> str:
         """Lê o valor exibido pelo react-select (.select__single-value) subindo a árvore."""
         try:
-            return await element.evaluate(
+            value: str = await element.evaluate(
                 """el => {
                     let c = el;
                     for (let i = 0; i < 6 && c; i++) {
@@ -360,6 +361,7 @@ class GreenhouseApplier(BaseApplier):
                     return sv ? sv.innerText.trim() : '';
                 }"""
             )
+            return value
         except Exception:
             return ""
 
