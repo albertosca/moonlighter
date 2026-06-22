@@ -23,14 +23,14 @@ try:
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
-except ImportError:
+except ImportError:  # pragma: no cover - fallback de import opcional (libs google)
     Credentials = None  # type: ignore[assignment, misc]
     Request = None  # type: ignore[assignment, misc]
     build = None
 
 try:
     from google_auth_oauthlib.flow import InstalledAppFlow
-except ImportError:
+except ImportError:  # pragma: no cover - fallback de import opcional (oauthlib)
     InstalledAppFlow = None
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]

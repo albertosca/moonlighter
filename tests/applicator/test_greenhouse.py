@@ -912,3 +912,190 @@ async def test_fill_form_combobox_no_match_marks_failed_not_filled():
         result = await applier.fill_form({"English level": "Fluent"}, cv_path="")
 
     assert result["English level"].startswith("failed")
+
+
+# ── _find_field: for_id resolve mas elemento ausente (159->163) ─────────────
+
+
+async def test_find_field_for_id_missing_falls_to_aria():
+    applier = make_applier()
+    applier.page.get_by_label = MagicMock(return_value=make_label_locator(None))
+    applier.page.evaluate = AsyncMock(return_value="phone_field")  # JS acha for_id
+    aria_field = MagicMock()
+
+    async def qs(selector):
+        if selector == "#phone_field":
+            return None  # mas #phone_field não existe → cai pro aria-label
+        if "aria-label" in selector:
+            return aria_field
+        return None
+
+    applier.page.query_selector = qs
+    result = await applier._find_field("Phone")
+    assert result is aria_field
+
+
+# ── fill_form: elemento não-nativo vai pro _fill_custom_element (109-110) ────
+
+
+async def test_fill_form_routes_non_native_element_to_custom():
+    applier = make_applier()
+    field = MagicMock()
+
+    async def ev(js, *a):
+        if "combobox" in js or "aria-haspopup" in js or "select__input" in js:
+            return False
+        if "tagName" in js:
+            return "div"  # não-nativo
+        return None
+
+    field.evaluate = ev
+    applier._find_field = AsyncMock(return_value=field)
+    applier._fill_custom_element = AsyncMock(return_value=False)
+    applier._upload_cv = AsyncMock(return_value="skipped")
+    with patch("asyncio.sleep", new=AsyncMock()):
+        status = await applier.fill_form({"Q": "A"}, cv_path="")
+    assert status["Q"] == "failed:custom_element_unsupported"
+
+
+# ── _fill_custom_element: typeahead com exceção (224-226) ───────────────────
+
+
+async def test_fill_custom_element_typeahead_exception_returns_false():
+    applier = make_applier()
+    element = MagicMock()
+    element.evaluate = AsyncMock(return_value="")  # role vazio, sem classe select
+    element.click = AsyncMock(side_effect=Exception("boom"))
+    with patch("asyncio.sleep", new=AsyncMock()):
+        assert await applier._fill_custom_element(element, "City", "BH") is False
+
+
+# ── _choose_and_click: clica mas não verifica → False (294->296) ────────────
+
+
+async def test_choose_and_click_false_when_value_not_verified():
+    applier = make_applier()
+    applier._click_option_exact = AsyncMock(return_value=True)
+    applier._selected_value = AsyncMock(return_value="")  # não confirmou seleção
+    applier._llm_pick = AsyncMock(return_value=None)
+    with patch("asyncio.sleep", new=AsyncMock()):
+        result = await applier._choose_and_click(MagicMock(), "Status", "Yes", ["Yes", "No"])
+    assert result is False
+
+
+# ── _visible_options (real) ─────────────────────────────────────────────────
+
+
+async def test_visible_options_returns_normalized_texts():
+    applier = make_applier()
+    loc = MagicMock()
+    loc.first.wait_for = AsyncMock()
+    loc.all_inner_texts = AsyncMock(return_value=["Yes", "  No  ", "   "])
+    applier.page.locator = MagicMock(return_value=loc)
+    assert await applier._visible_options() == ["Yes", "No"]
+
+
+async def test_visible_options_empty_when_wait_times_out():
+    applier = make_applier()
+    loc = MagicMock()
+    loc.first.wait_for = AsyncMock(side_effect=Exception("timeout"))
+    applier.page.locator = MagicMock(return_value=loc)
+    assert await applier._visible_options() == []
+
+
+async def test_visible_options_empty_on_locator_exception():
+    applier = make_applier()
+    applier.page.locator = MagicMock(side_effect=Exception("boom"))
+    assert await applier._visible_options() == []
+
+
+# ── _click_option_exact (real) ──────────────────────────────────────────────
+
+
+async def test_click_option_exact_clicks_matching_option():
+    applier = make_applier()
+    opt0 = MagicMock()
+    opt0.inner_text = AsyncMock(return_value="No")
+    opt1 = MagicMock()
+    opt1.inner_text = AsyncMock(return_value="Yes")
+    opt1.click = AsyncMock()
+    objs = {0: opt0, 1: opt1}
+    loc = MagicMock()
+    loc.count = AsyncMock(return_value=2)
+    loc.nth = MagicMock(side_effect=lambda i: objs[i])
+    applier.page.locator = MagicMock(return_value=loc)
+    assert await applier._click_option_exact("Yes") is True
+    opt1.click.assert_awaited_once()
+
+
+async def test_click_option_exact_returns_false_when_no_match():
+    applier = make_applier()
+    opt = MagicMock()
+    opt.inner_text = AsyncMock(return_value="Maybe")
+    loc = MagicMock()
+    loc.count = AsyncMock(return_value=1)
+    loc.nth = MagicMock(return_value=opt)
+    applier.page.locator = MagicMock(return_value=loc)
+    assert await applier._click_option_exact("Yes") is False
+
+
+async def test_click_option_exact_returns_false_on_exception():
+    applier = make_applier()
+    applier.page.locator = MagicMock(side_effect=Exception("boom"))
+    assert await applier._click_option_exact("Yes") is False
+
+
+# ── _llm_pick (real) ────────────────────────────────────────────────────────
+
+
+async def test_llm_pick_returns_choice():
+    applier = make_applier()
+    applier.config = {"llm_model": "m"}
+    with (
+        patch(
+            "candidatador.applicator.option_matcher.pick_option_with_llm",
+            new=AsyncMock(return_value="Native"),
+        ),
+        patch("candidatador.llm.make_caller", return_value=AsyncMock()),
+    ):
+        result = await applier._llm_pick("English", "Fluent", ["Native", "Basic"])
+    assert result == "Native"
+
+
+async def test_llm_pick_returns_none_without_options():
+    applier = make_applier()
+    assert await applier._llm_pick("English", "Fluent", []) is None
+
+
+async def test_llm_pick_returns_none_on_exception():
+    applier = make_applier()
+    with patch("candidatador.llm.make_caller", side_effect=Exception("boom")):
+        assert await applier._llm_pick("English", "Fluent", ["Native"]) is None
+
+
+# ── _selected_value (real) ──────────────────────────────────────────────────
+
+
+async def test_selected_value_reads_single_value():
+    applier = make_applier()
+    element = MagicMock()
+    element.evaluate = AsyncMock(return_value="Yes")
+    assert await applier._selected_value(element) == "Yes"
+
+
+async def test_selected_value_empty_on_exception():
+    applier = make_applier()
+    element = MagicMock()
+    element.evaluate = AsyncMock(side_effect=Exception("boom"))
+    assert await applier._selected_value(element) == ""
+
+
+async def test_select_custom_option_outer_exception_returns_false():
+    """Exceção não-suprimida dentro de _select_custom_option → False (278-280)."""
+    applier = make_applier()
+    applier._visible_options = AsyncMock(side_effect=Exception("boom"))
+    element = MagicMock()
+    element.scroll_into_view_if_needed = AsyncMock()
+    element.click = AsyncMock()
+    with patch("asyncio.sleep", new=AsyncMock()):
+        assert await applier._select_custom_option(element, "Status", "Yes") is False

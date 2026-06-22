@@ -1384,3 +1384,204 @@ class TestSyncResponses:
             updates = await sync_responses(self.CONFIG, _make_llm_caller({}))
 
         assert updates == []
+
+
+# ── helpers internos: cobertura de borda ────────────────────────────────────
+
+
+def test_extract_ref_skips_wrong_base_with_plus():
+    """Endereço com +ref mas base diferente → continua e retorna None (84->loop)."""
+    from candidatador.email_monitor import extract_ref
+
+    assert extract_ref("someoneelse+abc@gmail.com", BASE_EMAIL) is None
+
+
+def test_setup_gmail_service_raises_without_google_libs():
+    """Credentials None (libs ausentes) → GmailAuthError (email_monitor.py:98)."""
+    from candidatador.email_monitor import GmailAuthError, setup_gmail_service
+
+    with (
+        patch("candidatador.email_monitor.Credentials", None),
+        pytest.raises(GmailAuthError, match="google-api-python-client"),
+    ):
+        setup_gmail_service({"email": {}})
+
+
+# ── _extract_body ───────────────────────────────────────────────────────────
+
+
+def test_extract_body_html_top_level():
+    """Payload text/html no nível superior é decodificado (169)."""
+    from candidatador.email_monitor import _extract_body
+
+    payload = {"mimeType": "text/html", "body": {"data": _b64("<p>Hi</p>")}}
+    assert "Hi" in _extract_body(payload)
+
+
+def test_extract_body_multipart_skips_empty_parts_then_finds_html():
+    """Parts text/plain e text/html com data vazia são puladas (177->174, 181->180);
+    o html com data é aceito (183)."""
+    from candidatador.email_monitor import _extract_body
+
+    payload = {
+        "mimeType": "multipart/alternative",
+        "parts": [
+            {"mimeType": "text/plain", "body": {"data": ""}},  # vazio → pula
+            {"mimeType": "text/html", "body": {"data": ""}},  # vazio → pula
+            {"mimeType": "text/html", "body": {"data": _b64("<b>real</b>")}},
+        ],
+    }
+    assert "real" in _extract_body(payload)
+
+
+def test_extract_body_recurses_into_nested_multipart():
+    """multipart aninhado é resolvido por recursão (186-189)."""
+    from candidatador.email_monitor import _extract_body
+
+    payload = {
+        "mimeType": "multipart/mixed",
+        "parts": [
+            {
+                "mimeType": "multipart/alternative",
+                "parts": [{"mimeType": "text/plain", "body": {"data": _b64("nested body")}}],
+            }
+        ],
+    }
+    assert "nested body" in _extract_body(payload)
+
+
+def test_extract_body_unknown_mime_returns_empty():
+    from candidatador.email_monitor import _extract_body
+
+    assert _extract_body({"mimeType": "application/pdf", "body": {}}) == ""
+
+
+def test_decode_data_invalid_base64_returns_empty():
+    """Base64 inválido → '' sem levantar (199-200)."""
+    from candidatador.email_monitor import _decode_data
+
+    assert _decode_data("!!!nãoébase64@@@") == ""
+
+
+# ── _get_or_create_label ────────────────────────────────────────────────────
+
+
+def test_get_or_create_label_returns_existing():
+    """Label já existe → devolve o id existente (280-282)."""
+    from candidatador.email_monitor import _get_or_create_label
+
+    service = MagicMock()
+    service.users().labels().list().execute.return_value = {
+        "labels": [{"name": "candidatador/processado", "id": "Label_42"}]
+    }
+    assert _get_or_create_label(service, "candidatador/processado") == "Label_42"
+
+
+def test_get_or_create_label_creates_when_missing():
+    """Label não existe → cria e devolve o novo id (283-296)."""
+    from candidatador.email_monitor import _get_or_create_label
+
+    service = MagicMock()
+    service.users().labels().list().execute.return_value = {"labels": []}
+    service.users().labels().create().execute.return_value = {"id": "Label_new"}
+    assert _get_or_create_label(service, "candidatador/processado") == "Label_new"
+
+
+# ── _status_rank ────────────────────────────────────────────────────────────
+
+
+def test_status_rank_unknown_returns_minus_one():
+    from candidatador.email_monitor import _status_rank
+
+    assert _status_rank("status_inexistente") == -1
+
+
+# ── _resolve_application ────────────────────────────────────────────────────
+
+
+def test_resolve_application_ref_no_match_falls_through(tmp_db):
+    """ref dado mas sem Application → DoesNotExist engolido, cai no fuzzy (422-423)."""
+    init_db()
+    from candidatador.email_monitor import _resolve_application
+
+    app, match = _resolve_application("ref_inexistente", {"company": None, "job_title": None})
+    assert app is None
+    assert match == "incerto"
+
+
+def test_resolve_application_fuzzy_by_title_only(tmp_db):
+    """Sem company, só job_title → filtra só por título (436->438) e casa 1 (fuzzy)."""
+    init_db()
+    from candidatador.email_monitor import _resolve_application
+
+    job = _make_job(tmp_db, title="Staff Backend Engineer")
+    _make_application(job, status="submitted")
+    app, match = _resolve_application(None, {"company": None, "job_title": "Staff Backend"})
+    assert match == "fuzzy"
+    assert app is not None
+
+
+def test_resolve_application_fuzzy_by_company_only(tmp_db):
+    """Só company, sem job_title → filtra só por empresa (438->441)."""
+    init_db()
+    from candidatador.email_monitor import _resolve_application
+
+    job = _make_job(tmp_db, company="Anthropic")
+    _make_application(job, status="submitted")
+    app, match = _resolve_application(None, {"company": "Anthropic", "job_title": None})
+    assert match == "fuzzy"
+    assert app is not None
+
+
+def test_resolve_application_no_company_no_title_is_uncertain(tmp_db):
+    """Sem ref, sem company e sem job_title → incerto (448)."""
+    init_db()
+    from candidatador.email_monitor import _resolve_application
+
+    app, match = _resolve_application(None, {"company": None, "job_title": None})
+    assert app is None
+    assert match == "incerto"
+
+
+def test_run_gmail_oauth_raises_without_oauthlib():
+    """InstalledAppFlow None → GmailAuthError (454)."""
+    from candidatador.email_monitor import GmailAuthError, _run_gmail_oauth
+
+    with (
+        patch("candidatador.email_monitor.InstalledAppFlow", None),
+        pytest.raises(GmailAuthError, match="google-auth-oauthlib"),
+    ):
+        _run_gmail_oauth("creds.json", "token.json")
+
+
+def test_extract_body_multipart_unresolvable_returns_empty():
+    """Parts que não resolvem em texto → recursão termina sem achar (186->191, 188->186)."""
+    from candidatador.email_monitor import _extract_body
+
+    payload = {
+        "mimeType": "multipart/mixed",
+        "parts": [{"mimeType": "application/octet-stream", "body": {}}],
+    }
+    assert _extract_body(payload) == ""
+
+
+def test_get_or_create_label_skips_non_matching_then_creates():
+    """Label existente que não casa é pulado (281->280) e o alvo é criado."""
+    from candidatador.email_monitor import _get_or_create_label
+
+    service = MagicMock()
+    service.users().labels().list().execute.return_value = {
+        "labels": [{"name": "OUTRO", "id": "x"}]
+    }
+    service.users().labels().create().execute.return_value = {"id": "Label_new"}
+    assert _get_or_create_label(service, "candidatador/processado") == "Label_new"
+
+
+def test_resolve_application_fuzzy_zero_matches_is_uncertain(tmp_db):
+    """company sem nenhuma Application correspondente → 0 resultados → incerto (444->448)."""
+    init_db()
+    from candidatador.email_monitor import _resolve_application
+
+    app, match = _resolve_application(None, {"company": "EmpresaInexistente", "job_title": None})
+    assert app is None
+    assert match == "incerto"

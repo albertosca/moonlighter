@@ -34,6 +34,13 @@ candidatador = "candidatador.mcp_server:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# Gate de cobertura: 100% sobre a suíte unitária (config de source/branch/omit
+# em [tool.coverage.run]). e2e exige navegador real → fora do run padrão via
+# marker; rode com `pytest -m e2e`.
+addopts = "--cov --cov-fail-under=100 -m 'not e2e'"
+markers = [
+    "e2e: testes end-to-end que exigem navegador real (rodar com -m e2e)",
+]
 
 [tool.ruff]
 target-version = "py314"
