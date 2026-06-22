@@ -62,3 +62,20 @@ def test_log_message_reaches_file(tmp_path):
 
     content = Path(log_path).read_text()
     assert "mensagem de teste xyz" in content
+
+
+def test_setup_without_rich_falls_back_silently(tmp_path, monkeypatch):
+    """rich ausente → ImportError engolido, só o FileHandler fica (log.py:35-36)."""
+    import logging
+    import sys
+
+    from candidatador import log as log_mod
+
+    root = logging.getLogger("candidatador")
+    saved = root.handlers[:]
+    monkeypatch.setattr(log_mod, "_initialized", False)
+    monkeypatch.setitem(sys.modules, "rich.logging", None)  # import → ImportError
+    try:
+        log_mod.setup(log_path=str(tmp_path / "app.log"))
+    finally:
+        root.handlers[:] = saved  # restaura o logger global compartilhado

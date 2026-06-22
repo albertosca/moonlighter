@@ -329,3 +329,22 @@ def test_application_email_ref_lookup_by_ref(tmp_db):
     Application.create(job=job, email_ref="lkp001")
     found = Application.get(Application.email_ref == "lkp001")
     assert found.email_ref == "lkp001"
+
+
+def test_init_db_migrates_old_application_table(tmp_db):
+    """Tabela 'application' antiga (sem email_ref/current_stage) → init_db adiciona
+    as colunas via ALTER TABLE (db.py:98-99, 104)."""
+    from candidatador.db import db
+
+    db.init(tmp_db)
+    db.connect(reuse_if_open=True)
+    db.execute_sql("DROP TABLE IF EXISTS application")
+    db.execute_sql("CREATE TABLE application (id INTEGER PRIMARY KEY, status VARCHAR(50))")
+    db.close()
+
+    init_db()  # roda a migração segura
+
+    cursor = db.execute_sql("PRAGMA table_info(application)")
+    cols = {row[1] for row in cursor.fetchall()}
+    assert "email_ref" in cols
+    assert "current_stage" in cols

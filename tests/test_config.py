@@ -164,3 +164,55 @@ def test_project_root_is_absolute():
 def test_load_config_default_path_finds_project_config():
     config = load_config()
     assert config["llm_model"] == "claude-sonnet-4-6"
+
+
+# --- learned blocklist merge (branches) ---
+
+
+def test_load_config_no_learned_blocklist(tmp_path, monkeypatch):
+    """Sem blocklist_learned.yaml → config segue sem merge (config.py:64->72)."""
+    monkeypatch.setattr(
+        "candidatador.config._LEARNED_BLOCKLIST_PATH", tmp_path / "missing.yaml"
+    )
+    config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
+    assert "title_blocklist" in config
+
+
+def test_load_config_learned_blocklist_empty(tmp_path, monkeypatch):
+    """blocklist_learned.yaml existe mas sem patterns → não altera (config.py:67->72)."""
+    learned = tmp_path / "learned.yaml"
+    learned.write_text("title_blocklist: []\n")
+    monkeypatch.setattr("candidatador.config._LEARNED_BLOCKLIST_PATH", learned)
+    base = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
+    base_blocklist = list(base.get("title_blocklist", []))
+    monkeypatch.setattr("candidatador.config._LEARNED_BLOCKLIST_PATH", learned)
+    config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
+    assert list(config.get("title_blocklist", [])) == base_blocklist
+
+
+def test_load_config_learned_blocklist_merges(tmp_path, monkeypatch):
+    """patterns aprendidos são mesclados após os manuais, sem duplicar."""
+    learned = tmp_path / "learned.yaml"
+    learned.write_text("title_blocklist:\n  - recruiter\n  - intern\n")
+    monkeypatch.setattr("candidatador.config._LEARNED_BLOCKLIST_PATH", learned)
+    config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
+    assert "recruiter" in config["title_blocklist"]
+    assert "intern" in config["title_blocklist"]
+
+
+# --- load_company_list: formatos de valor ---
+
+
+def test_load_company_list_mixed_value_shapes(tmp_path):
+    """Fase-dict com valor não-lista é ignorado; valor escalar vira [] (125->124, 129)."""
+    company_file = tmp_path / "company_list.yaml"
+    company_file.write_text(
+        "greenhouse:\n"
+        "  phase1:\n"
+        "    - stripe\n"
+        "  phase_bad: not_a_list\n"
+        "lever: 42\n"  # valor escalar (nem lista nem dict)
+    )
+    result = load_company_list(path=str(company_file))  # phase=None → concatena
+    assert result["greenhouse"] == ["stripe"]
+    assert result["lever"] == []

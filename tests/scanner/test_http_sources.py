@@ -659,3 +659,24 @@ async def test_lever_logs_scan_fetched(caplog):
         await scanner.scan(["co"])
     assert "lever" in caplog.text
     assert "fetched" in caplog.text
+
+
+async def test_ashby_jobpostings_not_a_list_returns_empty():
+    """jobPostings com shape inesperado (não-lista, mas truthy) → [] (http_sources.py:171)."""
+    response = {"data": {"jobPostings": {"unexpected": "shape"}}}
+    mock_client = _make_mock_client(response)
+    with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs == []
+
+
+@pytest.mark.parametrize("Scanner", [GreenhouseScanner, LeverScanner, AshbyScanner])
+async def test_scan_skips_fetch_exceptions(Scanner):
+    """_fetch lança → gather(return_exceptions) devolve a exceção → ignorada (não-lista)."""
+    mock_client = _make_mock_client({})
+    with (
+        patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client),
+        patch.object(Scanner, "_fetch", new=AsyncMock(side_effect=RuntimeError("boom"))),
+    ):
+        jobs = await Scanner().scan(["co"])
+    assert jobs == []

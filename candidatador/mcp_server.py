@@ -30,7 +30,7 @@ mcp = FastMCP("candidatador")
 _config = load_config()
 try:
     _profile = load_profile()
-except FileNotFoundError:
+except FileNotFoundError:  # pragma: no cover - fallback de import sem profile.yaml
     _profile = {}
 _companies = load_company_list()
 init_db()
@@ -53,7 +53,7 @@ def _log_tool(name: str) -> AbstractAsyncContextManager[None]:
 
 
 _startup_warnings = validate_startup(_config, _profile)
-for _w in _startup_warnings:
+for _w in _startup_warnings:  # pragma: no cover - print de avisos no import do servidor
     _prefix = "🚫" if _w.level == "error" else "⚠️ "
     print(f"{_prefix} {_w.message}", flush=True)
 
@@ -310,7 +310,7 @@ async def sync_email_responses() -> str:
         return "\n".join(lines)
 
 
-def main() -> None:
+def main() -> None:  # pragma: no cover - entry-point do servidor MCP (boundary)
     mcp.run()
 
 

@@ -267,3 +267,17 @@ async def test_api_caller_satisfies_llm_caller_contract():
         result = await caller("hello", "any-model")
 
     assert isinstance(result, str)
+
+
+async def test_make_api_caller_raises_on_non_text_block():
+    """content[0] não é TextBlock → RuntimeError (llm.py:66)."""
+    mock_message = MagicMock()
+    mock_message.content = [MagicMock()]  # sem spec=TextBlock → isinstance False
+    mock_client = MagicMock()
+    mock_client.messages.create = AsyncMock(return_value=mock_message)
+    mock_anthropic = MagicMock()
+    mock_anthropic.AsyncAnthropic.return_value = mock_client
+    with patch("candidatador.llm.anthropic", mock_anthropic):
+        caller = _make_api_caller()
+        with pytest.raises(RuntimeError, match="bloco não-texto"):
+            await caller("prompt", "model")

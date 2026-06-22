@@ -1853,3 +1853,62 @@ async def test_confirm_apply_aborts_on_pending_needs_review(tmp_db, tmp_path):
     result = await confirm_apply(job_id=job.id)
     assert "NÃO submetida" in result or "decisão" in result.lower()
     assert Job.get_by_id(job.id).status != "applied"
+
+
+# ── add_job tool wrapper + setup_email error handlers ───────────────────────
+
+
+async def test_add_job_tool_delegates_to_service(tmp_db):
+    """O wrapper MCP add_job delega ao scan_service e devolve o resultado."""
+    init_db()
+    from candidatador.mcp_server import add_job
+
+    with patch(
+        "candidatador.services.scan_service.evaluate_job",
+        new=AsyncMock(return_value=make_eval_result(8.0)),
+    ):
+        result = await add_job(
+            url="https://x.com/manual/tool/1", company="Stripe", title="Eng", description="desc"
+        )
+    assert "Stripe" in result or "NEW" in result
+
+
+async def test_setup_email_handles_auth_error(tmp_path):
+    """GmailAuthError no OAuth → mensagem amigável (mcp_server.py:278-279)."""
+    from candidatador.email_monitor import GmailAuthError
+    from candidatador.mcp_server import setup_email
+
+    creds = tmp_path / "gmail-client.json"
+    creds.write_text("{}")
+    with (
+        patch(
+            "candidatador.mcp_server.load_config",
+            return_value={
+                "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
+            },
+        ),
+        patch(
+            "candidatador.mcp_server._run_gmail_oauth", side_effect=GmailAuthError("token inválido")
+        ),
+    ):
+        result = await setup_email()
+    assert "Gmail" in result and "token inválido" in result
+
+
+async def test_setup_email_handles_unexpected_error(tmp_path):
+    """Exceção inesperada no OAuth → mensagem de erro inesperado (mcp_server.py:280-281)."""
+    from candidatador.mcp_server import setup_email
+
+    creds = tmp_path / "gmail-client.json"
+    creds.write_text("{}")
+    with (
+        patch(
+            "candidatador.mcp_server.load_config",
+            return_value={
+                "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
+            },
+        ),
+        patch("candidatador.mcp_server._run_gmail_oauth", side_effect=RuntimeError("boom")),
+    ):
+        result = await setup_email()
+    assert "inesperado" in result.lower()

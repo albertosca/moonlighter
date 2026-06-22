@@ -555,3 +555,14 @@ async def test_evaluate_job_logs_score(caplog):
     assert "Stripe" in caplog.text
     assert "Backend Engineer" in caplog.text
     assert "8.5" in caplog.text
+
+
+async def test_evaluate_job_builds_default_caller_when_none():
+    """_caller=None → usa _make_api_caller() como fallback (evaluator.py:78)."""
+    fake = _make_caller(MOCK_LLM_RESPONSE)
+    with patch("candidatador.evaluator._make_api_caller", return_value=fake) as factory:
+        result = await evaluate_job(
+            company="Co", title="Eng", description=JD, profile=PROFILE, _caller=None
+        )
+    factory.assert_called_once()
+    assert result.score == 8.5
