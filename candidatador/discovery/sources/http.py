@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import re
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
@@ -11,22 +12,31 @@ from candidatador.discovery.sources.base import BaseScanner, RawJob, normalize_r
 
 logger = get_logger(__name__)
 
+_Fetch = Callable[[httpx.AsyncClient, str], Awaitable[list[RawJob]]]
+
+
+async def _gather_jobs(source: str, slugs: list[str], fetch: _Fetch) -> list[RawJob]:
+    """Busca todas as empresas em paralelo e achata o resultado. Uma empresa que
+    falha (exceção no fetch) é ignorada, não derruba as outras."""
+    logger.info("[%s] scanning %d companies", source, len(slugs))
+    jobs: list[RawJob] = []
+    async with httpx.AsyncClient(timeout=15) as client:
+        results = await asyncio.gather(
+            *(fetch(client, slug) for slug in slugs), return_exceptions=True
+        )
+    for result in results:
+        if isinstance(result, list):
+            jobs.extend(result)
+    logger.info("[%s] %d raw jobs fetched", source, len(jobs))
+    return jobs
+
 
 class GreenhouseScanner(BaseScanner):
     BASE = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
     HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "candidatador/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
-        logger.info("[greenhouse] scanning %d companies", len(company_slugs))
-        jobs = []
-        async with httpx.AsyncClient(timeout=15) as client:
-            tasks = [self._fetch(client, slug) for slug in company_slugs]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-        for result in results:
-            if isinstance(result, list):
-                jobs.extend(result)
-        logger.info("[greenhouse] %d raw jobs fetched", len(jobs))
-        return jobs
+        return await _gather_jobs("greenhouse", company_slugs, self._fetch)
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
         url = self.BASE.format(slug=slug)
@@ -72,16 +82,7 @@ class LeverScanner(BaseScanner):
     HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "candidatador/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
-        logger.info("[lever] scanning %d companies", len(company_slugs))
-        jobs = []
-        async with httpx.AsyncClient(timeout=15) as client:
-            tasks = [self._fetch(client, slug) for slug in company_slugs]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-        for result in results:
-            if isinstance(result, list):
-                jobs.extend(result)
-        logger.info("[lever] %d raw jobs fetched", len(jobs))
-        return jobs
+        return await _gather_jobs("lever", company_slugs, self._fetch)
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
         url = self.BASE.format(slug=slug)
@@ -137,16 +138,7 @@ class AshbyScanner(BaseScanner):
     """
 
     async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
-        logger.info("[ashby] scanning %d companies", len(company_slugs))
-        jobs = []
-        async with httpx.AsyncClient(timeout=15) as client:
-            tasks = [self._fetch(client, slug) for slug in company_slugs]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-        for result in results:
-            if isinstance(result, list):
-                jobs.extend(result)
-        logger.info("[ashby] %d raw jobs fetched", len(jobs))
-        return jobs
+        return await _gather_jobs("ashby", company_slugs, self._fetch)
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
         try:

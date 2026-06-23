@@ -102,47 +102,57 @@ async def classify_submit_outcome(
 
 
 async def _fill_field(field: Any, answer: str) -> None:
-    """
-    Preenche um campo de formulário conforme o tipo do elemento.
-    - <select>: opção por label visível; fallback por value.
-    - <input type=radio>: clica o radio do grupo cujo value ou label bate com answer.
-    - <input type=checkbox>: marca/desmarca conforme answer ser truthy/falsy.
-    - <input>/<textarea>: digita o texto.
-    """
+    """Preenche o campo conforme o tipo do elemento (select, input, textarea)."""
     tag = await field.evaluate("el => el.tagName.toLowerCase()")
     if tag == "select":
-        try:
-            await field.select_option(label=answer)
-        except Exception:
-            with contextlib.suppress(Exception):
-                await field.select_option(value=answer)
+        await _fill_select(field, answer)
     elif tag == "input":
-        input_type = ((await field.get_attribute("type")) or "text").lower()
-        if input_type == "radio":
-            await field.evaluate(
-                """(el, answer) => {
-                    const root = el.form || document;
-                    const name = el.getAttribute('name');
-                    const radios = root.querySelectorAll(`input[type=radio][name="${name}"]`);
-                    const a = answer.toLowerCase().trim();
-                    for (const r of radios) {
-                        if (r.value.toLowerCase().trim() === a) { r.click(); return; }
-                    }
-                    for (const r of radios) {
-                        const lbl = document.querySelector(`label[for="${r.id}"]`);
-                        if (lbl && lbl.textContent.trim().toLowerCase() === a) { r.click(); return; }
-                    }
-                }""",
-                answer,
-            )
-        elif input_type == "checkbox":
-            truthy = answer.lower() in ("yes", "true", "1", "sim", "on", "checked")
-            if truthy != await field.is_checked():
-                await field.click()
-        else:
-            await field.fill(answer)
+        await _fill_input(field, answer)
     elif tag == "textarea":
         await field.fill(answer)
+
+
+async def _fill_select(field: Any, answer: str) -> None:
+    """Escolhe a opção pelo label visível; cai para o value se o label não bater."""
+    try:
+        await field.select_option(label=answer)
+    except Exception:
+        with contextlib.suppress(Exception):
+            await field.select_option(value=answer)
+
+
+_CHECKBOX_TRUTHY = ("yes", "true", "1", "sim", "on", "checked")
+
+
+async def _fill_input(field: Any, answer: str) -> None:
+    input_type = ((await field.get_attribute("type")) or "text").lower()
+    if input_type == "radio":
+        await _click_radio(field, answer)
+    elif input_type == "checkbox":
+        if (answer.lower() in _CHECKBOX_TRUTHY) != await field.is_checked():
+            await field.click()
+    else:
+        await field.fill(answer)
+
+
+async def _click_radio(field: Any, answer: str) -> None:
+    """Clica o radio do grupo cujo value (ou label associado) bate com a resposta."""
+    await field.evaluate(
+        """(el, answer) => {
+            const root = el.form || document;
+            const name = el.getAttribute('name');
+            const radios = root.querySelectorAll(`input[type=radio][name="${name}"]`);
+            const a = answer.toLowerCase().trim();
+            for (const r of radios) {
+                if (r.value.toLowerCase().trim() === a) { r.click(); return; }
+            }
+            for (const r of radios) {
+                const lbl = document.querySelector(`label[for="${r.id}"]`);
+                if (lbl && lbl.textContent.trim().toLowerCase() === a) { r.click(); return; }
+            }
+        }""",
+        answer,
+    )
 
 
 ANSWER_PROMPT = """You are filling out a job application on behalf of a senior software engineer.
@@ -242,22 +252,36 @@ async def generate_answers(
     llm_answers: dict[str, str] = {}
     llm_error: str | None = None
     if remaining_fields:
-        prompt = ANSWER_PROMPT.format(
-            profile_yaml=yaml.dump(profile, allow_unicode=True),
-            company=company,
-            title=title,
-            description=description[:4000],
-            fields_list="\n".join(f"- {f}" for f in remaining_fields),
+        llm_answers, llm_error = await _ask_llm(
+            remaining_fields, company, title, description, profile, model, _caller
         )
-        try:
-            raw_text = await _caller(prompt, model)
-            raw = _extract_json(raw_text)
-            llm_answers = json.loads(raw)
-            logger.info("→ LLM answers ok (%d respostas)", len(llm_answers))
-        except Exception as e:
-            llm_error = str(e)
-            logger.warning("→ LLM answers error: %s", e)
 
-    # Pre-populated tem prioridade sobre LLM para campos de contato
+    # Pre-populated tem prioridade sobre o LLM para campos de contato.
     answers = {**llm_answers, **pre_populated}
     return ApplicationDraft(job_id=job_id, answers=answers, form_fields=fields, error=llm_error)
+
+
+async def _ask_llm(
+    fields: list[str],
+    company: str,
+    title: str,
+    description: str,
+    profile: dict[str, Any],
+    model: str,
+    caller: LLMCaller,
+) -> tuple[dict[str, str], str | None]:
+    """Pede ao LLM as respostas dos campos restantes. Devolve (respostas, erro)."""
+    prompt = ANSWER_PROMPT.format(
+        profile_yaml=yaml.dump(profile, allow_unicode=True),
+        company=company,
+        title=title,
+        description=description[:4000],
+        fields_list="\n".join(f"- {f}" for f in fields),
+    )
+    try:
+        answers: dict[str, str] = json.loads(_extract_json(await caller(prompt, model)))
+        logger.info("→ LLM answers ok (%d respostas)", len(answers))
+        return answers, None
+    except Exception as e:
+        logger.warning("→ LLM answers error: %s", e)
+        return {}, str(e)

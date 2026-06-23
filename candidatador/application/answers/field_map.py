@@ -69,6 +69,14 @@ _COMPILED: list[tuple[re.Pattern[str], _RuleFn]] = [
 ]
 
 
+def _static_answer(label: str, profile: dict[str, Any]) -> str | None:
+    """Resposta da primeira regra estática que casa o label (vazia conta como sem match)."""
+    for pattern, fn in _COMPILED:
+        if pattern.search(label):
+            return fn(profile) or None
+    return None
+
+
 def pre_populate_answers(
     fields: list[str],
     profile: dict[str, Any],
@@ -90,18 +98,11 @@ def pre_populate_answers(
     result: dict[str, str] = {}
     for field_label in fields:
         clean = field_label.strip().rstrip("*").strip()
-
-        # 1) Autorização de trabalho (país-dependente, conservador)
-        wa = resolve_work_auth(clean, country, cfg)
-        if wa is not None:
-            result[field_label] = wa
-            continue
-
-        # 2) Regras estáticas
-        for pattern, fn in _COMPILED:
-            if pattern.search(clean):
-                value = fn(profile)
-                if value:
-                    result[field_label] = value
-                break
+        # Autorização de trabalho é país-dependente (conservador); o resto sai das
+        # regras estáticas. Campos sem match ficam para o LLM responder.
+        answer = resolve_work_auth(clean, country, cfg)
+        if answer is None:
+            answer = _static_answer(clean, profile)
+        if answer is not None:
+            result[field_label] = answer
     return result
