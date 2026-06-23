@@ -1,6 +1,6 @@
 """Serviço de scan: descobre vagas (HTTP + LinkedIn), avalia com LLM e salva.
 
-As tools MCP em mcp_server são wrappers finos que chamam estas funções passando
+As tools MCP em server.py são wrappers finos que chamam estas funções passando
 config/profile/caller. A lógica fica aqui, testável isolada.
 """
 
@@ -43,107 +43,130 @@ def _is_spend_limit(exc: Exception) -> bool:
     return any(m in msg for m in _SPEND_LIMIT_MARKERS)
 
 
-async def scan_and_evaluate(
-    keywords: str, phase: str, config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
-) -> str:
-    threshold = config["score_threshold"]
-    model = config.get("eval_model", config.get("llm_model", "claude-haiku-4-5-20251001"))
-    blocklist: list[str] = config.get("title_blocklist", [])
+class _StopScan:
+    """Sentinela devolvida por uma coroutine que detectou spend limit e parou."""
 
-    effective_phase = None if phase == "all" else phase
-    companies = load_company_list(phase=effective_phase)
 
-    # Fetch raw jobs from HTTP sources
-    scanners = {
-        "greenhouse": GreenhouseScanner(),
-        "lever": LeverScanner(),
-        "ashby": AshbyScanner(),
-    }
-    all_raw = []
-    for source, scanner in scanners.items():
-        slugs = companies.get(source, [])
-        if slugs:
-            raw = await scanner.scan(slugs)
-            all_raw.extend(raw)
+def _model_for(config: dict[str, Any]) -> str:
+    model: str = config.get("eval_model", config.get("llm_model", "claude-haiku-4-5-20251001"))
+    return model
 
-    # LinkedIn scan (Playwright — requires prior login)
+
+def _claim(raw: RawJob) -> bool:
+    """Reserva a URL no ScanLog antes de qualquer trabalho. ScanLog.create é
+    síncrono, então o asyncio não troca de contexto entre o insert e o retorno — a
+    UNIQUE em job_url é o guard atômico contra duas chamadas concorrentes avaliarem
+    a mesma URL. Devolve False quando a URL já foi reservada."""
+    try:
+        ScanLog.create(job_url=raw.url, source=raw.source)
+        return True
+    except IntegrityError:
+        return False
+
+
+def _release(raw: RawJob) -> None:
+    """Libera o claim para retry num scan futuro (nunca deixa claim órfão)."""
+    ScanLog.delete().where(ScanLog.job_url == raw.url).execute()
+
+
+def _persist(raw: RawJob, **scoring: Any) -> Job | None:
+    """Salva o RawJob como Job com os campos de scoring. None se a URL já existe."""
+    try:
+        job: Job = Job.create(
+            source=raw.source,
+            company=raw.company,
+            title=raw.title,
+            url=raw.url,
+            location=raw.location,
+            remote_type=raw.remote_type,
+            description=raw.description,
+            posted_at=raw.posted_at,
+            **scoring,
+        )
+        return job
+    except IntegrityError:
+        return None
+
+
+async def _scan_linkedin(keywords: str, config: dict[str, Any]) -> tuple[list[RawJob], str | None]:
+    """Scan do LinkedIn via Playwright (exige login prévio). Sessão expirada vira
+    aviso; qualquer outra falha — inclusive não haver browser — é silenciosa para
+    não bloquear os resultados HTTP."""
     from candidatador.discovery.sources.playwright import (
         LinkedInScanner,
         LinkedInSessionExpiredError,
     )
 
-    li_warning: str | None = None
     try:
-        li_page = await browser.new_page(config)
-        try:
-            li_scanner = LinkedInScanner(li_page)
-            li_jobs = await li_scanner.scan(keywords=keywords or "software engineer")
-            all_raw.extend(li_jobs)
-        except LinkedInSessionExpiredError as e:
-            li_warning = f"⚠️  LinkedIn: {e}"
-        except Exception:
-            pass  # outros erros do LinkedIn não bloqueiam resultados HTTP
-        finally:
-            await li_page.close()
+        page = await browser.new_page(config)
     except Exception:
-        pass  # new_page() falhou — sem browser disponível
+        return [], None
+    try:
+        jobs = await LinkedInScanner(page).scan(keywords=keywords or "software engineer")
+        return jobs, None
+    except LinkedInSessionExpiredError as e:
+        return [], f"⚠️  LinkedIn: {e}"
+    except Exception:
+        return [], None
+    finally:
+        await page.close()
 
-    # Dedup against scan_log
-    seen_urls = {row.job_url for row in ScanLog.select(ScanLog.job_url)}
-    new_raw = [j for j in all_raw if j.url not in seen_urls]
 
-    def _with_li_warning(msg: str) -> str:
-        return f"{msg}\n\n{li_warning}" if li_warning else msg
+async def _collect_raw_jobs(
+    keywords: str, config: dict[str, Any], companies: dict[str, list[str]]
+) -> tuple[list[RawJob], str | None]:
+    """Coleta vagas das fontes HTTP e do LinkedIn. Devolve as vagas brutas e um
+    aviso opcional do LinkedIn."""
+    scanners = {
+        "greenhouse": GreenhouseScanner(),
+        "lever": LeverScanner(),
+        "ashby": AshbyScanner(),
+    }
+    raw_jobs: list[RawJob] = []
+    for source, scanner in scanners.items():
+        slugs = companies.get(source, [])
+        if slugs:
+            raw_jobs.extend(await scanner.scan(slugs))
 
-    if not new_raw:
-        return _with_li_warning("Nenhuma vaga nova encontrada.")
+    li_jobs, li_warning = await _scan_linkedin(keywords, config)
+    raw_jobs.extend(li_jobs)
+    return raw_jobs, li_warning
 
-    results: list[Job] = []
 
-    # Sentinela retornada por uma coroutine que detectou spend limit.
-    class _StopScan:
-        pass
+def _drop_already_seen(raw_jobs: list[RawJob]) -> list[RawJob]:
+    seen = {row.job_url for row in ScanLog.select(ScanLog.job_url)}
+    return [j for j in raw_jobs if j.url not in seen]
 
-    stop_event = asyncio.Event()
 
-    async def _eval_and_save(raw: RawJob) -> Job | None | _StopScan:
-        # Claim the URL in ScanLog before any work. ScanLog.create is synchronous
-        # (no await), so asyncio won't context-switch between the insert and its
-        # return — the UNIQUE constraint on job_url makes this the atomic guard
-        # against concurrent scan_and_evaluate calls evaluating the same URL twice.
-        try:
-            ScanLog.create(job_url=raw.url, source=raw.source)
-        except IntegrityError:
-            return None  # already claimed or processed by a concurrent call
+async def _evaluate_and_store(
+    new_jobs: list[RawJob], config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
+) -> tuple[list[Job], bool]:
+    """Avalia e salva cada vaga em lotes concorrentes, parando conservadoramente no
+    primeiro spend limit ou erro inesperado. Devolve as vagas salvas e se parou."""
+    threshold = config["score_threshold"]
+    model = _model_for(config)
+    blocklist: list[str] = config.get("title_blocklist", [])
+    stop = asyncio.Event()
 
-        # Se uma irmã já bateu o limite, libera o claim e sai sem gastar token.
-        if stop_event.is_set():
-            ScanLog.delete().where(ScanLog.job_url == raw.url).execute()
+    async def evaluate_one(raw: RawJob) -> Job | None | _StopScan:
+        if not _claim(raw):
+            return None
+        if stop.is_set():
+            _release(raw)
             return _StopScan()
 
-        matched_pattern = should_skip_by_title(raw.title, blocklist)
-        if matched_pattern:
-            try:
-                filtered: Job = Job.create(
-                    source=raw.source,
-                    company=raw.company,
-                    title=raw.title,
-                    url=raw.url,
-                    location=raw.location,
-                    remote_type=raw.remote_type,
-                    description=raw.description,
-                    posted_at=raw.posted_at,
-                    score=0.0,
-                    score_notes=f"title filtered: {matched_pattern!r}",
-                    caveats="[]",
-                    status="archived",
-                )
-                return filtered
-            except IntegrityError:
-                return None
+        matched = should_skip_by_title(raw.title, blocklist)
+        if matched:
+            return _persist(
+                raw,
+                score=0.0,
+                score_notes=f"title filtered: {matched!r}",
+                caveats="[]",
+                status="archived",
+            )
 
         try:
-            eval_result = await evaluate_job(
+            result = await evaluate_job(
                 company=raw.company,
                 title=raw.title,
                 description=raw.description or f"{raw.title} at {raw.company}",
@@ -152,73 +175,63 @@ async def scan_and_evaluate(
                 _caller=caller,
             )
         except Exception as e:
-            # Falhou: libera o claim para retry num scan futuro (nunca órfão).
-            ScanLog.delete().where(ScanLog.job_url == raw.url).execute()
+            _release(raw)
             if _is_spend_limit(e):
-                stop_event.set()
+                stop.set()
                 return _StopScan()
-            # Erro inesperado: NÃO silenciar — loga e devolve como exceção.
             logger.error("scan: erro inesperado avaliando %s/%s — %s", raw.company, raw.title, e)
             raise
 
-        try:
-            saved: Job = Job.create(
-                source=raw.source,
-                company=raw.company,
-                title=raw.title,
-                url=raw.url,
-                location=raw.location,
-                remote_type=raw.remote_type,
-                description=raw.description,
-                posted_at=raw.posted_at,
-                score=eval_result.score,
-                score_notes=eval_result.score_notes,
-                caveats=json.dumps(eval_result.caveats),
-                salary_min=eval_result.salary_min,
-                salary_max=eval_result.salary_max,
-                salary_currency=eval_result.salary_currency,
-                salary_source=eval_result.salary_source,
-                status="new" if eval_result.score >= threshold else "archived",
-            )
-            return saved
-        except IntegrityError:
-            return None
+        return _persist(
+            raw,
+            score=result.score,
+            score_notes=result.score_notes,
+            caveats=json.dumps(result.caveats),
+            salary_min=result.salary_min,
+            salary_max=result.salary_max,
+            salary_currency=result.salary_currency,
+            salary_source=result.salary_source,
+            status="new" if result.score >= threshold else "archived",
+        )
 
+    saved: list[Job] = []
     spend_hit = False
-    for i in range(0, len(new_raw), BATCH_SIZE):
-        # Guarda defensiva: na prática inalcançável — quem seta stop_event sempre
-        # devolve um _StopScan no MESMO batch, que já dispara o break em 'if
-        # spend_hit' abaixo antes de reentrar no loop. Mantida por segurança.
-        if stop_event.is_set():  # pragma: no cover
+    for start in range(0, len(new_jobs), BATCH_SIZE):
+        # Guarda defensiva: na prática inalcançável — quem seta stop sempre devolve um
+        # _StopScan no MESMO batch, que já dispara o break abaixo antes de reentrar.
+        if stop.is_set():  # pragma: no cover
             spend_hit = True
             break
-        batch = new_raw[i : i + BATCH_SIZE]
-        # return_exceptions=True: nenhuma coroutine é cancelada — cada uma roda
-        # até o fim e limpa o próprio claim. Isso elimina claims órfãos.
-        batch_results = await asyncio.gather(
-            *[_eval_and_save(raw) for raw in batch], return_exceptions=True
-        )
-        for r in batch_results:
-            if isinstance(r, _StopScan):
+        batch = new_jobs[start : start + BATCH_SIZE]
+        # return_exceptions=True: nenhuma coroutine é cancelada — cada uma roda até o
+        # fim e limpa o próprio claim, eliminando claims órfãos.
+        outcomes = await asyncio.gather(*map(evaluate_one, batch), return_exceptions=True)
+        for outcome in outcomes:
+            if isinstance(outcome, _StopScan):
                 spend_hit = True
-            elif isinstance(r, BaseException):
-                logger.error("scan: coroutine falhou — %s", r)
-                spend_hit = True  # para conservadoramente em erro inesperado
-            elif r is not None:
-                results.append(r)
+            elif isinstance(outcome, BaseException):
+                logger.error("scan: coroutine falhou — %s", outcome)
+                spend_hit = True
+            elif outcome is not None:
+                saved.append(outcome)
         if spend_hit:
             break
 
     if spend_hit:
-        logger.warning(
-            "scan_and_evaluate: interrompido por spend limit após %d vagas", len(results)
-        )
+        logger.warning("scan_and_evaluate: interrompido por spend limit após %d vagas", len(saved))
+    return saved, spend_hit
 
-    above = [j for j in results if j.status == "new"]
+
+def _with_warning(message: str, warning: str | None) -> str:
+    return f"{message}\n\n{warning}" if warning else message
+
+
+def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
+    above = [j for j in saved if j.status == "new"]
     title_filtered = sum(
-        1 for j in results if j.score_notes and j.score_notes.startswith("title filtered:")
+        1 for j in saved if j.score_notes and j.score_notes.startswith("title filtered:")
     )
-    below = len(results) - len(above) - title_filtered
+    below = len(saved) - len(above) - title_filtered
     spend_note = (
         "\n\n⚠️  Spend limit atingido — scan interrompido (vagas restantes ficam para o próximo scan)."
         if spend_hit
@@ -226,8 +239,8 @@ async def scan_and_evaluate(
     )
 
     if not above:
-        return _with_li_warning(
-            f"{len(results)} vagas processadas. Nenhuma passou o threshold de {threshold}. "
+        return (
+            f"{len(saved)} vagas processadas. Nenhuma passou o threshold de {threshold}. "
             f"({title_filtered} descartadas por título, {below} abaixo do score){spend_note}"
         )
 
@@ -236,9 +249,23 @@ async def scan_and_evaluate(
         f"\n∗ = salário estimado pelo LLM  |  "
         f"{below} abaixo do threshold  |  {title_filtered} descartadas por título"
     )
-    return _with_li_warning(
-        f"{len(results)} vagas processadas. {len(above)} acima do threshold:\n\n{table}{footer}{spend_note}"
+    return (
+        f"{len(saved)} vagas processadas. {len(above)} acima do threshold:"
+        f"\n\n{table}{footer}{spend_note}"
     )
+
+
+async def scan_and_evaluate(
+    keywords: str, phase: str, config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
+) -> str:
+    companies = load_company_list(phase=None if phase == "all" else phase)
+    raw_jobs, li_warning = await _collect_raw_jobs(keywords, config, companies)
+    new_jobs = _drop_already_seen(raw_jobs)
+    if not new_jobs:
+        return _with_warning("Nenhuma vaga nova encontrada.", li_warning)
+
+    saved, spend_hit = await _evaluate_and_store(new_jobs, config, profile, caller)
+    return _with_warning(_format_report(saved, spend_hit, config["score_threshold"]), li_warning)
 
 
 async def add_job(
@@ -251,22 +278,20 @@ async def add_job(
     caller: LLMCaller,
 ) -> str:
     threshold = config["score_threshold"]
-    model = config.get("eval_model", config.get("llm_model", "claude-haiku-4-5-20251001"))
+    model = _model_for(config)
     blocklist: list[str] = config.get("title_blocklist", [])
 
-    # Tenta buscar descrição automaticamente se não foi fornecida
     if not description:
         try:
             async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
                 r = await client.get(url, headers={"User-Agent": "candidatador/0.1"})
-            if r.status_code == 200:
-                description = re.sub(r"<[^>]+>", " ", r.text).strip()
-                description = re.sub(r"\s+", " ", description)[:8000]
-            else:
+            if r.status_code != 200:
                 return (
                     f"Não consegui buscar a URL (HTTP {r.status_code}). "
                     f"Forneça 'description' manualmente."
                 )
+            description = re.sub(r"<[^>]+>", " ", r.text).strip()
+            description = re.sub(r"\s+", " ", description)[:8000]
         except Exception as e:
             return (
                 f"Erro ao buscar URL: {e}\n"
@@ -277,19 +302,20 @@ async def add_job(
     if not company or not title:
         return "Forneça pelo menos 'company' e 'title' junto com a URL."
 
-    # Verifica duplicata
     if ScanLog.select().where(ScanLog.job_url == url).exists():
         try:
-            job = Job.get(Job.url == url)
-            return f"Vaga já existe no banco (id={job.id}, score={job.score:.1f}, status={job.status})."
+            existing = Job.get(Job.url == url)
+            return (
+                f"Vaga já existe no banco "
+                f"(id={existing.id}, score={existing.score:.1f}, status={existing.status})."
+            )
         except Job.DoesNotExist:
             pass
 
-    # Filtro de título
-    matched_pattern = should_skip_by_title(title, blocklist)
-    if matched_pattern:
+    matched = should_skip_by_title(title, blocklist)
+    if matched:
         try:
-            job = Job.create(
+            Job.create(
                 source="manual",
                 company=company,
                 title=title,
@@ -299,17 +325,16 @@ async def add_job(
                 description=description,
                 posted_at=None,
                 score=0.0,
-                score_notes=f"title filtered: {matched_pattern!r}",
+                score_notes=f"title filtered: {matched!r}",
                 caveats="[]",
                 status="archived",
             )
             ScanLog.create(job_url=url, source="manual")
         except IntegrityError:
             pass
-        return f"Vaga descartada pelo filtro de título (padrão: {matched_pattern!r})."
+        return f"Vaga descartada pelo filtro de título (padrão: {matched!r})."
 
-    # Avaliação LLM
-    eval_result = await evaluate_job(
+    result = await evaluate_job(
         company=company,
         title=title,
         description=description,
@@ -318,7 +343,7 @@ async def add_job(
         _caller=caller,
     )
 
-    status = "new" if eval_result.score >= threshold else "archived"
+    status = "new" if result.score >= threshold else "archived"
     try:
         job = Job.create(
             source="manual",
@@ -329,13 +354,13 @@ async def add_job(
             remote_type=None,
             description=description,
             posted_at=None,
-            score=eval_result.score,
-            score_notes=eval_result.score_notes,
-            caveats=json.dumps(eval_result.caveats),
-            salary_min=eval_result.salary_min,
-            salary_max=eval_result.salary_max,
-            salary_currency=eval_result.salary_currency,
-            salary_source=eval_result.salary_source,
+            score=result.score,
+            score_notes=result.score_notes,
+            caveats=json.dumps(result.caveats),
+            salary_min=result.salary_min,
+            salary_max=result.salary_max,
+            salary_currency=result.salary_currency,
+            salary_source=result.salary_source,
             status=status,
         )
         ScanLog.create(job_url=url, source="manual")
@@ -344,12 +369,12 @@ async def add_job(
 
     icon = "✓ NEW" if status == "new" else "arquivada"
     caveats_str = (
-        "\n".join(f"  ⚠ {c}" for c in eval_result.caveats) if eval_result.caveats else "  nenhum"
+        "\n".join(f"  ⚠ {c}" for c in result.caveats) if result.caveats else "  nenhum"
     )
     return (
         f"{icon} — {company} / {title}\n"
-        f"Score: {eval_result.score:.1f}/10  (threshold: {threshold})\n"
-        f"Notas: {eval_result.score_notes}\n"
+        f"Score: {result.score:.1f}/10  (threshold: {threshold})\n"
+        f"Notas: {result.score_notes}\n"
         f"Caveats:\n{caveats_str}\n"
         f"id={job.id}"
     )
