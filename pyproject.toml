@@ -30,7 +30,7 @@ dev = [
 ]
 
 [project.scripts]
-candidatador = "candidatador.mcp_server:main"
+candidatador = "candidatador.server:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -66,8 +66,8 @@ omit = [
     # Boundaries de I/O puro — conexão CDP/Playwright e scraping do LinkedIn.
     # São testáveis só com browser real (e2e), não em unit. Cobrir aqui daria
     # falsa sensação de garantia (os mocks testariam o mock, não o boundary).
-    "candidatador/browser.py",
-    "candidatador/scanner/playwright_sources.py",
+    "candidatador/core/browser.py",
+    "candidatador/discovery/sources/playwright.py",
 ]
 
 [tool.coverage.report]

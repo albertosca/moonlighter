@@ -6,7 +6,7 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from candidatador.db import Job
+from candidatador.core.db import Job
 
 
 def render_jobs_table(jobs: list[Job]) -> str:

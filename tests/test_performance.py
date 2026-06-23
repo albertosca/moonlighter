@@ -10,7 +10,7 @@ async def test_greenhouse_scan_20_companies_concurrent():
     20 companies scanned in parallel should finish much faster than sequential.
     Each mock HTTP call has a 0.02s delay. Sequential: ~0.4s. Concurrent: ~0.02s.
     """
-    from candidatador.scanner.http_sources import GreenhouseScanner
+    from candidatador.discovery.sources.http import GreenhouseScanner
 
     async def slow_get(url, **kwargs):
         await asyncio.sleep(0.02)
@@ -26,7 +26,7 @@ async def test_greenhouse_scan_20_companies_concurrent():
 
     slugs = [f"company-{i}" for i in range(20)]
 
-    with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
+    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         t0 = time.perf_counter()
         await GreenhouseScanner().scan(slugs)
         elapsed = time.perf_counter() - t0
@@ -37,7 +37,7 @@ async def test_greenhouse_scan_20_companies_concurrent():
 
 async def test_lever_scan_15_companies_concurrent():
     """15 Lever companies fetched concurrently."""
-    from candidatador.scanner.http_sources import LeverScanner
+    from candidatador.discovery.sources.http import LeverScanner
 
     async def slow_get(url, **kwargs):
         await asyncio.sleep(0.02)
@@ -53,7 +53,7 @@ async def test_lever_scan_15_companies_concurrent():
 
     slugs = [f"company-{i}" for i in range(15)]
 
-    with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
+    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         t0 = time.perf_counter()
         await LeverScanner().scan(slugs)
         elapsed = time.perf_counter() - t0
@@ -63,7 +63,7 @@ async def test_lever_scan_15_companies_concurrent():
 
 async def test_ashby_scan_10_companies_concurrent():
     """10 Ashby companies fetched concurrently via POST."""
-    from candidatador.scanner.http_sources import AshbyScanner
+    from candidatador.discovery.sources.http import AshbyScanner
 
     async def slow_post(url, **kwargs):
         await asyncio.sleep(0.02)
@@ -79,7 +79,7 @@ async def test_ashby_scan_10_companies_concurrent():
 
     slugs = [f"company-{i}" for i in range(10)]
 
-    with patch("candidatador.scanner.http_sources.httpx.AsyncClient", return_value=mock_client):
+    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         t0 = time.perf_counter()
         await AshbyScanner().scan(slugs)
         elapsed = time.perf_counter() - t0
@@ -98,7 +98,7 @@ async def test_evaluate_10_jobs_concurrent_faster_than_sequential():
     """
     import json
 
-    from candidatador.evaluator import evaluate_job
+    from candidatador.discovery.evaluator import evaluate_job
 
     call_count = [0]
     _response = json.dumps(
@@ -159,7 +159,7 @@ async def test_evaluate_batch_size_10_processes_all():
     """
     import json
 
-    from candidatador.evaluator import evaluate_job
+    from candidatador.discovery.evaluator import evaluate_job
 
     _response = json.dumps(
         {
@@ -207,7 +207,7 @@ async def test_evaluate_batch_size_10_processes_all():
 
 async def test_list_jobs_1000_records_fast(tmp_db):
     """list_jobs with 1000 records in DB returns in < 500ms."""
-    from candidatador.db import Job, init_db
+    from candidatador.core.db import Job, init_db
 
     init_db()
 
@@ -223,7 +223,7 @@ async def test_list_jobs_1000_records_fast(tmp_db):
                 status="new",
             )
 
-    from candidatador.mcp_server import list_jobs
+    from candidatador.server import list_jobs
 
     t0 = time.perf_counter()
     result = await list_jobs(status="new", limit=20)
@@ -235,7 +235,7 @@ async def test_list_jobs_1000_records_fast(tmp_db):
 
 async def test_scan_log_dedup_1000_urls_fast(tmp_db):
     """Dedup check against ScanLog with 1000 entries completes in < 200ms."""
-    from candidatador.db import ScanLog, init_db
+    from candidatador.core.db import ScanLog, init_db
 
     init_db()
 
@@ -258,7 +258,7 @@ async def test_generate_answers_concurrent_faster_than_sequential():
     """
     import json
 
-    from candidatador.applicator.base import generate_answers
+    from candidatador.application.appliers.base import generate_answers
 
     async def slow_caller(prompt, model):
         await asyncio.sleep(0.05)

@@ -1,6 +1,6 @@
 import datetime
 
-from candidatador.db import Job, init_db
+from candidatador.core.db import Job, init_db
 from candidatador.views import render_jobs_table
 
 

@@ -26,11 +26,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from candidatador.config import load_config, load_profile
-from candidatador.db import Job, init_db
-from candidatador.evaluator import evaluate_job, should_skip_by_title
-from candidatador.llm import make_caller
-from candidatador.log import setup as setup_logging
+from candidatador.core.config import load_config, load_profile
+from candidatador.core.db import Job, init_db
+from candidatador.core.llm import make_caller
+from candidatador.core.log import setup as setup_logging
+from candidatador.discovery.evaluator import evaluate_job, should_skip_by_title
 
 BUG_MARKER = "evaluation error: claude CLI exited with code 1"
 
@@ -192,7 +192,7 @@ def main() -> None:
     setup_logging()
     config = load_config()
     profile = load_profile()
-    db_path = str(Path(config.get("db_path", "~/.candidatador/candidatador.db")).expanduser())
+    db_path = str(Path(config.get("db_path", "~/.candidatador/candidatador.core.db")).expanduser())
     os.environ["CANDIDATADOR_DB"] = db_path
     init_db()
 

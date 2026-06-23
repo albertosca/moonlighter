@@ -29,11 +29,11 @@ import yaml
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from candidatador.config import load_config
-from candidatador.db import Job, init_db
-from candidatador.llm import make_caller
-from candidatador.log import setup as setup_logging
-from candidatador.parsing import _extract_json
+from candidatador.core.config import load_config
+from candidatador.core.db import Job, init_db
+from candidatador.core.llm import make_caller
+from candidatador.core.log import setup as setup_logging
+from candidatador.core.parsing import _extract_json
 
 LEARNED_PATH = _ROOT / "blocklist_learned.yaml"
 
@@ -221,7 +221,7 @@ def main() -> None:
 
     setup_logging()
     config = load_config()
-    db_path = str(Path(config.get("db_path", "~/.candidatador/candidatador.db")).expanduser())
+    db_path = str(Path(config.get("db_path", "~/.candidatador/candidatador.core.db")).expanduser())
     os.environ["CANDIDATADOR_DB"] = db_path
     init_db()
 
