@@ -10,8 +10,37 @@ from candidatador.core.log import get_logger
 
 logger = get_logger(__name__)
 
+# Sentinelas de resposta que não devem ser preenchidas no formulário.
+_SKIP_SENTINELS = {"__SKIP__", "__MANUAL_UPLOAD_REQUIRED__", "__NEEDS_REVIEW__"}
+
+# Labels da área de upload de CV/currículo — o anexo é tratado por _upload_cv, então
+# não devem ir pro LLM como campos de texto (senão recebem resposta-lixo).
+_UPLOAD_LABELS = {
+    "resume/cv",
+    "cover letter",
+    "attach",
+    "anexar",
+    "enter manually",
+    "informe manualmente",
+}
+
+
+def _is_skip(answer: str) -> bool:
+    return not answer or answer in _SKIP_SENTINELS
+
+
+def _log_fill_stats(status: dict[str, str]) -> None:
+    filled = sum(1 for s in status.values() if s == "filled")
+    failed = [label for label, s in status.items() if s.startswith("failed")]
+    skipped = sum(1 for s in status.values() if s == "skipped")
+    logger.info("fill_form: %d filled, %d failed, %d skipped", filled, len(failed), skipped)
+    if failed:
+        logger.warning("fill_form: campos com falha: %s", failed)
+
 
 class GreenhouseApplier(BaseApplier):
+    _OPTION_SELECTOR = '.select__option, [role="option"], [role="listbox"] li'
+
     async def detect(self) -> bool:
         match = "greenhouse.io" in self.page.url or "boards.greenhouse.io" in self.page.url
         if match:
@@ -19,6 +48,23 @@ class GreenhouseApplier(BaseApplier):
         return match
 
     async def extract_fields(self) -> list[str]:
+        await self._open_application()
+        from candidatador.application.appliers.base import _query_labels_with_fallback
+
+        label_els = await _query_labels_with_fallback(
+            self.page,
+            ["label, .field-label", ".application-question label", "[data-field-label]"],
+        )
+        labels = []
+        for el in label_els:
+            text = (await el.inner_text()).strip()
+            if text and text.lower() not in _UPLOAD_LABELS:
+                labels.append(text)
+        logger.debug("extract_fields: %d campos", len(labels))
+        return labels
+
+    async def _open_application(self) -> None:
+        """Clica no botão 'Apply' quando o formulário ainda não está aberto."""
         try:
             apply_btn = await self.page.query_selector(
                 "a#apply, button#apply, a[data-greenhouse-job-board-apply]"
@@ -29,120 +75,66 @@ class GreenhouseApplier(BaseApplier):
         except PlaywrightTimeout:
             pass
 
-        from candidatador.application.appliers.base import _query_labels_with_fallback
-
-        label_els = await _query_labels_with_fallback(
-            self.page,
-            [
-                "label, .field-label",
-                ".application-question label",
-                "[data-field-label]",
-            ],
-        )
-        # Campos da área de upload de CV/currículo — o anexo é tratado por _upload_cv,
-        # então não devem ir pro LLM como campos de texto (senão recebem resposta-lixo).
-        _UPLOAD_LABELS = {
-            "resume/cv",
-            "cover letter",
-            "attach",
-            "anexar",
-            "enter manually",
-            "informe manualmente",
-        }
-        labels = []
-        for el in label_els:
-            text = (await el.inner_text()).strip()
-            if text and text.lower() not in _UPLOAD_LABELS:
-                labels.append(text)
-        logger.debug("extract_fields: %d campos", len(labels))
-        return labels
-
     async def fill_form(self, answers: dict[str, str], cv_path: str) -> dict[str, str]:
-        """
-        Preenche o formulário com as respostas fornecidas.
-        Retorna um dict {label: status} onde status é "filled", "skipped" ou "failed:<motivo>".
-        Nunca levanta exceção — falhas são registradas no retorno e no log.
-        """
-        from candidatador.application.appliers.base import _fill_field
-
-        status: dict[str, str] = {}
+        """Preenche o formulário. Devolve {label: "filled"|"skipped"|"failed:<motivo>"}.
+        Nunca levanta — falhas vão no retorno e no log."""
         logger.info("fill_form: start (%d respostas)", len(answers))
-
-        for label_text, answer in answers.items():
-            if not answer or answer in (
-                "__SKIP__",
-                "__MANUAL_UPLOAD_REQUIRED__",
-                "__NEEDS_REVIEW__",
-            ):
-                status[label_text] = "skipped"
-                continue
-            try:
-                field = await self._find_field(label_text)
-                if field is None:
-                    logger.debug("fill_form: campo não encontrado — '%s'", label_text)
-                    status[label_text] = "failed:not_found"
-                    continue
-
-                tag = await field.evaluate("el => el.tagName.toLowerCase()")
-
-                # react-select e afins expõem um <input role=combobox aria-haspopup>
-                # (class select__input). Tratar como text input só DIGITA no campo de
-                # busca sem selecionar a opção — e ainda reportaria 'filled' (falso
-                # positivo). Roteamos esses para o handler de dropdown custom.
-                is_custom_combobox = await field.evaluate(
-                    "el => el.getAttribute('role') === 'combobox'"
-                    " || el.getAttribute('aria-haspopup') === 'true'"
-                    " || (el.className || '').toLowerCase().includes('select__input')"
-                )
-
-                if is_custom_combobox:
-                    # fill_form já sabe que é combobox — vai direto pro handler de
-                    # react-select (digita/filtra/verifica), sem re-detectar o tipo.
-                    filled = await self._select_custom_option(field, label_text, answer)
-                    status[label_text] = "filled" if filled else "failed:custom_dropdown"
-                elif tag in ("input", "textarea", "select"):
-                    await _fill_field(field, answer)
-                    await asyncio.sleep(0.2)
-                    status[label_text] = "filled"
-                else:
-                    # Elemento não é um input nativo — pode ser custom dropdown ou typeahead
-                    filled = await self._fill_custom_element(field, label_text, answer)
-                    status[label_text] = "filled" if filled else "failed:custom_element_unsupported"
-
-            except Exception as e:
-                logger.debug("fill_form: exception em '%s': %s", label_text, e)
-                status[label_text] = f"failed:{type(e).__name__}"
-
-        # Upload de CV
-        cv_status = await self._upload_cv(cv_path)
+        status = {label: await self._fill_one(label, answer) for label, answer in answers.items()}
         if cv_path:
-            status["__cv__"] = cv_status
-
-        n_filled = sum(1 for s in status.values() if s == "filled")
-        failed = [k for k, s in status.items() if s.startswith("failed")]
-        logger.info(
-            "fill_form: %d filled, %d failed, %d skipped",
-            n_filled,
-            sum(1 for s in status.values() if s.startswith("failed")),
-            sum(1 for s in status.values() if s == "skipped"),
-        )
-        if failed:
-            logger.warning("fill_form: campos com falha: %s", failed)
-
+            status["__cv__"] = await self._upload_cv(cv_path)
+        _log_fill_stats(status)
         return status
 
+    async def _fill_one(self, label_text: str, answer: str) -> str:
+        if _is_skip(answer):
+            return "skipped"
+        try:
+            field = await self._find_field(label_text)
+            if field is None:
+                logger.debug("fill_form: campo não encontrado — '%s'", label_text)
+                return "failed:not_found"
+
+            if await self._is_custom_combobox(field):
+                ok = await self._select_custom_option(field, label_text, answer)
+                return "filled" if ok else "failed:custom_dropdown"
+
+            tag = await field.evaluate("el => el.tagName.toLowerCase()")
+            if tag in ("input", "textarea", "select"):
+                from candidatador.application.appliers.base import _fill_field
+
+                await _fill_field(field, answer)
+                await asyncio.sleep(0.2)
+                return "filled"
+
+            ok = await self._fill_custom_element(field, label_text, answer)
+            return "filled" if ok else "failed:custom_element_unsupported"
+        except Exception as e:
+            logger.debug("fill_form: exception em '%s': %s", label_text, e)
+            return f"failed:{type(e).__name__}"
+
+    async def _is_custom_combobox(self, field: Any) -> bool:
+        """react-select expõe um <input role=combobox aria-haspopup class=select__input>.
+        Tratá-lo como text input só DIGITA no campo de busca sem selecionar a opção — e
+        ainda reportaria 'filled' (falso positivo). Por isso roteamos para o handler
+        de dropdown custom em vez do _fill_field nativo."""
+        return bool(
+            await field.evaluate(
+                "el => el.getAttribute('role') === 'combobox'"
+                " || el.getAttribute('aria-haspopup') === 'true'"
+                " || (el.className || '').toLowerCase().includes('select__input')"
+            )
+        )
+
     async def _find_field(self, label_text: str) -> Any:
-        """
-        Estratégia em cascata para localizar o elemento de input associado a um label.
-        Retorna o ElementHandle ou None.
-        """
-        # Estratégia 1: get_by_label (resolve for/aria-label/labelledby + normaliza texto)
+        """Localiza o input associado a um label, em cascata. Devolve o ElementHandle
+        ou None."""
+        # 1) get_by_label (resolve for/aria-label/labelledby + normaliza texto)
         for exact in (True, False):
             locator = self.page.get_by_label(label_text, exact=exact)
             if await locator.count() > 0:
                 return await locator.first.element_handle()
 
-        # Estratégia 2: JS — normaliza label (strip *, &nbsp;, espaços) → pega o `for` attribute
+        # 2) JS: normaliza o label (strip *, &nbsp;, espaços) e pega o atributo `for`
         for_id = await self.page.evaluate(
             """(text) => {
                 const target = text.replace(/[*\\u00a0]+/g, ' ').replace(/\\s+/g, ' ').trim().toLowerCase();
@@ -159,35 +151,36 @@ class GreenhouseApplier(BaseApplier):
             if el:
                 return el
 
-        # Estratégia 3: aria-label direto
+        # 3) aria-label direto
         escaped = label_text.replace("'", "\\'")
-        el = await self.page.query_selector(f"[aria-label='{escaped}']")
-        if el:
-            return el
-
-        return None
+        return await self.page.query_selector(f"[aria-label='{escaped}']")
 
     async def _fill_custom_element(self, element: Any, label_text: str, answer: str) -> bool:
-        """
-        Trata elementos não-nativos: custom dropdowns (role=combobox/listbox)
-        e typeaheads (autocomplete). Retorna True se conseguiu preencher.
-        """
+        """Trata elementos não-nativos: dropdowns custom (role=combobox/listbox) e
+        typeaheads (autocomplete). True se conseguiu preencher."""
+        if await self._looks_like_dropdown(element):
+            return await self._select_custom_option(element, label_text, answer)
+        return await self._try_typeahead(element, label_text, answer)
+
+    async def _looks_like_dropdown(self, element: Any) -> bool:
         role = await element.evaluate(
             "el => el.getAttribute('role') || el.getAttribute('aria-haspopup') || ''"
         )
+        if role in ("combobox", "listbox", "button"):
+            return True
+        return bool(
+            await element.evaluate(
+                "el => el.classList.toString().toLowerCase().includes('select')"
+                " || el.classList.toString().toLowerCase().includes('dropdown')"
+            )
+        )
 
-        # Custom dropdown / combobox
-        if role in ("combobox", "listbox", "button") or await element.evaluate(
-            "el => el.classList.toString().toLowerCase().includes('select') || el.classList.toString().toLowerCase().includes('dropdown')"
-        ):
-            return await self._select_custom_option(element, label_text, answer)
-
-        # Tenta typeahead: digita e espera sugestões
+    async def _try_typeahead(self, element: Any, label_text: str, answer: str) -> bool:
+        """Digita no campo e clica na primeira sugestão que contém a resposta."""
         try:
             await element.click()
             await element.type(answer, delay=50)
             await asyncio.sleep(0.6)
-            # Coleta sugestões visíveis e tenta clicar na que bate
             result = await self.page.evaluate(
                 """(answer) => {
                     const a = answer.toLowerCase().trim();
@@ -213,12 +206,11 @@ class GreenhouseApplier(BaseApplier):
             )
             if result.get("clicked"):
                 return True
-            options = result.get("options", [])
             logger.warning(
                 "_fill_custom_element typeahead: '%s' não achou '%s'. Opções visíveis: %s",
                 label_text,
                 answer,
-                options or "(nenhuma)",
+                result.get("options") or "(nenhuma)",
             )
             return False
         except Exception as e:
@@ -226,51 +218,24 @@ class GreenhouseApplier(BaseApplier):
             return False
 
     async def _select_custom_option(self, element: Any, label_text: str, answer: str) -> bool:
-        """
-        Seleciona uma opção num react-select / dropdown custom escolhendo SEMPRE pelo
-        TEXTO REAL da opção (match local ou LLM) e clicando a opção exata, com
-        verificação via .select__single-value. NUNCA dá Enter cego (Enter na lista
-        filtrada selecionaria a opção destacada — pode ser a errada, ex: digitar
-        'Fluent' filtra para 'not able to speak fluently' e o Enter pegaria a negativa).
-        Em selects ESTÁTICOS escolhe pela lista completa SEM digitar; só digita quando
-        não há opções estáticas (select async/typeahead que carrega ao digitar).
-        """
+        """Seleciona uma opção num react-select escolhendo SEMPRE pelo TEXTO REAL da
+        opção (match local ou LLM) e clicando a opção exata, com verificação via
+        .select__single-value. NUNCA dá Enter cego — na lista filtrada o Enter pegaria
+        a opção destacada, que pode ser a errada (digitar 'Fluent' filtra para 'not
+        able to speak fluently' e o Enter pegaria a negativa). Selects estáticos são
+        escolhidos pela lista completa sem digitar; só digita quando não há opções
+        estáticas (select async/typeahead que carrega ao digitar)."""
         try:
-            with contextlib.suppress(Exception):
-                await element.scroll_into_view_if_needed()
-            # Abre o menu. Em caso de clique interceptado por overlay, foca via JS.
-            try:
-                await element.click()
-            except Exception:
-                with contextlib.suppress(Exception):
-                    await element.evaluate("el => el.focus()")
-            await asyncio.sleep(0.4)
-
-            static_opts = await self._visible_options()
-            if static_opts:
-                # Select estático/descritivo: escolher pela LISTA COMPLETA, sem digitar.
-                if await self._choose_and_click(element, label_text, answer, static_opts):
-                    return True
-                shown = static_opts
-            else:
-                # Sem opções estáticas → async/typeahead (ex: cidade): digitar carrega.
-                try:
-                    await element.type(answer, delay=30)
-                    await asyncio.sleep(0.7)
-                except Exception:
-                    pass
-                loaded_opts = await self._visible_options()
-                if loaded_opts and await self._choose_and_click(
-                    element, label_text, answer, loaded_opts
-                ):
-                    return True
-                shown = loaded_opts
+            await self._open_menu(element)
+            options = await self._visible_options() or await self._type_and_reload(element, answer)
+            if options and await self._choose_and_click(element, label_text, answer, options):
+                return True
 
             logger.warning(
                 "_select_custom_option: '%s' não selecionou '%s'. Opções: %s",
                 label_text,
                 answer,
-                shown or "(nenhuma — dropdown não abriu/carregou?)",
+                options or "(nenhuma — dropdown não abriu/carregou?)",
             )
             with contextlib.suppress(Exception):
                 await self.page.keyboard.press("Escape")
@@ -279,6 +244,25 @@ class GreenhouseApplier(BaseApplier):
             logger.warning("_select_custom_option: '%s' exception — %s", label_text, e)
             return False
 
+    async def _open_menu(self, element: Any) -> None:
+        with contextlib.suppress(Exception):
+            await element.scroll_into_view_if_needed()
+        try:
+            await element.click()
+        except Exception:
+            with contextlib.suppress(Exception):
+                await element.evaluate("el => el.focus()")  # clique interceptado por overlay
+        await asyncio.sleep(0.4)
+
+    async def _type_and_reload(self, element: Any, answer: str) -> list[str]:
+        """Select async/typeahead (ex: cidade): digitar carrega as opções."""
+        try:
+            await element.type(answer, delay=30)
+            await asyncio.sleep(0.7)
+        except Exception:
+            pass
+        return await self._visible_options()
+
     async def _choose_and_click(
         self, element: Any, label_text: str, answer: str, options: list[str]
     ) -> bool:
@@ -286,21 +270,19 @@ class GreenhouseApplier(BaseApplier):
         EXATA e verifica a seleção. Sem escolha confirmada → False."""
         from candidatador.application.answers.option_matcher import match_option_locally
 
-        choice = match_option_locally(answer, options)
-        if not choice:
-            choice = await self._llm_pick(label_text, answer, options)
+        choice = match_option_locally(answer, options) or await self._llm_pick(
+            label_text, answer, options
+        )
         if choice and await self._click_option_exact(choice):
             await asyncio.sleep(0.2)
             if await self._selected_value(element):
                 return True
         return False
 
-    _OPTION_SELECTOR = '.select__option, [role="option"], [role="listbox"] li'
-
     async def _visible_options(self) -> list[str]:
-        """Lista os textos das opções do dropdown aberto. Usa locator com auto-wait
-        (as opções do react-select renderizam com delay) — um querySelectorAll único
-        pegaria a lista ainda vazia."""
+        """Textos das opções do dropdown aberto. Usa locator com auto-wait (as opções
+        do react-select renderizam com delay) — um querySelectorAll único pegaria a
+        lista ainda vazia."""
         try:
             loc = self.page.locator(self._OPTION_SELECTOR)
             try:
@@ -317,11 +299,10 @@ class GreenhouseApplier(BaseApplier):
         try:
             want = re.sub(r"\s+", " ", text or "").strip().lower()
             loc = self.page.locator(self._OPTION_SELECTOR)
-            n = await loc.count()
-            for i in range(n):
-                t = re.sub(r"\s+", " ", await loc.nth(i).inner_text()).strip().lower()
-                if t == want:
-                    await loc.nth(i).click()
+            for i in range(await loc.count()):
+                option = loc.nth(i)
+                if re.sub(r"\s+", " ", await option.inner_text()).strip().lower() == want:
+                    await option.click()
                     return True
             return False
         except Exception:
@@ -366,14 +347,11 @@ class GreenhouseApplier(BaseApplier):
             return ""
 
     async def _upload_cv(self, cv_path: str) -> str:
-        """
-        Faz upload do CV. Retorna "filled", "skipped" ou "failed:<motivo>".
-        Tenta múltiplas estratégias para encontrar o input de arquivo.
-        """
+        """Anexa o CV. Devolve "filled", "skipped" ou "failed:<motivo>". Tenta locator
+        (resiliente a inputs ocultos) e depois query_selector."""
         if not cv_path:
             return "skipped"
         try:
-            # Estratégia 1: locator (mais resiliente — funciona com inputs ocultos)
             file_locator = self.page.locator("input[type='file']").first
             if await file_locator.count() > 0:
                 await file_locator.set_input_files(cv_path)
@@ -381,7 +359,6 @@ class GreenhouseApplier(BaseApplier):
                 logger.info("_upload_cv: CV anexado via locator")
                 return "filled"
 
-            # Estratégia 2: query_selector com force (para inputs hidden)
             file_input = await self.page.query_selector("input[type='file']")
             if file_input:
                 await file_input.set_input_files(cv_path)
@@ -396,10 +373,15 @@ class GreenhouseApplier(BaseApplier):
             return f"failed:{type(e).__name__}"
 
     async def submit(self) -> str:
-        logger.info("submit: verificando campos obrigatórios")
+        empty = await self._empty_required_fields()
+        if empty:
+            logger.warning("submit: %d campo(s) obrigatório(s) vazios: %s", len(empty), empty)
+        return await self._click_submit_and_classify()
 
-        # Verifica se há campos obrigatórios visivelmente vazios antes de submeter
-        empty_required = await self.page.evaluate("""() => {
+    async def _empty_required_fields(self) -> list[str]:
+        """Labels com '*' cujo input/select está visivelmente vazio antes do submit."""
+        logger.info("submit: verificando campos obrigatórios")
+        empty: list[str] = await self.page.evaluate("""() => {
             const empty = [];
             for (const label of document.querySelectorAll('label')) {
                 if (!label.textContent.includes('*')) continue;
@@ -416,11 +398,9 @@ class GreenhouseApplier(BaseApplier):
             }
             return empty;
         }""")
-        if empty_required:
-            logger.warning(
-                "submit: %d campo(s) obrigatório(s) vazios: %s", len(empty_required), empty_required
-            )
+        return empty
 
+    async def _click_submit_and_classify(self) -> str:
         logger.info("submit: click")
         try:
             submit_btn = await self.page.query_selector(
