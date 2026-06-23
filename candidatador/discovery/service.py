@@ -277,75 +277,100 @@ async def add_job(
     profile: dict[str, Any],
     caller: LLMCaller,
 ) -> str:
-    threshold = config["score_threshold"]
-    model = _model_for(config)
-    blocklist: list[str] = config.get("title_blocklist", [])
-
     if not description:
-        try:
-            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                r = await client.get(url, headers={"User-Agent": "candidatador/0.1"})
-            if r.status_code != 200:
-                return (
-                    f"Não consegui buscar a URL (HTTP {r.status_code}). "
-                    f"Forneça 'description' manualmente."
-                )
-            description = re.sub(r"<[^>]+>", " ", r.text).strip()
-            description = re.sub(r"\s+", " ", description)[:8000]
-        except Exception as e:
-            return (
-                f"Erro ao buscar URL: {e}\n"
-                f"Para páginas que requerem login (LinkedIn, etc.), forneça "
-                f"'company', 'title' e 'description' manualmente."
-            )
-
+        fetched, error = await _fetch_description(url)
+        if error:
+            return error
+        description = fetched or ""
     if not company or not title:
         return "Forneça pelo menos 'company' e 'title' junto com a URL."
 
-    if ScanLog.select().where(ScanLog.job_url == url).exists():
-        try:
-            existing = Job.get(Job.url == url)
-            return (
-                f"Vaga já existe no banco "
-                f"(id={existing.id}, score={existing.score:.1f}, status={existing.status})."
-            )
-        except Job.DoesNotExist:
-            pass
+    already = _existing_job_message(url)
+    if already:
+        return already
 
-    matched = should_skip_by_title(title, blocklist)
+    matched = should_skip_by_title(title, config.get("title_blocklist", []))
     if matched:
-        try:
-            Job.create(
-                source="manual",
-                company=company,
-                title=title,
-                url=url,
-                location=None,
-                remote_type=None,
-                description=description,
-                posted_at=None,
-                score=0.0,
-                score_notes=f"title filtered: {matched!r}",
-                caveats="[]",
-                status="archived",
-            )
-            ScanLog.create(job_url=url, source="manual")
-        except IntegrityError:
-            pass
+        _persist_manual(
+            company,
+            title,
+            url,
+            description,
+            score=0.0,
+            score_notes=f"title filtered: {matched!r}",
+            caveats="[]",
+            status="archived",
+        )
         return f"Vaga descartada pelo filtro de título (padrão: {matched!r})."
 
+    threshold = config["score_threshold"]
     result = await evaluate_job(
         company=company,
         title=title,
         description=description,
         profile=profile,
-        model=model,
+        model=_model_for(config),
         _caller=caller,
     )
-
     status = "new" if result.score >= threshold else "archived"
+    job = _persist_manual(
+        company,
+        title,
+        url,
+        description,
+        score=result.score,
+        score_notes=result.score_notes,
+        caveats=json.dumps(result.caveats),
+        salary_min=result.salary_min,
+        salary_max=result.salary_max,
+        salary_currency=result.salary_currency,
+        salary_source=result.salary_source,
+        status=status,
+    )
+    if job is None:
+        return "Vaga já existe no banco (conflito de URL)."
+    return _format_add_result(job, company, title, result, threshold, status)
+
+
+async def _fetch_description(url: str) -> tuple[str | None, str | None]:
+    """Busca e limpa (sem HTML) a descrição da vaga. Devolve (descrição, erro) — só
+    um dos dois é não-nulo. Não funciona em páginas que exigem login."""
     try:
-        job = Job.create(
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            r = await client.get(url, headers={"User-Agent": "candidatador/0.1"})
+        if r.status_code != 200:
+            return None, (
+                f"Não consegui buscar a URL (HTTP {r.status_code}). "
+                f"Forneça 'description' manualmente."
+            )
+        text = re.sub(r"<[^>]+>", " ", r.text).strip()
+        return re.sub(r"\s+", " ", text)[:8000], None
+    except Exception as e:
+        return None, (
+            f"Erro ao buscar URL: {e}\n"
+            f"Para páginas que requerem login (LinkedIn, etc.), forneça "
+            f"'company', 'title' e 'description' manualmente."
+        )
+
+
+def _existing_job_message(url: str) -> str | None:
+    """Mensagem de 'já existe' se a URL já está no banco; None caso contrário."""
+    if not ScanLog.select().where(ScanLog.job_url == url).exists():
+        return None
+    try:
+        job = Job.get(Job.url == url)
+    except Job.DoesNotExist:
+        return None
+    return f"Vaga já existe no banco (id={job.id}, score={job.score:.1f}, status={job.status})."
+
+
+def _persist_manual(
+    company: str, title: str, url: str, description: str, **scoring: Any
+) -> Job | None:
+    """Salva uma vaga manual (source='manual') + o claim no ScanLog. None se a URL
+    já existe (corrida/conflito)."""
+    try:
+        job: Job = Job.create(
             source="manual",
             company=company,
             title=title,
@@ -354,23 +379,19 @@ async def add_job(
             remote_type=None,
             description=description,
             posted_at=None,
-            score=result.score,
-            score_notes=result.score_notes,
-            caveats=json.dumps(result.caveats),
-            salary_min=result.salary_min,
-            salary_max=result.salary_max,
-            salary_currency=result.salary_currency,
-            salary_source=result.salary_source,
-            status=status,
+            **scoring,
         )
         ScanLog.create(job_url=url, source="manual")
+        return job
     except IntegrityError:
-        return "Vaga já existe no banco (conflito de URL)."
+        return None
 
+
+def _format_add_result(
+    job: Job, company: str, title: str, result: Any, threshold: float, status: str
+) -> str:
     icon = "✓ NEW" if status == "new" else "arquivada"
-    caveats_str = (
-        "\n".join(f"  ⚠ {c}" for c in result.caveats) if result.caveats else "  nenhum"
-    )
+    caveats_str = "\n".join(f"  ⚠ {c}" for c in result.caveats) if result.caveats else "  nenhum"
     return (
         f"{icon} — {company} / {title}\n"
         f"Score: {result.score:.1f}/10  (threshold: {threshold})\n"
