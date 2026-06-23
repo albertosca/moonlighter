@@ -22,26 +22,28 @@ def render_jobs_table(jobs: list[Job]) -> str:
     table.add_column("Caveats", min_width=20)
 
     for job in jobs:
-        score_str = f"{job.score:.1f}" if job.score is not None else "—"
-        if job.salary_min and job.salary_max:
-            sal = f"${job.salary_min // 1000}–{job.salary_max // 1000}k"
-            if job.salary_source == "llm_estimate":
-                sal += " *"
-        elif job.salary_min:
-            sal = f"${job.salary_min // 1000}k+"
-        else:
-            sal = "n/d"
-        posted = job.posted_at.strftime("%d/%m") if job.posted_at else "—"
-        caveats_list = job.get_caveats()
-        caveat_str = caveats_list[0][:30] if caveats_list else "—"
         table.add_row(
             str(job.id),
             f"{job.company} / {job.title}",
-            score_str,
-            sal,
-            posted,
+            f"{job.score:.1f}" if job.score is not None else "—",
+            _salary_cell(job),
+            job.posted_at.strftime("%d/%m") if job.posted_at else "—",
             job.remote_type or "—",
-            caveat_str,
+            _caveat_cell(job),
         )
     console.print(table)
     return buf.getvalue()
+
+
+def _salary_cell(job: Job) -> str:
+    if job.salary_min and job.salary_max:
+        cell = f"${job.salary_min // 1000}–{job.salary_max // 1000}k"
+        return f"{cell} *" if job.salary_source == "llm_estimate" else cell
+    if job.salary_min:
+        return f"${job.salary_min // 1000}k+"
+    return "n/d"
+
+
+def _caveat_cell(job: Job) -> str:
+    caveats = job.get_caveats()
+    return caveats[0][:30] if caveats else "—"

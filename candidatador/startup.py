@@ -15,64 +15,61 @@ def validate_startup(
     profile: dict[str, Any],
     cv_path: str | None = None,
 ) -> list[StartupWarning]:
-    """
-    Inspeciona o ambiente e retorna lista de avisos/erros de configuração.
-    Nenhum aviso = tudo ok para rodar. Errors = funcionalidade crítica indisponível.
-    cv_path: se None, procura em <project_root>/profile/cv.pdf
-    """
-    warnings: list[StartupWarning] = []
+    """Inspeciona o ambiente e devolve os avisos/erros de configuração. Lista vazia =
+    tudo ok. 'error' = funcionalidade crítica indisponível.
+    cv_path: se None, procura em <project_root>/profile/cv.pdf."""
+    cv = cv_path or str(Path(__file__).parent.parent / "profile" / "cv.pdf")
+    checks = [
+        _check_profile(profile),
+        _check_api_key(config),
+        _check_cv(cv),
+        _check_brave(config),
+    ]
+    return [warning for warning in checks if warning is not None]
 
-    # Profile vazio → avaliações LLM inúteis
-    if not profile:
-        warnings.append(
-            StartupWarning(
-                level="warn",
-                message=(
-                    "profile/profile.yaml está vazio. "
-                    "Preencha skills, experiências e critérios para avaliações LLM úteis."
-                ),
-            )
-        )
 
-    # API key ausente → toda avaliação LLM retorna score=0.0.
-    # Só é necessária no backend "api"; com llm_backend="cli" usa-se o `claude` CLI.
-    if config.get("llm_backend") != "cli" and not os.environ.get("ANTHROPIC_API_KEY"):
-        warnings.append(
-            StartupWarning(
-                level="error",
-                message=(
-                    "ANTHROPIC_API_KEY não encontrada no ambiente. "
-                    "scan_and_evaluate e apply_jobs não funcionarão."
-                ),
-            )
-        )
+def _check_profile(profile: dict[str, Any]) -> StartupWarning | None:
+    """Profile vazio → avaliações LLM inúteis."""
+    if profile:
+        return None
+    return StartupWarning(
+        "warn",
+        "profile/profile.yaml está vazio. "
+        "Preencha skills, experiências e critérios para avaliações LLM úteis.",
+    )
 
-    # CV ausente → confirm_apply vai falhar
-    if cv_path is None:
-        cv_path = str(Path(__file__).parent.parent / "profile" / "cv.pdf")
-    if not Path(cv_path).exists():
-        warnings.append(
-            StartupWarning(
-                level="warn",
-                message=(
-                    "Arquivo cv.pdf não encontrado. "
-                    "confirm_apply vai falhar. Adicione seu currículo ao diretório correto."
-                ),
-            )
-        )
 
-    # Brave ausente → LinkedIn scan e candidaturas via browser não funcionam
+def _check_api_key(config: dict[str, Any]) -> StartupWarning | None:
+    """API key ausente → toda avaliação LLM retorna score=0.0. Só é necessária no
+    backend 'api'; com llm_backend='cli' usa-se o `claude` CLI."""
+    if config.get("llm_backend") == "cli" or os.environ.get("ANTHROPIC_API_KEY"):
+        return None
+    return StartupWarning(
+        "error",
+        "ANTHROPIC_API_KEY não encontrada no ambiente. "
+        "scan_and_evaluate e apply_jobs não funcionarão.",
+    )
+
+
+def _check_cv(cv_path: str) -> StartupWarning | None:
+    """CV ausente → confirm_apply vai falhar."""
+    if Path(cv_path).exists():
+        return None
+    return StartupWarning(
+        "warn",
+        "Arquivo cv.pdf não encontrado. "
+        "confirm_apply vai falhar. Adicione seu currículo ao diretório correto.",
+    )
+
+
+def _check_brave(config: dict[str, Any]) -> StartupWarning | None:
+    """Brave ausente → LinkedIn scan e candidaturas via browser não funcionam."""
     brave_path = config.get("brave_path", "")
-    if brave_path and not Path(brave_path).exists():
-        warnings.append(
-            StartupWarning(
-                level="warn",
-                message=(
-                    f"Brave não encontrado em {brave_path}. "
-                    "Scan LinkedIn e candidaturas via browser não funcionarão. "
-                    "Instale o Brave ou ajuste brave_path em config.yaml."
-                ),
-            )
-        )
-
-    return warnings
+    if not brave_path or Path(brave_path).exists():
+        return None
+    return StartupWarning(
+        "warn",
+        f"Brave não encontrado em {brave_path}. "
+        "Scan LinkedIn e candidaturas via browser não funcionarão. "
+        "Instale o Brave ou ajuste brave_path em config.yaml.",
+    )

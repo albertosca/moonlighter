@@ -25,37 +25,44 @@ def _devtools_ready() -> bool:
         return False
 
 
+async def _first_or_new_context(browser: Browser) -> BrowserContext:
+    return browser.contexts[0] if browser.contexts else await browser.new_context()
+
+
+async def _launch_brave(config: dict[str, Any], session_dir: Path) -> None:
+    """Sobe o Brave com a porta de debug e espera o DevTools responder (até 30s)."""
+    global _brave_process
+    logger.info("Launching Brave on port %d", _DEBUG_PORT)
+    _brave_process = subprocess.Popen(
+        [
+            config["brave_path"],
+            f"--remote-debugging-port={_DEBUG_PORT}",
+            f"--user-data-dir={session_dir}",
+            "--no-first-run",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    for _ in range(60):
+        if _devtools_ready():
+            return
+        await asyncio.sleep(0.5)
+    _brave_process.kill()
+    _brave_process = None
+    raise RuntimeError(f"Brave não ficou disponível na porta {_DEBUG_PORT} em 30s")
+
+
 async def get_context(config: dict[str, Any]) -> BrowserContext:
     """Return a Brave browser context via CDP. Launches Brave if not running."""
-    global _playwright, _browser, _brave_process
+    global _playwright, _browser
 
     if _browser is not None and _browser.is_connected():
-        contexts = _browser.contexts
-        return contexts[0] if contexts else await _browser.new_context()
+        return await _first_or_new_context(_browser)
 
     session_dir = Path(config["browser_session_dir"]).expanduser()
     session_dir.mkdir(parents=True, exist_ok=True)
-
     if not _devtools_ready():
-        logger.info("Launching Brave on port %d", _DEBUG_PORT)
-        _brave_process = subprocess.Popen(
-            [
-                config["brave_path"],
-                f"--remote-debugging-port={_DEBUG_PORT}",
-                f"--user-data-dir={session_dir}",
-                "--no-first-run",
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        for _ in range(60):
-            if _devtools_ready():
-                break
-            await asyncio.sleep(0.5)
-        else:
-            _brave_process.kill()
-            _brave_process = None
-            raise RuntimeError(f"Brave não ficou disponível na porta {_DEBUG_PORT} em 30s")
+        await _launch_brave(config, session_dir)
 
     _playwright = await async_playwright().start()
     _browser = await _playwright.chromium.connect_over_cdp(
@@ -63,9 +70,7 @@ async def get_context(config: dict[str, Any]) -> BrowserContext:
         slow_mo=config.get("slow_mo_ms", 300),
     )
     logger.info("CDP connected")
-
-    contexts = _browser.contexts
-    return contexts[0] if contexts else await _browser.new_context()
+    return await _first_or_new_context(_browser)
 
 
 async def new_page(config: dict[str, Any]) -> Page:
