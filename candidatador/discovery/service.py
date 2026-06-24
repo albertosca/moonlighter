@@ -15,7 +15,7 @@ from peewee import IntegrityError
 from candidatador.core import browser
 from candidatador.core.config import load_company_list
 from candidatador.core.db import Job, ScanLog
-from candidatador.core.llm import LLMCaller
+from candidatador.core.llm import LLMCaller, is_spend_limit
 from candidatador.core.log import get_logger
 from candidatador.discovery.evaluator import evaluate_job, should_skip_by_title
 from candidatador.discovery.sources.base import RawJob
@@ -24,23 +24,7 @@ from candidatador.views import render_jobs_table
 
 logger = get_logger(__name__)
 
-_SPEND_LIMIT_MARKERS = (
-    "spend limit",
-    "quota",
-    "rate limit",
-    "too many requests",
-    "overloaded",
-    "429",
-    "usage limit",
-)
-
 BATCH_SIZE = 10
-
-
-def _is_spend_limit(exc: Exception) -> bool:
-    """True se a exceção indica esgotamento de cota/limite de gasto do LLM."""
-    msg = str(exc).lower()
-    return any(m in msg for m in _SPEND_LIMIT_MARKERS)
 
 
 class _StopScan:
@@ -176,7 +160,7 @@ async def _evaluate_and_store(
             )
         except Exception as e:
             _release(raw)
-            if _is_spend_limit(e):
+            if is_spend_limit(e):
                 stop.set()
                 return _StopScan()
             logger.error("scan: erro inesperado avaliando %s/%s — %s", raw.company, raw.title, e)

@@ -4,7 +4,7 @@ from typing import Any
 
 import yaml
 
-from candidatador.core.llm import LLMCaller, _make_api_caller
+from candidatador.core.llm import LLMCaller, _make_api_caller, is_spend_limit
 from candidatador.core.log import get_logger
 from candidatador.core.parsing import _extract_json
 
@@ -84,37 +84,27 @@ async def evaluate_job(
         description=description[:8000],  # cap to avoid huge context
     )
     try:
-        raw_text = await _caller(prompt, model)
-        raw = _extract_json(raw_text)
-        data = json.loads(raw)
-        result = EvaluationResult(
-            score=float(data.get("score", 0.0)),
-            score_notes=data.get("score_notes", ""),
-            caveats=data.get("caveats") or [],
-            salary_min=data.get("salary_min"),
-            salary_max=data.get("salary_max"),
-            salary_currency=data.get("salary_currency"),
-            salary_source=data.get("salary_source"),
-        )
+        data = json.loads(_extract_json(await _caller(prompt, model)))
+        result = _result_from(data)
         logger.debug("→ score %.1f (%s)", result.score, company)
         return result
     except json.JSONDecodeError:
         logger.warning("evaluator: parse error para %s/%s", company, title)
         return EvaluationResult(score=0.0, score_notes="parse error: LLM returned non-JSON")
     except Exception as e:
-        err_str = str(e).lower()
-        if any(
-            m in err_str
-            for m in (
-                "spend limit",
-                "quota",
-                "rate limit",
-                "too many requests",
-                "overloaded",
-                "429",
-                "usage limit",
-            )
-        ):
-            raise
+        if is_spend_limit(e):
+            raise  # esgotou cota — quem chama decide parar; não é erro da vaga
         logger.warning("evaluator: erro para %s/%s — %s", company, title, e)
         return EvaluationResult(score=0.0, score_notes=f"evaluation error: {e}")
+
+
+def _result_from(data: dict[str, Any]) -> EvaluationResult:
+    return EvaluationResult(
+        score=float(data.get("score", 0.0)),
+        score_notes=data.get("score_notes", ""),
+        caveats=data.get("caveats") or [],
+        salary_min=data.get("salary_min"),
+        salary_max=data.get("salary_max"),
+        salary_currency=data.get("salary_currency"),
+        salary_source=data.get("salary_source"),
+    )

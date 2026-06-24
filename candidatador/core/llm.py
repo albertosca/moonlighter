@@ -9,6 +9,24 @@ from anthropic.types import TextBlock
 # (prompt: str, model: str) -> raw_text: str
 LLMCaller = Callable[[str, str], Awaitable[str]]
 
+# Sinais de que o LLM esgotou cota/limite de gasto — vale parar o scan e re-tentar
+# depois, em vez de tratar como erro da vaga.
+SPEND_LIMIT_MARKERS = (
+    "spend limit",
+    "quota",
+    "rate limit",
+    "too many requests",
+    "overloaded",
+    "429",
+    "usage limit",
+)
+
+
+def is_spend_limit(exc: Exception) -> bool:
+    """True se a exceção indica esgotamento de cota/limite de gasto do LLM."""
+    msg = str(exc).lower()
+    return any(marker in msg for marker in SPEND_LIMIT_MARKERS)
+
 
 def make_caller(config: dict[str, Any]) -> LLMCaller:
     """Return the appropriate LLM caller based on config['llm_backend'].
