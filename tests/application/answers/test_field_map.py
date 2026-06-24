@@ -8,6 +8,15 @@ PROFILE = {
     "location": "Belo Horizonte, MG, Brasil",
 }
 
+WA_CONFIG_BRAZIL = {
+    "work_authorization": {
+        "citizenship_country": "brazil",
+        "authorized_answer": "Yes",
+        "not_authorized_answer": "No",
+        "needs_review_sentinel": "__NEEDS_REVIEW__",
+    }
+}
+
 
 def test_first_name():
     r = pre_populate_answers(["First Name"], PROFILE)
@@ -57,7 +66,7 @@ def test_visa_field_unknown_country_needs_review():
 
 def test_visa_field_brazil_location_answers_no():
     fields = ["Will you require visa sponsorship?"]
-    r = pre_populate_answers(fields, PROFILE, job_location="São Paulo, Brazil")
+    r = pre_populate_answers(fields, PROFILE, config=WA_CONFIG_BRAZIL, job_location="São Paulo, Brazil")
     assert r[fields[0]] == "No"
 
 

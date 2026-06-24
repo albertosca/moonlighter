@@ -69,7 +69,7 @@ def resolve_work_auth(field_label: str, country: str | None, config: dict[str, A
     não for de autorização (aí o LLM cuida).
     """
     wa = config.get("work_authorization", {}) or {}
-    citizenship: str = (wa.get("citizenship_country") or "brazil").lower()
+    citizenship: str = (wa.get("citizenship_country") or "").lower()
     yes: str = wa.get("authorized_answer", "Yes")
     no: str = wa.get("not_authorized_answer", "No")
     review: str = wa.get("needs_review_sentinel", "__NEEDS_REVIEW__")
@@ -79,7 +79,7 @@ def resolve_work_auth(field_label: str, country: str | None, config: dict[str, A
     if not (is_auth or is_sponsor):
         return None
 
-    if country is None:
+    if not citizenship or country is None:
         return review
 
     authorized_here = country == citizenship

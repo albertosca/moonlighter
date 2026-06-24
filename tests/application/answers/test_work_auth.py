@@ -64,3 +64,37 @@ def test_resolve_unknown_country_needs_review():
 
 def test_resolve_non_work_auth_field_returns_none():
     assert resolve_work_auth("What is your favorite language?", "brazil", WA_CONFIG) is None
+
+
+WA_CONFIG_EMPTY_CITIZENSHIP = {
+    "work_authorization": {
+        "citizenship_country": "",
+        "authorized_answer": "Yes",
+        "not_authorized_answer": "No",
+        "needs_review_sentinel": "__NEEDS_REVIEW__",
+    }
+}
+
+WA_CONFIG_NO_CITIZENSHIP = {
+    "work_authorization": {
+        "authorized_answer": "Yes",
+        "not_authorized_answer": "No",
+        "needs_review_sentinel": "__NEEDS_REVIEW__",
+    }
+}
+
+
+def test_empty_citizenship_needs_review_even_with_known_country():
+    """citizenship_country vazio → nunca chuta o país, sempre __NEEDS_REVIEW__."""
+    r = resolve_work_auth(
+        "Are you authorized to work in this location?", "brazil", WA_CONFIG_EMPTY_CITIZENSHIP
+    )
+    assert r == "__NEEDS_REVIEW__"
+
+
+def test_missing_citizenship_needs_review():
+    """citizenship_country ausente do config → mesmo comportamento que vazio."""
+    r = resolve_work_auth(
+        "Are you authorized to work in this location?", "brazil", WA_CONFIG_NO_CITIZENSHIP
+    )
+    assert r == "__NEEDS_REVIEW__"
