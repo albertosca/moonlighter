@@ -99,12 +99,21 @@ async def evaluate_job(
 
 
 def _result_from(data: dict[str, Any]) -> EvaluationResult:
+    caveats = data.get("caveats")
     return EvaluationResult(
-        score=float(data.get("score", 0.0)),
-        score_notes=data.get("score_notes", ""),
-        caveats=data.get("caveats") or [],
+        score=_as_float(data.get("score")),
+        score_notes=str(data.get("score_notes") or ""),
+        caveats=caveats if isinstance(caveats, list) else [],
         salary_min=data.get("salary_min"),
         salary_max=data.get("salary_max"),
         salary_currency=data.get("salary_currency"),
         salary_source=data.get("salary_source"),
     )
+
+
+def _as_float(value: Any) -> float:
+    """Coage o score para float; null/string-inválida do LLM viram 0.0 (sem crash)."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0

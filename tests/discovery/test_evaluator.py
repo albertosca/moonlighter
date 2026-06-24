@@ -566,3 +566,27 @@ async def test_evaluate_job_builds_default_caller_when_none():
         )
     factory.assert_called_once()
     assert result.score == 8.5
+
+
+# ── robustez: saída malformada do LLM (score/caveats) ───────────────────────
+
+
+async def test_evaluate_job_null_score_becomes_zero_keeps_notes():
+    """score null → 0.0 preservando as notas (não cai no 'evaluation error')."""
+    caller = _make_caller(json.dumps({"score": None, "score_notes": "sem score", "caveats": ["x"]}))
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.score == 0.0
+    assert result.score_notes == "sem score"
+    assert result.caveats == ["x"]
+
+
+async def test_evaluate_job_non_numeric_score_becomes_zero():
+    caller = _make_caller(json.dumps({"score": "high", "score_notes": "n"}))
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.score == 0.0
+
+
+async def test_evaluate_job_non_list_caveats_becomes_empty():
+    caller = _make_caller(json.dumps({"score": 7.0, "caveats": "não é lista"}))
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.caveats == []
