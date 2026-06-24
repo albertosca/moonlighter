@@ -226,6 +226,7 @@ async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=No
         patch("candidatador.discovery.service.browser") as mock_browser,
         patch("candidatador.discovery.service.evaluate_job", new=eval_mock),
         patch("candidatador.discovery.sources.playwright.LinkedInScanner") as MockLI,
+        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])

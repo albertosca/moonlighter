@@ -81,6 +81,7 @@ async def test_scan_all_below_threshold(tmp_db):
             "candidatador.discovery.service.evaluate_job",
             new=AsyncMock(return_value=make_eval_result(score=4.0)),
         ),
+        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -114,6 +115,7 @@ async def test_scan_above_threshold_shows_table(tmp_db):
             "candidatador.discovery.service.evaluate_job",
             new=AsyncMock(return_value=make_eval_result(score=8.0)),
         ),
+        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -204,6 +206,7 @@ async def test_scan_saves_salary_fields(tmp_db):
             "candidatador.discovery.service.evaluate_job",
             new=AsyncMock(return_value=eval_result),
         ),
+        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -236,6 +239,7 @@ async def test_scan_saves_caveats_as_json(tmp_db):
             "candidatador.discovery.service.evaluate_job",
             new=AsyncMock(return_value=eval_result),
         ),
+        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -265,6 +269,7 @@ async def test_scan_status_archived_if_below_threshold(tmp_db):
             "candidatador.discovery.service.evaluate_job",
             new=AsyncMock(return_value=make_eval_result(score=3.0)),
         ),
+        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -611,10 +616,12 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
     async def fake_fill(answers, cv):
         fill_calls.append(answers.copy())
 
+    test_email = "candidaturas@gmail.com"
     with (
         patch("candidatador.application.service.browser") as mock_browser,
         patch("candidatador.application.service.detect_applier") as mock_detect,
         patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("candidatador.server._config", {"email": {"address": test_email}}),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -623,13 +630,13 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
         from candidatador.application.answers.email_alias import build_email_alias
-        from candidatador.server import _config, confirm_apply
+        from candidatador.server import confirm_apply
 
         await confirm_apply(job_id=job.id)
 
     app_fresh = Application.get_by_id(app.id)
     assert app_fresh.email_ref  # ref foi gerado
-    expected = build_email_alias(_config["email"]["address"], app_fresh.email_ref)
+    expected = build_email_alias(test_email, app_fresh.email_ref)
     assert fill_calls[0]["Email"] == expected
     assert "+" in fill_calls[0]["Email"]
 
@@ -837,6 +844,7 @@ async def test_scan_concurrent_batch_all_processed(tmp_db):
             "candidatador.discovery.service.evaluate_job",
             new=AsyncMock(return_value=make_eval_result(score=7.0)),
         ),
+        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -878,6 +886,7 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
         patch("candidatador.discovery.service.AshbyScanner") as MockAB,
         patch("candidatador.discovery.service.browser") as mock_browser,
         patch("candidatador.discovery.service.evaluate_job", side_effect=eval_side),
+        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -919,6 +928,7 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
         patch("candidatador.discovery.service.AshbyScanner") as MockAB,
         patch("candidatador.discovery.service.browser") as mock_browser,
         patch("candidatador.discovery.service.evaluate_job", side_effect=eval_side),
+        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1388,6 +1398,7 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
             "candidatador.discovery.service.evaluate_job",
             new=AsyncMock(return_value=make_eval_result(score=8.0)),
         ),
+        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1745,6 +1756,12 @@ def _scan_patches(raw_jobs, eval_mock):
         )
     )
     stack.enter_context(patch("candidatador.discovery.service.evaluate_job", new=eval_mock))
+    stack.enter_context(
+        patch(
+            "candidatador.discovery.service.load_company_list",
+            return_value={"greenhouse": ["co"]},
+        )
+    )
     return stack
 
 

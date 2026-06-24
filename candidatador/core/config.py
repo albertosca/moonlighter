@@ -1,9 +1,17 @@
+import os
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+def candidatador_home() -> Path:
+    return Path(os.environ.get("CANDIDATADOR_HOME", "~/.candidatador")).expanduser()
+
+
+def _learned_blocklist_path() -> Path:
+    return candidatador_home() / "blocklist_learned.yaml"
+
 
 DEFAULTS = {
     "brave_path": "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
@@ -15,21 +23,18 @@ DEFAULTS = {
     "eval_model": "claude-haiku-4-5-20251001",
     "slow_mo_ms": 300,
     "title_blocklist": [],
-    # CV por empresa. Caminhos relativos à raiz do projeto; match case-insensitive.
+    # CV por empresa. Caminhos relativos a CANDIDATADOR_HOME; match case-insensitive.
     # 'default' usado quando a empresa não tem entrada. Pode ser sobrescrito no
     # config.yaml local. Se o arquivo escolhido não existir, confirm_apply aborta.
     "cv": {
-        "default": "profile/general/CV-updated.pdf",
-        "by_company": {
-            "nubank": "profile/nubank/cv-nu-staff.pdf",
-            "airbnb": "profile/airbnb/cv-airbnb.pdf",
-        },
+        "default": "",
+        "by_company": {},
     },
     # Autorização de trabalho país-dependente. O candidato é autorizado a trabalhar
     # apenas no país de cidadania. Quando o país da vaga não é inferível com
     # confiança, o campo vira __NEEDS_REVIEW__ (decisão manual — nunca um chute).
     "work_authorization": {
-        "citizenship_country": "brazil",
+        "citizenship_country": "",
         "authorized_answer": "Yes",
         "not_authorized_answer": "No",
         "needs_review_sentinel": "__NEEDS_REVIEW__",
@@ -37,7 +42,6 @@ DEFAULTS = {
 }
 
 _PATH_KEYS = ("browser_session_dir", "screenshots_dir", "db_path")
-_LEARNED_BLOCKLIST_PATH = _PROJECT_ROOT / "blocklist_learned.yaml"
 
 
 def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
@@ -52,7 +56,7 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
     Returns:
         dict with merged config (defaults + overrides)
     """
-    config_path = Path(config_path) if config_path is not None else _PROJECT_ROOT / "config.yaml"
+    config_path = Path(config_path) if config_path is not None else candidatador_home() / "config.yaml"
     config: dict[str, Any] = dict(DEFAULTS)
     if config_path.exists():
         user = yaml.safe_load(config_path.read_text()) or {}
@@ -61,9 +65,10 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
         config[key] = str(Path(config[key]).expanduser())
 
     # Merge learned blocklist (blocklist_learned.yaml) into title_blocklist
-    if _LEARNED_BLOCKLIST_PATH.exists():
-        learned = yaml.safe_load(_LEARNED_BLOCKLIST_PATH.read_text()) or {}
-        learned_patterns = learned.get("title_blocklist", [])
+    learned = _learned_blocklist_path()
+    if learned.exists():
+        data = yaml.safe_load(learned.read_text()) or {}
+        learned_patterns = data.get("title_blocklist", [])
         if learned_patterns:
             manual = config.get("title_blocklist", [])
             merged = list(dict.fromkeys(manual + learned_patterns))  # dedup, manual first
@@ -83,9 +88,8 @@ def load_profile(profile_path: str | Path | None = None) -> dict[str, Any]:
         dict with profile data (skills, experience, preferences, criteria, etc.)
     """
     profile_path = (
-        Path(profile_path)
-        if profile_path is not None
-        else _PROJECT_ROOT / "profile" / "profile.yaml"
+        Path(profile_path) if profile_path is not None
+        else candidatador_home() / "profile.yaml"
     )
     return yaml.safe_load(profile_path.read_text()) or {}
 
@@ -105,7 +109,7 @@ def load_company_list(path: str | Path | None = None, phase: str | None = None) 
     Returns:
         dict: {source: [slug, ...]} (e.g., {"greenhouse": ["nubank", "ifoodcarreiras"]})
     """
-    path = Path(path) if path is not None else _PROJECT_ROOT / "company_list.yaml"
+    path = Path(path) if path is not None else candidatador_home() / "company_list.yaml"
     if not path.exists():
         return {}
     raw = yaml.safe_load(path.read_text()) or {}

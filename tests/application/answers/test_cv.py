@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from candidatador.application.answers.cv import CVNotFoundError, resolve_cv_path
@@ -39,13 +41,13 @@ def test_resolve_cv_path_raises_when_no_mapping_and_no_default():
         resolve_cv_path("stripe", {"cv": {"by_company": {}}})
 
 
-def test_resolve_cv_path_relative_resolved_from_project_root():
-    """Caminho relativo é resolvido a partir da raiz do projeto (cv.py:31)."""
-    from pathlib import Path
-
-    from candidatador.application.answers.cv import _PROJECT_ROOT
-
-    config = {"cv": {"default": "pyproject.toml"}}  # relativo, existe na raiz
+def test_resolve_cv_path_relative_resolved_from_candidatador_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+    cv_file = tmp_path / "cvs" / "general.pdf"
+    cv_file.parent.mkdir(parents=True)
+    cv_file.write_bytes(b"x")
+    config = {"cv": {"default": "cvs/general.pdf"}}
+    from candidatador.core.config import candidatador_home
     result = resolve_cv_path("stripe", config)
-    assert result == str(_PROJECT_ROOT / "pyproject.toml")
+    assert result == str(candidatador_home() / "cvs" / "general.pdf")
     assert Path(result).exists()

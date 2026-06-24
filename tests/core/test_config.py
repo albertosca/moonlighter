@@ -1,6 +1,8 @@
+from pathlib import Path
+
 import pytest
 
-from candidatador.core.config import _PROJECT_ROOT, load_company_list, load_config, load_profile
+from candidatador.core.config import candidatador_home, load_company_list, load_config, load_profile
 
 
 def test_load_config_defaults(tmp_path):
@@ -150,51 +152,52 @@ ashby:
         assert key in result, f"key '{key}' missing from company list"
 
 
-# --- _PROJECT_ROOT ---
+# --- candidatador_home ---
 
 
-def test_project_root_is_absolute():
-    assert _PROJECT_ROOT.is_absolute(), "_PROJECT_ROOT is not an absolute path"
-    assert ".." not in _PROJECT_ROOT.parts, "_PROJECT_ROOT contains '..'"
+def test_candidatador_home_default():
+    home = candidatador_home()
+    assert home == (Path.home() / ".candidatador")
+
+
+def test_candidatador_home_env_var(monkeypatch, tmp_path):
+    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+    assert candidatador_home() == tmp_path
 
 
 # --- load_config default path ---
 
 
-def test_load_config_default_path_finds_project_config():
-    config = load_config()
-    assert config["llm_model"] == "claude-sonnet-4-6"
+def test_load_config_default_path_uses_candidatador_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+    config = load_config()  # sem config.yaml → usa defaults
+    assert config["score_threshold"] == 6.5
 
 
 # --- learned blocklist merge (branches) ---
 
 
 def test_load_config_no_learned_blocklist(tmp_path, monkeypatch):
-    """Sem blocklist_learned.yaml → config segue sem merge (config.py:64->72)."""
-    monkeypatch.setattr(
-        "candidatador.core.config._LEARNED_BLOCKLIST_PATH", tmp_path / "missing.yaml"
-    )
+    """Sem blocklist_learned.yaml → config segue sem merge."""
+    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
     assert "title_blocklist" in config
 
 
 def test_load_config_learned_blocklist_empty(tmp_path, monkeypatch):
-    """blocklist_learned.yaml existe mas sem patterns → não altera (config.py:67->72)."""
-    learned = tmp_path / "learned.yaml"
+    """blocklist_learned.yaml existe mas sem patterns → não altera."""
+    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+    learned = tmp_path / "blocklist_learned.yaml"
     learned.write_text("title_blocklist: []\n")
-    monkeypatch.setattr("candidatador.core.config._LEARNED_BLOCKLIST_PATH", learned)
-    base = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
-    base_blocklist = list(base.get("title_blocklist", []))
-    monkeypatch.setattr("candidatador.core.config._LEARNED_BLOCKLIST_PATH", learned)
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
-    assert list(config.get("title_blocklist", [])) == base_blocklist
+    assert config.get("title_blocklist", []) == []
 
 
 def test_load_config_learned_blocklist_merges(tmp_path, monkeypatch):
     """patterns aprendidos são mesclados após os manuais, sem duplicar."""
-    learned = tmp_path / "learned.yaml"
+    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+    learned = tmp_path / "blocklist_learned.yaml"
     learned.write_text("title_blocklist:\n  - recruiter\n  - intern\n")
-    monkeypatch.setattr("candidatador.core.config._LEARNED_BLOCKLIST_PATH", learned)
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
     assert "recruiter" in config["title_blocklist"]
     assert "intern" in config["title_blocklist"]
@@ -216,3 +219,17 @@ def test_load_company_list_mixed_value_shapes(tmp_path):
     result = load_company_list(path=str(company_file))  # phase=None → concatena
     assert result["greenhouse"] == ["stripe"]
     assert result["lever"] == []
+
+
+def test_load_company_list_with_phase_filter(tmp_path):
+    """Quando phase é especificado, retorna apenas os slugs daquela fase."""
+    company_file = tmp_path / "company_list.yaml"
+    company_file.write_text(
+        "greenhouse:\n"
+        "  phase1:\n"
+        "    - stripe\n"
+        "  phase2:\n"
+        "    - linear\n"
+    )
+    result = load_company_list(path=str(company_file), phase="phase1")
+    assert result["greenhouse"] == ["stripe"]
