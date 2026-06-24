@@ -6,6 +6,11 @@ PROFILE = {
     "email": "maria.pereira@example.com",
     "linkedin": "https://www.linkedin.com/in/mariapereira/",
     "location": "Belo Horizonte, MG, Brasil",
+    # campos genéricos de localização/idioma/disponibilidade
+    "country_en": "Brazil",
+    "country_pt": "Brasil",
+    "english_level": "Fluent",
+    "office_available": True,
 }
 
 WA_CONFIG_BRAZIL = {
@@ -168,3 +173,73 @@ def test_currently_based_midsentence_confirmation_not_prepopulated():
     )
     r = pre_populate_answers([label], PROFILE)
     assert label not in r
+
+
+# ── Campos opcionais do profile (country_en, country_pt, english_level, office_available) ──
+
+
+PROFILE_NO_LOCALE = {
+    "name": "Test User",
+    "phone": "11999999999",
+    "email": "test@example.com",
+    "linkedin": "https://www.linkedin.com/in/testuser/",
+    "location": "São Paulo, SP, Brazil",
+}
+
+
+def test_country_absent_from_profile_not_prepopulated():
+    """Sem country_en no perfil → campo 'Country' não entra no resultado (LLM decide)."""
+    r = pre_populate_answers(["Country"], PROFILE_NO_LOCALE)
+    assert "Country" not in r
+
+
+def test_pais_absent_from_profile_not_prepopulated():
+    """Sem country_pt no perfil → campo 'País' não entra no resultado."""
+    r = pre_populate_answers(["País"], PROFILE_NO_LOCALE)
+    assert "País" not in r
+
+
+def test_english_level_absent_from_profile_not_prepopulated():
+    """Sem english_level no perfil → campo 'English level' não entra no resultado."""
+    r = pre_populate_answers(["English level"], PROFILE_NO_LOCALE)
+    assert "English level" not in r
+
+
+def test_office_available_true_returns_yes():
+    """office_available=True → 'Yes'."""
+    profile = {**PROFILE_NO_LOCALE, "office_available": True}
+    r = pre_populate_answers(
+        ["Are you able to work from the office at least two days per week?"], profile
+    )
+    assert r["Are you able to work from the office at least two days per week?"] == "Yes"
+
+
+def test_office_available_false_returns_no():
+    """office_available=False → 'No'."""
+    profile = {**PROFILE_NO_LOCALE, "office_available": False}
+    r = pre_populate_answers(
+        ["Are you able to work from the office at least two days per week?"], profile
+    )
+    assert r["Are you able to work from the office at least two days per week?"] == "No"
+
+
+def test_office_absent_from_profile_not_prepopulated():
+    """Sem office_available no perfil → campo não entra no resultado."""
+    r = pre_populate_answers(
+        ["Are you able to work from the office at least two days per week?"], PROFILE_NO_LOCALE
+    )
+    assert "Are you able to work from the office at least two days per week?" not in r
+
+
+def test_country_en_from_profile():
+    """country_en no perfil → usado como resposta para ^country$."""
+    profile = {**PROFILE_NO_LOCALE, "country_en": "Germany"}
+    r = pre_populate_answers(["Country"], profile)
+    assert r["Country"] == "Germany"
+
+
+def test_english_level_from_profile():
+    """english_level no perfil → usado na regra de proficiência."""
+    profile = {**PROFILE_NO_LOCALE, "english_level": "Native"}
+    r = pre_populate_answers(["English level"], profile)
+    assert r["English level"] == "Native"
