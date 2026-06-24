@@ -9,7 +9,7 @@ DEFAULTS = {
     "brave_path": "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
     "browser_session_dir": "~/.candidatador/browser-session",
     "screenshots_dir": "~/.candidatador/screenshots",
-    "db_path": "~/.candidatador/candidatador.core.db",
+    "db_path": "~/.candidatador/candidatador.db",
     "score_threshold": 6.5,
     "llm_model": "claude-sonnet-4-6",
     "eval_model": "claude-haiku-4-5-20251001",

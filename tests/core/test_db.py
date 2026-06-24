@@ -348,3 +348,18 @@ def test_init_db_migrates_old_application_table(tmp_db):
     cols = {row[1] for row in cursor.fetchall()}
     assert "email_ref" in cols
     assert "current_stage" in cols
+
+
+def test_db_path_default_when_env_unset(monkeypatch):
+    """Sem CANDIDATADOR_DB_PATH → default ~/.candidatador/candidatador.db (não .core.db)."""
+    from candidatador.core.db import _db_path
+
+    monkeypatch.delenv("CANDIDATADOR_DB_PATH", raising=False)
+    assert _db_path().endswith("/.candidatador/candidatador.db")
+
+
+def test_db_path_respects_env(monkeypatch):
+    from candidatador.core.db import _db_path
+
+    monkeypatch.setenv("CANDIDATADOR_DB_PATH", "/tmp/custom-candidatador.db")
+    assert _db_path() == "/tmp/custom-candidatador.db"

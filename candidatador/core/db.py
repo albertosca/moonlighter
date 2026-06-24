@@ -18,7 +18,7 @@ from peewee import (
 
 def _db_path() -> str:
     return os.environ.get(
-        "CANDIDATADOR_DB_PATH", str(Path("~/.candidatador/candidatador.core.db").expanduser())
+        "CANDIDATADOR_DB_PATH", str(Path("~/.candidatador/candidatador.db").expanduser())
     )
 
 
