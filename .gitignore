@@ -3,21 +3,21 @@ __pycache__/
 .DS_Store
 .venv/
 *.egg-info/
-config.yaml
-profile/cv.pdf
-profile/profile.yaml
-profile/*.aux
-profile/*.log
-profile/*.out
 ~/.candidatador/
 .superpowers/
 pytest_output.txt
-candidatador.db
-profile/**/*.aux
-profile/**/*.log
-profile/**/*.out
-profile/nubank/test-color.*
 .venv314/
+
+# Dados pessoais — fora do repo (mantidos em disco localmente). Templates
+# genéricos (.example) entram quando for preparar o release público.
+config.yaml
+profile/
+docs/
+company_list.yaml
+blocklist_learned.yaml
+.mcp.json
+TODO.md
+candidatador.db
 
 # Coverage
 .coverage
