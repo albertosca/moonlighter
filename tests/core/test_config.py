@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from candidatador.core.config import candidatador_home, load_company_list, load_config, load_profile
 
 

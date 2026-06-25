@@ -1,9 +1,9 @@
 import asyncio
+import inspect
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from anthropic.types import TextBlock
-
 from candidatador.core.llm import LLMCaller, _call_cli, _make_api_caller, make_caller
 
 # ── make_caller factory ───────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ def test_make_caller_api_returns_callable():
     with patch("candidatador.core.llm.anthropic"):
         caller = make_caller({"llm_backend": "api"})
     assert callable(caller)
-    assert asyncio.iscoroutinefunction(caller)
+    assert inspect.iscoroutinefunction(caller)
 
 
 def test_make_caller_defaults_to_api_when_key_missing():
