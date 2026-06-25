@@ -15,9 +15,6 @@ def _learned_blocklist_path() -> Path:
 
 DEFAULTS = {
     "brave_path": "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
-    "browser_session_dir": "~/.candidatador/browser-session",
-    "screenshots_dir": "~/.candidatador/screenshots",
-    "db_path": "~/.candidatador/candidatador.db",
     "score_threshold": 6.5,
     "llm_model": "claude-sonnet-4-6",
     "eval_model": "claude-haiku-4-5-20251001",
@@ -59,7 +56,13 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
     config_path = (
         Path(config_path) if config_path is not None else candidatador_home() / "config.yaml"
     )
-    config: dict[str, Any] = dict(DEFAULTS)
+    home = candidatador_home()
+    config: dict[str, Any] = {
+        **DEFAULTS,
+        "browser_session_dir": str(home / "browser-session"),
+        "screenshots_dir": str(home / "screenshots"),
+        "db_path": str(home / "candidatador.db"),
+    }
     if config_path.exists():
         user = yaml.safe_load(config_path.read_text()) or {}
         config.update(user)
