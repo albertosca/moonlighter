@@ -1,25 +1,7 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[tool.uv.workspace]
+members = ["packages/*"]
 
-[project]
-name = "candidatador"
-version = "0.1.0"
-requires-python = ">=3.14"
-dependencies = [
-    "fastmcp>=2.0",
-    "playwright>=1.47",
-    "peewee>=3.17",
-    "anthropic>=0.40",
-    "rich>=13.7",
-    "pyyaml>=6.0",
-    "httpx>=0.27",
-    "google-api-python-client>=2.100",
-    "google-auth-httplib2>=0.2",
-    "google-auth-oauthlib>=1.1",
-]
-
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -29,14 +11,8 @@ dev = [
     "mypy>=1.11",
 ]
 
-[project.scripts]
-candidatador = "candidatador.server:main"
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-# Gate de cobertura: 100% sobre a suíte unitária (config de source/branch/omit
-# em [tool.coverage.run]). e2e exige navegador real → fora do run padrão via
-# marker; rode com `pytest -m e2e`.
 addopts = "--cov --cov-fail-under=100 -m 'not e2e'"
 markers = [
     "e2e: testes end-to-end que exigem navegador real (rodar com -m e2e)",
@@ -48,32 +24,29 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RET", "PTH", "RUF"]
-# RUF001-003: caracteres "ambíguos" são tipografia PT-BR intencional no output
-# (en-dash em faixas salariais "$150–200k", ∗ de footnote). Não são bugs.
-# E501: o `ruff format` já é dono do tamanho de linha do CÓDIGO (100); as linhas
-# longas restantes são conteúdo de string (JS/CSS embutido, regex, prompts) que o
-# formatter não toca e que picotar deixaria pior.
 ignore = ["RUF001", "RUF002", "RUF003", "E501"]
 
 [tool.ruff.lint.per-file-ignores]
-# Scripts inserem a raiz no sys.path ANTES de importar o pacote (E402 esperado).
 "scripts/*" = ["E402"]
 
 [tool.coverage.run]
-source = ["candidatador"]
+source_pkgs = [
+    "candidatador.core",
+    "candidatador.discovery",
+    "candidatador.application",
+    "candidatador.tracking",
+    "candidatador.server",
+    "candidatador.startup",
+    "candidatador.views",
+]
 branch = true
 omit = [
-    # Boundaries de I/O puro — conexão CDP/Playwright e scraping do LinkedIn.
-    # São testáveis só com browser real (e2e), não em unit. Cobrir aqui daria
-    # falsa sensação de garantia (os mocks testariam o mock, não o boundary).
-    "candidatador/core/browser.py",
-    "candidatador/discovery/sources/playwright.py",
+    "*/candidatador/core/browser.py",
+    "*/candidatador/discovery/sources/playwright.py",
 ]
 
 [tool.coverage.report]
 exclude_also = [
-    # Funções/trechos que SÓ falam com serviço externo (subprocess do CLI Claude,
-    # chamadas da Gmail API). A lógica em volta é coberta; o boundary, não.
     "pragma: no cover",
     "if __name__ == .__main__.:",
     "raise NotImplementedError",

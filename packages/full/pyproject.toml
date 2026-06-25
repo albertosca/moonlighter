@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "candidatador-full"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "candidatador-core>=0.1.0",
+    "candidatador-scan>=0.1.0",
+    "candidatador-apply>=0.1.0",
+    "candidatador-email>=0.1.0",
+    "fastmcp>=2.0",
+]
+
+[project.scripts]
+candidatador = "candidatador.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["candidatador"]
+
+[tool.uv.sources]
+candidatador-core = { workspace = true }
+candidatador-scan = { workspace = true }
+candidatador-apply = { workspace = true }
+candidatador-email = { workspace = true }
