@@ -249,3 +249,9 @@ def test_scan_concurrency_override(tmp_path, monkeypatch):
     (tmp_path / "config.yaml").write_text("scan_concurrency: 3\n")
     from candidatador.core.config import load_config
     assert load_config()["scan_concurrency"] == 3
+
+
+def test_scan_batch_size_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+    from candidatador.core.config import load_config
+    assert load_config()["scan_batch_size"] == 5

@@ -24,6 +24,9 @@ DEFAULTS = {
     # desperdício após o spend-limit (irmãs em voo). Com batching (scan_batch_size),
     # é o nº de LOTES em paralelo. Concorrência efetiva = scan_concurrency × scan_batch_size.
     "scan_concurrency": 5,
+    # Vagas avaliadas por chamada LLM. O profile vai uma única vez por lote, cortando
+    # re-transmissão por fator K. 1 desliga o batching (1 vaga por chamada).
+    "scan_batch_size": 5,
     # CV por empresa. Caminhos relativos a CANDIDATADOR_HOME; match case-insensitive.
     # 'default' usado quando a empresa não tem entrada. Pode ser sobrescrito no
     # config.yaml local. Se o arquivo escolhido não existir, confirm_apply aborta.
