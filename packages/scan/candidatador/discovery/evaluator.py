@@ -67,6 +67,14 @@ Return a JSON object with ONLY these keys (no markdown, no explanation):
 Return only valid JSON."""
 
 
+@dataclass(frozen=True)
+class EvalInput:
+    """Entrada para avaliação em lote: company, title, description."""
+    company: str
+    title: str
+    description: str
+
+
 @dataclass
 class EvaluationResult:
     score: float
@@ -127,5 +135,22 @@ def _as_float(value: Any) -> float:
     """Coage o score para float; null/string-inválida do LLM viram 0.0 (sem crash)."""
     try:
         return float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return 0.0
+
+
+def _parse_batch(raw: str, n: int) -> list[EvaluationResult] | None:
+    """Faz parse da resposta de lote num array de n EvaluationResult. Devolve None
+    quando a ESTRUTURA é inválida (não é lista ou tamanho ≠ n) — o chamador então cai
+    no fallback per-job. Item individual malformado é tolerado via _result_from."""
+    try:
+        # Tenta parse direto (arrays puras); se falhar, tenta extrair JSON de markdown/prose
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            data = json.loads(_extract_json(raw))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, list) or len(data) != n:
+        return None
+    return [_result_from(item if isinstance(item, dict) else {}) for item in data]

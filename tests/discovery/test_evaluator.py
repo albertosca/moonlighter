@@ -4,7 +4,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from candidatador.discovery.evaluator import (
+    EvalInput,
     EvaluationResult,
+    _parse_batch,
     evaluate_job,
     profile_for_eval,
     should_skip_by_title,
@@ -614,3 +616,50 @@ async def test_evaluate_job_non_list_caveats_becomes_empty():
     caller = _make_caller(json.dumps({"score": 7.0, "caveats": "não é lista"}))
     result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
     assert result.caveats == []
+
+
+# ── EvalInput ────────────────────────────────────────────────────────────────
+
+
+def test_eval_input_is_frozen():
+    """EvalInput é um frozen dataclass."""
+    inp = EvalInput(company="Acme", title="Engineer", description="desc")
+    with pytest.raises(Exception):  # FrozenInstanceError
+        inp.company = "other"
+
+
+def test_eval_input_fields():
+    """EvalInput tem os campos esperados."""
+    inp = EvalInput(company="Acme", title="Sr Engineer", description="Build stuff.")
+    assert inp.company == "Acme"
+    assert inp.title == "Sr Engineer"
+    assert inp.description == "Build stuff."
+
+
+# ── _parse_batch ─────────────────────────────────────────────────────────────
+
+
+def test_parse_batch_valid_array_maps_by_order():
+    raw = '[{"score": 8.0, "score_notes": "a", "caveats": []}, {"score": 3.0, "score_notes": "b", "caveats": ["x"]}]'
+    results = _parse_batch(raw, 2)
+    assert results is not None
+    assert [r.score for r in results] == [8.0, 3.0]
+    assert results[1].caveats == ["x"]
+
+
+def test_parse_batch_wrong_length_returns_none():
+    assert _parse_batch('[{"score": 8.0}]', 2) is None
+
+
+def test_parse_batch_non_array_returns_none():
+    assert _parse_batch('{"score": 8.0}', 1) is None
+
+
+def test_parse_batch_invalid_json_returns_none():
+    assert _parse_batch("not json", 2) is None
+
+
+def test_parse_batch_item_with_missing_keys_uses_defaults():
+    results = _parse_batch('[{"foo": 1}]', 1)
+    assert results is not None
+    assert results[0].score == 0.0 and results[0].caveats == []
