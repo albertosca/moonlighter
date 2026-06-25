@@ -27,8 +27,8 @@ async def _query_labels_with_fallback(page: Page, selectors: list[str]) -> list[
 
 
 # Marcadores de confirmação de submissão. Conservador de propósito: na dúvida
-# retornamos False — um falso "enviado" é pior (Alberto não acompanha e perde a
-# vaga) do que um falso "falhou" (ele revisa o screenshot e re-tenta).
+# retornamos False — um falso "enviado" é pior (candidatura perdida sem acompanhamento)
+# do que um falso "falhou" (screenshot revisável, re-tentável).
 SUCCESS_TEXT_MARKERS = (
     "thank you for applying",
     "thanks for applying",

@@ -29,22 +29,26 @@ import yaml
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from candidatador.core.config import load_config
+from candidatador.core.config import candidatador_home, load_config, load_profile
 from candidatador.core.db import Job, init_db
 from candidatador.core.llm import make_caller
 from candidatador.core.log import setup as setup_logging
 from candidatador.core.parsing import _extract_json
 
-LEARNED_PATH = _ROOT / "blocklist_learned.yaml"
 
-PROPOSAL_PROMPT = """\
-You are building a job title blocklist for Alberto, a senior software engineer (15+ years, \
-Staff-level, Elixir/Ruby/Python/JS). He is looking for engineering roles only.
+def _make_proposal_prompt(
+    company: str, threshold: float, titles_block: str, profile: dict
+) -> str:
+    name = profile.get("name", "the candidate")
+    level = profile.get("level", "senior software engineer")
+    skills = ", ".join((profile.get("top_skills") or [])[:4]) or "software engineering"
+    return f"""\
+You are building a job title blocklist for {name}, a {level} specializing in {skills}.
 
 The following job titles at **{company}** were evaluated and scored {threshold} or below out of 10 \
-— meaning they are clearly irrelevant for him:
+— meaning they are clearly irrelevant for them:
 
-{titles}
+{titles_block}
 
 Your task: propose minimal, safe **substring patterns** (lowercase) to block future titles like these \
 before they reach the LLM evaluator.
@@ -86,17 +90,24 @@ QUOTA_MARKERS = (
 )
 
 
+def _learned_path() -> Path:
+    return candidatador_home() / "blocklist_learned.yaml"
+
+
 def _load_learned() -> list[str]:
-    if not LEARNED_PATH.exists():
+    path = _learned_path()
+    if not path.exists():
         return []
-    data = yaml.safe_load(LEARNED_PATH.read_text()) or {}
+    data = yaml.safe_load(path.read_text()) or {}
     return data.get("title_blocklist", [])
 
 
 def _save_learned(patterns: list[str]) -> None:
+    path = _learned_path()
     existing = _load_learned()
     merged = list(dict.fromkeys(existing + patterns))  # dedup, preserve order
-    LEARNED_PATH.write_text(
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
         yaml.dump({"title_blocklist": merged}, allow_unicode=True, default_flow_style=False)
     )
 
@@ -126,14 +137,10 @@ def _fetch_low_scorers(threshold: float, company: str | None) -> dict[str, list[
 
 
 async def _propose_for_company(
-    company: str, titles: list[str], threshold: float, caller, model: str
+    company: str, titles: list[str], threshold: float, caller, model: str, profile: dict
 ) -> list[dict]:
     titles_block = "\n".join(f"- {t}" for t in titles[:80])  # cap at 80 to avoid huge context
-    prompt = PROPOSAL_PROMPT.format(
-        company=company,
-        threshold=threshold,
-        titles=titles_block,
-    )
+    prompt = _make_proposal_prompt(company, threshold, titles_block, profile)
     try:
         raw = await caller(prompt, model)
         extracted = _extract_json(raw)
@@ -154,7 +161,8 @@ async def _propose_for_company(
 
 
 async def _run(
-    threshold: float, company_filter: str | None, dry_run: bool, model: str, config: dict
+    threshold: float, company_filter: str | None, dry_run: bool, model: str, config: dict,
+    profile: dict
 ) -> None:
     caller = make_caller(config)
     grouped = _fetch_low_scorers(threshold, company_filter)
@@ -175,7 +183,7 @@ async def _run(
     for company, titles in sorted(grouped.items(), key=lambda x: -len(x[1])):
         print(f"▶ {company} ({len(titles)} vagas)...")
         try:
-            proposals = await _propose_for_company(company, titles, threshold, caller, model)
+            proposals = await _propose_for_company(company, titles, threshold, caller, model, profile)
         except Exception as e:
             if any(m in str(e).lower() for m in QUOTA_MARKERS):
                 print(f"🚫 COTA ATINGIDA — parando. Erro: {e}")
@@ -221,15 +229,20 @@ def main() -> None:
 
     setup_logging()
     config = load_config()
-    db_path = str(Path(config.get("db_path", "~/.candidatador/candidatador.core.db")).expanduser())
-    os.environ["CANDIDATADOR_DB"] = db_path
+    try:
+        profile = load_profile()
+    except FileNotFoundError:
+        profile = {}
+    db_path = str(Path(config.get("db_path", "~/.candidatador/candidatador.db")).expanduser())
+    os.environ["CANDIDATADOR_DB_PATH"] = db_path
     init_db()
 
     model = config.get("eval_model", "claude-haiku-4-5-20251001")
-    print(f"Modelo: {model}  |  blocklist_learned.yaml: {LEARNED_PATH}")
+    learned_path = candidatador_home() / "blocklist_learned.yaml"
+    print(f"Modelo: {model}  |  blocklist_learned: {learned_path}")
     print()
 
-    asyncio.run(_run(args.threshold, args.company, args.dry_run, model, config))
+    asyncio.run(_run(args.threshold, args.company, args.dry_run, model, config, profile))
 
 
 if __name__ == "__main__":
