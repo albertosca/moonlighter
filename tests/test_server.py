@@ -22,6 +22,13 @@ def make_eval_result(score=8.0):
     )
 
 
+def _batch_of(result):
+    """Mock de evaluate_jobs_batch que devolve [result] para cada vaga do lote."""
+    async def _batch(jobs, profile, model, caller):
+        return [result for _ in jobs]
+    return _batch
+
+
 def create_job(tmp_db, **kwargs):
     """Helper: creates a job in the temp DB. Call init_db() first."""
     defaults = {
@@ -78,8 +85,8 @@ async def test_scan_all_below_threshold(tmp_db):
         patch("candidatador.discovery.service.AshbyScanner") as MockAB,
         patch("candidatador.discovery.service.browser") as mock_browser,
         patch(
-            "candidatador.discovery.service.evaluate_job",
-            new=AsyncMock(return_value=make_eval_result(score=4.0)),
+            "candidatador.discovery.service.evaluate_jobs_batch",
+            new=_batch_of(make_eval_result(score=4.0)),
         ),
         patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
@@ -89,7 +96,7 @@ async def test_scan_all_below_threshold(tmp_db):
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
         result = await scan_and_evaluate()
     assert "threshold" in result.lower()
-    # Job should be archived
+    # Job should be archived because score=4.0 is below the default threshold=6.5
     job = Job.get(Job.url == "https://x.com/1")
     assert job.status == "archived"
 
@@ -112,8 +119,8 @@ async def test_scan_above_threshold_shows_table(tmp_db):
         patch("candidatador.discovery.service.AshbyScanner") as MockAB,
         patch("candidatador.discovery.service.browser") as mock_browser,
         patch(
-            "candidatador.discovery.service.evaluate_job",
-            new=AsyncMock(return_value=make_eval_result(score=8.0)),
+            "candidatador.discovery.service.evaluate_jobs_batch",
+            new=_batch_of(make_eval_result(score=8.0)),
         ),
         patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
     ):
@@ -138,14 +145,17 @@ async def test_scan_dedup_against_scan_log(tmp_db):
         patch("candidatador.discovery.service.LeverScanner") as MockLV,
         patch("candidatador.discovery.service.AshbyScanner") as MockAB,
         patch("candidatador.discovery.service.browser") as mock_browser,
-        patch("candidatador.discovery.service.evaluate_job") as mock_eval,
+        patch("candidatador.discovery.service.evaluate_jobs_batch") as mock_batch,
+        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
         result = await scan_and_evaluate()
-    mock_eval.assert_not_called()
+    # evaluate_jobs_batch genuinamente não chamado: scanner retornou a vaga mas
+    # o dedup (ScanLog pré-existente) a filtrou antes de chegar em _evaluate_and_store.
+    mock_batch.assert_not_called()
     assert "Nenhuma vaga nova" in result
 
 
@@ -163,16 +173,17 @@ async def test_scan_linkedin_failure_doesnt_block(tmp_db):
         patch("candidatador.discovery.service.AshbyScanner") as MockAB,
         patch("candidatador.discovery.service.browser") as mock_browser,
         patch(
-            "candidatador.discovery.service.evaluate_job",
-            new=AsyncMock(return_value=make_eval_result(score=8.0)),
+            "candidatador.discovery.service.evaluate_jobs_batch",
+            new=_batch_of(make_eval_result(score=8.0)),
         ),
+        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("LinkedIn not available"))
         result = await scan_and_evaluate()
-    # Should still return HTTP results
+    # Falha do LinkedIn não bloqueia os resultados HTTP; vaga com score=8.0 acima do threshold.
     assert "co" in result or "Eng" in result or "vagas" in result.lower()
 
 
@@ -203,8 +214,8 @@ async def test_scan_saves_salary_fields(tmp_db):
         patch("candidatador.discovery.service.AshbyScanner") as MockAB,
         patch("candidatador.discovery.service.browser") as mock_browser,
         patch(
-            "candidatador.discovery.service.evaluate_job",
-            new=AsyncMock(return_value=eval_result),
+            "candidatador.discovery.service.evaluate_jobs_batch",
+            new=_batch_of(eval_result),
         ),
         patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
     ):
@@ -236,8 +247,8 @@ async def test_scan_saves_caveats_as_json(tmp_db):
         patch("candidatador.discovery.service.AshbyScanner") as MockAB,
         patch("candidatador.discovery.service.browser") as mock_browser,
         patch(
-            "candidatador.discovery.service.evaluate_job",
-            new=AsyncMock(return_value=eval_result),
+            "candidatador.discovery.service.evaluate_jobs_batch",
+            new=_batch_of(eval_result),
         ),
         patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
@@ -266,8 +277,8 @@ async def test_scan_status_archived_if_below_threshold(tmp_db):
         patch("candidatador.discovery.service.AshbyScanner") as MockAB,
         patch("candidatador.discovery.service.browser") as mock_browser,
         patch(
-            "candidatador.discovery.service.evaluate_job",
-            new=AsyncMock(return_value=make_eval_result(score=3.0)),
+            "candidatador.discovery.service.evaluate_jobs_batch",
+            new=_batch_of(make_eval_result(score=3.0)),
         ),
         patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
@@ -276,6 +287,7 @@ async def test_scan_status_archived_if_below_threshold(tmp_db):
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
         await scan_and_evaluate()
+    # score=3.0 injetado via evaluate_jobs_batch → status genuinamente "archived"
     job = Job.get(Job.url == "https://x.com/7")
     assert job.status == "archived"
 
@@ -855,8 +867,16 @@ async def test_scan_concurrent_batch_all_processed(tmp_db):
 
 
 async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
-    """INVARIANTE: ao bater spend limit no meio de um batch, nenhum ScanLog
-    pode ficar sem Job correspondente (senão a vaga some para sempre)."""
+    """INVARIANTE: ao bater spend limit num chunk, nenhum ScanLog pode ficar
+    sem Job correspondente (senão a vaga some para sempre do pipeline).
+
+    Usa scan_batch_size=4 com 8 vagas (2 chunks de 4) e scan_concurrency=1
+    para serializar: o chunk 0 chama evaluate_jobs_batch (levanta spend-limit),
+    o loop `for raw in to_eval: _release(raw)` roda para as 4 vagas do chunk,
+    e o chunk 1 vê o stop event e não toca mais nada.
+
+    Este teste FALHA se o loop _release for removido do except de spend-limit:
+    sem release, as 4 vagas do chunk 0 ficam com ScanLog mas sem Job."""
     init_db()
     from candidatador.discovery.sources.base import RawJob
     from candidatador.server import scan_and_evaluate
@@ -872,21 +892,23 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
         for i in range(8)
     ]
 
-    call = [0]
-
-    async def eval_side(**kwargs):
-        call[0] += 1
-        if call[0] == 3:
-            raise Exception("Claude API: spend limit exceeded")
-        return make_eval_result(score=7.0)
+    spend_limit_err = Exception("You've hit your monthly spend limit")
+    mock_batch = AsyncMock(side_effect=spend_limit_err)
 
     with (
         patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
         patch("candidatador.discovery.service.LeverScanner") as MockLV,
         patch("candidatador.discovery.service.AshbyScanner") as MockAB,
         patch("candidatador.discovery.service.browser") as mock_browser,
-        patch("candidatador.discovery.service.evaluate_job", side_effect=eval_side),
+        patch("candidatador.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("candidatador.server._config", {
+            "score_threshold": 6.5,
+            "llm_model": "claude-haiku-4-5-20251001",
+            "title_blocklist": [],
+            "scan_concurrency": 1,
+            "scan_batch_size": 4,
+        }),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -900,7 +922,12 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
 
 
 async def test_scan_spend_limit_stops_further_batches(tmp_db):
-    """Ao bater spend limit no batch 1, o batch 2 não deve nem ser tentado."""
+    """Ao bater spend limit no batch 1, os batches seguintes não são tentados.
+
+    Com scan_concurrency=1 os chunks são serializados: o chunk 0 chama
+    evaluate_jobs_batch (que levanta spend-limit), seta o stop event e libera
+    o semáforo; os chunks 1 e 2 vêem o stop antes de chamar evaluate_jobs_batch.
+    Prova concreta de parada antecipada: call_count == 1, não 3."""
     init_db()
     from candidatador.discovery.sources.base import RawJob
     from candidatador.server import scan_and_evaluate
@@ -913,22 +940,26 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
             url=f"https://x.com/stop/{i}",
             description="desc",
         )
-        for i in range(15)  # 2 batches: 10 + 5
+        for i in range(15)  # 3 batches de 5 com scan_batch_size=5
     ]
 
-    evaluated_urls = []
-
-    async def eval_side(**kwargs):
-        evaluated_urls.append(kwargs["title"])
-        raise Exception("usage limit reached")  # spend limit já no 1º
+    spend_limit_err = Exception("usage limit reached")
+    mock_batch = AsyncMock(side_effect=spend_limit_err)
 
     with (
         patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
         patch("candidatador.discovery.service.LeverScanner") as MockLV,
         patch("candidatador.discovery.service.AshbyScanner") as MockAB,
         patch("candidatador.discovery.service.browser") as mock_browser,
-        patch("candidatador.discovery.service.evaluate_job", side_effect=eval_side),
+        patch("candidatador.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("candidatador.server._config", {
+            "score_threshold": 6.5,
+            "llm_model": "claude-haiku-4-5-20251001",
+            "title_blocklist": [],
+            "scan_concurrency": 1,
+            "scan_batch_size": 5,
+        }),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -936,8 +967,12 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
         await scan_and_evaluate()
 
-    # no máximo o 1º batch (10) pode ter chamado o LLM; o 2º batch (5) nunca.
-    assert len(evaluated_urls) <= 10
+    # Com scan_concurrency=1 o stop impede que batches 2 e 3 chamem o LLM.
+    # call_count deve ser 1 (não 3 = total de batches).
+    assert mock_batch.call_count == 1, (
+        f"esperado 1 chamada a evaluate_jobs_batch, mas foram {mock_batch.call_count} "
+        f"(batches 2 e 3 deveriam ter sido parados pelo stop event)"
+    )
     # e nenhum claim órfão sobrou
     job_urls = {j.url for j in Job.select()}
     assert all(sl.job_url in job_urls for sl in ScanLog.select())
@@ -1395,8 +1430,8 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
         patch("candidatador.discovery.service.browser") as mock_browser,
         patch("candidatador.discovery.sources.playwright.LinkedInScanner") as MockLI,
         patch(
-            "candidatador.discovery.service.evaluate_job",
-            new=AsyncMock(return_value=make_eval_result(score=8.0)),
+            "candidatador.discovery.service.evaluate_jobs_batch",
+            new=_batch_of(make_eval_result(score=8.0)),
         ),
         patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
     ):
@@ -1755,7 +1790,11 @@ def _scan_patches(raw_jobs, eval_mock):
             **{"new_page": AsyncMock(side_effect=Exception("no browser"))},
         )
     )
-    stack.enter_context(patch("candidatador.discovery.service.evaluate_job", new=eval_mock))
+    async def _batch(jobs, profile, model, caller):
+        # Chama eval_mock por vaga; erros (spend limit) propagam para evaluate_chunk.
+        return [await eval_mock(j.company, j.title, j.description, profile, model, caller) for j in jobs]
+
+    stack.enter_context(patch("candidatador.discovery.service.evaluate_jobs_batch", new=_batch))
     stack.enter_context(
         patch(
             "candidatador.discovery.service.load_company_list",

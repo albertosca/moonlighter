@@ -217,15 +217,23 @@ async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=No
     linkedin_exc: exceção que o LinkedInScanner.scan deve levantar.
     linkedin_jobs: lista de RawJob que o LinkedInScanner.scan deve retornar.
     Se ambos forem None, simula ausência de browser (new_page falha).
+
+    eval_mock: AsyncMock aplicado por vaga dentro do lote. Pode ser
+    AsyncMock(return_value=EvaluationResult) ou AsyncMock(side_effect=exc).
     """
     cfg = config or {**CONFIG, "title_blocklist": ["staff accountant"]}
-    eval_mock = eval_mock or AsyncMock(return_value=_eval(8.0))
+    _eval_per_job = eval_mock or AsyncMock(return_value=_eval(8.0))
+
+    async def _batch(jobs, profile, model, caller):
+        # Aplica eval_mock a cada vaga do lote; erros propagam para evaluate_chunk.
+        return [await _eval_per_job(j.company, model) for j in jobs]
+
     with (
         patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
         patch("candidatador.discovery.service.LeverScanner") as MockLV,
         patch("candidatador.discovery.service.AshbyScanner") as MockAB,
         patch("candidatador.discovery.service.browser") as mock_browser,
-        patch("candidatador.discovery.service.evaluate_job", new=eval_mock),
+        patch("candidatador.discovery.service.evaluate_jobs_batch", new=_batch),
         patch("candidatador.discovery.sources.playwright.LinkedInScanner") as MockLI,
         patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
@@ -335,7 +343,7 @@ class _Tracker:
 async def test_scan_concurrency_is_capped(tmp_db):
     init_db()
     caller = _Tracker()
-    config = {"score_threshold": 6.5, "eval_model": "m", "scan_concurrency": 2, "title_blocklist": []}
+    config = {"score_threshold": 6.5, "eval_model": "m", "scan_concurrency": 2, "scan_batch_size": 1, "title_blocklist": []}
     jobs = [_raw(i) for i in range(6)]
     saved, spend_hit = await scan_service._evaluate_and_store(jobs, config, {}, caller)
     assert len(saved) == 6
@@ -351,7 +359,7 @@ async def test_scan_stops_before_llm_after_spend_limit(tmp_db):
         calls["n"] += 1
         raise RuntimeError("spend limit reached")
 
-    config = {"score_threshold": 6.5, "eval_model": "m", "scan_concurrency": 1, "title_blocklist": []}
+    config = {"score_threshold": 6.5, "eval_model": "m", "scan_concurrency": 1, "scan_batch_size": 1, "title_blocklist": []}
     jobs = [_raw(i) for i in range(5)]
     _saved, spend_hit = await scan_service._evaluate_and_store(jobs, config, {}, caller)
     assert spend_hit is True
@@ -359,3 +367,40 @@ async def test_scan_stops_before_llm_after_spend_limit(tmp_db):
     # stop=True logo após o semaphore e nem chamam o LLM.
     assert calls["n"] == 1
     assert ScanLog.select().count() == 0  # todos os claims liberados
+
+
+async def test_scan_chunk_skips_already_claimed_job(tmp_db):
+    init_db()
+    # Pré-insere claim para a URL → _claim retorna False → vaga pulada sem chamar o LLM.
+    ScanLog.create(job_url="https://x.com/scan/99", source="greenhouse")
+
+    async def caller(prompt: str, model: str) -> str:
+        raise AssertionError("LLM não deve ser chamado para vaga já reservada")
+
+    config = {
+        "score_threshold": 6.5, "eval_model": "m",
+        "scan_concurrency": 5, "scan_batch_size": 5, "title_blocklist": [],
+    }
+    saved, spend_hit = await scan_service._evaluate_and_store([_raw(99)], config, {}, caller)
+    assert saved == []
+    assert spend_hit is False
+    assert ScanLog.select().count() == 1  # apenas o claim pré-existente
+
+
+async def test_scan_batches_jobs_into_one_call(tmp_db):
+    init_db()
+    calls = {"n": 0}
+
+    async def caller(prompt: str, model: str) -> str:
+        calls["n"] += 1
+        return '[' + ", ".join('{"score": 8.0, "score_notes": "ok", "caveats": []}' for _ in range(4)) + ']'
+
+    config = {
+        "score_threshold": 6.5, "eval_model": "m",
+        "scan_concurrency": 5, "scan_batch_size": 4, "title_blocklist": [],
+    }
+    jobs = [_raw(i) for i in range(4)]
+    saved, spend_hit = await scan_service._evaluate_and_store(jobs, config, {}, caller)
+    assert len(saved) == 4
+    assert spend_hit is False
+    assert calls["n"] == 1  # 4 vagas, 1 lote, 1 chamada

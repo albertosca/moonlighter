@@ -15,7 +15,12 @@ from candidatador.core.config import load_company_list
 from candidatador.core.db import Job, ScanLog
 from candidatador.core.llm import LLMCaller, is_spend_limit
 from candidatador.core.log import get_logger
-from candidatador.discovery.evaluator import evaluate_job, should_skip_by_title
+from candidatador.discovery.evaluator import (
+    EvalInput,
+    evaluate_job,
+    evaluate_jobs_batch,
+    should_skip_by_title,
+)
 from candidatador.discovery.sources.base import RawJob
 from candidatador.discovery.sources.http import AshbyScanner, GreenhouseScanner, LeverScanner
 from candidatador.views import render_jobs_table
@@ -121,65 +126,87 @@ def _drop_already_seen(raw_jobs: list[RawJob]) -> list[RawJob]:
 async def _evaluate_and_store(
     new_jobs: list[RawJob], config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
 ) -> tuple[list[Job], bool]:
-    """Avalia e salva cada vaga com concorrência limitada por semaphore, parando
-    conservadoramente no primeiro spend limit ou erro inesperado. Devolve as vagas
-    salvas e se parou."""
+    """Avalia e salva as vagas em LOTES concorrentes (até scan_concurrency lotes em
+    paralelo, scan_batch_size vagas por lote), parando no primeiro spend limit ou erro
+    inesperado. Devolve as vagas salvas e se parou."""
     threshold = config["score_threshold"]
     model = _model_for(config)
     blocklist: list[str] = config.get("title_blocklist", [])
     concurrency: int = config.get("scan_concurrency", 5)
+    batch_size: int = config.get("scan_batch_size", 5)
     stop = asyncio.Event()
     semaphore = asyncio.Semaphore(concurrency)
 
-    async def evaluate_one(raw: RawJob) -> Job | None | _StopScan:
+    async def evaluate_chunk(chunk: list[RawJob]) -> list[Job | _StopScan]:
         async with semaphore:
             # Já parou enquanto esperava o permit: não reserva nem chama o LLM.
             if stop.is_set():
-                return _StopScan()
-            if not _claim(raw):
-                return None
+                return [_StopScan()]
 
-            matched = should_skip_by_title(raw.title, blocklist)
-            if matched:
-                return _persist(
-                    raw, score=0.0, score_notes=f"title filtered: {matched!r}",
-                    caveats="[]", status="archived",
-                )
+            results: list[Job | _StopScan] = []
+            to_eval: list[RawJob] = []
+            for raw in chunk:
+                if not _claim(raw):
+                    continue  # já reservada (corrida/scan anterior)
+                matched = should_skip_by_title(raw.title, blocklist)
+                if matched:
+                    job = _persist(
+                        raw, score=0.0, score_notes=f"title filtered: {matched!r}",
+                        caveats="[]", status="archived",
+                    )
+                    if job is not None:
+                        results.append(job)
+                else:
+                    to_eval.append(raw)
+
+            if not to_eval:
+                return results
 
             try:
-                result = await evaluate_job(
-                    company=raw.company,
-                    title=raw.title,
-                    description=raw.description or f"{raw.title} at {raw.company}",
-                    profile=profile, model=model, _caller=caller,
+                evals = await evaluate_jobs_batch(
+                    [
+                        EvalInput(r.company, r.title, r.description or f"{r.title} at {r.company}")
+                        for r in to_eval
+                    ],
+                    profile, model, caller,
                 )
             except Exception as e:
-                _release(raw)
+                for raw in to_eval:
+                    _release(raw)
                 if is_spend_limit(e):
                     stop.set()
-                    return _StopScan()
-                logger.error("scan: erro inesperado avaliando %s/%s — %s", raw.company, raw.title, e)
+                    results.append(_StopScan())
+                    return results
+                logger.error("scan: erro inesperado no lote — %s", e)
                 raise
 
-            return _persist(
-                raw, score=result.score, score_notes=result.score_notes,
-                caveats=json.dumps(result.caveats), salary_min=result.salary_min,
-                salary_max=result.salary_max, salary_currency=result.salary_currency,
-                salary_source=result.salary_source,
-                status="new" if result.score >= threshold else "archived",
-            )
+            for raw, result in zip(to_eval, evals, strict=True):
+                job = _persist(
+                    raw, score=result.score, score_notes=result.score_notes,
+                    caveats=json.dumps(result.caveats), salary_min=result.salary_min,
+                    salary_max=result.salary_max, salary_currency=result.salary_currency,
+                    salary_source=result.salary_source,
+                    status="new" if result.score >= threshold else "archived",
+                )
+                if job is not None:
+                    results.append(job)
+            return results
 
-    outcomes = await asyncio.gather(*map(evaluate_one, new_jobs), return_exceptions=True)
+    chunks = [new_jobs[i : i + batch_size] for i in range(0, len(new_jobs), batch_size)]
+    chunk_outcomes = await asyncio.gather(*map(evaluate_chunk, chunks), return_exceptions=True)
+
     saved: list[Job] = []
     spend_hit = False
-    for outcome in outcomes:
-        if isinstance(outcome, _StopScan):
+    for outcome in chunk_outcomes:
+        if isinstance(outcome, BaseException):
+            logger.error("scan: lote falhou — %s", outcome)
             spend_hit = True
-        elif isinstance(outcome, BaseException):
-            logger.error("scan: coroutine falhou — %s", outcome)
-            spend_hit = True
-        elif outcome is not None:
-            saved.append(outcome)
+            continue
+        for item in outcome:
+            if isinstance(item, _StopScan):
+                spend_hit = True
+            else:
+                saved.append(item)
 
     if spend_hit:
         logger.warning("scan_and_evaluate: interrompido por spend limit após %d vagas", len(saved))
