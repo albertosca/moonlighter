@@ -12,8 +12,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from playwright.async_api import Page
-
 from candidatador.application.answers.cv import CVNotFoundError, resolve_cv_path
 from candidatador.application.answers.email_alias import build_email_alias, inject_email_alias
 from candidatador.application.appliers.ashby import AshbyApplier
@@ -25,6 +23,7 @@ from candidatador.core import browser
 from candidatador.core.db import Application, Job
 from candidatador.core.llm import LLMCaller
 from candidatador.core.log import get_logger
+from playwright.async_api import Page
 
 logger = get_logger(__name__)
 

@@ -5,8 +5,6 @@ from contextlib import AbstractAsyncContextManager
 from datetime import datetime
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
-
 from candidatador.application import service as apply_service
 from candidatador.core import browser as _browser_mod
 from candidatador.core.config import load_company_list, load_config, load_profile
@@ -23,6 +21,7 @@ from candidatador.tracking.email_monitor import (
     sync_responses,
 )
 from candidatador.views import render_jobs_table
+from mcp.server.fastmcp import FastMCP
 
 _setup_logging()
 _log = _get_logger(__name__)

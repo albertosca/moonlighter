@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import yaml
-
 from candidatador.core.llm import LLMCaller, _make_api_caller, is_spend_limit
 from candidatador.core.log import get_logger
 from candidatador.core.parsing import _extract_json
@@ -115,5 +114,5 @@ def _as_float(value: Any) -> float:
     """Coage o score para float; null/string-inválida do LLM viram 0.0 (sem crash)."""
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 0.0

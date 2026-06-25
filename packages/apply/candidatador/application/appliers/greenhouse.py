@@ -3,10 +3,9 @@ import contextlib
 import re
 from typing import Any
 
-from playwright.async_api import TimeoutError as PlaywrightTimeout
-
 from candidatador.application.appliers.base import BaseApplier
 from candidatador.core.log import get_logger
+from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 logger = get_logger(__name__)
 

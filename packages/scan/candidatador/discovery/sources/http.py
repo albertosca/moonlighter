@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 import httpx
-
 from candidatador.core.log import get_logger
 from candidatador.discovery.sources.base import BaseScanner, RawJob, normalize_remote_type
 

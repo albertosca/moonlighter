@@ -4,9 +4,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from playwright.async_api import Browser, BrowserContext, Page, async_playwright
-
 from candidatador.core.log import get_logger
+from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
 logger = get_logger(__name__)
 

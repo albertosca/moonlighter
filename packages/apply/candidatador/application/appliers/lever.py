@@ -1,17 +1,16 @@
 import asyncio
 
+from candidatador.application.appliers.base import BaseApplier
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
-from candidatador.application.appliers.base import BaseApplier
 
-
-class AshbyApplier(BaseApplier):
+class LeverApplier(BaseApplier):
     async def detect(self) -> bool:
-        return "ashbyhq.com" in self.page.url or "jobs.ashbyhq.com" in self.page.url
+        return "jobs.lever.co" in self.page.url
 
     async def extract_fields(self) -> list[str]:
         try:
-            await self.page.wait_for_selector("form", timeout=10000)
+            await self.page.wait_for_selector(".application-form", timeout=10000)
         except PlaywrightTimeout:
             return []
         labels = []
@@ -20,9 +19,9 @@ class AshbyApplier(BaseApplier):
         label_els = await _query_labels_with_fallback(
             self.page,
             [
-                "label",
-                ".ashby-application-form label",
-                "[class*='label']:not(legend)",
+                ".application-label, label",
+                ".lever-application-form label",
+                "[class*='label']",
             ],
         )
         for el in label_els:
@@ -59,7 +58,7 @@ class AshbyApplier(BaseApplier):
         from candidatador.application.appliers.base import classify_submit_outcome
 
         try:
-            btn = await self.page.query_selector("button[type='submit']")
+            btn = await self.page.query_selector("button[type='submit'], .template-btn-submit")
             if not btn:
                 return "failed"
             await btn.click()

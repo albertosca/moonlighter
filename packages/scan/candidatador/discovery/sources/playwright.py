@@ -1,11 +1,10 @@
 import asyncio
 from typing import Any
 
-from playwright.async_api import Page
-from playwright.async_api import TimeoutError as PlaywrightTimeout
-
 from candidatador.core.log import get_logger
 from candidatador.discovery.sources.base import BaseScanner, RawJob, normalize_remote_type
+from playwright.async_api import Page
+from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 logger = get_logger(__name__)
 

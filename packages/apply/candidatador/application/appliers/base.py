@@ -5,11 +5,10 @@ from dataclasses import dataclass
 from typing import Any
 
 import yaml
-from playwright.async_api import Page
-
 from candidatador.core.llm import LLMCaller, _make_api_caller
 from candidatador.core.log import get_logger
 from candidatador.core.parsing import _extract_json
+from playwright.async_api import Page
 
 logger = get_logger(__name__)
 

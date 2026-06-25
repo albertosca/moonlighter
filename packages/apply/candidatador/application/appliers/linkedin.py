@@ -1,8 +1,7 @@
 import asyncio
 
-from playwright.async_api import TimeoutError as PlaywrightTimeout
-
 from candidatador.application.appliers.base import BaseApplier
+from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 
 class LinkedInApplier(BaseApplier):

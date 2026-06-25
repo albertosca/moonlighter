@@ -56,7 +56,9 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
     Returns:
         dict with merged config (defaults + overrides)
     """
-    config_path = Path(config_path) if config_path is not None else candidatador_home() / "config.yaml"
+    config_path = (
+        Path(config_path) if config_path is not None else candidatador_home() / "config.yaml"
+    )
     config: dict[str, Any] = dict(DEFAULTS)
     if config_path.exists():
         user = yaml.safe_load(config_path.read_text()) or {}
@@ -88,8 +90,7 @@ def load_profile(profile_path: str | Path | None = None) -> dict[str, Any]:
         dict with profile data (skills, experience, preferences, criteria, etc.)
     """
     profile_path = (
-        Path(profile_path) if profile_path is not None
-        else candidatador_home() / "profile.yaml"
+        Path(profile_path) if profile_path is not None else candidatador_home() / "profile.yaml"
     )
     return yaml.safe_load(profile_path.read_text()) or {}
 

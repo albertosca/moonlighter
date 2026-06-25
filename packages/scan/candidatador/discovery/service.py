@@ -10,8 +10,6 @@ import re
 from typing import Any
 
 import httpx
-from peewee import IntegrityError
-
 from candidatador.core import browser
 from candidatador.core.config import load_company_list
 from candidatador.core.db import Job, ScanLog
@@ -21,6 +19,7 @@ from candidatador.discovery.evaluator import evaluate_job, should_skip_by_title
 from candidatador.discovery.sources.base import RawJob
 from candidatador.discovery.sources.http import AshbyScanner, GreenhouseScanner, LeverScanner
 from candidatador.views import render_jobs_table
+from peewee import IntegrityError
 
 logger = get_logger(__name__)
 

@@ -23,8 +23,7 @@ def resolve_cv_path(company: str, config: dict[str, Any]) -> str:
     rel = by_company.get((company or "").lower(), cv_cfg.get("default"))
     if not rel:
         raise CVNotFoundError(
-            f"Sem CV mapeado para '{company}' e sem 'cv.default' em config. "
-            "Verifique config.yaml."
+            f"Sem CV mapeado para '{company}' e sem 'cv.default' em config. Verifique config.yaml."
         )
     path = Path(rel)
     if not path.is_absolute():

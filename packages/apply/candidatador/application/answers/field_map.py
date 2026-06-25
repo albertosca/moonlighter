@@ -56,10 +56,15 @@ _RULES: list[tuple[str, _RuleFn]] = [
     # Autorização de trabalho / visto / sponsorship: NÃO ficam aqui — são tratados
     # de forma país-dependente em work_auth (resposta fixa seria mentira p/ vaga US).
     # Idiomas
-    (r"english\s+level|english\s+proficiency|profici.*english", lambda p: p.get("english_level") or None),
+    (
+        r"english\s+level|english\s+proficiency|profici.*english",
+        lambda p: p.get("english_level") or None,
+    ),
     # Disponibilidade para escritório — lê do profile; False → "No", ausente → None (LLM decide)
-    (r"work\s+from\s+the\s+office|office\s+at\s+least",
-     lambda p: ("Yes" if p["office_available"] else "No") if "office_available" in p else None),
+    (
+        r"work\s+from\s+the\s+office|office\s+at\s+least",
+        lambda p: ("Yes" if p["office_available"] else "No") if "office_available" in p else None,
+    ),
     # Localização atual — ancorado no início p/ não casar frases de confirmação que
     # contêm "currently based" no meio (ex: "...require you to be currently based...").
     (r"^where\s+are\s+you\s+(currently\s+)?based|^current\s+location|^currently\s+based", _city),

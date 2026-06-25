@@ -2,11 +2,10 @@
 
 import io
 
+from candidatador.core.db import Job
 from rich import box
 from rich.console import Console
 from rich.table import Table
-
-from candidatador.core.db import Job
 
 
 def render_jobs_table(jobs: list[Job]) -> str:
