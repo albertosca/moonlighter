@@ -155,7 +155,8 @@ ashby:
 # --- candidatador_home ---
 
 
-def test_candidatador_home_default():
+def test_candidatador_home_default(monkeypatch):
+    monkeypatch.delenv("CANDIDATADOR_HOME", raising=False)
     home = candidatador_home()
     assert home == (Path.home() / ".candidatador")
 
