@@ -20,6 +20,10 @@ DEFAULTS = {
     "eval_model": "claude-haiku-4-5-20251001",
     "slow_mo_ms": 300,
     "title_blocklist": [],
+    # Máximo de avaliações LLM em paralelo no scan. Limita o burst de tokens e o
+    # desperdício após o spend-limit (irmãs em voo). Com batching (scan_batch_size),
+    # é o nº de LOTES em paralelo. Concorrência efetiva = scan_concurrency × scan_batch_size.
+    "scan_concurrency": 5,
     # CV por empresa. Caminhos relativos a CANDIDATADOR_HOME; match case-insensitive.
     # 'default' usado quando a empresa não tem entrada. Pode ser sobrescrito no
     # config.yaml local. Se o arquivo escolhido não existir, confirm_apply aborta.

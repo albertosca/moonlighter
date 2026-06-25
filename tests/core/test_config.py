@@ -233,3 +233,19 @@ def test_load_company_list_with_phase_filter(tmp_path):
     )
     result = load_company_list(path=str(company_file), phase="phase1")
     assert result["greenhouse"] == ["stripe"]
+
+
+# --- scan_concurrency ---
+
+
+def test_scan_concurrency_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+    from candidatador.core.config import load_config
+    assert load_config()["scan_concurrency"] == 5
+
+
+def test_scan_concurrency_override(tmp_path, monkeypatch):
+    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+    (tmp_path / "config.yaml").write_text("scan_concurrency: 3\n")
+    from candidatador.core.config import load_config
+    assert load_config()["scan_concurrency"] == 3
