@@ -9,6 +9,19 @@ from candidatador.core.parsing import _extract_json
 
 logger = get_logger(__name__)
 
+# Campos do profile que importam para PONTUAR uma vaga. Contato/credenciais
+# (name/phone/email/linkedin) e education/publications não influenciam o score e
+# só inflam o prompt — ficam de fora.
+_EVAL_PROFILE_KEYS = (
+    "criteria", "skills", "headline", "summary", "preferences", "languages", "experience",
+)
+
+
+def profile_for_eval(profile: dict[str, Any]) -> dict[str, Any]:
+    """Subconjunto do profile relevante para avaliação. Reduz tokens por chamada
+    sem perder os dealbreakers (criteria) nem o contexto de match (skills/experience)."""
+    return {k: profile[k] for k in _EVAL_PROFILE_KEYS if k in profile}
+
 
 def should_skip_by_title(title: str, blocklist: list[str]) -> str | None:
     """Retorna o padrão que deu match se o título deve ser descartado, ou None.
@@ -77,7 +90,7 @@ async def evaluate_job(
         _caller = _make_api_caller()
     logger.debug("evaluating %s/%s", company, title)
     prompt = EVAL_PROMPT.format(
-        profile_yaml=yaml.dump(profile, allow_unicode=True),
+        profile_yaml=yaml.dump(profile_for_eval(profile), allow_unicode=True),
         company=company,
         title=title,
         description=description[:8000],  # cap to avoid huge context

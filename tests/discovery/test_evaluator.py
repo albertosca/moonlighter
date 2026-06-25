@@ -3,8 +3,12 @@ import logging
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
-from candidatador.discovery.evaluator import EvaluationResult, evaluate_job, should_skip_by_title
+from candidatador.discovery.evaluator import (
+    EvaluationResult,
+    evaluate_job,
+    profile_for_eval,
+    should_skip_by_title,
+)
 
 MOCK_LLM_RESPONSE = json.dumps(
     {
@@ -27,6 +31,26 @@ PROFILE = {
 }
 
 JD = "Senior Elixir Engineer. Remote. Build distributed systems with Elixir/OTP."
+
+
+def test_profile_for_eval_keeps_scoring_keys():
+    profile = {
+        "name": "X", "phone": "1", "email": "e", "linkedin": "l",
+        "education": [], "publications": [],
+        "criteria": {"hard_filters": ["no .NET"]}, "skills": ["python"],
+        "headline": "Staff", "summary": "...", "preferences": {"salary_min_usd": 150000},
+        "languages": ["pt", "en"], "experience": [{"role": "X"}],
+    }
+    trimmed = profile_for_eval(profile)
+    assert set(trimmed) == {
+        "criteria", "skills", "headline", "summary", "preferences", "languages", "experience"
+    }
+    assert "email" not in trimmed and "phone" not in trimmed
+
+
+def test_profile_for_eval_tolerates_missing_keys():
+    assert profile_for_eval({"skills": ["go"]}) == {"skills": ["go"]}
+    assert profile_for_eval({}) == {}
 
 
 def _make_caller(text: str):
