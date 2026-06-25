@@ -23,9 +23,6 @@ from peewee import IntegrityError
 
 logger = get_logger(__name__)
 
-BATCH_SIZE = 10
-
-
 class _StopScan:
     """Sentinela devolvida por uma coroutine que detectou spend limit e parou."""
 
@@ -124,81 +121,65 @@ def _drop_already_seen(raw_jobs: list[RawJob]) -> list[RawJob]:
 async def _evaluate_and_store(
     new_jobs: list[RawJob], config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
 ) -> tuple[list[Job], bool]:
-    """Avalia e salva cada vaga em lotes concorrentes, parando conservadoramente no
-    primeiro spend limit ou erro inesperado. Devolve as vagas salvas e se parou."""
+    """Avalia e salva cada vaga com concorrência limitada por semaphore, parando
+    conservadoramente no primeiro spend limit ou erro inesperado. Devolve as vagas
+    salvas e se parou."""
     threshold = config["score_threshold"]
     model = _model_for(config)
     blocklist: list[str] = config.get("title_blocklist", [])
+    concurrency: int = config.get("scan_concurrency", 5)
     stop = asyncio.Event()
+    semaphore = asyncio.Semaphore(concurrency)
 
     async def evaluate_one(raw: RawJob) -> Job | None | _StopScan:
-        if not _claim(raw):
-            return None
-        if stop.is_set():
-            _release(raw)
-            return _StopScan()
-
-        matched = should_skip_by_title(raw.title, blocklist)
-        if matched:
-            return _persist(
-                raw,
-                score=0.0,
-                score_notes=f"title filtered: {matched!r}",
-                caveats="[]",
-                status="archived",
-            )
-
-        try:
-            result = await evaluate_job(
-                company=raw.company,
-                title=raw.title,
-                description=raw.description or f"{raw.title} at {raw.company}",
-                profile=profile,
-                model=model,
-                _caller=caller,
-            )
-        except Exception as e:
-            _release(raw)
-            if is_spend_limit(e):
-                stop.set()
+        async with semaphore:
+            # Já parou enquanto esperava o permit: não reserva nem chama o LLM.
+            if stop.is_set():
                 return _StopScan()
-            logger.error("scan: erro inesperado avaliando %s/%s — %s", raw.company, raw.title, e)
-            raise
+            if not _claim(raw):
+                return None
 
-        return _persist(
-            raw,
-            score=result.score,
-            score_notes=result.score_notes,
-            caveats=json.dumps(result.caveats),
-            salary_min=result.salary_min,
-            salary_max=result.salary_max,
-            salary_currency=result.salary_currency,
-            salary_source=result.salary_source,
-            status="new" if result.score >= threshold else "archived",
-        )
+            matched = should_skip_by_title(raw.title, blocklist)
+            if matched:
+                return _persist(
+                    raw, score=0.0, score_notes=f"title filtered: {matched!r}",
+                    caveats="[]", status="archived",
+                )
 
+            try:
+                result = await evaluate_job(
+                    company=raw.company,
+                    title=raw.title,
+                    description=raw.description or f"{raw.title} at {raw.company}",
+                    profile=profile, model=model, _caller=caller,
+                )
+            except Exception as e:
+                _release(raw)
+                if is_spend_limit(e):
+                    stop.set()
+                    return _StopScan()
+                logger.error("scan: erro inesperado avaliando %s/%s — %s", raw.company, raw.title, e)
+                raise
+
+            return _persist(
+                raw, score=result.score, score_notes=result.score_notes,
+                caveats=json.dumps(result.caveats), salary_min=result.salary_min,
+                salary_max=result.salary_max, salary_currency=result.salary_currency,
+                salary_source=result.salary_source,
+                status="new" if result.score >= threshold else "archived",
+            )
+
+    outcomes = await asyncio.gather(*map(evaluate_one, new_jobs), return_exceptions=True)
     saved: list[Job] = []
     spend_hit = False
-    for start in range(0, len(new_jobs), BATCH_SIZE):
-        # Guarda defensiva: na prática inalcançável — quem seta stop sempre devolve um
-        # _StopScan no MESMO batch, que já dispara o break abaixo antes de reentrar.
-        if stop.is_set():  # pragma: no cover
+    for outcome in outcomes:
+        if isinstance(outcome, _StopScan):
             spend_hit = True
-            break
-        batch = new_jobs[start : start + BATCH_SIZE]
-        # return_exceptions=True: nenhuma coroutine é cancelada — cada uma roda até o
-        # fim e limpa o próprio claim, eliminando claims órfãos.
-        outcomes = await asyncio.gather(*map(evaluate_one, batch), return_exceptions=True)
-        for outcome in outcomes:
-            if isinstance(outcome, _StopScan):
-                spend_hit = True
-            elif isinstance(outcome, BaseException):
-                logger.error("scan: coroutine falhou — %s", outcome)
-                spend_hit = True
-            elif outcome is not None:
-                saved.append(outcome)
-        if spend_hit:
-            break
+        elif isinstance(outcome, BaseException):
+            logger.error("scan: coroutine falhou — %s", outcome)
+            spend_hit = True
+        elif outcome is not None:
+            saved.append(outcome)
 
     if spend_hit:
         logger.warning("scan_and_evaluate: interrompido por spend limit após %d vagas", len(saved))

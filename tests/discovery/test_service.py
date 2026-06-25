@@ -5,6 +5,7 @@ add_job é chamado direto no service (não pela tool MCP) para isolar a lógica 
 config/profile/caller, sem depender da config global carregada no import.
 """
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from candidatador.core.db import Job, ScanLog, init_db
@@ -311,3 +312,50 @@ async def test_scan_title_filtered_integrity_error_skips_silently(tmp_db):
     Job.create(source="x", company="x", title="x", url="https://x.com/scan/6", status="new")
     result = await _run_scan([_raw(6, title="Staff Accountant")])
     assert "processadas" in result or "Nenhuma" in result
+
+
+# ── concorrência com semaphore ───────────────────────────────────────────────
+
+
+class _Tracker:
+    """Caller que rastreia pico de chamadas LLM simultâneas."""
+
+    def __init__(self) -> None:
+        self.current = 0
+        self.peak = 0
+
+    async def __call__(self, prompt: str, model: str) -> str:
+        self.current += 1
+        self.peak = max(self.peak, self.current)
+        await asyncio.sleep(0.01)
+        self.current -= 1
+        return '{"score": 8.0, "score_notes": "ok", "caveats": []}'
+
+
+async def test_scan_concurrency_is_capped(tmp_db):
+    init_db()
+    caller = _Tracker()
+    config = {"score_threshold": 6.5, "eval_model": "m", "scan_concurrency": 2, "title_blocklist": []}
+    jobs = [_raw(i) for i in range(6)]
+    saved, spend_hit = await scan_service._evaluate_and_store(jobs, config, {}, caller)
+    assert len(saved) == 6
+    assert spend_hit is False
+    assert caller.peak == 2
+
+
+async def test_scan_stops_before_llm_after_spend_limit(tmp_db):
+    init_db()
+    calls = {"n": 0}
+
+    async def caller(prompt: str, model: str) -> str:
+        calls["n"] += 1
+        raise RuntimeError("spend limit reached")
+
+    config = {"score_threshold": 6.5, "eval_model": "m", "scan_concurrency": 1, "title_blocklist": []}
+    jobs = [_raw(i) for i in range(5)]
+    _saved, spend_hit = await scan_service._evaluate_and_store(jobs, config, {}, caller)
+    assert spend_hit is True
+    # concurrency=1: a 1ª call detecta o spend-limit e seta stop; as demais veem
+    # stop=True logo após o semaphore e nem chamam o LLM.
+    assert calls["n"] == 1
+    assert ScanLog.select().count() == 0  # todos os claims liberados
