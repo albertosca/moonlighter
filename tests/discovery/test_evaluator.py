@@ -1,5 +1,6 @@
 import json
 import logging
+from dataclasses import FrozenInstanceError
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -8,6 +9,7 @@ from candidatador.discovery.evaluator import (
     EvaluationResult,
     _parse_batch,
     evaluate_job,
+    evaluate_jobs_batch,
     profile_for_eval,
     should_skip_by_title,
 )
@@ -624,7 +626,7 @@ async def test_evaluate_job_non_list_caveats_becomes_empty():
 def test_eval_input_is_frozen():
     """EvalInput é um frozen dataclass."""
     inp = EvalInput(company="Acme", title="Engineer", description="desc")
-    with pytest.raises(Exception):  # FrozenInstanceError
+    with pytest.raises(FrozenInstanceError):
         inp.company = "other"
 
 
@@ -663,3 +665,71 @@ def test_parse_batch_item_with_missing_keys_uses_defaults():
     results = _parse_batch('[{"foo": 1}]', 1)
     assert results is not None
     assert results[0].score == 0.0 and results[0].caveats == []
+
+
+# ── evaluate_jobs_batch ───────────────────────────────────────────────────────
+
+
+def _inputs(n: int) -> list[EvalInput]:
+    return [EvalInput(company=f"Co{i}", title=f"T{i}", description=f"d{i}") for i in range(n)]
+
+
+async def test_batch_happy_path_single_call():
+    calls = {"n": 0}
+
+    async def caller(prompt, model):
+        calls["n"] += 1
+        return '[{"score": 8.0, "score_notes": "a", "caveats": []}, {"score": 2.0, "score_notes": "b", "caveats": []}]'
+
+    results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    assert [r.score for r in results] == [8.0, 2.0]
+    assert calls["n"] == 1  # uma única chamada para o lote
+
+
+async def test_batch_falls_back_per_job_on_bad_json():
+    calls = {"n": 0}
+
+    async def caller(prompt, model):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return "garbage not json"  # lote falha o parse
+        return '{"score": 5.0, "score_notes": "x", "caveats": []}'  # per-job
+
+    results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    assert [r.score for r in results] == [5.0, 5.0]
+    assert calls["n"] == 3  # 1 lote (falhou) + 2 per-job
+
+
+async def test_batch_spend_limit_propagates():
+    async def caller(prompt, model):
+        raise RuntimeError("spend limit reached")
+
+    with pytest.raises(RuntimeError, match="spend limit"):
+        await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+
+
+async def test_batch_single_job_uses_single_path():
+    calls = {"n": 0}
+
+    async def caller(prompt, model):
+        calls["n"] += 1
+        return '{"score": 7.0, "score_notes": "x", "caveats": []}'
+
+    results = await evaluate_jobs_batch(_inputs(1), {}, "m", caller)
+    assert results[0].score == 7.0
+    assert calls["n"] == 1
+
+
+async def test_batch_falls_back_per_job_on_non_spend_error():
+    """Erro não-cota na chamada de lote → fallback per-job (score=0 por evaluate_job)."""
+    calls = {"n": 0}
+
+    async def caller(prompt, model):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ConnectionError("timeout")  # erro não-cota: fallback
+        return '{"score": 3.0, "score_notes": "y", "caveats": []}'
+
+    results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    assert calls["n"] == 3  # 1 lote (erro) + 2 per-job
+    assert len(results) == 2
