@@ -29,16 +29,26 @@ _US_MARKERS = (
     "usa",
     "u.s.",
     "u.s.a",
-    ", ca",
-    ", ny",
-    ", wa",
-    ", tx",
     "san francisco",
     "new york",
     "seattle",
     "austin",
     "boston",
 )
+# Códigos de estado (", CA"/", NY"/...) precisam de word-boundary: como substring,
+# ", ca" casaria "Toronto, Ca-nada" e marcaria a vaga canadense como US (falso positivo).
+_US_STATE_RE = re.compile(r",\s*(ca|ny|wa|tx)\b")
+
+
+def _canonical_country(value: str) -> str | None:
+    """Normaliza um nome de país (livre, qualquer locale) para a forma canônica
+    usada na comparação. Desconhecido (nem BR nem US) → None (vira review)."""
+    text = value.strip().lower()
+    if text in ("brazil", "brasil", "br"):
+        return "brazil"
+    if text in ("united states", "usa", "us", "u.s.", "u.s.a", "united states of america"):
+        return "united states"
+    return None
 
 # Detecta o tipo de campo. authorization e sponsorship são respondidos de forma
 # OPOSTA conforme o país.
@@ -57,7 +67,7 @@ def infer_country(location: str | None, remote_type: str | None) -> str | None:
     text = (location or "").lower()
     if any(m in text for m in _BRAZIL_MARKERS):
         return "brazil"
-    if any(m in text for m in _US_MARKERS):
+    if any(m in text for m in _US_MARKERS) or _US_STATE_RE.search(text):
         return "united states"
     return None
 
@@ -69,7 +79,9 @@ def resolve_work_auth(field_label: str, country: str | None, config: dict[str, A
     não for de autorização (aí o LLM cuida).
     """
     wa = config.get("work_authorization", {}) or {}
-    citizenship: str = (wa.get("citizenship_country") or "").lower()
+    # Normaliza pra forma canônica: aceita "Brasil"/"Brazil"/"BR" etc. sem depender
+    # de locale exato. Vazio/ausente/desconhecido → None → review (conservador).
+    citizenship = _canonical_country(wa.get("citizenship_country") or "")
     yes: str = wa.get("authorized_answer", "Yes")
     no: str = wa.get("not_authorized_answer", "No")
     review: str = wa.get("needs_review_sentinel", "__NEEDS_REVIEW__")

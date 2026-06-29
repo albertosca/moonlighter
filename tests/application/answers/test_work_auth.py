@@ -98,3 +98,41 @@ def test_missing_citizenship_needs_review():
         "Are you authorized to work in this location?", "brazil", WA_CONFIG_NO_CITIZENSHIP
     )
     assert r == "__NEEDS_REVIEW__"
+
+
+# ── C2: edge cases (regressões) ───────────────────────────────────────────────
+
+
+def test_infer_country_canada_not_misread_as_us():
+    """', ca' NÃO pode casar 'Canada' (de 'ca-nada') — senão vaga canadense vira US."""
+    assert infer_country("Toronto, Canada", None) is None
+    assert infer_country("Vancouver, BC, Canada", None) is None
+
+
+def test_infer_country_us_state_codes_still_match():
+    # cidades FORA da lista de markers → força o caminho do regex de estado
+    assert infer_country("Sacramento, CA", None) == "united states"
+    assert infer_country("Tacoma, WA", None) == "united states"
+    assert infer_country("Dallas, TX", None) == "united states"
+
+
+def test_resolve_citizenship_locale_normalized():
+    """citizenship_country não-canônico ('Brasil'/'Brazil'/'BR') deve casar 'brazil'."""
+    for form in ("Brasil", "Brazil", "BR", " brazil "):
+        cfg = {"work_authorization": {"citizenship_country": form}}
+        r = resolve_work_auth("Are you authorized to work here?", "brazil", cfg)
+        assert r == "Yes", f"falhou para {form!r}"
+
+
+def test_resolve_us_citizenship_normalized():
+    """citizenship_country em forma US ('USA') normaliza e casa país 'united states'."""
+    cfg = {"work_authorization": {"citizenship_country": "USA"}}
+    r = resolve_work_auth("Are you authorized to work here?", "united states", cfg)
+    assert r == "Yes"
+
+
+def test_resolve_unrecognized_citizenship_needs_review():
+    """País de cidadania não-reconhecido (nem BR nem US) → review (conservador)."""
+    cfg = {"work_authorization": {"citizenship_country": "Portugal"}}
+    r = resolve_work_auth("Are you authorized to work here?", "united states", cfg)
+    assert r == "__NEEDS_REVIEW__"
