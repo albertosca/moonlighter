@@ -281,3 +281,78 @@ async def test_make_api_caller_raises_on_non_text_block():
         caller = _make_api_caller()
         with pytest.raises(RuntimeError, match="bloco não-texto"):
             await caller("prompt", "model")
+
+
+# ── cache_prefix (Task 8) ─────────────────────────────────────────────────────
+
+
+async def test_cli_concatenates_cache_prefix():
+    """cache_prefix é concatenado ao prompt no backend cli."""
+    captured: dict[str, str] = {}
+
+    async def fake_exec(*args: object, **kwargs: object) -> MagicMock:
+        captured["prompt"] = args[2]  # claude, -p, <prompt>
+        proc = MagicMock()
+        proc.returncode = 0
+        proc.communicate = AsyncMock(return_value=(b"ok", b""))
+        return proc
+
+    with patch("candidatador.core.llm.asyncio.create_subprocess_exec", new=fake_exec):
+        await _call_cli("DYN", "m", cache_prefix="STATIC")
+    assert captured["prompt"] == "STATIC\n\nDYN"
+
+
+async def test_cli_no_cache_prefix_keeps_prompt_unchanged():
+    """cache_prefix=None (default) mantém o comportamento original no cli."""
+    captured: dict[str, str] = {}
+
+    async def fake_exec(*args: object, **kwargs: object) -> MagicMock:
+        captured["prompt"] = args[2]
+        proc = MagicMock()
+        proc.returncode = 0
+        proc.communicate = AsyncMock(return_value=(b"ok", b""))
+        return proc
+
+    with patch("candidatador.core.llm.asyncio.create_subprocess_exec", new=fake_exec):
+        await _call_cli("PROMPT_ONLY", "m")
+    assert captured["prompt"] == "PROMPT_ONLY"
+
+
+async def test_api_uses_cache_control_block():
+    """cache_prefix vira um content block com cache_control ephemeral no api."""
+    mock_message = MagicMock()
+    mock_message.content = [MagicMock(spec=TextBlock, text="ok")]
+    mock_client = MagicMock()
+    mock_client.messages.create = AsyncMock(return_value=mock_message)
+
+    mock_anthropic = MagicMock()
+    mock_anthropic.AsyncAnthropic.return_value = mock_client
+
+    with patch("candidatador.core.llm.anthropic", mock_anthropic):
+        caller = _make_api_caller()
+        await caller("DYN", "m", cache_prefix="STATIC")
+
+    call_kwargs = mock_client.messages.create.call_args.kwargs
+    content = call_kwargs["messages"][0]["content"]
+    assert isinstance(content, list)
+    assert content[0] == {"type": "text", "text": "STATIC", "cache_control": {"type": "ephemeral"}}
+    assert content[1] == {"type": "text", "text": "DYN"}
+
+
+async def test_api_no_cache_prefix_sends_plain_string():
+    """cache_prefix=None (default) mantém envio de string simples no api."""
+    mock_message = MagicMock()
+    mock_message.content = [MagicMock(spec=TextBlock, text="ok")]
+    mock_client = MagicMock()
+    mock_client.messages.create = AsyncMock(return_value=mock_message)
+
+    mock_anthropic = MagicMock()
+    mock_anthropic.AsyncAnthropic.return_value = mock_client
+
+    with patch("candidatador.core.llm.anthropic", mock_anthropic):
+        caller = _make_api_caller()
+        await caller("PROMPT_ONLY", "m")
+
+    call_kwargs = mock_client.messages.create.call_args.kwargs
+    content = call_kwargs["messages"][0]["content"]
+    assert content == "PROMPT_ONLY"
