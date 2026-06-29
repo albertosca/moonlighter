@@ -62,7 +62,6 @@ def test_load_company_list_nonexistent():
 
 def test_load_config_path_keys_expanded(tmp_path):
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
-    assert "~" not in config["db_path"]
     assert "~" not in config["browser_session_dir"]
     assert "~" not in config["screenshots_dir"]
 
@@ -87,7 +86,7 @@ def test_load_config_partial_override(tmp_path):
 
 def test_load_config_all_path_keys_no_tilde(tmp_path):
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
-    for key in ("db_path", "browser_session_dir", "screenshots_dir"):
+    for key in ("browser_session_dir", "screenshots_dir"):
         assert "~" not in config[key], f"{key} still contains '~'"
 
 

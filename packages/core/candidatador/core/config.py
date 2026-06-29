@@ -45,7 +45,7 @@ DEFAULTS = {
     },
 }
 
-_PATH_KEYS = ("browser_session_dir", "screenshots_dir", "db_path")
+_PATH_KEYS = ("browser_session_dir", "screenshots_dir")
 
 
 def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
@@ -68,7 +68,6 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
         **DEFAULTS,
         "browser_session_dir": str(home / "browser-session"),
         "screenshots_dir": str(home / "screenshots"),
-        "db_path": str(home / "candidatador.db"),
     }
     if config_path.exists():
         user = yaml.safe_load(config_path.read_text()) or {}

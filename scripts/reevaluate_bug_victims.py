@@ -20,7 +20,6 @@ Flags:
 import argparse
 import asyncio
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -192,9 +191,7 @@ def main() -> None:
     setup_logging()
     config = load_config()
     profile = load_profile()
-    db_path = str(Path(config.get("db_path", "~/.candidatador/candidatador.core.db")).expanduser())
-    os.environ["CANDIDATADOR_DB"] = db_path
-    init_db()
+    init_db()  # resolve o path via candidatador_home() / CANDIDATADOR_DB_PATH (fonte única em db.py)
 
     model = args.model or config.get(
         "eval_model", config.get("llm_model", "claude-haiku-4-5-20251001")

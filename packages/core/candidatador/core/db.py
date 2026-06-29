@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from candidatador.core.config import candidatador_home
 from peewee import (
     CharField,
     DateTimeField,
@@ -17,9 +18,9 @@ from peewee import (
 
 
 def _db_path() -> str:
-    return os.environ.get(
-        "CANDIDATADOR_DB_PATH", str(Path("~/.candidatador/candidatador.db").expanduser())
-    )
+    # Fonte única do caminho do banco: override explícito via CANDIDATADOR_DB_PATH,
+    # senão segue candidatador_home() (respeita CANDIDATADOR_HOME).
+    return os.environ.get("CANDIDATADOR_DB_PATH") or str(candidatador_home() / "candidatador.db")
 
 
 db = SqliteDatabase(None)  # initialized in init_db()

@@ -3,9 +3,8 @@ import json
 import os
 
 import pytest
-from peewee import IntegrityError
-
 from candidatador.core.db import Application, Job, ScanLog, init_db
+from peewee import IntegrityError
 
 
 def _make_job(**kwargs):
@@ -351,10 +350,11 @@ def test_init_db_migrates_old_application_table(tmp_db):
 
 
 def test_db_path_default_when_env_unset(monkeypatch):
-    """Sem CANDIDATADOR_DB_PATH → default ~/.candidatador/candidatador.db (não .core.db)."""
+    """Sem CANDIDATADOR_DB_PATH nem CANDIDATADOR_HOME → default ~/.candidatador/candidatador.db."""
     from candidatador.core.db import _db_path
 
     monkeypatch.delenv("CANDIDATADOR_DB_PATH", raising=False)
+    monkeypatch.delenv("CANDIDATADOR_HOME", raising=False)
     assert _db_path().endswith("/.candidatador/candidatador.db")
 
 
@@ -363,3 +363,12 @@ def test_db_path_respects_env(monkeypatch):
 
     monkeypatch.setenv("CANDIDATADOR_DB_PATH", "/tmp/custom-candidatador.db")
     assert _db_path() == "/tmp/custom-candidatador.db"
+
+
+def test_db_path_follows_candidatador_home(monkeypatch, tmp_path):
+    """Sem CANDIDATADOR_DB_PATH, o banco segue CANDIDATADOR_HOME (fonte única)."""
+    from candidatador.core.db import _db_path
+
+    monkeypatch.delenv("CANDIDATADOR_DB_PATH", raising=False)
+    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+    assert _db_path() == str(tmp_path / "candidatador.db")

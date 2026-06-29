@@ -20,7 +20,6 @@ Flags:
 import argparse
 import asyncio
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -233,9 +232,7 @@ def main() -> None:
         profile = load_profile()
     except FileNotFoundError:
         profile = {}
-    db_path = str(Path(config.get("db_path", "~/.candidatador/candidatador.db")).expanduser())
-    os.environ["CANDIDATADOR_DB_PATH"] = db_path
-    init_db()
+    init_db()  # resolve o path via candidatador_home() / CANDIDATADOR_DB_PATH (fonte única em db.py)
 
     model = config.get("eval_model", "claude-haiku-4-5-20251001")
     learned_path = candidatador_home() / "blocklist_learned.yaml"
