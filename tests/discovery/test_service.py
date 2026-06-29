@@ -332,7 +332,7 @@ class _Tracker:
         self.current = 0
         self.peak = 0
 
-    async def __call__(self, prompt: str, model: str) -> str:
+    async def __call__(self, prompt: str, model: str, cache_prefix: str | None = None) -> str:
         self.current += 1
         self.peak = max(self.peak, self.current)
         await asyncio.sleep(0.01)
@@ -355,7 +355,7 @@ async def test_scan_stops_before_llm_after_spend_limit(tmp_db):
     init_db()
     calls = {"n": 0}
 
-    async def caller(prompt: str, model: str) -> str:
+    async def caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:
         calls["n"] += 1
         raise RuntimeError("spend limit reached")
 
@@ -374,7 +374,7 @@ async def test_scan_chunk_skips_already_claimed_job(tmp_db):
     # Pré-insere claim para a URL → _claim retorna False → vaga pulada sem chamar o LLM.
     ScanLog.create(job_url="https://x.com/scan/99", source="greenhouse")
 
-    async def caller(prompt: str, model: str) -> str:
+    async def caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:
         raise AssertionError("LLM não deve ser chamado para vaga já reservada")
 
     config = {
@@ -391,7 +391,7 @@ async def test_scan_batches_jobs_into_one_call(tmp_db):
     init_db()
     calls = {"n": 0}
 
-    async def caller(prompt: str, model: str) -> str:
+    async def caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:
         calls["n"] += 1
         return '[' + ", ".join('{"score": 8.0, "score_notes": "ok", "caveats": []}' for _ in range(4)) + ']'
 

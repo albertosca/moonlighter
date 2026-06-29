@@ -113,7 +113,7 @@ async def test_evaluate_10_jobs_concurrent_faster_than_sequential():
         }
     )
 
-    async def slow_caller(prompt, model):
+    async def slow_caller(prompt, model, cache_prefix=None):
         await asyncio.sleep(0.05)
         call_count[0] += 1
         return _response
@@ -173,7 +173,7 @@ async def test_evaluate_batch_size_10_processes_all():
         }
     )
 
-    async def fast_caller(prompt, model):
+    async def fast_caller(prompt, model, cache_prefix=None):
         return _response
 
     profile = {}

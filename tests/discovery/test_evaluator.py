@@ -58,7 +58,7 @@ def test_profile_for_eval_tolerates_missing_keys():
 
 
 def _make_caller(text: str):
-    async def caller(prompt, model):
+    async def caller(prompt, model, cache_prefix=None):
         return text
 
     return caller
@@ -187,7 +187,7 @@ async def test_evaluate_job_caveats_multiple():
 async def test_evaluate_job_llm_exception_returns_zero():
     """Any exception from caller → score=0.0 with 'evaluation error' in notes."""
 
-    async def failing_caller(prompt, model):
+    async def failing_caller(prompt, model, cache_prefix=None):
         raise Exception("network timeout")
 
     result = await evaluate_job(
@@ -205,7 +205,7 @@ async def test_evaluate_job_llm_exception_returns_zero():
 async def test_evaluate_job_spend_limit_propagates():
     """Spend limit error must propagate — caller must not swallow it."""
 
-    async def spend_limit_caller(prompt, model):
+    async def spend_limit_caller(prompt, model, cache_prefix=None):
         raise Exception(
             "You've hit your monthly spend limit · raise it at claude.ai/settings/usage"
         )
@@ -224,7 +224,7 @@ async def test_evaluate_job_spend_limit_propagates():
 async def test_evaluate_job_rate_limit_propagates():
     """Rate limit / quota errors must also propagate."""
 
-    async def quota_caller(prompt, model):
+    async def quota_caller(prompt, model, cache_prefix=None):
         raise Exception("429 Too Many Requests: quota exceeded")
 
     with pytest.raises(Exception, match="429"):
@@ -254,7 +254,7 @@ async def test_evaluate_job_description_capped_at_8000():
         }
     )
 
-    async def capture_caller(prompt, model):
+    async def capture_caller(prompt, model, cache_prefix=None):
         captured_prompt.append(prompt)
         return response
 
@@ -286,7 +286,7 @@ async def test_evaluate_job_uses_injected_caller():
     )
     called = []
 
-    async def tracking_caller(prompt, model):
+    async def tracking_caller(prompt, model, cache_prefix=None):
         called.append((prompt, model))
         return response
 
@@ -307,7 +307,7 @@ async def test_evaluate_job_caller_receives_model():
     """The model argument is forwarded to the caller."""
     received_models = []
 
-    async def capture_caller(prompt, model):
+    async def capture_caller(prompt, model, cache_prefix=None):
         received_models.append(model)
         return json.dumps(
             {
@@ -435,7 +435,7 @@ async def test_evaluate_job_strips_leading_prose():
 async def test_eval_prompt_wraps_job_posting_in_xml_tags():
     captured = {}
 
-    async def cap(prompt, model):
+    async def cap(prompt, model, cache_prefix=None):
         captured["p"] = prompt
         return MOCK_LLM_RESPONSE
 
@@ -447,6 +447,7 @@ async def test_eval_prompt_wraps_job_posting_in_xml_tags():
         model="test",
         _caller=cap,
     )
+    # Vaga (sufixo dinâmico) deve conter as tags XML.
     assert "<job_posting>" in captured["p"]
     assert "</job_posting>" in captured["p"]
 
@@ -454,7 +455,8 @@ async def test_eval_prompt_wraps_job_posting_in_xml_tags():
 async def test_eval_prompt_includes_anti_injection_instruction():
     captured = {}
 
-    async def cap(prompt, model):
+    async def cap(prompt, model, cache_prefix=None):
+        captured["prefix"] = cache_prefix
         captured["p"] = prompt
         return MOCK_LLM_RESPONSE
 
@@ -466,14 +468,15 @@ async def test_eval_prompt_includes_anti_injection_instruction():
         model="test",
         _caller=cap,
     )
-    assert "dados externos" in captured["p"]
+    # A instrução anti-injeção fica no prefixo estático (cacheável), não no sufixo.
+    assert "dados externos" in captured["prefix"]
 
 
 async def test_eval_description_inside_xml_block():
     """Descrição da vaga deve aparecer dentro de <job_posting>...</job_posting>."""
     captured = {}
 
-    async def cap(prompt, model):
+    async def cap(prompt, model, cache_prefix=None):
         captured["p"] = prompt
         return MOCK_LLM_RESPONSE
 
@@ -495,7 +498,7 @@ async def test_eval_injection_in_description_stays_inside_xml():
     """Texto de injeção na descrição da vaga deve ficar dentro dos delimitadores."""
     captured = {}
 
-    async def cap(prompt, model):
+    async def cap(prompt, model, cache_prefix=None):
         captured["p"] = prompt
         return MOCK_LLM_RESPONSE
 
@@ -677,7 +680,7 @@ def _inputs(n: int) -> list[EvalInput]:
 async def test_batch_happy_path_single_call():
     calls = {"n": 0}
 
-    async def caller(prompt, model):
+    async def caller(prompt, model, cache_prefix=None):
         calls["n"] += 1
         return '[{"score": 8.0, "score_notes": "a", "caveats": []}, {"score": 2.0, "score_notes": "b", "caveats": []}]'
 
@@ -689,7 +692,7 @@ async def test_batch_happy_path_single_call():
 async def test_batch_falls_back_per_job_on_bad_json():
     calls = {"n": 0}
 
-    async def caller(prompt, model):
+    async def caller(prompt, model, cache_prefix=None):
         calls["n"] += 1
         if calls["n"] == 1:
             return "garbage not json"  # lote falha o parse
@@ -701,7 +704,7 @@ async def test_batch_falls_back_per_job_on_bad_json():
 
 
 async def test_batch_spend_limit_propagates():
-    async def caller(prompt, model):
+    async def caller(prompt, model, cache_prefix=None):
         raise RuntimeError("spend limit reached")
 
     with pytest.raises(RuntimeError, match="spend limit"):
@@ -711,7 +714,7 @@ async def test_batch_spend_limit_propagates():
 async def test_batch_single_job_uses_single_path():
     calls = {"n": 0}
 
-    async def caller(prompt, model):
+    async def caller(prompt, model, cache_prefix=None):
         calls["n"] += 1
         return '{"score": 7.0, "score_notes": "x", "caveats": []}'
 
@@ -724,7 +727,7 @@ async def test_batch_falls_back_per_job_on_non_spend_error():
     """Erro não-cota na chamada de lote → fallback per-job (score=0 por evaluate_job)."""
     calls = {"n": 0}
 
-    async def caller(prompt, model):
+    async def caller(prompt, model, cache_prefix=None):
         calls["n"] += 1
         if calls["n"] == 1:
             raise ConnectionError("timeout")  # erro não-cota: fallback
@@ -733,3 +736,19 @@ async def test_batch_falls_back_per_job_on_non_spend_error():
     results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
     assert calls["n"] == 3  # 1 lote (erro) + 2 per-job
     assert len(results) == 2
+
+
+async def test_evaluate_job_passes_cache_prefix():
+    """evaluate_job deve enviar o perfil/instruções como cache_prefix e a vaga como prompt."""
+    captured = {}
+
+    async def caller(prompt, model, cache_prefix=None):
+        captured["prefix"] = cache_prefix
+        captured["dynamic"] = prompt
+        return '{"score": 8.0, "score_notes": "x", "caveats": []}'
+
+    from candidatador.discovery.evaluator import evaluate_job
+    await evaluate_job("Co", "Eng", "JD aqui", {"skills": ["python"]}, "m", caller)
+    assert captured["prefix"] is not None and "python" in captured["prefix"]
+    assert "JD aqui" in captured["dynamic"]
+    assert "JD aqui" not in captured["prefix"]  # vaga não está no prefixo cacheável
