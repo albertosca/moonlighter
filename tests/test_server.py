@@ -832,7 +832,7 @@ async def test_update_status_no_application(tmp_db):
 
 
 async def test_scan_concurrent_batch_all_processed(tmp_db):
-    """15 jobs → processed in 2 batches (10+5) → all 15 in DB."""
+    """15 jobs → 3 chunks of 5 (scan_batch_size=5) → evaluate_jobs_batch called 3× → all 15 in DB."""
     init_db()
     from candidatador.discovery.sources.base import RawJob
     from candidatador.server import scan_and_evaluate
@@ -847,15 +847,13 @@ async def test_scan_concurrent_batch_all_processed(tmp_db):
         )
         for i in range(15)
     ]
+    mock_batch = AsyncMock(side_effect=_batch_of(make_eval_result(score=7.0)))
     with (
         patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
         patch("candidatador.discovery.service.LeverScanner") as MockLV,
         patch("candidatador.discovery.service.AshbyScanner") as MockAB,
         patch("candidatador.discovery.service.browser") as mock_browser,
-        patch(
-            "candidatador.discovery.service.evaluate_job",
-            new=AsyncMock(return_value=make_eval_result(score=7.0)),
-        ),
+        patch("candidatador.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
@@ -863,6 +861,11 @@ async def test_scan_concurrent_batch_all_processed(tmp_db):
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
         await scan_and_evaluate()
+    # chunking assertion: 15 jobs / batch_size=5 → exactly 3 calls to evaluate_jobs_batch
+    assert mock_batch.call_count == 3, (
+        f"esperado 3 chunks, mas evaluate_jobs_batch foi chamado {mock_batch.call_count}× "
+        f"(loop de chunking quebrado?)"
+    )
     assert Job.select().count() == 15
 
 

@@ -736,6 +736,7 @@ async def test_batch_falls_back_per_job_on_non_spend_error():
     results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
     assert calls["n"] == 3  # 1 lote (erro) + 2 per-job
     assert len(results) == 2
+    assert [r.score for r in results] == [3.0, 3.0]
 
 
 async def test_evaluate_job_passes_cache_prefix():
