@@ -151,3 +151,40 @@ async def test_confirm_apply_logs_failed_fields_but_submits(tmp_db, tmp_path):
         result = await apply_service.confirm_apply(job.id, None, cfg, PROFILE)
     assert "submetida e confirmada" in result
     assert Application.get(Application.job == job).status == "submitted"
+
+
+# ── _fill_open_page ─────────────────────────────────────────────────────────
+
+
+async def test_fill_open_page_fills_and_screenshots_without_submit(tmp_db, tmp_path):
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/fop")
+    applier = _confirm_mocks(job, fill_status={"Name": "filled"})
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    page = _page(job.url)
+    with (
+        patch("candidatador.application.service.browser") as mock_browser,
+        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=applier)),
+    ):
+        mock_browser.save_screenshot = AsyncMock()
+        result = await apply_service._fill_open_page(page, job, {"Name": "Alberto"}, "/tmp/cv.pdf", cfg, PROFILE)
+    assert result is not None
+    returned_applier, fill_status = result
+    assert returned_applier is applier
+    assert fill_status == {"Name": "filled"}
+    applier.submit.assert_not_called()
+    page.close.assert_not_called()  # o helper NÃO fecha a página
+    mock_browser.save_screenshot.assert_awaited()  # screenshot 03 tirado
+
+
+async def test_fill_open_page_returns_none_for_unknown_ats(tmp_db, tmp_path):
+    init_db()
+    job = _job(url="https://unknown/jobs/1")
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    with (
+        patch("candidatador.application.service.browser") as mock_browser,
+        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=None)),
+    ):
+        mock_browser.save_screenshot = AsyncMock()
+        result = await apply_service._fill_open_page(_page(job.url), job, {}, "/tmp/cv.pdf", cfg, PROFILE)
+    assert result is None

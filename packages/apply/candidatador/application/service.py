@@ -210,6 +210,29 @@ def _inject_reply_alias(answers: dict[str, str], ref: str, config: dict[str, Any
         inject_email_alias(answers, build_email_alias(base_address, ref))
 
 
+async def _fill_open_page(
+    page: Page,
+    job: Job,
+    answers: dict[str, str],
+    cv_path: str,
+    config: dict[str, Any],
+    profile: dict[str, Any],
+) -> tuple[BaseApplier, dict[str, str]] | None:
+    """Navega, detecta o ATS, preenche e tira o screenshot 03-filled numa página JÁ
+    ABERTA. Devolve (applier, fill_status) ou None se o ATS não for reconhecido. NÃO
+    fecha a página — quem abriu é dono do ciclo de vida."""
+    await page.goto(job.url, timeout=30000)
+    await page.wait_for_load_state("networkidle", timeout=15000)
+    applier = await detect_applier(page, config, profile)
+    if applier is None:
+        return None
+    if isinstance(applier, LinkedInApplier):
+        await applier.extract_fields()  # abre o modal
+    fill_status = await _fill_form(applier, answers, cv_path, job.id)
+    await browser.save_screenshot(page, job.id, "03-filled", config)
+    return applier, fill_status
+
+
 async def _submit_on_page(
     job: Job,
     app: Application,
@@ -221,22 +244,13 @@ async def _submit_on_page(
 ) -> str:
     page = await browser.new_page(config)
     try:
-        await page.goto(job.url, timeout=30000)
-        await page.wait_for_load_state("networkidle", timeout=15000)
-
-        applier = await detect_applier(page, config, profile)
-        if not applier:
+        result = await _fill_open_page(page, job, answers, cv_path, config, profile)
+        if result is None:
             return f"⚠️  ATS não reconhecido para vaga #{job.id}."
-        if isinstance(applier, LinkedInApplier):
-            await applier.extract_fields()  # abre o modal
-
-        fill_status = await _fill_form(applier, answers, cv_path, job.id)
-        await browser.save_screenshot(page, job.id, "03-filled", config)
-
+        applier, fill_status = result
         outcome = await applier.submit()
         await browser.save_screenshot(page, job.id, "04-submitted", config)
         shot = f"~/.candidatador/screenshots/{job.id}/04-submitted.png"
-
         if isinstance(outcome, str) and outcome.startswith("failed"):
             return _record_failed(app, job.id, outcome, fill_status, shot)
         if outcome == "unverified":
