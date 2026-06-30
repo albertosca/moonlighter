@@ -396,6 +396,31 @@ def _render_filled(job: Job, fill_status: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
+# ── submit_application: submete um form já preenchido ───────────────────────
+
+
+async def submit_application(job_id: int, config: dict[str, Any], profile: dict[str, Any]) -> str:
+    """Submete uma candidatura já preenchida (status 'filled'). Re-preenche das
+    respostas salvas (determinístico) e submete. Estrito: nunca submete às cegas."""
+    loaded = _load_draft(job_id)
+    if loaded is None:
+        return f"⚠️  Vaga #{job_id} não encontrada ou sem rascunho. Rode apply_jobs primeiro."
+    job, app = loaded
+    if app.status != "filled":
+        return (
+            f"🚫 Vaga #{job_id} não está preenchida (status={app.status}). Rode "
+            f"`fill_application({job_id})` primeiro — ou `confirm_apply({job_id})` para "
+            f"preencher e submeter num passo só."
+        )
+    try:
+        cv_path = resolve_cv_path(job.company, config)
+    except CVNotFoundError as e:
+        return f"⚠️  {e}\n🚫 Não submeti — não vou subir um CV errado."
+    return await _submit_on_page(
+        job, app, app.get_form_data(), app.email_ref or "", cv_path, config, profile
+    )
+
+
 async def retry_apply(job_id: int, config: dict[str, Any], profile: dict[str, Any]) -> str:
     try:
         app = Application.get(Application.job == Job.get_by_id(job_id))

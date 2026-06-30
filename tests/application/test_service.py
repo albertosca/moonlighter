@@ -306,3 +306,59 @@ async def test_fill_application_handles_exception(tmp_db, tmp_path):
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
     assert "Erro ao preencher" in result
     assert "falha inesperada" in result
+
+
+# ── submit_application: branches ────────────────────────────────────────────
+
+
+async def test_submit_application_requires_filled(tmp_db, tmp_path):
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/notfilled")
+    Application.create(job=job, status="draft", form_data='{"Name": "Alberto"}')
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    result = await apply_service.submit_application(job.id, cfg, PROFILE)
+    assert "fill_application" in result
+    assert Application.get(Application.job == job).status == "draft"  # não submeteu
+
+
+async def test_submit_application_refills_and_submits(tmp_db, tmp_path):
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/sub")
+    Application.create(
+        job=job, status="filled", form_data='{"Name": "Alberto"}', email_ref="abc123"
+    )
+    cv = tmp_path / "cv.pdf"
+    cv.write_text("x")
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    applier = _confirm_mocks(job, fill_status={"Name": "filled"}, submit="submitted")
+    with (
+        patch("candidatador.application.service.browser") as mock_browser,
+        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=applier)),
+        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv)),
+    ):
+        mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.save_screenshot = AsyncMock()
+        result = await apply_service.submit_application(job.id, cfg, PROFILE)
+    assert "submetida e confirmada" in result
+    applier.submit.assert_awaited()
+    assert Application.get(Application.job == job).status == "submitted"
+
+
+async def test_submit_application_no_draft(tmp_db, tmp_path):
+    init_db()
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    result = await apply_service.submit_application(99999, cfg, PROFILE)
+    assert "não encontrada" in result
+
+
+async def test_submit_application_missing_cv(tmp_db, tmp_path):
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/subnocv")
+    Application.create(job=job, status="filled", form_data='{"Name": "Alberto"}', email_ref="r")
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    with patch(
+        "candidatador.application.service.resolve_cv_path",
+        side_effect=CVNotFoundError("cv.pdf não existe"),
+    ):
+        result = await apply_service.submit_application(job.id, cfg, PROFILE)
+    assert "Não submeti" in result
