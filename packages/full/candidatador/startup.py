@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from candidatador.core.config import browser_executable
+
 
 @dataclass
 class StartupWarning:
@@ -23,7 +25,7 @@ def validate_startup(
         _check_profile(profile),
         _check_api_key(config),
         _check_cv(cv),
-        _check_brave(config),
+        _check_browser(config),
     ]
     return [warning for warning in checks if warning is not None]
 
@@ -62,14 +64,14 @@ def _check_cv(cv_path: str) -> StartupWarning | None:
     )
 
 
-def _check_brave(config: dict[str, Any]) -> StartupWarning | None:
-    """Brave ausente → LinkedIn scan e candidaturas via browser não funcionam."""
-    brave_path = config.get("brave_path", "")
-    if not brave_path or Path(brave_path).exists():
+def _check_browser(config: dict[str, Any]) -> StartupWarning | None:
+    """Browser ausente → LinkedIn scan e candidaturas via browser não funcionam."""
+    browser_path = browser_executable(config)
+    if not browser_path or Path(browser_path).exists():
         return None
     return StartupWarning(
         "warn",
-        f"Brave não encontrado em {brave_path}. "
+        f"Browser não encontrado em {browser_path}. "
         "Scan LinkedIn e candidaturas via browser não funcionarão. "
-        "Instale o Brave ou ajuste brave_path em config.yaml.",
+        "Instale o browser (Chrome/Chromium/Brave) ou ajuste browser_path em config.yaml.",
     )

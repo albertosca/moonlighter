@@ -139,14 +139,14 @@ async def get_job(id: int) -> str:
 
 @mcp.tool()
 async def login(platform: str = "linkedin") -> str:
-    """Open Brave for manual login. Session is saved and reused in future scans."""
+    """Open the browser for manual login. Session is saved and reused in future scans."""
     async with _log_tool("login"):
         if platform != "linkedin":
             return f"Platform '{platform}' not supported yet. Supported: linkedin"
         page = await _browser_mod.new_page(_config)
         await page.goto("https://www.linkedin.com/login")
         return (
-            "Brave aberto em linkedin.com/login. "
+            "Browser aberto em linkedin.com/login. "
             "Faça login manualmente. "
             "A sessão será salva automaticamente em ~/.candidatador/browser-session/"
         )
@@ -156,7 +156,7 @@ async def login(platform: str = "linkedin") -> str:
 async def apply_jobs(ids: list[int]) -> str:
     """
     Start application flow for given job IDs.
-    Opens each job in Brave, extracts form fields, generates LLM answers.
+    Opens each job in the browser, extracts form fields, generates LLM answers.
     Returns draft answers for review before submission.
     """
     async with _log_tool("apply_jobs"):

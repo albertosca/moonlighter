@@ -1,12 +1,11 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 import candidatador.core.browser as browser_mod
+import pytest
 
 _CONFIG = {
     "browser_session_dir": "/tmp/test_browser_session",
-    "brave_path": "/usr/bin/brave",
+    "browser_path": "/usr/bin/brave",
     "slow_mo_ms": 0,
     "screenshots_dir": "/tmp/test_screenshots",
 }
@@ -17,11 +16,11 @@ def reset_browser_globals():
     """Reset module-level singletons before each test."""
     browser_mod._playwright = None
     browser_mod._browser = None
-    browser_mod._brave_process = None
+    browser_mod._browser_process = None
     yield
     browser_mod._playwright = None
     browser_mod._browser = None
-    browser_mod._brave_process = None
+    browser_mod._browser_process = None
 
 
 def _make_cdp_mocks():
@@ -55,7 +54,7 @@ def _make_cdp_mocks():
 # ── get_context ───────────────────────────────────────────────────────────────
 
 
-async def test_get_context_launches_brave_when_devtools_not_ready():
+async def test_get_context_launches_browser_when_devtools_not_ready():
     mock_pw, mock_playwright, _mock_browser, mock_context, mock_proc = _make_cdp_mocks()
     with (
         patch("candidatador.core.browser.async_playwright", return_value=mock_pw),
@@ -78,7 +77,7 @@ async def test_get_context_skips_launch_when_devtools_already_ready():
     ):
         ctx = await browser_mod.get_context(_CONFIG)
     assert ctx is mock_context
-    popen.assert_not_called()  # Brave já estava de pé
+    popen.assert_not_called()  # browser já estava de pé
     mock_playwright.chromium.connect_over_cdp.assert_called_once()
 
 
@@ -121,14 +120,14 @@ async def test_get_context_creates_session_dir(tmp_path):
     assert (tmp_path / "new_session").exists()
 
 
-async def test_get_context_raises_when_brave_never_ready():
+async def test_get_context_raises_when_browser_never_ready():
     mock_pw, _, _, _, mock_proc = _make_cdp_mocks()
     with (
         patch("candidatador.core.browser.async_playwright", return_value=mock_pw),
         patch("candidatador.core.browser.subprocess.Popen", return_value=mock_proc),
         patch("candidatador.core.browser._devtools_ready", return_value=False),
         patch("candidatador.core.browser.asyncio.sleep", new=AsyncMock()),
-        pytest.raises(RuntimeError, match="Brave"),
+        pytest.raises(RuntimeError, match="Browser"),
     ):
         await browser_mod.get_context(_CONFIG)
     mock_proc.kill.assert_called_once()  # cleanup do processo travado
@@ -183,7 +182,7 @@ async def test_close_stops_everything_and_clears_globals():
 
     browser_mod._browser = mock_browser
     browser_mod._playwright = mock_playwright
-    browser_mod._brave_process = mock_process
+    browser_mod._browser_process = mock_process
 
     await browser_mod.close()
 
@@ -192,13 +191,13 @@ async def test_close_stops_everything_and_clears_globals():
     mock_process.terminate.assert_called_once()
     assert browser_mod._browser is None
     assert browser_mod._playwright is None
-    assert browser_mod._brave_process is None
+    assert browser_mod._browser_process is None
 
 
 async def test_close_is_idempotent_when_already_closed():
     browser_mod._browser = None
     browser_mod._playwright = None
-    browser_mod._brave_process = None
+    browser_mod._browser_process = None
     await browser_mod.close()  # should not raise
 
 

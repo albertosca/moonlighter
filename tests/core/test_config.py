@@ -90,6 +90,20 @@ def test_load_config_all_path_keys_no_tilde(tmp_path):
         assert "~" not in config[key], f"{key} still contains '~'"
 
 
+def test_browser_executable_prefers_browser_path():
+    from candidatador.core.config import browser_executable
+
+    assert browser_executable({"browser_path": "/usr/bin/chrome"}) == "/usr/bin/chrome"
+
+
+def test_browser_executable_falls_back_to_legacy_brave_path():
+    from candidatador.core.config import browser_executable
+
+    assert browser_executable({"browser_path": "", "brave_path": "/legacy/brave"}) == "/legacy/brave"
+    assert browser_executable({"brave_path": "/legacy/brave"}) == "/legacy/brave"
+    assert browser_executable({}) == ""
+
+
 # --- load_profile ---
 
 

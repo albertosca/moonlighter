@@ -1,9 +1,8 @@
 from pathlib import Path
 
 import pytest
+from candidatador.core.config import browser_executable, load_config
 from playwright.async_api import async_playwright
-
-from candidatador.core.config import load_config
 
 
 @pytest.fixture(scope="module")
@@ -13,13 +12,13 @@ def fixtures_dir():
 
 async def _launch(pw):
     """
-    Lança um Chromium headless. Prefere o Brave do usuário (mesmo binário que o
+    Lança um Chromium headless. Prefere o browser do usuário (mesmo binário que o
     app de verdade usa) via executable_path; cai no Chromium bundled do Playwright
-    se o Brave não existir. Perfil temporário e isolado — NÃO toca na sessão real.
+    se não existir. Perfil temporário e isolado — NÃO toca na sessão real.
     """
-    brave_path = load_config().get("brave_path", "")
-    if brave_path and Path(brave_path).exists():
-        return await pw.chromium.launch(headless=True, executable_path=brave_path)
+    browser_path = browser_executable(load_config())
+    if browser_path and Path(browser_path).exists():
+        return await pw.chromium.launch(headless=True, executable_path=browser_path)
     # Fallback: Chromium bundled (exige `playwright install chromium`).
     return await pw.chromium.launch(headless=True)
 

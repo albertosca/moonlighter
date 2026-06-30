@@ -13,8 +13,17 @@ def _learned_blocklist_path() -> Path:
     return candidatador_home() / "blocklist_learned.yaml"
 
 
+def browser_executable(config: dict[str, Any]) -> str:
+    """Caminho do executável do browser. Lê 'browser_path'; cai para 'brave_path'
+    (chave legada) se browser_path estiver vazio."""
+    path: str = config.get("browser_path") or config.get("brave_path", "")
+    return path
+
+
 DEFAULTS = {
-    "brave_path": "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+    # Caminho do executável do browser (Chrome/Chromium/Brave). Vazio por padrão:
+    # configure browser_path no config.yaml. Aceita brave_path (legado) como fallback.
+    "browser_path": "",
     "score_threshold": 6.5,
     "llm_model": "claude-sonnet-4-6",
     "eval_model": "claude-haiku-4-5-20251001",

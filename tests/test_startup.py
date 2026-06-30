@@ -59,25 +59,26 @@ def test_validate_startup_cv_present_no_cv_warning(tmp_path):
     assert not any("cv" in w.message.lower() for w in warnings)
 
 
-# ── brave path ────────────────────────────────────────────────────────────────
+# ── browser path ──────────────────────────────────────────────────────────────
 
 
-def test_validate_startup_missing_brave_produces_warn():
+def test_validate_startup_missing_browser_produces_warn():
     warnings = validate_startup(
-        config={"brave_path": "/nonexistent/Brave Browser"},
+        config={"browser_path": "/nonexistent/Chrome"},
         profile={"skills": []},
     )
-    assert any(w.level == "warn" and "brave" in w.message.lower() for w in warnings)
+    assert any(w.level == "warn" and "browser" in w.message.lower() for w in warnings)
 
 
-def test_validate_startup_brave_exists_no_brave_warning(tmp_path):
+def test_validate_startup_legacy_brave_path_still_works(tmp_path):
+    """Retrocompat: a chave legada brave_path ainda é reconhecida (via browser_executable)."""
     brave = tmp_path / "brave"
     brave.touch()
     warnings = validate_startup(
         config={"brave_path": str(brave)},
         profile={"skills": []},
     )
-    assert not any("brave" in w.message.lower() for w in warnings)
+    assert not any("browser" in w.message.lower() for w in warnings)
 
 
 # ── all clear ─────────────────────────────────────────────────────────────────
@@ -85,12 +86,12 @@ def test_validate_startup_brave_exists_no_brave_warning(tmp_path):
 
 def test_validate_startup_all_ok_returns_no_errors(monkeypatch, tmp_path):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    brave = tmp_path / "brave"
-    brave.touch()
+    browser = tmp_path / "chrome"
+    browser.touch()
     cv = tmp_path / "cv.pdf"
     cv.touch()
     warnings = validate_startup(
-        config={"brave_path": str(brave)},
+        config={"browser_path": str(browser)},
         profile={"skills": [{"name": "Python"}]},
         cv_path=str(cv),
     )

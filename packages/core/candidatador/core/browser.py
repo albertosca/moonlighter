@@ -4,6 +4,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from candidatador.core.config import browser_executable
 from candidatador.core.log import get_logger
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
@@ -11,7 +12,7 @@ logger = get_logger(__name__)
 
 _playwright: Any = None
 _browser: Browser | None = None
-_brave_process: subprocess.Popen[bytes] | None = None
+_browser_process: subprocess.Popen[bytes] | None = None
 
 _DEBUG_PORT = 9222
 
@@ -28,13 +29,14 @@ async def _first_or_new_context(browser: Browser) -> BrowserContext:
     return browser.contexts[0] if browser.contexts else await browser.new_context()
 
 
-async def _launch_brave(config: dict[str, Any], session_dir: Path) -> None:
-    """Sobe o Brave com a porta de debug e espera o DevTools responder (até 30s)."""
-    global _brave_process
-    logger.info("Launching Brave on port %d", _DEBUG_PORT)
-    _brave_process = subprocess.Popen(
+async def _launch_browser(config: dict[str, Any], session_dir: Path) -> None:
+    """Sobe o browser (Chrome/Chromium/Brave) com a porta de debug e espera o
+    DevTools responder (até 30s)."""
+    global _browser_process
+    logger.info("Launching browser on port %d", _DEBUG_PORT)
+    _browser_process = subprocess.Popen(
         [
-            config["brave_path"],
+            browser_executable(config),
             f"--remote-debugging-port={_DEBUG_PORT}",
             f"--user-data-dir={session_dir}",
             "--no-first-run",
@@ -46,13 +48,13 @@ async def _launch_brave(config: dict[str, Any], session_dir: Path) -> None:
         if _devtools_ready():
             return
         await asyncio.sleep(0.5)
-    _brave_process.kill()
-    _brave_process = None
-    raise RuntimeError(f"Brave não ficou disponível na porta {_DEBUG_PORT} em 30s")
+    _browser_process.kill()
+    _browser_process = None
+    raise RuntimeError(f"Browser não ficou disponível na porta {_DEBUG_PORT} em 30s")
 
 
 async def get_context(config: dict[str, Any]) -> BrowserContext:
-    """Return a Brave browser context via CDP. Launches Brave if not running."""
+    """Return a browser context via CDP. Launches the browser if not running."""
     global _playwright, _browser
 
     if _browser is not None and _browser.is_connected():
@@ -61,7 +63,7 @@ async def get_context(config: dict[str, Any]) -> BrowserContext:
     session_dir = Path(config["browser_session_dir"]).expanduser()
     session_dir.mkdir(parents=True, exist_ok=True)
     if not _devtools_ready():
-        await _launch_brave(config, session_dir)
+        await _launch_browser(config, session_dir)
 
     _playwright = await async_playwright().start()
     _browser = await _playwright.chromium.connect_over_cdp(
@@ -88,13 +90,13 @@ async def save_screenshot(page: Page, job_id: int, step: str, config: dict[str, 
 
 
 async def close() -> None:
-    global _playwright, _browser, _brave_process
+    global _playwright, _browser, _browser_process
     if _browser:
         await _browser.close()
         _browser = None
     if _playwright:
         await _playwright.stop()
         _playwright = None
-    if _brave_process:
-        _brave_process.terminate()
-        _brave_process = None
+    if _browser_process:
+        _browser_process.terminate()
+        _browser_process = None
