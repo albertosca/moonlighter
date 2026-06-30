@@ -6,6 +6,7 @@ apply_jobs/confirm_apply que o caminho feliz do test_mcp_server não toca.
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from candidatador.application import service as apply_service
+from candidatador.application.answers.cv import CVNotFoundError
 from candidatador.application.appliers.base import ApplicationDraft
 from candidatador.application.appliers.greenhouse import GreenhouseApplier
 from candidatador.core.db import Application, Job, init_db
@@ -188,3 +189,120 @@ async def test_fill_open_page_returns_none_for_unknown_ats(tmp_db, tmp_path):
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service._fill_open_page(_page(job.url), job, {}, "/tmp/cv.pdf", cfg, PROFILE)
     assert result is None
+
+
+# ── fill_application: branches ──────────────────────────────────────────────
+
+
+async def test_fill_application_fills_stops_persists(tmp_db, tmp_path):
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/fill")
+    Application.create(job=job, status="draft", form_data='{"Name": "Alberto"}')
+    cv = tmp_path / "cv.pdf"
+    cv.write_text("x")
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    applier = _confirm_mocks(job, fill_status={"Name": "filled"})
+    with (
+        patch("candidatador.application.service.browser") as mock_browser,
+        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=applier)),
+        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv)),
+    ):
+        mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.save_screenshot = AsyncMock()
+        result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
+    assert "PREENCHIDA" in result
+    assert "submit_application" in result
+    applier.submit.assert_not_called()  # NÃO submete
+    saved = Application.get(Application.job == job)
+    assert saved.status == "filled"
+    assert saved.email_ref is not None  # ref persistido
+
+
+async def test_fill_application_blocks_on_needs_review(tmp_db, tmp_path):
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/nr2")
+    Application.create(job=job, status="draft", form_data='{"Work auth?": "__NEEDS_REVIEW__"}')
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
+    assert "NÃO submetida" in result or "aguardando sua decisão" in result
+    assert Application.get(Application.job == job).status == "draft"  # não virou filled
+
+
+async def test_fill_application_aborts_on_missing_cv(tmp_db, tmp_path):
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/nocv")
+    Application.create(job=job, status="draft", form_data='{"Name": "Alberto"}')
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    with patch(
+        "candidatador.application.service.resolve_cv_path",
+        side_effect=CVNotFoundError("cv.pdf não existe"),
+    ):
+        result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
+    assert "Não preenchi" in result
+
+
+async def test_fill_application_reports_failed_fields(tmp_db, tmp_path):
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/fillfail")
+    Application.create(job=job, status="draft", form_data='{"Name": "Alberto", "X": "y"}')
+    cv = tmp_path / "cv.pdf"
+    cv.write_text("x")
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    applier = _confirm_mocks(job, fill_status={"Name": "filled", "X": "failed:not_found"})
+    with (
+        patch("candidatador.application.service.browser") as mock_browser,
+        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=applier)),
+        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv)),
+    ):
+        mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.save_screenshot = AsyncMock()
+        result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
+    assert "falha" in result.lower() and "X" in result
+
+
+async def test_fill_application_no_draft(tmp_db, tmp_path):
+    init_db()
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    result = await apply_service.fill_application(99999, None, cfg, PROFILE)
+    assert "não encontrada" in result
+
+
+async def test_fill_application_unknown_ats(tmp_db, tmp_path):
+    init_db()
+    job = _job(url="https://unknown/jobs/2")
+    Application.create(job=job, status="draft", form_data='{"Name": "Alberto"}')
+    cv = tmp_path / "cv.pdf"
+    cv.write_text("x")
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    with (
+        patch("candidatador.application.service.browser") as mock_browser,
+        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=None)),
+        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv)),
+    ):
+        mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.save_screenshot = AsyncMock()
+        result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
+    assert "ATS não reconhecido" in result
+
+
+async def test_fill_application_handles_exception(tmp_db, tmp_path):
+    """Erro inesperado em _fill_open_page é capturado e devolvido como mensagem de aviso."""
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/exc")
+    Application.create(job=job, status="draft", form_data='{"Name": "Alberto"}')
+    cv = tmp_path / "cv.pdf"
+    cv.write_text("x")
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    with (
+        patch("candidatador.application.service.browser") as mock_browser,
+        patch(
+            "candidatador.application.service._fill_open_page",
+            new=AsyncMock(side_effect=RuntimeError("falha inesperada")),
+        ),
+        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv)),
+    ):
+        mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.save_screenshot = AsyncMock()
+        result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
+    assert "Erro ao preencher" in result
+    assert "falha inesperada" in result

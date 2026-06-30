@@ -339,6 +339,63 @@ def _record_submitted(
     return f"✓ Candidatura #{job.id} submetida e confirmada: {job.company} / {job.title}"
 
 
+# ── fill_application: preenche e PARA (não submete) ─────────────────────────
+
+
+async def fill_application(
+    job_id: int, answers: dict[str, str] | None, config: dict[str, Any], profile: dict[str, Any]
+) -> str:
+    """Preenche o formulário e PARA antes do submit, para o humano revisar o
+    screenshot 03-filled. Persiste status='filled' + respostas (com alias) + ref."""
+    loaded = _load_draft(job_id)
+    if loaded is None:
+        return f"⚠️  Vaga #{job_id} não encontrada ou sem rascunho. Rode apply_jobs primeiro."
+    job, app = loaded
+
+    final_answers = {**app.get_form_data(), **(answers or {})}
+    blocked = _pending_review_message(job_id, final_answers)
+    if blocked:
+        return blocked
+
+    ref = secrets.token_urlsafe(4)[:6]
+    _inject_reply_alias(final_answers, ref, config)
+    try:
+        cv_path = resolve_cv_path(job.company, config)
+    except CVNotFoundError as e:
+        return f"⚠️  {e}\n🚫 Não preenchi — não vou subir um CV errado."
+
+    page = await browser.new_page(config)
+    try:
+        result = await _fill_open_page(page, job, final_answers, cv_path, config, profile)
+        if result is None:
+            return f"⚠️  ATS não reconhecido para vaga #{job.id}."
+        _applier, fill_status = result
+        app.status = "filled"
+        app.form_data = json.dumps(final_answers)
+        app.email_ref = ref
+        app.updated_at = datetime.now()
+        app.save()
+        return _render_filled(job, fill_status)
+    except Exception as e:
+        return f"⚠️  Erro ao preencher vaga #{job.id}: {e}"
+    finally:
+        await page.close()
+
+
+def _render_filled(job: Job, fill_status: dict[str, str]) -> str:
+    shot = f"~/.candidatador/screenshots/{job.id}/03-filled.png"
+    lines = [
+        f"📝 Vaga #{job.id} ({job.company} / {job.title}) PREENCHIDA — não submetida.",
+        f"Revise o formulário real no screenshot: {shot}",
+    ]
+    failed = [field for field, s in fill_status.items() if s.startswith("failed")]
+    if failed:
+        lines.append(f"⚠️  Campos com falha de preenchimento: {', '.join(failed)}")
+    lines.append(f"→ Para submeter: `submit_application({job.id})`")
+    lines.append(f'→ Para editar e re-preencher: `fill_application({job.id}, answers={{"campo": "valor"}})`')
+    return "\n".join(lines)
+
+
 async def retry_apply(job_id: int, config: dict[str, Any], profile: dict[str, Any]) -> str:
     try:
         app = Application.get(Application.job == Job.get_by_id(job_id))
