@@ -719,6 +719,37 @@ async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
     assert "submetida" in result or "✓" in result
 
 
+# ── fill_application ──────────────────────────────────────────────────────────
+
+
+async def test_fill_application_tool_delegates_to_service(monkeypatch):
+    import candidatador.server as server
+    called = {}
+
+    async def fake_fill(job_id, answers, config, profile):
+        called["args"] = (job_id, answers)
+        return "preenchida"
+
+    monkeypatch.setattr(server.apply_service, "fill_application", fake_fill)
+    result = await server.fill_application(42, {"campo": "v"})
+    assert result == "preenchida"
+    assert called["args"] == (42, {"campo": "v"})
+
+
+async def test_submit_application_tool_delegates_to_service(monkeypatch):
+    import candidatador.server as server
+    called = {}
+
+    async def fake_submit(job_id, config, profile):
+        called["id"] = job_id
+        return "submetida"
+
+    monkeypatch.setattr(server.apply_service, "submit_application", fake_submit)
+    result = await server.submit_application(42)
+    assert result == "submetida"
+    assert called["id"] == 42
+
+
 # ── get_pipeline ──────────────────────────────────────────────────────────────
 
 

@@ -175,6 +175,28 @@ async def confirm_apply(job_id: int, answers: dict[str, str] | None = None) -> s
 
 
 @mcp.tool()
+async def fill_application(job_id: int, answers: dict[str, str] | None = None) -> str:
+    """
+    Fill the application form and STOP before submitting (review the 03-filled
+    screenshot, then call submit_application). Does not submit.
+    job_id: ID of the job (must have a draft Application in DB)
+    answers: optional {field: answer} overrides merged into the saved draft
+    """
+    async with _log_tool("fill_application"):
+        return await apply_service.fill_application(job_id, answers, _config, _profile)
+
+
+@mcp.tool()
+async def submit_application(job_id: int) -> str:
+    """
+    Submit an already-filled application (must have been filled via fill_application).
+    Re-fills from the saved answers and submits.
+    """
+    async with _log_tool("submit_application"):
+        return await apply_service.submit_application(job_id, _config, _profile)
+
+
+@mcp.tool()
 async def retry_apply(job_id: int) -> str:
     """Retry a failed application. Reuses stored draft answers."""
     async with _log_tool("retry_apply"):
