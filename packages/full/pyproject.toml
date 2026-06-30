@@ -5,6 +5,9 @@ build-backend = "hatchling.build"
 [project]
 name = "candidatador-full"
 version = "0.1.0"
+description = "Full candidatador bundle — MCP server exposing all tools to Claude"
+license = {text = "AGPL-3.0-only"}
+authors = [{name = "Alberto de Sá Cavalcanti de Albuquerque", email = "albertoalbuquerque01@gmail.com"}]
 requires-python = ">=3.14"
 dependencies = [
     "candidatador-core>=0.1.0",
@@ -16,6 +19,11 @@ dependencies = [
 
 [project.scripts]
 candidatador = "candidatador.server:main"
+
+[project.urls]
+Homepage = "TODO_REPO_URL"
+Repository = "TODO_REPO_URL"
+"Bug Tracker" = "TODO_REPO_URL/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["candidatador"]

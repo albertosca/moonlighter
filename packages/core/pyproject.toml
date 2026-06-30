@@ -5,6 +5,9 @@ build-backend = "hatchling.build"
 [project]
 name = "candidatador-core"
 version = "0.1.0"
+description = "Core database, configuration, browser automation and LLM primitives for candidatador"
+license = {text = "AGPL-3.0-only"}
+authors = [{name = "Alberto de Sá Cavalcanti de Albuquerque", email = "albertoalbuquerque01@gmail.com"}]
 requires-python = ">=3.14"
 dependencies = [
     "peewee>=3.17",
@@ -13,6 +16,11 @@ dependencies = [
     "anthropic>=0.40",
     "playwright>=1.47",
 ]
+
+[project.urls]
+Homepage = "TODO_REPO_URL"
+Repository = "TODO_REPO_URL"
+"Bug Tracker" = "TODO_REPO_URL/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["candidatador"]

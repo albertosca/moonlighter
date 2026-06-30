@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --all-packages
+
+      - name: Lint and format check (ruff)
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Type check (mypy)
+        run: |
+          uv run mypy \
+            --package candidatador.core \
+            --package candidatador.discovery \
+            --package candidatador.application \
+            --package candidatador.tracking \
+            --package candidatador.server \
+            --package candidatador.startup \
+            --package candidatador.views
+
+      - name: Tests (unit, coverage gate 100%)
+        run: uv run pytest -m "not e2e"
