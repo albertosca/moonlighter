@@ -38,7 +38,7 @@ Um [workspace uv](https://docs.astral.sh/uv/concepts/workspaces/) com 5 namespac
 ### 1. Instalar
 
 ```bash
-git clone TODO_REPO_URL
+git clone https://github.com/albertosca/gauntler
 cd candidatador-de-vagas
 uv sync --all-packages
 ```
