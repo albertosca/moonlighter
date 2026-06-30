@@ -633,7 +633,10 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
         patch("candidatador.application.service.browser") as mock_browser,
         patch("candidatador.application.service.detect_applier") as mock_detect,
         patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
-        patch("candidatador.server._config", {"email": {"address": test_email}}),
+        patch(
+            "candidatador.server._config",
+            {"email": {"address": test_email}, "screenshots_dir": str(tmp_path)},
+        ),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()

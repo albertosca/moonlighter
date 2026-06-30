@@ -40,6 +40,11 @@ async def detect_applier(
     return None
 
 
+def _screenshot_path(job_id: int, name: str, config: dict[str, Any]) -> str:
+    """Caminho do screenshot exibido ao humano, derivado de screenshots_dir (não hardcode)."""
+    return f"{config['screenshots_dir']}/{job_id}/{name}.png"
+
+
 def archive_screenshots(job_id: int, config: dict[str, Any]) -> None:
     """Move screenshots de candidatura concluída para subdir 'done/', liberando espaço."""
     try:
@@ -250,7 +255,7 @@ async def _submit_on_page(
         applier, fill_status = result
         outcome = await applier.submit()
         await browser.save_screenshot(page, job.id, "04-submitted", config)
-        shot = f"~/.candidatador/screenshots/{job.id}/04-submitted.png"
+        shot = _screenshot_path(job.id, "04-submitted", config)
         if isinstance(outcome, str) and outcome.startswith("failed"):
             return _record_failed(app, job.id, outcome, fill_status, shot)
         if outcome == "unverified":
@@ -375,15 +380,15 @@ async def fill_application(
         app.email_ref = ref
         app.updated_at = datetime.now()
         app.save()
-        return _render_filled(job, fill_status)
+        return _render_filled(job, fill_status, config)
     except Exception as e:
         return f"⚠️  Erro ao preencher vaga #{job.id}: {e}"
     finally:
         await page.close()
 
 
-def _render_filled(job: Job, fill_status: dict[str, str]) -> str:
-    shot = f"~/.candidatador/screenshots/{job.id}/03-filled.png"
+def _render_filled(job: Job, fill_status: dict[str, str], config: dict[str, Any]) -> str:
+    shot = _screenshot_path(job.id, "03-filled", config)
     lines = [
         f"📝 Vaga #{job.id} ({job.company} / {job.title}) PREENCHIDA — não submetida.",
         f"Revise o formulário real no screenshot: {shot}",

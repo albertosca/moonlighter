@@ -212,6 +212,7 @@ async def test_fill_application_fills_stops_persists(tmp_db, tmp_path):
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
     assert "PREENCHIDA" in result
     assert "submit_application" in result
+    assert str(tmp_path) in result  # path do screenshot deriva de screenshots_dir, não hardcode
     applier.submit.assert_not_called()  # NÃO submete
     saved = Application.get(Application.job == job)
     assert saved.status == "filled"
