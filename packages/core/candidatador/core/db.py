@@ -62,7 +62,7 @@ class Application(BaseModel):
     notes = TextField(null=True)
     status = CharField(
         default="draft"
-    )  # 'draft'|'submitted'|'screening'|'interviews'|'offer'|'rejected'
+    )  # 'draft'|'filled'|'submitted'|'needs_review'|'screening'|'interviews'|'offer'|'rejected'
     next_action = TextField(null=True)
     updated_at = DateTimeField(default=datetime.datetime.now)
     email_ref = CharField(max_length=8, null=True, unique=True)
