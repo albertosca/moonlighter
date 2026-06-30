@@ -1,0 +1,61 @@
+# Example configuration. Copy to ~/.candidatador/config.yaml (or set CANDIDATADOR_HOME)
+# and adjust. All values here are generic placeholders.
+
+# Browser executable path (Chrome/Chromium/Brave). Required for the LinkedIn scan and
+# for browser-based applications. Examples per platform:
+#   macOS Chrome: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+#   macOS Brave:  /Applications/Brave Browser.app/Contents/MacOS/Brave Browser
+#   Linux Chrome: /usr/bin/google-chrome
+browser_path: ""
+
+# LLM backend:
+#   "cli" -> uses the Claude Code CLI (no API key; uses the claude.ai session).
+#   "api" -> uses the Anthropic SDK (requires ANTHROPIC_API_KEY in the environment).
+llm_backend: api
+
+# Main model (answer generation) and evaluation model (cheaper, for scoring jobs).
+llm_model: claude-sonnet-4-6
+eval_model: claude-haiku-4-5-20251001
+
+# Jobs scoring below this threshold are archived.
+score_threshold: 6.5
+
+# Delay (ms) between browser actions — helps stabilize dynamic forms.
+slow_mo_ms: 300
+
+# Job titles discarded without calling the LLM (substring, case-insensitive).
+title_blocklist:
+  - "sales"
+  - "account executive"
+  - "marketing"
+  - "recruiter"
+  - "product manager"
+
+# Country-dependent work authorization. Empty -> always __NEEDS_REVIEW__ (never guesses).
+# citizenship_country accepts free forms ("Brazil"/"Brasil"/"BR"/"USA"/"United States").
+work_authorization:
+  citizenship_country: ""
+  authorized_answer: "Yes"
+  not_authorized_answer: "No"
+  needs_review_sentinel: "__NEEDS_REVIEW__"
+
+# CV per company (paths relative to CANDIDATADOR_HOME). 'default' is used when a
+# company has no entry. by_company matches the company name case-insensitively.
+cv:
+  default: "cv.pdf"
+  by_company: {}
+    # acme: "cv-acme.pdf"
+
+# Email monitoring (Gmail OAuth). Optional — only if you want to track replies.
+email:
+  address: "your-email@gmail.com"
+  credentials_path: "~/.candidatador/gmail-client.json"
+  token_path: "~/.candidatador/gmail-token.json"
+  processed_label: "candidatador/processed"
+  # false (default) = sync is read-only; dedup is done in a local table.
+  mark_processed: false
+  interview_stages:
+    - phone_screening
+    - technical_interview
+    - system_design
+    - final_interview

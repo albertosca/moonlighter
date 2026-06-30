@@ -1,0 +1,57 @@
+# Example candidate profile. Copy to ~/.candidatador/profile.yaml and fill with your
+# real data. The LLM reads the scoring-relevant fields (criteria, skills, experience,
+# preferences, summary, headline, languages) to evaluate and answer job applications.
+
+name: "Jane Doe"
+headline: "Senior Software Engineer"
+location: "Remote (Brazil)"
+phone: "+55 11 90000-0000"
+email: "jane@example.com"
+linkedin: "https://www.linkedin.com/in/janedoe"
+
+languages:
+  - "Portuguese (native)"
+  - "English (fluent)"
+
+summary: >
+  Senior engineer with 10+ years building backend and full-stack systems.
+  Strong in distributed systems, APIs and data-intensive services.
+
+skills:
+  - "Python"
+  - "Go"
+  - "PostgreSQL"
+  - "Kubernetes"
+  - "AWS"
+
+experience:
+  - company: "Acme Corp"
+    role: "Senior Software Engineer"
+    period: "2020 - present"
+    highlights:
+      - "Led the migration of a monolith to services, cutting p99 latency by 40%."
+      - "Built the billing pipeline handling 2M events/day."
+
+education:
+  - degree: "BSc Computer Science"
+    school: "Example University"
+    year: 2014
+
+publications: []
+
+preferences:
+  salary_min_usd: 150000
+  remote: true
+  relocation: false
+
+# criteria drives the LLM score. hard_filters are non-negotiable dealbreakers:
+# if any is triggered by a posting, the score is forced to <= 2.0.
+criteria:
+  hard_filters:
+    - "requires .NET"
+    - "on-site only (no remote)"
+    - "US citizens only"
+  soft_filters:
+    - "prefer product companies over agencies"
+  priority_targets:
+    - "companies with a strong remote culture"

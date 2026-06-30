@@ -1,0 +1,21 @@
+# Example company list. Copy to ~/.candidatador/company_list.yaml and adjust.
+# Organized by ATS (greenhouse / lever / ashby) and by phase. The slug is the
+# company identifier in that ATS's job board URL, e.g. for
+# https://boards.greenhouse.io/acme the slug is "acme".
+#
+# A scan can target a single phase or all phases at once.
+
+greenhouse:
+  phase1:
+    - acme
+    - globex
+  phase2:
+    - initech
+
+lever:
+  phase1:
+    - umbrella
+
+ashby:
+  phase1:
+    - hooli
