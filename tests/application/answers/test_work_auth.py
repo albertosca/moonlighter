@@ -1,4 +1,4 @@
-from candidatador.application.answers.work_auth import infer_country, resolve_work_auth
+from gauntler.application.answers.work_auth import infer_country, resolve_work_auth
 
 WA_CONFIG = {
     "work_authorization": {

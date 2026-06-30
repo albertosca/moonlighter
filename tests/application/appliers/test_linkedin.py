@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
-from candidatador.application.appliers.linkedin import LinkedInApplier
+from gauntler.application.appliers.linkedin import LinkedInApplier
 
 
 def make_applier(url="https://www.linkedin.com/jobs/view/123"):

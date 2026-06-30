@@ -5,13 +5,13 @@ apply_jobs/confirm_apply que o caminho feliz do test_mcp_server não toca.
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from candidatador.application import service as apply_service
-from candidatador.application.answers.cv import CVNotFoundError
-from candidatador.application.appliers.base import ApplicationDraft
-from candidatador.application.appliers.greenhouse import GreenhouseApplier
-from candidatador.core.db import Application, Job, init_db
+from gauntler.application import service as apply_service
+from gauntler.application.answers.cv import CVNotFoundError
+from gauntler.application.appliers.base import ApplicationDraft
+from gauntler.application.appliers.greenhouse import GreenhouseApplier
+from gauntler.core.db import Application, Job, init_db
 
-CONFIG = {"screenshots_dir": "/tmp/candidatador-test-shots", "llm_model": "x", "email": {}}
+CONFIG = {"screenshots_dir": "/tmp/gauntler-test-shots", "llm_model": "x", "email": {}}
 PROFILE: dict = {}
 
 
@@ -67,7 +67,7 @@ def test_archive_screenshots_noop_when_missing(tmp_path):
 def test_archive_screenshots_swallows_exception(tmp_path):
     src = tmp_path / "456"
     src.mkdir()
-    with patch("candidatador.application.service.shutil.move", side_effect=OSError("disk")):
+    with patch("gauntler.application.service.shutil.move", side_effect=OSError("disk")):
         # exceção é logada como não-crítica, não propaga
         apply_service.archive_screenshots(456, {"screenshots_dir": str(tmp_path)})
 
@@ -84,12 +84,12 @@ async def test_apply_jobs_shows_needs_review_fields(tmp_db):
         form_fields=["Work auth?", "Name"],
     )
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.browser") as mock_browser,
         patch(
-            "candidatador.application.service.generate_answers",
+            "gauntler.application.service.generate_answers",
             new=AsyncMock(return_value=draft),
         ),
-        patch("candidatador.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.save_screenshot = AsyncMock()
@@ -123,9 +123,9 @@ async def test_confirm_apply_without_email_config_skips_alias(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x"}  # sem chave "email"
     applier = _confirm_mocks(job, fill_status={"Name": "filled"})
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=applier)),
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.save_screenshot = AsyncMock()
@@ -143,9 +143,9 @@ async def test_confirm_apply_logs_failed_fields_but_submits(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     applier = _confirm_mocks(job, fill_status={"Name": "filled", "X": "failed:not_found"})
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=applier)),
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.save_screenshot = AsyncMock()
@@ -164,8 +164,8 @@ async def test_fill_open_page_fills_and_screenshots_without_submit(tmp_db, tmp_p
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     page = _page(job.url)
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=applier)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
     ):
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service._fill_open_page(page, job, {"Name": "Alberto"}, "/tmp/cv.pdf", cfg, PROFILE)
@@ -183,8 +183,8 @@ async def test_fill_open_page_returns_none_for_unknown_ats(tmp_db, tmp_path):
     job = _job(url="https://unknown/jobs/1")
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=None)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)),
     ):
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service._fill_open_page(_page(job.url), job, {}, "/tmp/cv.pdf", cfg, PROFILE)
@@ -203,9 +203,9 @@ async def test_fill_application_fills_stops_persists(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     applier = _confirm_mocks(job, fill_status={"Name": "filled"})
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=applier)),
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.save_screenshot = AsyncMock()
@@ -235,7 +235,7 @@ async def test_fill_application_aborts_on_missing_cv(tmp_db, tmp_path):
     Application.create(job=job, status="draft", form_data='{"Name": "Alberto"}')
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     with patch(
-        "candidatador.application.service.resolve_cv_path",
+        "gauntler.application.service.resolve_cv_path",
         side_effect=CVNotFoundError("cv.pdf não existe"),
     ):
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
@@ -251,9 +251,9 @@ async def test_fill_application_reports_failed_fields(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     applier = _confirm_mocks(job, fill_status={"Name": "filled", "X": "failed:not_found"})
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=applier)),
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.save_screenshot = AsyncMock()
@@ -276,9 +276,9 @@ async def test_fill_application_unknown_ats(tmp_db, tmp_path):
     cv.write_text("x")
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=None)),
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)),
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.save_screenshot = AsyncMock()
@@ -295,12 +295,12 @@ async def test_fill_application_handles_exception(tmp_db, tmp_path):
     cv.write_text("x")
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.browser") as mock_browser,
         patch(
-            "candidatador.application.service._fill_open_page",
+            "gauntler.application.service._fill_open_page",
             new=AsyncMock(side_effect=RuntimeError("falha inesperada")),
         ),
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.save_screenshot = AsyncMock()
@@ -333,9 +333,9 @@ async def test_submit_application_refills_and_submits(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     applier = _confirm_mocks(job, fill_status={"Name": "filled"}, submit="submitted")
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier", new=AsyncMock(return_value=applier)),
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.save_screenshot = AsyncMock()
@@ -358,7 +358,7 @@ async def test_submit_application_missing_cv(tmp_db, tmp_path):
     Application.create(job=job, status="filled", form_data='{"Name": "Alberto"}', email_ref="r")
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     with patch(
-        "candidatador.application.service.resolve_cv_path",
+        "gauntler.application.service.resolve_cv_path",
         side_effect=CVNotFoundError("cv.pdf não existe"),
     ):
         result = await apply_service.submit_application(job.id, cfg, PROFILE)

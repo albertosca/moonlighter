@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from candidatador.discovery.sources.http import AshbyScanner, GreenhouseScanner, LeverScanner
+from gauntler.discovery.sources.http import AshbyScanner, GreenhouseScanner, LeverScanner
 
 GREENHOUSE_RESPONSE = {
     "jobs": [
@@ -129,7 +129,7 @@ async def test_greenhouse_html_stripped_from_description():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert len(jobs) == 1
     assert "<" not in jobs[0].description
@@ -150,7 +150,7 @@ async def test_greenhouse_posted_at_parsed():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].posted_at is not None
     assert isinstance(jobs[0].posted_at, datetime)
@@ -169,7 +169,7 @@ async def test_greenhouse_posted_at_invalid_format():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].posted_at is None
 
@@ -186,7 +186,7 @@ async def test_greenhouse_missing_location():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].location is None
     assert jobs[0].remote_type is None
@@ -194,14 +194,14 @@ async def test_greenhouse_missing_location():
 
 async def test_greenhouse_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_greenhouse_empty_jobs_list():
     mock_client = _make_mock_client({"jobs": []})
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -219,7 +219,7 @@ async def test_greenhouse_multiple_companies():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["stripe", "linear"])
     assert len(jobs) == 2
 
@@ -238,7 +238,7 @@ async def test_lever_skips_entry_without_title():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
@@ -254,7 +254,7 @@ async def test_lever_skips_entry_without_url():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
@@ -270,7 +270,7 @@ async def test_lever_timestamp_is_utc_aware():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs[0].posted_at is not None
     assert jobs[0].posted_at.tzinfo is not None
@@ -286,28 +286,28 @@ async def test_lever_missing_created_at():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs[0].posted_at is None
 
 
 async def test_lever_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_lever_500_response_skips_company():
     mock_client = _make_mock_client([], status_code=500)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_lever_empty_array_response():
     mock_client = _make_mock_client([])
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
@@ -333,7 +333,7 @@ ASHBY_RESPONSE = {
 
 async def test_ashby_scan_success():
     mock_client = _make_mock_client(ASHBY_RESPONSE)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["openai"])
     assert len(jobs) == 1
     assert jobs[0].company == "openai"
@@ -344,7 +344,7 @@ async def test_ashby_scan_success():
 
 async def test_ashby_is_remote_flag_true():
     mock_client = _make_mock_client(ASHBY_RESPONSE)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["openai"])
     assert jobs[0].remote_type == "remote"
 
@@ -365,21 +365,21 @@ async def test_ashby_is_remote_flag_false_uses_location():
         }
     }
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs[0].remote_type == "onsite"
 
 
 async def test_ashby_500_response_skips_company():
     mock_client = _make_mock_client({}, status_code=500)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_ashby_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -388,7 +388,7 @@ async def test_ashby_graphql_error_returns_empty():
     """API returns {"errors": [...]} → no data key → returns []."""
     response = {"errors": [{"message": "Unauthorized"}]}
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -409,7 +409,7 @@ async def test_ashby_missing_published_date_returns_none():
         }
     }
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert len(jobs) == 1
     assert jobs[0].posted_at is None
@@ -432,7 +432,7 @@ async def test_ashby_published_date_parsed_as_datetime():
         }
     }
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs[0].posted_at is not None
     assert isinstance(jobs[0].posted_at, datetime)
@@ -442,7 +442,7 @@ async def test_ashby_empty_job_postings_returns_empty():
     """jobPostings: [] → scan returns []."""
     response = {"data": {"jobPostings": []}}
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -477,7 +477,7 @@ async def test_greenhouse_partial_failure_continues():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["ok1", "fail", "ok2"])
     assert len(jobs) == 2
 
@@ -494,7 +494,7 @@ async def test_lever_multiple_companies_returns_all():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["stripe", "linear"])
     assert len(jobs) == 2
     assert jobs[0].company == "stripe"
@@ -517,7 +517,7 @@ async def test_greenhouse_missing_title_skips_job():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -535,7 +535,7 @@ async def test_greenhouse_missing_absolute_url_skips_job():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -543,7 +543,7 @@ async def test_greenhouse_missing_absolute_url_skips_job():
 async def test_greenhouse_invalid_top_level_schema_returns_empty():
     """API retorna lista em vez de dict com 'jobs' → retorna [] sem crash."""
     mock_client = _make_mock_client([{"title": "Eng"}])  # lista em vez de dict
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -551,7 +551,7 @@ async def test_greenhouse_invalid_top_level_schema_returns_empty():
 async def test_greenhouse_jobs_key_missing_returns_empty():
     """API retorna dict mas sem chave 'jobs' → retorna [] sem crash."""
     mock_client = _make_mock_client({"data": []})  # sem 'jobs'
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -562,7 +562,7 @@ async def test_greenhouse_jobs_key_missing_returns_empty():
 async def test_lever_non_list_response_returns_empty():
     """API retorna dict (ex: erro) em vez de lista → retorna [] sem crash."""
     mock_client = _make_mock_client({"error": "rate limited"})
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
@@ -585,7 +585,7 @@ async def test_ashby_missing_title_skips_job():
         }
     }
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -598,7 +598,7 @@ async def test_ashby_missing_url_skips_job():
         }
     }
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -607,7 +607,7 @@ async def test_ashby_null_job_postings_returns_empty():
     """data.jobPostings é null → retorna [] sem crash."""
     response = {"data": {"jobPostings": None}}
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -631,8 +631,8 @@ async def test_greenhouse_logs_scan_start_and_fetched(caplog):
     }
     mock_client = _make_mock_client(payload)
     with (
-        patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        caplog.at_level(logging.INFO, logger="candidatador.discovery.sources.http"),
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        caplog.at_level(logging.INFO, logger="gauntler.discovery.sources.http"),
     ):
         await scanner.scan(["co"])
     assert "greenhouse" in caplog.text
@@ -653,8 +653,8 @@ async def test_lever_logs_scan_fetched(caplog):
     ]
     mock_client = _make_mock_client(payload)
     with (
-        patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        caplog.at_level(logging.INFO, logger="candidatador.discovery.sources.http"),
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        caplog.at_level(logging.INFO, logger="gauntler.discovery.sources.http"),
     ):
         await scanner.scan(["co"])
     assert "lever" in caplog.text
@@ -665,7 +665,7 @@ async def test_ashby_jobpostings_not_a_list_returns_empty():
     """jobPostings com shape inesperado (não-lista, mas truthy) → [] (http_sources.py:171)."""
     response = {"data": {"jobPostings": {"unexpected": "shape"}}}
     mock_client = _make_mock_client(response)
-    with patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -675,7 +675,7 @@ async def test_scan_skips_fetch_exceptions(Scanner):
     """_fetch lança → gather(return_exceptions) devolve a exceção → ignorada (não-lista)."""
     mock_client = _make_mock_client({})
     with (
-        patch("candidatador.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
         patch.object(Scanner, "_fetch", new=AsyncMock(side_effect=RuntimeError("boom"))),
     ):
         jobs = await Scanner().scan(["co"])

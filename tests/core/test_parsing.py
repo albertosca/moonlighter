@@ -1,6 +1,6 @@
 import json
 
-from candidatador.core.parsing import _extract_json
+from gauntler.core.parsing import _extract_json
 
 
 def test_extract_json_plain_json_passthrough():

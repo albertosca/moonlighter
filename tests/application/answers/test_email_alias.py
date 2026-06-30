@@ -1,4 +1,4 @@
-from candidatador.application.answers.email_alias import build_email_alias, inject_email_alias
+from gauntler.application.answers.email_alias import build_email_alias, inject_email_alias
 
 
 def test_build_email_alias_formats_correctly():

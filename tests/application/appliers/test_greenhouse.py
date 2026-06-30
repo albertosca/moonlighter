@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
-from candidatador.application.appliers.greenhouse import GreenhouseApplier
+from gauntler.application.appliers.greenhouse import GreenhouseApplier
 
 
 def make_label_locator(field_mock=None):
@@ -713,7 +713,7 @@ async def test_fill_custom_element_typeahead_logs_options_on_miss(caplog):
 
     with (
         patch("asyncio.sleep", new=AsyncMock()),
-        caplog.at_level(logging.WARNING, logger="candidatador.application.appliers.greenhouse"),
+        caplog.at_level(logging.WARNING, logger="gauntler.application.appliers.greenhouse"),
     ):
         result = await applier._fill_custom_element(element, "City", "Belo Horizonte")
 
@@ -739,7 +739,7 @@ async def test_select_custom_option_logs_options_on_miss(caplog):
 
     with (
         patch("asyncio.sleep", new=AsyncMock()),
-        caplog.at_level(logging.WARNING, logger="candidatador.application.appliers.greenhouse"),
+        caplog.at_level(logging.WARNING, logger="gauntler.application.appliers.greenhouse"),
     ):
         result = await applier._select_custom_option(element, "Work auth", "Maybe")
 
@@ -797,7 +797,7 @@ async def test_submit_logs_empty_required_fields(caplog):
     # evaluate: (1) empty required fields presentes, (2) form not visible after submit
     applier.page.evaluate = AsyncMock(side_effect=[["First Name *"], False, []])
 
-    with caplog.at_level(logging.WARNING, logger="candidatador.application.appliers.greenhouse"):
+    with caplog.at_level(logging.WARNING, logger="gauntler.application.appliers.greenhouse"):
         await applier.submit()
 
     assert "First Name" in caplog.text
@@ -811,7 +811,7 @@ async def test_greenhouse_detect_logs_match(caplog):
     import logging
 
     applier = make_applier("https://boards.greenhouse.io/stripe/jobs/1")
-    with caplog.at_level(logging.DEBUG, logger="candidatador.application.appliers.greenhouse"):
+    with caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.greenhouse"):
         await applier.detect()
     assert "detect: greenhouse" in caplog.text
 
@@ -828,7 +828,7 @@ async def test_greenhouse_submit_logs_outcome(caplog):
     applier.page.inner_text = AsyncMock(return_value="application submitted successfully")
     applier.page.url = "https://boards.greenhouse.io/confirmation"
 
-    with caplog.at_level(logging.INFO, logger="candidatador.application.appliers.greenhouse"):
+    with caplog.at_level(logging.INFO, logger="gauntler.application.appliers.greenhouse"):
         outcome = await applier.submit()
 
     assert "submit" in caplog.text
@@ -1053,10 +1053,10 @@ async def test_llm_pick_returns_choice():
     applier.config = {"llm_model": "m"}
     with (
         patch(
-            "candidatador.application.answers.option_matcher.pick_option_with_llm",
+            "gauntler.application.answers.option_matcher.pick_option_with_llm",
             new=AsyncMock(return_value="Native"),
         ),
-        patch("candidatador.core.llm.make_caller", return_value=AsyncMock()),
+        patch("gauntler.core.llm.make_caller", return_value=AsyncMock()),
     ):
         result = await applier._llm_pick("English", "Fluent", ["Native", "Basic"])
     assert result == "Native"
@@ -1069,7 +1069,7 @@ async def test_llm_pick_returns_none_without_options():
 
 async def test_llm_pick_returns_none_on_exception():
     applier = make_applier()
-    with patch("candidatador.core.llm.make_caller", side_effect=Exception("boom")):
+    with patch("gauntler.core.llm.make_caller", side_effect=Exception("boom")):
         assert await applier._llm_pick("English", "Fluent", ["Native"]) is None
 
 

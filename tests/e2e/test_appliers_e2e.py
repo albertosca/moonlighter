@@ -2,10 +2,10 @@ from unittest.mock import patch
 
 import pytest
 
-from candidatador.application.appliers.ashby import AshbyApplier
-from candidatador.application.appliers.greenhouse import GreenhouseApplier
-from candidatador.application.appliers.lever import LeverApplier
-from candidatador.application.appliers.linkedin import LinkedInApplier
+from gauntler.application.appliers.ashby import AshbyApplier
+from gauntler.application.appliers.greenhouse import GreenhouseApplier
+from gauntler.application.appliers.lever import LeverApplier
+from gauntler.application.appliers.linkedin import LinkedInApplier
 
 # Suíte e2e: exige navegador real (lança Brave/Chromium). Fora do run padrão —
 # rode com `pytest -m e2e`. O gate de cobertura roda sobre a suíte unitária.

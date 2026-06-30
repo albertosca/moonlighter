@@ -3,7 +3,7 @@ import json
 import os
 
 import pytest
-from candidatador.core.db import Application, Job, ScanLog, init_db
+from gauntler.core.db import Application, Job, ScanLog, init_db
 from peewee import IntegrityError
 
 
@@ -20,7 +20,7 @@ def _make_job(**kwargs):
 
 
 def test_init_creates_tables(tmp_db):
-    os.environ["CANDIDATADOR_DB_PATH"] = tmp_db
+    os.environ["GAUNTLER_DB_PATH"] = tmp_db
     init_db()
     # Tables exist and accept writes
     job = Job.create(
@@ -34,7 +34,7 @@ def test_init_creates_tables(tmp_db):
 
 
 def test_scan_log_dedup(tmp_db):
-    os.environ["CANDIDATADOR_DB_PATH"] = tmp_db
+    os.environ["GAUNTLER_DB_PATH"] = tmp_db
     init_db()
     ScanLog.create(job_url="https://example.com/job/1", source="greenhouse")
     urls = {row.job_url for row in ScanLog.select()}
@@ -241,8 +241,8 @@ def test_job_salary_notes_field(tmp_db):
 
 
 def test_db_path_reads_env_var(tmp_db):
-    """_db_path() returns value of CANDIDATADOR_DB_PATH env var when set."""
-    from candidatador.core.db import _db_path
+    """_db_path() returns value of GAUNTLER_DB_PATH env var when set."""
+    from gauntler.core.db import _db_path
 
     assert _db_path() == tmp_db
 
@@ -333,7 +333,7 @@ def test_application_email_ref_lookup_by_ref(tmp_db):
 def test_init_db_migrates_old_application_table(tmp_db):
     """Tabela 'application' antiga (sem email_ref/current_stage) → init_db adiciona
     as colunas via ALTER TABLE (db.py:98-99, 104)."""
-    from candidatador.core.db import db
+    from gauntler.core.db import db
 
     db.init(tmp_db)
     db.connect(reuse_if_open=True)
@@ -350,25 +350,25 @@ def test_init_db_migrates_old_application_table(tmp_db):
 
 
 def test_db_path_default_when_env_unset(monkeypatch):
-    """Sem CANDIDATADOR_DB_PATH nem CANDIDATADOR_HOME → default ~/.candidatador/candidatador.db."""
-    from candidatador.core.db import _db_path
+    """Sem GAUNTLER_DB_PATH nem GAUNTLER_HOME → default ~/.gauntler/gauntler.db."""
+    from gauntler.core.db import _db_path
 
-    monkeypatch.delenv("CANDIDATADOR_DB_PATH", raising=False)
-    monkeypatch.delenv("CANDIDATADOR_HOME", raising=False)
-    assert _db_path().endswith("/.candidatador/candidatador.db")
+    monkeypatch.delenv("GAUNTLER_DB_PATH", raising=False)
+    monkeypatch.delenv("GAUNTLER_HOME", raising=False)
+    assert _db_path().endswith("/.gauntler/gauntler.db")
 
 
 def test_db_path_respects_env(monkeypatch):
-    from candidatador.core.db import _db_path
+    from gauntler.core.db import _db_path
 
-    monkeypatch.setenv("CANDIDATADOR_DB_PATH", "/tmp/custom-candidatador.db")
-    assert _db_path() == "/tmp/custom-candidatador.db"
+    monkeypatch.setenv("GAUNTLER_DB_PATH", "/tmp/custom-gauntler.db")
+    assert _db_path() == "/tmp/custom-gauntler.db"
 
 
-def test_db_path_follows_candidatador_home(monkeypatch, tmp_path):
-    """Sem CANDIDATADOR_DB_PATH, o banco segue CANDIDATADOR_HOME (fonte única)."""
-    from candidatador.core.db import _db_path
+def test_db_path_follows_gauntler_home(monkeypatch, tmp_path):
+    """Sem GAUNTLER_DB_PATH, o banco segue GAUNTLER_HOME (fonte única)."""
+    from gauntler.core.db import _db_path
 
-    monkeypatch.delenv("CANDIDATADOR_DB_PATH", raising=False)
-    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
-    assert _db_path() == str(tmp_path / "candidatador.db")
+    monkeypatch.delenv("GAUNTLER_DB_PATH", raising=False)
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    assert _db_path() == str(tmp_path / "gauntler.db")

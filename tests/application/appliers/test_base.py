@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from candidatador.application.appliers.base import ApplicationDraft, _fill_field, generate_answers
+from gauntler.application.appliers.base import ApplicationDraft, _fill_field, generate_answers
 
 MOCK_ANSWERS = json.dumps(
     {
@@ -157,7 +157,7 @@ async def test_generate_answers_uses_injected_caller():
         called.append((prompt, model))
         return json.dumps({"Q": "a"})
 
-    with patch("candidatador.application.appliers.base._make_api_caller") as mock_factory:
+    with patch("gauntler.application.appliers.base._make_api_caller") as mock_factory:
         await generate_answers(
             company="Co",
             title="Eng",
@@ -515,11 +515,11 @@ async def test_generate_answers_prepopulated_overrides_llm():
 async def test_generate_answers_logs_start_and_ok(caplog):
     import logging
 
-    from candidatador.application.appliers.base import generate_answers
+    from gauntler.application.appliers.base import generate_answers
 
     mock_caller = AsyncMock(return_value=json.dumps({"Por que a Stripe?": "Porque é top"}))
 
-    with caplog.at_level(logging.INFO, logger="candidatador.application.appliers.base"):
+    with caplog.at_level(logging.INFO, logger="gauntler.application.appliers.base"):
         await generate_answers(
             company="Stripe",
             title="SRE",
@@ -538,11 +538,11 @@ async def test_generate_answers_logs_start_and_ok(caplog):
 async def test_generate_answers_logs_error(caplog):
     import logging
 
-    from candidatador.application.appliers.base import generate_answers
+    from gauntler.application.appliers.base import generate_answers
 
     mock_caller = AsyncMock(side_effect=Exception("timeout"))
 
-    with caplog.at_level(logging.INFO, logger="candidatador.application.appliers.base"):
+    with caplog.at_level(logging.INFO, logger="gauntler.application.appliers.base"):
         result = await generate_answers(
             company="Nubank",
             title="Dev",
@@ -560,7 +560,7 @@ async def test_generate_answers_logs_error(caplog):
 
 
 async def test_classify_submit_outcome_confirmed():
-    from candidatador.application.appliers.base import classify_submit_outcome
+    from gauntler.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
     page.inner_text = AsyncMock(return_value="Thank you for applying!")
@@ -570,7 +570,7 @@ async def test_classify_submit_outcome_confirmed():
 
 
 async def test_classify_submit_outcome_validation_failed_when_form_visible():
-    from candidatador.application.appliers.base import classify_submit_outcome
+    from gauntler.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
     page.inner_text = AsyncMock(return_value="sem confirmação aqui")
@@ -583,7 +583,7 @@ async def test_classify_submit_outcome_validation_failed_when_form_visible():
 
 
 async def test_classify_submit_outcome_unverified_when_ambiguous():
-    from candidatador.application.appliers.base import classify_submit_outcome
+    from gauntler.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
     page.inner_text = AsyncMock(return_value="página qualquer sem marcador")
@@ -597,7 +597,7 @@ async def test_classify_submit_outcome_unverified_when_ambiguous():
 
 async def test_confirm_submitted_swallows_inner_text_exception():
     """inner_text('body') lança → body vira '' e segue pela URL (53-54)."""
-    from candidatador.application.appliers.base import classify_submit_outcome
+    from gauntler.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
     page.inner_text = AsyncMock(side_effect=Exception("detached"))
@@ -609,7 +609,7 @@ async def test_confirm_submitted_swallows_inner_text_exception():
 
 async def test_classify_form_visible_evaluate_exception_is_false():
     """page.evaluate(form_visible) lança → trata como não-visível → unverified (93-94)."""
-    from candidatador.application.appliers.base import classify_submit_outcome
+    from gauntler.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
     page.inner_text = AsyncMock(return_value="sem marcador")
@@ -620,7 +620,7 @@ async def test_classify_form_visible_evaluate_exception_is_false():
 
 async def test_classify_error_messages_evaluate_exception_is_empty():
     """form visível mas o 2º evaluate (mensagens de erro) lança → errors=[] (98-99)."""
-    from candidatador.application.appliers.base import classify_submit_outcome
+    from gauntler.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
     page.inner_text = AsyncMock(return_value="sem marcador")
@@ -642,7 +642,7 @@ async def test_generate_answers_builds_default_caller_when_none():
     """_caller=None → usa _make_api_caller() como fallback (linha 225)."""
     fake_caller = AsyncMock(return_value='{"Q": "A"}')
     with patch(
-        "candidatador.application.appliers.base._make_api_caller", return_value=fake_caller
+        "gauntler.application.appliers.base._make_api_caller", return_value=fake_caller
     ) as mock_factory:
         result = await generate_answers(
             company="Co", title="Eng", description="d", fields=["Q"], profile={}, _caller=None

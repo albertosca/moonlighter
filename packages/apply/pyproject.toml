@@ -3,14 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "candidatador-apply"
+name = "gauntler-apply"
 version = "0.1.0"
-description = "Browser-based job application automation for candidatador"
+description = "Browser-based job application automation for gauntler"
 license = {text = "AGPL-3.0-only"}
 authors = [{name = "Alberto de Sá Cavalcanti de Albuquerque", email = "albertoalbuquerque01@gmail.com"}]
 requires-python = ">=3.14"
 dependencies = [
-    "candidatador-core>=0.1.0",
+    "gauntler-core>=0.1.0",
 ]
 
 [project.urls]
@@ -19,7 +19,7 @@ Repository = "https://github.com/albertosca/gauntler"
 "Bug Tracker" = "https://github.com/albertosca/gauntler/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["candidatador"]
+packages = ["gauntler"]
 
 [tool.uv.sources]
-candidatador-core = { workspace = true }
+gauntler-core = { workspace = true }

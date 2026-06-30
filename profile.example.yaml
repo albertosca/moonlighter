@@ -1,4 +1,4 @@
-# Example candidate profile. Copy to ~/.candidatador/profile.yaml and fill with your
+# Example candidate profile. Copy to ~/.gauntler/profile.yaml and fill with your
 # real data. The LLM reads the scoring-relevant fields (criteria, skills, experience,
 # preferences, summary, headline, languages) to evaluate and answer job applications.
 

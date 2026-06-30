@@ -8,9 +8,9 @@ config/profile/caller, sem depender da config global carregada no import.
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from candidatador.core.db import Job, ScanLog, init_db
-from candidatador.discovery import service as scan_service
-from candidatador.discovery.evaluator import EvaluationResult
+from gauntler.core.db import Job, ScanLog, init_db
+from gauntler.discovery import service as scan_service
+from gauntler.discovery.evaluator import EvaluationResult
 
 CONFIG = {
     "score_threshold": 7.0,
@@ -60,9 +60,9 @@ async def test_add_job_fetches_description_when_empty(tmp_db):
     init_db()
     acm, _ = _http_client(text="<html><body>Real desc</body></html>")
     with (
-        patch("candidatador.discovery.service.httpx.AsyncClient", return_value=acm),
+        patch("gauntler.discovery.service.httpx.AsyncClient", return_value=acm),
         patch(
-            "candidatador.discovery.service.evaluate_job",
+            "gauntler.discovery.service.evaluate_job",
             new=AsyncMock(return_value=_eval(8.0)),
         ),
     ):
@@ -77,7 +77,7 @@ async def test_add_job_fetches_description_when_empty(tmp_db):
 async def test_add_job_http_non_200_returns_error(tmp_db):
     init_db()
     acm, _ = _http_client(status_code=404)
-    with patch("candidatador.discovery.service.httpx.AsyncClient", return_value=acm):
+    with patch("gauntler.discovery.service.httpx.AsyncClient", return_value=acm):
         result = await scan_service.add_job(
             "https://x.com/3", "Stripe", "Engineer", "", CONFIG, PROFILE, MagicMock()
         )
@@ -89,7 +89,7 @@ async def test_add_job_http_exception_returns_error(tmp_db):
     acm = MagicMock()
     acm.__aenter__ = AsyncMock(side_effect=Exception("connection refused"))
     acm.__aexit__ = AsyncMock(return_value=False)
-    with patch("candidatador.discovery.service.httpx.AsyncClient", return_value=acm):
+    with patch("gauntler.discovery.service.httpx.AsyncClient", return_value=acm):
         result = await scan_service.add_job(
             "https://x.com/4", "Stripe", "Engineer", "", CONFIG, PROFILE, MagicMock()
         )
@@ -119,7 +119,7 @@ async def test_add_job_scanlog_without_job_proceeds_to_eval(tmp_db):
     # colide com o registro existente → IntegrityError → mensagem de conflito.
     ScanLog.create(job_url="https://x.com/6", source="manual")
     with patch(
-        "candidatador.discovery.service.evaluate_job",
+        "gauntler.discovery.service.evaluate_job",
         new=AsyncMock(return_value=_eval(8.0)),
     ):
         result = await scan_service.add_job(
@@ -158,7 +158,7 @@ async def test_add_job_title_blocklist_integrity_swallowed(tmp_db):
 async def test_add_job_new_above_threshold_with_caveats(tmp_db):
     init_db()
     with patch(
-        "candidatador.discovery.service.evaluate_job",
+        "gauntler.discovery.service.evaluate_job",
         new=AsyncMock(return_value=_eval(9.0, caveats=["visa", "relocation"])),
     ):
         result = await scan_service.add_job(
@@ -172,7 +172,7 @@ async def test_add_job_new_above_threshold_with_caveats(tmp_db):
 async def test_add_job_below_threshold_archived(tmp_db):
     init_db()
     with patch(
-        "candidatador.discovery.service.evaluate_job",
+        "gauntler.discovery.service.evaluate_job",
         new=AsyncMock(return_value=_eval(3.0)),
     ):
         result = await scan_service.add_job(
@@ -187,7 +187,7 @@ async def test_add_job_integrity_conflict_on_create(tmp_db):
     init_db()
     Job.create(source="manual", company="Acme", title="x", url="https://x.com/11", status="new")
     with patch(
-        "candidatador.discovery.service.evaluate_job",
+        "gauntler.discovery.service.evaluate_job",
         new=AsyncMock(return_value=_eval(8.0)),
     ):
         result = await scan_service.add_job(
@@ -198,7 +198,7 @@ async def test_add_job_integrity_conflict_on_create(tmp_db):
 
 # ── branches de borda do scan_and_evaluate ──────────────────────────────────
 
-from candidatador.discovery.sources.base import RawJob  # noqa: E402
+from gauntler.discovery.sources.base import RawJob  # noqa: E402
 
 
 def _raw(i, title="Engineer", source="greenhouse"):
@@ -229,13 +229,13 @@ async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=No
         return [await _eval_per_job(j.company, model) for j in jobs]
 
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
-        patch("candidatador.discovery.service.evaluate_jobs_batch", new=_batch),
-        patch("candidatador.discovery.sources.playwright.LinkedInScanner") as MockLI,
-        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.evaluate_jobs_batch", new=_batch),
+        patch("gauntler.discovery.sources.playwright.LinkedInScanner") as MockLI,
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -277,7 +277,7 @@ async def test_scan_title_filtered_archives_with_score_zero(tmp_db):
 
 async def test_scan_linkedin_session_expired_adds_warning(tmp_db):
     init_db()
-    from candidatador.discovery.sources.playwright import LinkedInSessionExpiredError
+    from gauntler.discovery.sources.playwright import LinkedInSessionExpiredError
 
     result = await _run_scan(
         [_raw(2)], linkedin_exc=LinkedInSessionExpiredError("sessão expirada")

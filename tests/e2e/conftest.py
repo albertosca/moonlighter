@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from candidatador.core.config import browser_executable, load_config
+from gauntler.core.config import browser_executable, load_config
 from playwright.async_api import async_playwright
 
 

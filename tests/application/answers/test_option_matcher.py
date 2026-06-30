@@ -1,6 +1,6 @@
 import pytest
 
-from candidatador.application.answers.option_matcher import (
+from gauntler.application.answers.option_matcher import (
     match_option_locally,
     pick_option_with_llm,
 )
@@ -129,7 +129,7 @@ async def test_llm_not_called_when_no_options():
 
 def test_starts_with_word_equal_strings_is_prefix():
     """prefix == string inteira é word-boundary válido (option_matcher.py:28)."""
-    from candidatador.application.answers.option_matcher import _starts_with_word
+    from gauntler.application.answers.option_matcher import _starts_with_word
 
     assert _starts_with_word("yes", "yes") is True
 

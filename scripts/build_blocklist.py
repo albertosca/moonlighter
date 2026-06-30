@@ -28,11 +28,11 @@ import yaml
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from candidatador.core.config import candidatador_home, load_config, load_profile
-from candidatador.core.db import Job, init_db
-from candidatador.core.llm import make_caller
-from candidatador.core.log import setup as setup_logging
-from candidatador.core.parsing import _extract_json
+from gauntler.core.config import gauntler_home, load_config, load_profile
+from gauntler.core.db import Job, init_db
+from gauntler.core.llm import make_caller
+from gauntler.core.log import setup as setup_logging
+from gauntler.core.parsing import _extract_json
 
 
 def _make_proposal_prompt(
@@ -90,7 +90,7 @@ QUOTA_MARKERS = (
 
 
 def _learned_path() -> Path:
-    return candidatador_home() / "blocklist_learned.yaml"
+    return gauntler_home() / "blocklist_learned.yaml"
 
 
 def _load_learned() -> list[str]:
@@ -232,10 +232,10 @@ def main() -> None:
         profile = load_profile()
     except FileNotFoundError:
         profile = {}
-    init_db()  # resolve o path via candidatador_home() / CANDIDATADOR_DB_PATH (fonte única em db.py)
+    init_db()  # resolve o path via gauntler_home() / GAUNTLER_DB_PATH (fonte única em db.py)
 
     model = config.get("eval_model", "claude-haiku-4-5-20251001")
-    learned_path = candidatador_home() / "blocklist_learned.yaml"
+    learned_path = gauntler_home() / "blocklist_learned.yaml"
     print(f"Modelo: {model}  |  blocklist_learned: {learned_path}")
     print()
 

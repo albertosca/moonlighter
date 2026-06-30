@@ -3,18 +3,18 @@ from pathlib import Path
 
 
 def test_get_logger_returns_logger_with_correct_name():
-    from candidatador.core.log import get_logger
+    from gauntler.core.log import get_logger
 
-    logger = get_logger("candidatador.foo")
-    assert logger.name == "candidatador.foo"
+    logger = get_logger("gauntler.foo")
+    assert logger.name == "gauntler.foo"
 
 
 def test_setup_creates_file_handler(tmp_path):
-    from candidatador.core import log as log_mod
+    from gauntler.core import log as log_mod
 
     # reset estado do módulo para garantir setup limpo
     log_mod._initialized = False
-    root = logging.getLogger("candidatador")
+    root = logging.getLogger("gauntler")
     for h in root.handlers[:]:
         root.removeHandler(h)
 
@@ -27,10 +27,10 @@ def test_setup_creates_file_handler(tmp_path):
 
 
 def test_setup_idempotent(tmp_path):
-    from candidatador.core import log as log_mod
+    from gauntler.core import log as log_mod
 
     log_mod._initialized = False
-    root = logging.getLogger("candidatador")
+    root = logging.getLogger("gauntler")
     for h in root.handlers[:]:
         root.removeHandler(h)
 
@@ -43,17 +43,17 @@ def test_setup_idempotent(tmp_path):
 
 
 def test_log_message_reaches_file(tmp_path):
-    from candidatador.core import log as log_mod
+    from gauntler.core import log as log_mod
 
     log_mod._initialized = False
-    root = logging.getLogger("candidatador")
+    root = logging.getLogger("gauntler")
     for h in root.handlers[:]:
         root.removeHandler(h)
 
     log_path = str(tmp_path / "test.log")
     log_mod.setup(log_path=log_path)
 
-    logger = log_mod.get_logger("candidatador.test_write")
+    logger = log_mod.get_logger("gauntler.test_write")
     logger.info("mensagem de teste xyz")
 
     # flush e fecha handlers para garantir escrita
@@ -69,9 +69,9 @@ def test_setup_without_rich_falls_back_silently(tmp_path, monkeypatch):
     import logging
     import sys
 
-    from candidatador.core import log as log_mod
+    from gauntler.core import log as log_mod
 
-    root = logging.getLogger("candidatador")
+    root = logging.getLogger("gauntler")
     saved = root.handlers[:]
     monkeypatch.setattr(log_mod, "_initialized", False)
     monkeypatch.setitem(sys.modules, "rich.logging", None)  # import → ImportError

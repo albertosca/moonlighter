@@ -1,4 +1,4 @@
-from candidatador.application.answers.field_map import pre_populate_answers
+from gauntler.application.answers.field_map import pre_populate_answers
 
 PROFILE = {
     "name": "Maria de Souza Pereira",

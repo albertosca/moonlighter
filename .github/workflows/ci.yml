@@ -32,13 +32,13 @@ jobs:
       - name: Type check (mypy)
         run: |
           uv run mypy \
-            --package candidatador.core \
-            --package candidatador.discovery \
-            --package candidatador.application \
-            --package candidatador.tracking \
-            --package candidatador.server \
-            --package candidatador.startup \
-            --package candidatador.views
+            --package gauntler.core \
+            --package gauntler.discovery \
+            --package gauntler.application \
+            --package gauntler.tracking \
+            --package gauntler.server \
+            --package gauntler.startup \
+            --package gauntler.views
 
       - name: Tests (unit, coverage gate 100%)
         run: uv run pytest -m "not e2e"

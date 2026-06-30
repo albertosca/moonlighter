@@ -1,4 +1,4 @@
-from candidatador.startup import StartupWarning, validate_startup
+from gauntler.startup import StartupWarning, validate_startup
 
 # ── profile ───────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 > **[Read in English](README.md)**
 
-# candidatador-de-vagas
+# gauntler
 
 Pipeline de candidatura a vagas com IA. Escaneia portais de emprego, avalia o fit do candidato via LLM e automatiza candidaturas via browser — tudo orquestrado pelo Claude através de um servidor [Model Context Protocol](https://modelcontextprotocol.io) (MCP).
 
@@ -15,15 +15,15 @@ Todas as etapas são expostas como ferramentas MCP e orquestradas pelo Claude nu
 
 ## Arquitetura
 
-Um [workspace uv](https://docs.astral.sh/uv/concepts/workspaces/) com 5 namespace packages (`candidatador.*`), organizados por feature:
+Um [workspace uv](https://docs.astral.sh/uv/concepts/workspaces/) com 5 namespace packages (`gauntler.*`), organizados por feature:
 
 | Package | Namespace | Propósito |
 |---------|-----------|-----------|
-| `candidatador-core` | `candidatador.core` | DB (Peewee/SQLite), config, browser driver, cliente LLM |
-| `candidatador-scan` | `candidatador.discovery` | Scrapers de ATS e scoring de vagas via LLM |
-| `candidatador-apply` | `candidatador.application` | Preenchedor de formulários, gerador de respostas, work-auth |
-| `candidatador-email` | `candidatador.tracking` | Sincronização com Gmail e classificação de estágios de entrevista |
-| `candidatador-full` | `candidatador.server` | Servidor FastMCP — conecta todos os pacotes |
+| `gauntler-core` | `gauntler.core` | DB (Peewee/SQLite), config, browser driver, cliente LLM |
+| `gauntler-scan` | `gauntler.discovery` | Scrapers de ATS e scoring de vagas via LLM |
+| `gauntler-apply` | `gauntler.application` | Preenchedor de formulários, gerador de respostas, work-auth |
+| `gauntler-email` | `gauntler.tracking` | Sincronização com Gmail e classificação de estágios de entrevista |
+| `gauntler-full` | `gauntler.server` | Servidor FastMCP — conecta todos os pacotes |
 
 ## Requisitos
 
@@ -39,19 +39,19 @@ Um [workspace uv](https://docs.astral.sh/uv/concepts/workspaces/) com 5 namespac
 
 ```bash
 git clone https://github.com/albertosca/gauntler
-cd candidatador-de-vagas
+cd gauntler
 uv sync --all-packages
 ```
 
 ### 2. Configurar
 
-Copie os arquivos de exemplo para o `CANDIDATADOR_HOME` (padrão: `~/.candidatador/`) e edite:
+Copie os arquivos de exemplo para o `GAUNTLER_HOME` (padrão: `~/.gauntler/`) e edite:
 
 ```bash
-mkdir -p ~/.candidatador
-cp config.example.yaml ~/.candidatador/config.yaml
-cp profile.example.yaml ~/.candidatador/profile.yaml
-cp company_list.example.yaml ~/.candidatador/company_list.yaml
+mkdir -p ~/.gauntler
+cp config.example.yaml ~/.gauntler/config.yaml
+cp profile.example.yaml ~/.gauntler/profile.yaml
+cp company_list.example.yaml ~/.gauntler/company_list.yaml
 ```
 
 Campos principais do `config.yaml`:
@@ -70,7 +70,7 @@ Edite `company_list.yaml` para adicionar as empresas e plataformas ATS que quer 
 ### 3. Rastreamento por Gmail (opcional)
 
 1. Crie um projeto no [Google Cloud Console](https://console.cloud.google.com), ative a API do Gmail e baixe as credenciais OAuth como `client.json`.
-2. Coloque o arquivo em `~/.candidatador/gmail-client.json`.
+2. Coloque o arquivo em `~/.gauntler/gmail-client.json`.
 3. Na primeira chamada a `setup_email`, um browser abrirá para autorização e o token será salvo.
 
 ### 4. Registrar como servidor MCP
@@ -80,9 +80,9 @@ Adicione ao `~/.claude/settings.json` (ou ao `settings.json` do projeto):
 ```json
 {
   "mcpServers": {
-    "candidatador": {
-      "command": "/caminho/para/candidatador-de-vagas/.venv/bin/python",
-      "args": ["-m", "candidatador.server"]
+    "gauntler": {
+      "command": "/caminho/para/gauntler/.venv/bin/python",
+      "args": ["-m", "gauntler.server"]
     }
   }
 }

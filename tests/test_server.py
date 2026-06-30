@@ -1,11 +1,11 @@
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from candidatador.application.answers.cv import CVNotFoundError
-from candidatador.application.appliers.base import ApplicationDraft
-from candidatador.application.appliers.linkedin import LinkedInApplier
-from candidatador.core.db import Application, Job, ScanLog, init_db
-from candidatador.discovery.evaluator import EvaluationResult
+from gauntler.application.answers.cv import CVNotFoundError
+from gauntler.application.appliers.base import ApplicationDraft
+from gauntler.application.appliers.linkedin import LinkedInApplier
+from gauntler.core.db import Application, Job, ScanLog, init_db
+from gauntler.discovery.evaluator import EvaluationResult
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -54,13 +54,13 @@ def create_application(job, **kwargs):
 
 async def test_scan_no_new_jobs(tmp_db):
     init_db()
-    from candidatador.server import scan_and_evaluate
+    from gauntler.server import scan_and_evaluate
 
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
     ):
         for M in (MockGH, MockLV, MockAB):
             instance = AsyncMock()
@@ -73,22 +73,22 @@ async def test_scan_no_new_jobs(tmp_db):
 
 async def test_scan_all_below_threshold(tmp_db):
     init_db()
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse", company="co", title="Eng", url="https://x.com/1", description="desc"
     )
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
         patch(
-            "candidatador.discovery.service.evaluate_jobs_batch",
+            "gauntler.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=4.0)),
         ),
-        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -103,8 +103,8 @@ async def test_scan_all_below_threshold(tmp_db):
 
 async def test_scan_above_threshold_shows_table(tmp_db):
     init_db()
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse",
@@ -114,15 +114,15 @@ async def test_scan_above_threshold_shows_table(tmp_db):
         description="desc",
     )
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
         patch(
-            "candidatador.discovery.service.evaluate_jobs_batch",
+            "gauntler.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
         ),
-        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -136,17 +136,17 @@ async def test_scan_above_threshold_shows_table(tmp_db):
 async def test_scan_dedup_against_scan_log(tmp_db):
     init_db()
     ScanLog.create(job_url="https://x.com/3", source="greenhouse")
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
 
     raw = RawJob(source="greenhouse", company="co", title="Eng", url="https://x.com/3")
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
-        patch("candidatador.discovery.service.evaluate_jobs_batch") as mock_batch,
-        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.evaluate_jobs_batch") as mock_batch,
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -161,22 +161,22 @@ async def test_scan_dedup_against_scan_log(tmp_db):
 
 async def test_scan_linkedin_failure_doesnt_block(tmp_db):
     init_db()
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse", company="co", title="Eng", url="https://x.com/4", description="desc"
     )
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
         patch(
-            "candidatador.discovery.service.evaluate_jobs_batch",
+            "gauntler.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
         ),
-        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -189,8 +189,8 @@ async def test_scan_linkedin_failure_doesnt_block(tmp_db):
 
 async def test_scan_saves_salary_fields(tmp_db):
     init_db()
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse",
@@ -209,15 +209,15 @@ async def test_scan_saves_salary_fields(tmp_db):
         salary_source="stated",
     )
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
         patch(
-            "candidatador.discovery.service.evaluate_jobs_batch",
+            "gauntler.discovery.service.evaluate_jobs_batch",
             new=_batch_of(eval_result),
         ),
-        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -232,8 +232,8 @@ async def test_scan_saves_salary_fields(tmp_db):
 
 async def test_scan_saves_caveats_as_json(tmp_db):
     init_db()
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse", company="co", title="Eng", url="https://x.com/6", description="desc"
@@ -242,15 +242,15 @@ async def test_scan_saves_caveats_as_json(tmp_db):
         score=7.0, score_notes="ok", caveats=["US only", "requires visa"]
     )
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
         patch(
-            "candidatador.discovery.service.evaluate_jobs_batch",
+            "gauntler.discovery.service.evaluate_jobs_batch",
             new=_batch_of(eval_result),
         ),
-        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -265,22 +265,22 @@ async def test_scan_saves_caveats_as_json(tmp_db):
 
 async def test_scan_status_archived_if_below_threshold(tmp_db):
     init_db()
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse", company="co", title="Eng", url="https://x.com/7", description="desc"
     )
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
         patch(
-            "candidatador.discovery.service.evaluate_jobs_batch",
+            "gauntler.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=3.0)),
         ),
-        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -298,7 +298,7 @@ async def test_scan_status_archived_if_below_threshold(tmp_db):
 async def test_list_jobs_default_new(tmp_db):
     init_db()
     create_job(tmp_db, url="https://x.com/lj1", status="new", score=8.0)
-    from candidatador.server import list_jobs
+    from gauntler.server import list_jobs
 
     result = await list_jobs(status="new")
     assert "Stripe" in result
@@ -308,7 +308,7 @@ async def test_list_jobs_filtered_by_status(tmp_db):
     init_db()
     create_job(tmp_db, url="https://x.com/lj2", status="reviewed", score=7.0, company="Linear")
     create_job(tmp_db, url="https://x.com/lj3", status="new", score=8.0, company="Vercel")
-    from candidatador.server import list_jobs
+    from gauntler.server import list_jobs
 
     result = await list_jobs(status="reviewed")
     assert "Linear" in result
@@ -325,7 +325,7 @@ async def test_list_jobs_limit(tmp_db):
             score=float(i),
             company=f"Co{i}",
         )
-    from candidatador.server import list_jobs
+    from gauntler.server import list_jobs
 
     result = await list_jobs(status="new", limit=3)
     # Verify it returned without error
@@ -335,7 +335,7 @@ async def test_list_jobs_limit(tmp_db):
 
 async def test_list_jobs_empty(tmp_db):
     init_db()
-    from candidatador.server import list_jobs
+    from gauntler.server import list_jobs
 
     result = await list_jobs(status="offer")
     assert "Nenhuma vaga" in result
@@ -345,7 +345,7 @@ async def test_list_jobs_ordered_by_score_desc(tmp_db):
     init_db()
     create_job(tmp_db, url="https://x.com/lj-lo", status="new", score=6.0, company="LowScore")
     create_job(tmp_db, url="https://x.com/lj-hi", status="new", score=9.5, company="HighScore")
-    from candidatador.server import list_jobs
+    from gauntler.server import list_jobs
 
     result = await list_jobs(status="new")
     # HighScore should appear before LowScore in the output
@@ -358,7 +358,7 @@ async def test_list_jobs_ordered_by_score_desc(tmp_db):
 async def test_get_job_existing(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/gj1")
-    from candidatador.server import get_job
+    from gauntler.server import get_job
 
     result = await get_job(id=job.id)
     assert "Stripe" in result
@@ -368,7 +368,7 @@ async def test_get_job_existing(tmp_db):
 
 async def test_get_job_nonexistent(tmp_db):
     init_db()
-    from candidatador.server import get_job
+    from gauntler.server import get_job
 
     result = await get_job(id=99999)
     assert "não encontrada" in result
@@ -377,7 +377,7 @@ async def test_get_job_nonexistent(tmp_db):
 async def test_get_job_with_caveats(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/gj2", caveats='["US only"]')
-    from candidatador.server import get_job
+    from gauntler.server import get_job
 
     result = await get_job(id=job.id)
     assert "US only" in result
@@ -393,7 +393,7 @@ async def test_get_job_with_salary(tmp_db):
         salary_currency="USD",
         salary_source="stated",
     )
-    from candidatador.server import get_job
+    from gauntler.server import get_job
 
     result = await get_job(id=job.id)
     assert "150" in result or "200" in result
@@ -402,7 +402,7 @@ async def test_get_job_with_salary(tmp_db):
 async def test_get_job_without_salary(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/gj4")
-    from candidatador.server import get_job
+    from gauntler.server import get_job
 
     result = await get_job(id=job.id)
     # Should not crash; salary line absent
@@ -412,7 +412,7 @@ async def test_get_job_without_salary(tmp_db):
 async def test_get_job_without_posted_at(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/gj5", posted_at=None)
-    from candidatador.server import get_job
+    from gauntler.server import get_job
 
     result = await get_job(id=job.id)
     assert "n/d" in result
@@ -439,19 +439,19 @@ async def test_apply_jobs_creates_draft(tmp_db):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/apply1")
     draft = ApplicationDraft(job_id=job.id, answers={"Q": "A"}, form_fields=["Q"])
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.browser") as mock_browser,
         patch(
-            "candidatador.application.service.generate_answers",
+            "gauntler.application.service.generate_answers",
             new=AsyncMock(return_value=draft),
         ),
-        patch("candidatador.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.extract_fields = AsyncMock(return_value=["Q"])
         mock_detect.return_value = mock_applier
-        from candidatador.server import apply_jobs
+        from gauntler.server import apply_jobs
 
         result = await apply_jobs(ids=[job.id])
     app = Application.get(Application.job == job)
@@ -461,7 +461,7 @@ async def test_apply_jobs_creates_draft(tmp_db):
 
 async def test_apply_jobs_job_not_found(tmp_db):
     init_db()
-    from candidatador.server import apply_jobs
+    from gauntler.server import apply_jobs
 
     result = await apply_jobs(ids=[99999])
     assert "não encontrada" in result
@@ -472,14 +472,14 @@ async def test_apply_jobs_unknown_ats(tmp_db):
     job = create_job(tmp_db, url="https://unknownats.com/jobs/1")
     page = make_mock_page(url="https://unknownats.com/jobs/1")
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.browser") as mock_browser,
         patch(
-            "candidatador.application.service.detect_applier", new=AsyncMock(return_value=None)
+            "gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)
         ),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
-        from candidatador.server import apply_jobs
+        from gauntler.server import apply_jobs
 
         result = await apply_jobs(ids=[job.id])
     assert "ATS não reconhecido" in result
@@ -491,19 +491,19 @@ async def test_apply_jobs_updates_job_status(tmp_db):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/apply2")
     draft = ApplicationDraft(job_id=job.id, answers={"Q": "A"}, form_fields=["Q"])
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.browser") as mock_browser,
         patch(
-            "candidatador.application.service.generate_answers",
+            "gauntler.application.service.generate_answers",
             new=AsyncMock(return_value=draft),
         ),
-        patch("candidatador.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.extract_fields = AsyncMock(return_value=["Q"])
         mock_detect.return_value = mock_applier
-        from candidatador.server import apply_jobs
+        from gauntler.server import apply_jobs
 
         await apply_jobs(ids=[job.id])
     job_fresh = Job.get_by_id(job.id)
@@ -523,9 +523,9 @@ async def test_confirm_apply_success(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ca1")
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier") as mock_detect,
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -533,7 +533,7 @@ async def test_confirm_apply_success(tmp_db, tmp_path):
         mock_applier.fill_form = AsyncMock()
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
-        from candidatador.server import confirm_apply
+        from gauntler.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id)
 
@@ -548,7 +548,7 @@ async def test_confirm_apply_no_application(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca2")
     # No application created
-    from candidatador.server import confirm_apply
+    from gauntler.server import confirm_apply
 
     result = await confirm_apply(job_id=job.id)
     assert "sem rascunho" in result or "não encontrada" in result
@@ -556,7 +556,7 @@ async def test_confirm_apply_no_application(tmp_db):
 
 async def test_confirm_apply_job_not_found(tmp_db):
     init_db()
-    from candidatador.server import confirm_apply
+    from gauntler.server import confirm_apply
 
     result = await confirm_apply(job_id=88888)
     assert "não encontrada" in result or "sem rascunho" in result
@@ -567,10 +567,10 @@ async def test_confirm_apply_cv_not_found(tmp_db):
     job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca3", status="applying")
     create_application(job)
     with patch(
-        "candidatador.application.service.resolve_cv_path",
+        "gauntler.application.service.resolve_cv_path",
         side_effect=CVNotFoundError("CV não encontrado"),
     ):
-        from candidatador.server import confirm_apply
+        from gauntler.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id)
     assert "CV" in result and "não encontrado" in result
@@ -592,9 +592,9 @@ async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
         fill_calls.append(answers.copy())
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier") as mock_detect,
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -602,7 +602,7 @@ async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
         mock_applier.fill_form = fake_fill
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
-        from candidatador.server import confirm_apply
+        from gauntler.server import confirm_apply
 
         await confirm_apply(job_id=job.id, answers={"Q1": "overridden"})
 
@@ -630,11 +630,11 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
 
     test_email = "candidaturas@gmail.com"
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier") as mock_detect,
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
         patch(
-            "candidatador.server._config",
+            "gauntler.server._config",
             {"email": {"address": test_email}, "screenshots_dir": str(tmp_path)},
         ),
     ):
@@ -644,8 +644,8 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
         mock_applier.fill_form = fake_fill
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
-        from candidatador.application.answers.email_alias import build_email_alias
-        from candidatador.server import confirm_apply
+        from gauntler.application.answers.email_alias import build_email_alias
+        from gauntler.server import confirm_apply
 
         await confirm_apply(job_id=job.id)
 
@@ -665,16 +665,16 @@ async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ca5")
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier") as mock_detect,
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = MagicMock()
         mock_applier.fill_form = AsyncMock(side_effect=Exception("browser crash"))
         mock_detect.return_value = mock_applier
-        from candidatador.server import confirm_apply
+        from gauntler.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id)
 
@@ -691,7 +691,7 @@ async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
 async def test_retry_apply_no_draft(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ra1")
-    from candidatador.server import retry_apply
+    from gauntler.server import retry_apply
 
     result = await retry_apply(job_id=job.id)
     assert "apply_jobs" in result or "primeiro" in result
@@ -706,9 +706,9 @@ async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ra2")
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier") as mock_detect,
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -716,7 +716,7 @@ async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
         mock_applier.fill_form = AsyncMock()
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
-        from candidatador.server import retry_apply
+        from gauntler.server import retry_apply
 
         result = await retry_apply(job_id=job.id)
     assert "submetida" in result or "✓" in result
@@ -726,7 +726,7 @@ async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
 
 
 async def test_fill_application_tool_delegates_to_service(monkeypatch):
-    import candidatador.server as server
+    import gauntler.server as server
     called = {}
 
     async def fake_fill(job_id, answers, config, profile):
@@ -740,7 +740,7 @@ async def test_fill_application_tool_delegates_to_service(monkeypatch):
 
 
 async def test_submit_application_tool_delegates_to_service(monkeypatch):
-    import candidatador.server as server
+    import gauntler.server as server
     called = {}
 
     async def fake_submit(job_id, config, profile):
@@ -758,7 +758,7 @@ async def test_submit_application_tool_delegates_to_service(monkeypatch):
 
 async def test_get_pipeline_empty(tmp_db):
     init_db()
-    from candidatador.server import get_pipeline
+    from gauntler.server import get_pipeline
 
     result = await get_pipeline()
     assert "0" in result or "Total" in result
@@ -770,7 +770,7 @@ async def test_get_pipeline_groups_by_status(tmp_db):
     job2 = create_job(tmp_db, url="https://x.com/pl2", company="Linear")
     create_application(job1, status="submitted")
     create_application(job2, status="interviews")
-    from candidatador.server import get_pipeline
+    from gauntler.server import get_pipeline
 
     result = await get_pipeline()
     assert "Submitted" in result or "submitted" in result.lower()
@@ -781,7 +781,7 @@ async def test_get_pipeline_shows_next_action(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/pl3")
     create_application(job, status="submitted", next_action="follow up em 2026-06-01")
-    from candidatador.server import get_pipeline
+    from gauntler.server import get_pipeline
 
     result = await get_pipeline()
     assert "follow up" in result
@@ -791,7 +791,7 @@ async def test_get_pipeline_skips_empty_statuses(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/pl4")
     create_application(job, status="submitted")
-    from candidatador.server import get_pipeline
+    from gauntler.server import get_pipeline
 
     result = await get_pipeline()
     # "Offer" section should not appear since no offer apps
@@ -805,7 +805,7 @@ async def test_update_status_success(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/us1")
     create_application(job)
-    from candidatador.server import update_status
+    from gauntler.server import update_status
 
     result = await update_status(job_id=job.id, status="screening")
     app = Application.get(Application.job == job)
@@ -817,7 +817,7 @@ async def test_update_status_with_notes(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/us2")
     create_application(job)
-    from candidatador.server import update_status
+    from gauntler.server import update_status
 
     await update_status(job_id=job.id, status="interviews", notes="Scheduled for Monday")
     app = Application.get(Application.job == job)
@@ -828,7 +828,7 @@ async def test_update_status_with_next_action(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/us3")
     create_application(job)
-    from candidatador.server import update_status
+    from gauntler.server import update_status
 
     result = await update_status(job_id=job.id, status="screening", next_action="Call Friday")
     app = Application.get(Application.job == job)
@@ -838,7 +838,7 @@ async def test_update_status_with_next_action(tmp_db):
 
 async def test_update_status_invalid(tmp_db):
     init_db()
-    from candidatador.server import update_status
+    from gauntler.server import update_status
 
     result = await update_status(job_id=1, status="banana")
     assert "inválido" in result or "Status" in result
@@ -846,7 +846,7 @@ async def test_update_status_invalid(tmp_db):
 
 async def test_update_status_job_not_found(tmp_db):
     init_db()
-    from candidatador.server import update_status
+    from gauntler.server import update_status
 
     result = await update_status(job_id=77777, status="screening")
     assert "não encontrada" in result
@@ -856,7 +856,7 @@ async def test_update_status_no_application(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/us5")
     # No application
-    from candidatador.server import update_status
+    from gauntler.server import update_status
 
     result = await update_status(job_id=job.id, status="screening")
     assert "candidatura" in result or "não encontrada" in result
@@ -868,8 +868,8 @@ async def test_update_status_no_application(tmp_db):
 async def test_scan_concurrent_batch_all_processed(tmp_db):
     """15 jobs → 3 chunks of 5 (scan_batch_size=5) → evaluate_jobs_batch called 3× → all 15 in DB."""
     init_db()
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
 
     raws = [
         RawJob(
@@ -883,12 +883,12 @@ async def test_scan_concurrent_batch_all_processed(tmp_db):
     ]
     mock_batch = AsyncMock(side_effect=_batch_of(make_eval_result(score=7.0)))
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
-        patch("candidatador.discovery.service.evaluate_jobs_batch", new=mock_batch),
-        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -915,8 +915,8 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
     Este teste FALHA se o loop _release for removido do except de spend-limit:
     sem release, as 4 vagas do chunk 0 ficam com ScanLog mas sem Job."""
     init_db()
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
 
     raws = [
         RawJob(
@@ -933,13 +933,13 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
     mock_batch = AsyncMock(side_effect=spend_limit_err)
 
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
-        patch("candidatador.discovery.service.evaluate_jobs_batch", new=mock_batch),
-        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
-        patch("candidatador.server._config", {
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("gauntler.server._config", {
             "score_threshold": 6.5,
             "llm_model": "claude-haiku-4-5-20251001",
             "title_blocklist": [],
@@ -966,8 +966,8 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
     o semáforo; os chunks 1 e 2 vêem o stop antes de chamar evaluate_jobs_batch.
     Prova concreta de parada antecipada: call_count == 1, não 3."""
     init_db()
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
 
     raws = [
         RawJob(
@@ -984,13 +984,13 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
     mock_batch = AsyncMock(side_effect=spend_limit_err)
 
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
-        patch("candidatador.discovery.service.evaluate_jobs_batch", new=mock_batch),
-        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
-        patch("candidatador.server._config", {
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("gauntler.server._config", {
             "score_threshold": 6.5,
             "llm_model": "claude-haiku-4-5-20251001",
             "title_blocklist": [],
@@ -1028,15 +1028,15 @@ async def test_apply_jobs_linkedin_not_easy_apply(tmp_db):
     li_applier = LinkedInApplier(page, {}, {})
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.browser") as mock_browser,
         patch(
-            "candidatador.application.service.detect_applier",
+            "gauntler.application.service.detect_applier",
             new=AsyncMock(return_value=li_applier),
         ),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
-        from candidatador.server import apply_jobs
+        from gauntler.server import apply_jobs
 
         result = await apply_jobs(ids=[job.id])
 
@@ -1051,19 +1051,19 @@ async def test_apply_jobs_llm_error_still_creates_draft(tmp_db):
     error_draft = ApplicationDraft(job_id=job.id, answers={}, form_fields=[], error="LLM timeout")
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.browser") as mock_browser,
         patch(
-            "candidatador.application.service.generate_answers",
+            "gauntler.application.service.generate_answers",
             new=AsyncMock(return_value=error_draft),
         ),
-        patch("candidatador.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.extract_fields = AsyncMock(return_value=["Q"])
         mock_detect.return_value = mock_applier
-        from candidatador.server import apply_jobs
+        from gauntler.server import apply_jobs
 
         result = await apply_jobs(ids=[job.id])
 
@@ -1081,19 +1081,19 @@ async def test_apply_jobs_updates_existing_draft(tmp_db):
     new_draft = ApplicationDraft(job_id=job.id, answers={"NewQ": "NewA"}, form_fields=["NewQ"])
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.browser") as mock_browser,
         patch(
-            "candidatador.application.service.generate_answers",
+            "gauntler.application.service.generate_answers",
             new=AsyncMock(return_value=new_draft),
         ),
-        patch("candidatador.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.extract_fields = AsyncMock(return_value=["NewQ"])
         mock_detect.return_value = mock_applier
-        from candidatador.server import apply_jobs
+        from gauntler.server import apply_jobs
 
         await apply_jobs(ids=[job.id])
 
@@ -1122,16 +1122,16 @@ async def test_apply_jobs_exception_continues_to_next(tmp_db):
         return mock_applier
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.browser") as mock_browser,
         patch(
-            "candidatador.application.service.generate_answers",
+            "gauntler.application.service.generate_answers",
             new=AsyncMock(return_value=draft),
         ),
-        patch("candidatador.application.service.detect_applier", side_effect=detect_side_effect),
+        patch("gauntler.application.service.detect_applier", side_effect=detect_side_effect),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
-        from candidatador.server import apply_jobs
+        from gauntler.server import apply_jobs
 
         result = await apply_jobs(ids=[job1.id, job2.id])
 
@@ -1153,9 +1153,9 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/sf1")
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier") as mock_detect,
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1163,7 +1163,7 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
         mock_applier.fill_form = AsyncMock()
         mock_applier.submit = AsyncMock(return_value="failed")
         mock_detect.return_value = mock_applier
-        from candidatador.server import confirm_apply
+        from gauntler.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id)
 
@@ -1185,9 +1185,9 @@ async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db,
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/uv1")
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier") as mock_detect,
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1195,7 +1195,7 @@ async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db,
         mock_applier.fill_form = AsyncMock()
         mock_applier.submit = AsyncMock(return_value="unverified")
         mock_detect.return_value = mock_applier
-        from candidatador.server import confirm_apply
+        from gauntler.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id)
 
@@ -1216,7 +1216,7 @@ async def test_retry_apply_refuses_needs_review(tmp_db):
         tmp_db, url="https://boards.greenhouse.io/stripe/jobs/nr1", status="needs_review"
     )
     create_application(job, status="needs_review")
-    from candidatador.server import retry_apply
+    from gauntler.server import retry_apply
 
     result = await retry_apply(job_id=job.id)
     assert "needs_review" in result or "revis" in result.lower()
@@ -1227,7 +1227,7 @@ async def test_get_pipeline_shows_needs_review(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/pl-nr", company="Stripe")
     create_application(job, status="needs_review")
-    from candidatador.server import get_pipeline
+    from gauntler.server import get_pipeline
 
     result = await get_pipeline()
     assert "needs_review" in result.lower() or "revis" in result.lower()
@@ -1243,15 +1243,15 @@ async def test_confirm_apply_unknown_ats(tmp_db, tmp_path):
     page = make_mock_page(url="https://unknownats.com/jobs/ca99")
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.browser") as mock_browser,
         patch(
-            "candidatador.application.service.detect_applier", new=AsyncMock(return_value=None)
+            "gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)
         ),
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
-        from candidatador.server import confirm_apply
+        from gauntler.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id)
 
@@ -1283,16 +1283,16 @@ async def test_confirm_apply_linkedin_calls_extract_fields(tmp_db, tmp_path):
     li_applier = TrackingLinkedInApplier(page, {}, {})
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.browser") as mock_browser,
         patch(
-            "candidatador.application.service.detect_applier",
+            "gauntler.application.service.detect_applier",
             new=AsyncMock(return_value=li_applier),
         ),
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
-        from candidatador.server import confirm_apply
+        from gauntler.server import confirm_apply
 
         await confirm_apply(job_id=job.id)
 
@@ -1306,7 +1306,7 @@ async def test_get_job_score_null(tmp_db):
     """get_job with score=None must not raise TypeError (bug fix)."""
     init_db()
     job = create_job(tmp_db, url="https://x.com/gj-null-score", score=None)
-    from candidatador.server import get_job
+    from gauntler.server import get_job
 
     result = await get_job(id=job.id)
     assert "—" in result
@@ -1319,7 +1319,7 @@ async def test_get_job_score_null(tmp_db):
 async def test_login_unsupported_platform(tmp_db):
     """login() with unsupported platform returns error message."""
     init_db()
-    from candidatador.server import login
+    from gauntler.server import login
 
     result = await login(platform="github")
     assert "not supported" in result or "suport" in result.lower() or "github" in result.lower()
@@ -1329,9 +1329,9 @@ async def test_login_linkedin_returns_instruction(tmp_db):
     """login('linkedin') opens browser and returns instruction string."""
     init_db()
     page = make_mock_page(url="https://www.linkedin.com/login")
-    with patch("candidatador.server._browser_mod") as mock_browser:
+    with patch("gauntler.server._browser_mod") as mock_browser:
         mock_browser.new_page = AsyncMock(return_value=page)
-        from candidatador.server import login
+        from gauntler.server import login
 
         result = await login(platform="linkedin")
     assert "linkedin" in result.lower()
@@ -1353,7 +1353,7 @@ async def test_list_jobs_salary_estimate_shows_asterisk(tmp_db):
         salary_source="llm_estimate",
         status="new",
     )
-    from candidatador.server import list_jobs
+    from gauntler.server import list_jobs
 
     result = await list_jobs(status="new")
     assert " *" in result
@@ -1371,7 +1371,7 @@ async def test_list_jobs_salary_min_only_shows_plus(tmp_db):
         salary_source="stated",
         status="new",
     )
-    from candidatador.server import list_jobs
+    from gauntler.server import list_jobs
 
     result = await list_jobs(status="new")
     assert "k+" in result or "120" in result
@@ -1389,7 +1389,7 @@ async def test_get_pipeline_total_count(tmp_db):
     create_application(job1, status="submitted")
     create_application(job2, status="interviews")
     create_application(job3, status="rejected")
-    from candidatador.server import get_pipeline
+    from gauntler.server import get_pipeline
 
     result = await get_pipeline()
     assert "3" in result
@@ -1402,13 +1402,13 @@ def test_validate_startup_called_at_import_with_real_config():
     """validate_startup não lança exceção durante inicialização do mcp_server."""
     # O mcp_server já foi importado nos testes anteriores.
     # Este teste garante que o módulo importa sem crash mesmo sem API key.
-    import candidatador.server  # noqa: F401 — verifica que importa ok
+    import gauntler.server  # noqa: F401 — verifica que importa ok
 
     assert True  # se chegou aqui, não crashou
 
 
 def test_startup_warning_level_values():
-    from candidatador.startup import StartupWarning
+    from gauntler.startup import StartupWarning
 
     w_err = StartupWarning(level="error", message="msg")
     w_warn = StartupWarning(level="warn", message="msg")
@@ -1422,15 +1422,15 @@ def test_startup_warning_level_values():
 async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
     """LinkedInSessionExpiredError → aviso explícito no resultado (não silêncio)."""
     init_db()
-    from candidatador.discovery.sources.playwright import LinkedInSessionExpiredError
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.playwright import LinkedInSessionExpiredError
+    from gauntler.server import scan_and_evaluate
 
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
-        patch("candidatador.discovery.sources.playwright.LinkedInScanner") as MockLI,
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.sources.playwright.LinkedInScanner") as MockLI,
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1448,9 +1448,9 @@ async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
 async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db):
     """LinkedInSessionExpiredError não impede que vagas HTTP sejam retornadas."""
     init_db()
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.discovery.sources.playwright import LinkedInSessionExpiredError
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.discovery.sources.playwright import LinkedInSessionExpiredError
+    from gauntler.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse",
@@ -1461,16 +1461,16 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
     )
 
     with (
-        patch("candidatador.discovery.service.GreenhouseScanner") as MockGH,
-        patch("candidatador.discovery.service.LeverScanner") as MockLV,
-        patch("candidatador.discovery.service.AshbyScanner") as MockAB,
-        patch("candidatador.discovery.service.browser") as mock_browser,
-        patch("candidatador.discovery.sources.playwright.LinkedInScanner") as MockLI,
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.sources.playwright.LinkedInScanner") as MockLI,
         patch(
-            "candidatador.discovery.service.evaluate_jobs_batch",
+            "gauntler.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
         ),
-        patch("candidatador.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1499,12 +1499,12 @@ async def test_confirm_apply_generates_6_char_ref(tmp_db, tmp_path):
     cv_path.write_bytes(b"fake pdf")
     page = make_mock_page(url=job.url)
 
-    from candidatador.server import confirm_apply
+    from gauntler.server import confirm_apply
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier") as mock_detect,
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1532,12 +1532,12 @@ async def test_confirm_apply_ref_is_url_safe(tmp_db, tmp_path):
     cv_path.write_bytes(b"fake pdf")
     page = make_mock_page(url=job.url)
 
-    from candidatador.server import confirm_apply
+    from gauntler.server import confirm_apply
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier") as mock_detect,
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1558,7 +1558,7 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
     cv_path.write_bytes(b"fake pdf")
     refs = set()
 
-    from candidatador.server import confirm_apply
+    from gauntler.server import confirm_apply
 
     for i in range(10):
         job = create_job(
@@ -1568,9 +1568,9 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
         page = make_mock_page(url=job.url)
 
         with (
-            patch("candidatador.application.service.browser") as mock_browser,
-            patch("candidatador.application.service.detect_applier") as mock_detect,
-            patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
+            patch("gauntler.application.service.browser") as mock_browser,
+            patch("gauntler.application.service.detect_applier") as mock_detect,
+            patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
         ):
             mock_browser.new_page = AsyncMock(return_value=page)
             mock_browser.save_screenshot = AsyncMock()
@@ -1591,21 +1591,21 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
 
 async def test_setup_email_calls_gmail_flow():
     """setup_email deve iniciar o fluxo OAuth e confirmar sucesso."""
-    from candidatador.server import setup_email
+    from gauntler.server import setup_email
 
     with (
-        patch("candidatador.server.setup_gmail_service") as mock_setup,
+        patch("gauntler.server.setup_gmail_service") as mock_setup,
         patch(
-            "candidatador.server.load_config",
+            "gauntler.server.load_config",
             return_value={
                 "email": {
                     "address": "candidaturas@gmail.com",
-                    "credentials_path": "~/.candidatador/gmail-client.json",
-                    "token_path": "~/.candidatador/gmail-token.json",
+                    "credentials_path": "~/.gauntler/gmail-client.json",
+                    "token_path": "~/.gauntler/gmail-token.json",
                 }
             },
         ),
-        patch("candidatador.server._run_gmail_oauth") as mock_oauth,
+        patch("gauntler.server._run_gmail_oauth") as mock_oauth,
         patch("os.path.exists", return_value=True),
     ):
         mock_oauth.return_value = None
@@ -1617,15 +1617,15 @@ async def test_setup_email_calls_gmail_flow():
 
 async def test_setup_email_raises_friendly_error_when_client_json_missing():
     """setup_email deve retornar mensagem clara se gmail-client.json não existe."""
-    from candidatador.server import setup_email
+    from gauntler.server import setup_email
 
     with patch(
-        "candidatador.server.load_config",
+        "gauntler.server.load_config",
         return_value={
             "email": {
                 "address": "candidaturas@gmail.com",
                 "credentials_path": "/nonexistent/gmail-client.json",
-                "token_path": "~/.candidatador/gmail-token.json",
+                "token_path": "~/.gauntler/gmail-token.json",
             }
         },
     ):
@@ -1640,7 +1640,7 @@ async def test_setup_email_raises_friendly_error_when_client_json_missing():
 async def test_sync_email_responses_returns_summary(tmp_db):
     """sync_email_responses deve chamar sync_responses e retornar resumo legível."""
     init_db()
-    from candidatador.server import sync_email_responses
+    from gauntler.server import sync_email_responses
 
     fake_updates = [
         {
@@ -1660,15 +1660,15 @@ async def test_sync_email_responses_returns_summary(tmp_db):
     ]
 
     with (
-        patch("candidatador.server.sync_responses", new=AsyncMock(return_value=fake_updates)),
+        patch("gauntler.server.sync_responses", new=AsyncMock(return_value=fake_updates)),
         patch(
-            "candidatador.server.load_config",
+            "gauntler.server.load_config",
             return_value={
                 "email": {
                     "address": "candidaturas@gmail.com",
-                    "credentials_path": "~/.candidatador/gmail-client.json",
-                    "token_path": "~/.candidatador/gmail-token.json",
-                    "processed_label": "candidatador/processado",
+                    "credentials_path": "~/.gauntler/gmail-client.json",
+                    "token_path": "~/.gauntler/gmail-token.json",
+                    "processed_label": "gauntler/processed",
                     "interview_stages": [],
                 },
                 "llm_model": "claude-sonnet-4-6",
@@ -1685,18 +1685,18 @@ async def test_sync_email_responses_returns_summary(tmp_db):
 async def test_sync_email_responses_empty_inbox(tmp_db):
     """sync_email_responses com inbox vazia deve retornar mensagem adequada."""
     init_db()
-    from candidatador.server import sync_email_responses
+    from gauntler.server import sync_email_responses
 
     with (
-        patch("candidatador.server.sync_responses", new=AsyncMock(return_value=[])),
+        patch("gauntler.server.sync_responses", new=AsyncMock(return_value=[])),
         patch(
-            "candidatador.server.load_config",
+            "gauntler.server.load_config",
             return_value={
                 "email": {
                     "address": "candidaturas@gmail.com",
-                    "credentials_path": "~/.candidatador/gmail-client.json",
-                    "token_path": "~/.candidatador/gmail-token.json",
-                    "processed_label": "candidatador/processado",
+                    "credentials_path": "~/.gauntler/gmail-client.json",
+                    "token_path": "~/.gauntler/gmail-token.json",
+                    "processed_label": "gauntler/processed",
                     "interview_stages": [],
                 },
                 "llm_model": "claude-sonnet-4-6",
@@ -1710,7 +1710,7 @@ async def test_sync_email_responses_empty_inbox(tmp_db):
 
 def test_mcp_server_initializes_logging():
     """Importar o mcp_server não deve explodir e deve ter setup de logging configurado."""
-    import candidatador.core.log as log_mod
+    import gauntler.core.log as log_mod
 
     # se o módulo já foi importado, _initialized deve ser True
     assert log_mod._initialized is True
@@ -1721,7 +1721,7 @@ def test_mcp_server_initializes_logging():
 
 def test_archive_screenshots_moves_dir(tmp_path):
     """_archive_screenshots move o dir de screenshots para done/<job_id>/."""
-    from candidatador.application.service import archive_screenshots
+    from gauntler.application.service import archive_screenshots
 
     job_dir = tmp_path / "42"
     job_dir.mkdir()
@@ -1739,7 +1739,7 @@ def test_archive_screenshots_moves_dir(tmp_path):
 
 def test_archive_screenshots_no_dir_is_noop(tmp_path):
     """_archive_screenshots não falha quando o dir ainda não existe."""
-    from candidatador.application.service import archive_screenshots
+    from gauntler.application.service import archive_screenshots
 
     config = {"screenshots_dir": str(tmp_path)}
     archive_screenshots(999, config)  # não deve levantar
@@ -1747,7 +1747,7 @@ def test_archive_screenshots_no_dir_is_noop(tmp_path):
 
 def test_archive_screenshots_overwrites_existing_done(tmp_path):
     """_archive_screenshots substitui done/<job_id>/ se já existe."""
-    from candidatador.application.service import archive_screenshots
+    from gauntler.application.service import archive_screenshots
 
     job_dir = tmp_path / "7"
     job_dir.mkdir()
@@ -1776,10 +1776,10 @@ async def test_confirm_apply_archives_on_success(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/arch1")
 
     with (
-        patch("candidatador.application.service.browser") as mock_browser,
-        patch("candidatador.application.service.detect_applier") as mock_detect,
-        patch("candidatador.application.service.resolve_cv_path", return_value=str(cv_path)),
-        patch("candidatador.application.service.archive_screenshots") as mock_archive,
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("gauntler.application.service.archive_screenshots") as mock_archive,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -1787,7 +1787,7 @@ async def test_confirm_apply_archives_on_success(tmp_db, tmp_path):
         mock_applier.fill_form = AsyncMock()
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
-        from candidatador.server import confirm_apply
+        from gauntler.server import confirm_apply
 
         await confirm_apply(job_id=job.id)
 
@@ -1805,25 +1805,25 @@ def _scan_patches(raw_jobs, eval_mock):
     stack = ExitStack()
     stack.enter_context(
         patch(
-            "candidatador.discovery.service.GreenhouseScanner",
+            "gauntler.discovery.service.GreenhouseScanner",
             **{"return_value.scan": AsyncMock(return_value=raw_jobs)},
         )
     )
     stack.enter_context(
         patch(
-            "candidatador.discovery.service.LeverScanner",
+            "gauntler.discovery.service.LeverScanner",
             **{"return_value.scan": AsyncMock(return_value=[])},
         )
     )
     stack.enter_context(
         patch(
-            "candidatador.discovery.service.AshbyScanner",
+            "gauntler.discovery.service.AshbyScanner",
             **{"return_value.scan": AsyncMock(return_value=[])},
         )
     )
     stack.enter_context(
         patch(
-            "candidatador.discovery.service.browser",
+            "gauntler.discovery.service.browser",
             **{"new_page": AsyncMock(side_effect=Exception("no browser"))},
         )
     )
@@ -1831,10 +1831,10 @@ def _scan_patches(raw_jobs, eval_mock):
         # Chama eval_mock por vaga; erros (spend limit) propagam para evaluate_chunk.
         return [await eval_mock(j.company, j.title, j.description, profile, model, caller) for j in jobs]
 
-    stack.enter_context(patch("candidatador.discovery.service.evaluate_jobs_batch", new=_batch))
+    stack.enter_context(patch("gauntler.discovery.service.evaluate_jobs_batch", new=_batch))
     stack.enter_context(
         patch(
-            "candidatador.discovery.service.load_company_list",
+            "gauntler.discovery.service.load_company_list",
             return_value={"greenhouse": ["co"]},
         )
     )
@@ -1850,8 +1850,8 @@ async def test_scan_concurrent_calls_evaluate_same_url_only_once(tmp_db):
     import asyncio
 
     init_db()
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
 
     url = "https://x.com/race-1"
     raw = RawJob(source="greenhouse", company="Co", title="Eng", url=url, description="desc")
@@ -1873,8 +1873,8 @@ async def test_scan_spend_limit_releases_scan_log_claim(tmp_db):
     libera o claim no ScanLog (URL re-tentável no próximo scan), não cria Job, e
     avisa no retorno. Contrato conservador — sem exceção propagando para o tool."""
     init_db()
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
 
     url = "https://x.com/spend-limit-1"
     raw = RawJob(source="greenhouse", company="Co", title="Eng", url=url, description="desc")
@@ -1898,8 +1898,8 @@ async def test_scan_already_in_scan_log_skips_llm(tmp_db):
     """URL already in ScanLog at scan start → evaluate_job not called (existing dedup)."""
     init_db()
     ScanLog.create(job_url="https://x.com/already-seen", source="greenhouse")
-    from candidatador.discovery.sources.base import RawJob
-    from candidatador.server import scan_and_evaluate
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
 
     raw = RawJob(source="greenhouse", company="Co", title="Eng", url="https://x.com/already-seen")
     eval_mock = AsyncMock(return_value=make_eval_result(score=8.0))
@@ -1921,10 +1921,10 @@ async def test_confirm_apply_aborts_when_cv_missing(tmp_db):
     )
     create_application(job)
     with patch(
-        "candidatador.application.service.resolve_cv_path",
+        "gauntler.application.service.resolve_cv_path",
         side_effect=CVNotFoundError("nao achei"),
     ):
-        from candidatador.server import confirm_apply
+        from gauntler.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id)
     assert "CV" in result and ("não" in result or "nao" in result)
@@ -1941,7 +1941,7 @@ async def test_confirm_apply_aborts_on_pending_needs_review(tmp_db, tmp_path):
         company="stripe",
     )
     create_application(job, form_data='{"Authorized to work?": "__NEEDS_REVIEW__"}')
-    from candidatador.server import confirm_apply
+    from gauntler.server import confirm_apply
 
     result = await confirm_apply(job_id=job.id)
     assert "NÃO submetida" in result or "decisão" in result.lower()
@@ -1954,10 +1954,10 @@ async def test_confirm_apply_aborts_on_pending_needs_review(tmp_db, tmp_path):
 async def test_add_job_tool_delegates_to_service(tmp_db):
     """O wrapper MCP add_job delega ao scan_service e devolve o resultado."""
     init_db()
-    from candidatador.server import add_job
+    from gauntler.server import add_job
 
     with patch(
-        "candidatador.discovery.service.evaluate_job",
+        "gauntler.discovery.service.evaluate_job",
         new=AsyncMock(return_value=make_eval_result(8.0)),
     ):
         result = await add_job(
@@ -1968,20 +1968,20 @@ async def test_add_job_tool_delegates_to_service(tmp_db):
 
 async def test_setup_email_handles_auth_error(tmp_path):
     """GmailAuthError no OAuth → mensagem amigável (mcp_server.py:278-279)."""
-    from candidatador.server import setup_email
-    from candidatador.tracking.email_monitor import GmailAuthError
+    from gauntler.server import setup_email
+    from gauntler.tracking.email_monitor import GmailAuthError
 
     creds = tmp_path / "gmail-client.json"
     creds.write_text("{}")
     with (
         patch(
-            "candidatador.server.load_config",
+            "gauntler.server.load_config",
             return_value={
                 "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
             },
         ),
         patch(
-            "candidatador.server._run_gmail_oauth", side_effect=GmailAuthError("token inválido")
+            "gauntler.server._run_gmail_oauth", side_effect=GmailAuthError("token inválido")
         ),
     ):
         result = await setup_email()
@@ -1990,18 +1990,18 @@ async def test_setup_email_handles_auth_error(tmp_path):
 
 async def test_setup_email_handles_unexpected_error(tmp_path):
     """Exceção inesperada no OAuth → mensagem de erro inesperado (mcp_server.py:280-281)."""
-    from candidatador.server import setup_email
+    from gauntler.server import setup_email
 
     creds = tmp_path / "gmail-client.json"
     creds.write_text("{}")
     with (
         patch(
-            "candidatador.server.load_config",
+            "gauntler.server.load_config",
             return_value={
                 "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
             },
         ),
-        patch("candidatador.server._run_gmail_oauth", side_effect=RuntimeError("boom")),
+        patch("gauntler.server._run_gmail_oauth", side_effect=RuntimeError("boom")),
     ):
         result = await setup_email()
     assert "inesperado" in result.lower()

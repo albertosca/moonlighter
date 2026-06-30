@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
-from candidatador.application.appliers.ashby import AshbyApplier
+from gauntler.application.appliers.ashby import AshbyApplier
 
 
 def make_applier(url="https://jobs.ashbyhq.com/openai/123"):

@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SCRIPT="python scripts/reevaluate_bug_victims.py --title-only --concurrency 5"
-LOG="$HOME/.candidatador/reevaluate_all.log"
+LOG="$HOME/.gauntler/reevaluate_all.log"
 
 echo "=============================" | tee -a "$LOG"
 echo "Início: $(date)" | tee -a "$LOG"

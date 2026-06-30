@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from candidatador.discovery.sources.base import RawJob, normalize_remote_type
+from gauntler.discovery.sources.base import RawJob, normalize_remote_type
 
 
 def test_rawjob_defaults():

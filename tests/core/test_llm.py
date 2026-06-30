@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from anthropic.types import TextBlock
-from candidatador.core.llm import LLMCaller, _call_cli, _make_api_caller, make_caller
+from gauntler.core.llm import LLMCaller, _call_cli, _make_api_caller, make_caller
 
 # ── make_caller factory ───────────────────────────────────────────────────────
 
@@ -15,7 +15,7 @@ def test_make_caller_cli_returns_call_cli():
 
 
 def test_make_caller_api_returns_callable():
-    with patch("candidatador.core.llm.anthropic"):
+    with patch("gauntler.core.llm.anthropic"):
         caller = make_caller({"llm_backend": "api"})
     assert callable(caller)
     assert inspect.iscoroutinefunction(caller)
@@ -23,7 +23,7 @@ def test_make_caller_api_returns_callable():
 
 def test_make_caller_defaults_to_api_when_key_missing():
     """No 'llm_backend' key → falls back to api caller (not _call_cli)."""
-    with patch("candidatador.core.llm.anthropic"):
+    with patch("gauntler.core.llm.anthropic"):
         caller = make_caller({})
     assert caller is not _call_cli
     assert callable(caller)
@@ -31,7 +31,7 @@ def test_make_caller_defaults_to_api_when_key_missing():
 
 def test_make_caller_unknown_backend_falls_back_to_api():
     """Unknown backend string → api caller (safe default)."""
-    with patch("candidatador.core.llm.anthropic"):
+    with patch("gauntler.core.llm.anthropic"):
         caller = make_caller({"llm_backend": "unknown-backend"})
     assert caller is not _call_cli
     assert callable(caller)
@@ -46,7 +46,7 @@ async def test_call_cli_returns_stdout():
     mock_proc.communicate = AsyncMock(return_value=(b"hello from claude\n", b""))
 
     with patch(
-        "candidatador.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+        "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
     ) as mock_exec:
         result = await _call_cli("my prompt", "ignored-model")
 
@@ -67,7 +67,7 @@ async def test_call_cli_ignores_model_param():
     mock_proc.communicate = AsyncMock(return_value=(b"output", b""))
 
     with patch(
-        "candidatador.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+        "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
     ) as mock_exec:
         await _call_cli("prompt", "claude-opus-99")
 
@@ -81,7 +81,7 @@ async def test_call_cli_raises_on_nonzero_exit():
     mock_proc.communicate = AsyncMock(return_value=(b"", b"some error message"))
 
     with (
-        patch("candidatador.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
+        patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
         pytest.raises(RuntimeError) as exc_info,
     ):
         await _call_cli("prompt", "model")
@@ -98,7 +98,7 @@ async def test_call_cli_stderr_truncated_to_300_chars():
     mock_proc.communicate = AsyncMock(return_value=(b"", long_stderr))
 
     with (
-        patch("candidatador.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
+        patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
         pytest.raises(RuntimeError) as exc_info,
     ):
         await _call_cli("p", "m")
@@ -115,7 +115,7 @@ async def test_call_cli_empty_prompt_still_calls_subprocess():
     mock_proc.communicate = AsyncMock(return_value=(b"response", b""))
 
     with patch(
-        "candidatador.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+        "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
     ) as mock_exec:
         result = await _call_cli("", "model")
 
@@ -136,7 +136,7 @@ async def test_make_api_caller_calls_messages_create():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("candidatador.core.llm.anthropic", mock_anthropic):
+    with patch("gauntler.core.llm.anthropic", mock_anthropic):
         caller = _make_api_caller()
         result = await caller("my prompt", "claude-sonnet-4-6")
 
@@ -157,7 +157,7 @@ async def test_make_api_caller_custom_max_tokens():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("candidatador.core.llm.anthropic", mock_anthropic):
+    with patch("gauntler.core.llm.anthropic", mock_anthropic):
         caller = _make_api_caller(max_tokens=512)
         await caller("prompt", "model")
 
@@ -174,7 +174,7 @@ async def test_make_api_caller_forwards_model():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("candidatador.core.llm.anthropic", mock_anthropic):
+    with patch("gauntler.core.llm.anthropic", mock_anthropic):
         caller = _make_api_caller()
         await caller("prompt", "claude-opus-4-7")
 
@@ -195,7 +195,7 @@ async def test_make_api_caller_returns_first_content_text():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("candidatador.core.llm.anthropic", mock_anthropic):
+    with patch("gauntler.core.llm.anthropic", mock_anthropic):
         caller = _make_api_caller()
         result = await caller("prompt", "model")
 
@@ -210,7 +210,7 @@ async def test_make_api_caller_propagates_exception():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("candidatador.core.llm.anthropic", mock_anthropic):
+    with patch("gauntler.core.llm.anthropic", mock_anthropic):
         caller = _make_api_caller()
         with pytest.raises(Exception, match="rate limit"):
             await caller("prompt", "model")
@@ -226,7 +226,7 @@ def test_make_api_caller_reuses_client_across_calls():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("candidatador.core.llm.anthropic", mock_anthropic):
+    with patch("gauntler.core.llm.anthropic", mock_anthropic):
         _make_api_caller()
 
     assert mock_anthropic.AsyncAnthropic.call_count == 1
@@ -236,7 +236,7 @@ def test_make_api_caller_reuses_client_across_calls():
 
 
 def test_llm_caller_type_is_exported():
-    """LLMCaller is importable from candidatador.core.llm."""
+    """LLMCaller is importable from gauntler.core.llm."""
     assert LLMCaller is not None
 
 
@@ -246,7 +246,7 @@ async def test_cli_caller_satisfies_llm_caller_contract():
     mock_proc.returncode = 0
     mock_proc.communicate = AsyncMock(return_value=(b"result", b""))
 
-    with patch("candidatador.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
+    with patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
         result = await _call_cli("hello", "any-model")
 
     assert isinstance(result, str)
@@ -262,7 +262,7 @@ async def test_api_caller_satisfies_llm_caller_contract():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("candidatador.core.llm.anthropic", mock_anthropic):
+    with patch("gauntler.core.llm.anthropic", mock_anthropic):
         caller = _make_api_caller()
         result = await caller("hello", "any-model")
 
@@ -277,7 +277,7 @@ async def test_make_api_caller_raises_on_non_text_block():
     mock_client.messages.create = AsyncMock(return_value=mock_message)
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
-    with patch("candidatador.core.llm.anthropic", mock_anthropic):
+    with patch("gauntler.core.llm.anthropic", mock_anthropic):
         caller = _make_api_caller()
         with pytest.raises(RuntimeError, match="bloco não-texto"):
             await caller("prompt", "model")
@@ -297,7 +297,7 @@ async def test_cli_concatenates_cache_prefix():
         proc.communicate = AsyncMock(return_value=(b"ok", b""))
         return proc
 
-    with patch("candidatador.core.llm.asyncio.create_subprocess_exec", new=fake_exec):
+    with patch("gauntler.core.llm.asyncio.create_subprocess_exec", new=fake_exec):
         await _call_cli("DYN", "m", cache_prefix="STATIC")
     assert captured["prompt"] == "STATIC\n\nDYN"
 
@@ -313,7 +313,7 @@ async def test_cli_no_cache_prefix_keeps_prompt_unchanged():
         proc.communicate = AsyncMock(return_value=(b"ok", b""))
         return proc
 
-    with patch("candidatador.core.llm.asyncio.create_subprocess_exec", new=fake_exec):
+    with patch("gauntler.core.llm.asyncio.create_subprocess_exec", new=fake_exec):
         await _call_cli("PROMPT_ONLY", "m")
     assert captured["prompt"] == "PROMPT_ONLY"
 
@@ -328,7 +328,7 @@ async def test_api_uses_cache_control_block():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("candidatador.core.llm.anthropic", mock_anthropic):
+    with patch("gauntler.core.llm.anthropic", mock_anthropic):
         caller = _make_api_caller()
         await caller("DYN", "m", cache_prefix="STATIC")
 
@@ -349,7 +349,7 @@ async def test_api_no_cache_prefix_sends_plain_string():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("candidatador.core.llm.anthropic", mock_anthropic):
+    with patch("gauntler.core.llm.anthropic", mock_anthropic):
         caller = _make_api_caller()
         await caller("PROMPT_ONLY", "m")
 

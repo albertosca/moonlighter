@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from candidatador.core.config import candidatador_home, load_company_list, load_config, load_profile
+from gauntler.core.config import gauntler_home, load_company_list, load_config, load_profile
 
 
 def test_load_config_defaults(tmp_path):
@@ -91,13 +91,13 @@ def test_load_config_all_path_keys_no_tilde(tmp_path):
 
 
 def test_browser_executable_prefers_browser_path():
-    from candidatador.core.config import browser_executable
+    from gauntler.core.config import browser_executable
 
     assert browser_executable({"browser_path": "/usr/bin/chrome"}) == "/usr/bin/chrome"
 
 
 def test_browser_executable_falls_back_to_legacy_brave_path():
-    from candidatador.core.config import browser_executable
+    from gauntler.core.config import browser_executable
 
     assert browser_executable({"browser_path": "", "brave_path": "/legacy/brave"}) == "/legacy/brave"
     assert browser_executable({"brave_path": "/legacy/brave"}) == "/legacy/brave"
@@ -164,25 +164,25 @@ ashby:
         assert key in result, f"key '{key}' missing from company list"
 
 
-# --- candidatador_home ---
+# --- gauntler_home ---
 
 
-def test_candidatador_home_default(monkeypatch):
-    monkeypatch.delenv("CANDIDATADOR_HOME", raising=False)
-    home = candidatador_home()
-    assert home == (Path.home() / ".candidatador")
+def test_gauntler_home_default(monkeypatch):
+    monkeypatch.delenv("GAUNTLER_HOME", raising=False)
+    home = gauntler_home()
+    assert home == (Path.home() / ".gauntler")
 
 
-def test_candidatador_home_env_var(monkeypatch, tmp_path):
-    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
-    assert candidatador_home() == tmp_path
+def test_gauntler_home_env_var(monkeypatch, tmp_path):
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    assert gauntler_home() == tmp_path
 
 
 # --- load_config default path ---
 
 
-def test_load_config_default_path_uses_candidatador_home(monkeypatch, tmp_path):
-    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+def test_load_config_default_path_uses_gauntler_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     config = load_config()  # sem config.yaml → usa defaults
     assert config["score_threshold"] == 6.5
 
@@ -192,14 +192,14 @@ def test_load_config_default_path_uses_candidatador_home(monkeypatch, tmp_path):
 
 def test_load_config_no_learned_blocklist(tmp_path, monkeypatch):
     """Sem blocklist_learned.yaml → config segue sem merge."""
-    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
     assert "title_blocklist" in config
 
 
 def test_load_config_learned_blocklist_empty(tmp_path, monkeypatch):
     """blocklist_learned.yaml existe mas sem patterns → não altera."""
-    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     learned = tmp_path / "blocklist_learned.yaml"
     learned.write_text("title_blocklist: []\n")
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
@@ -208,7 +208,7 @@ def test_load_config_learned_blocklist_empty(tmp_path, monkeypatch):
 
 def test_load_config_learned_blocklist_merges(tmp_path, monkeypatch):
     """patterns aprendidos são mesclados após os manuais, sem duplicar."""
-    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     learned = tmp_path / "blocklist_learned.yaml"
     learned.write_text("title_blocklist:\n  - recruiter\n  - intern\n")
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
@@ -252,19 +252,19 @@ def test_load_company_list_with_phase_filter(tmp_path):
 
 
 def test_scan_concurrency_default(tmp_path, monkeypatch):
-    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
-    from candidatador.core.config import load_config
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    from gauntler.core.config import load_config
     assert load_config()["scan_concurrency"] == 5
 
 
 def test_scan_concurrency_override(tmp_path, monkeypatch):
-    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text("scan_concurrency: 3\n")
-    from candidatador.core.config import load_config
+    from gauntler.core.config import load_config
     assert load_config()["scan_concurrency"] == 3
 
 
 def test_scan_batch_size_default(tmp_path, monkeypatch):
-    monkeypatch.setenv("CANDIDATADOR_HOME", str(tmp_path))
-    from candidatador.core.config import load_config
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    from gauntler.core.config import load_config
     assert load_config()["scan_batch_size"] == 5

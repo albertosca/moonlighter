@@ -31,18 +31,18 @@ ignore = ["RUF001", "RUF002", "RUF003", "E501"]
 
 [tool.coverage.run]
 source_pkgs = [
-    "candidatador.core",
-    "candidatador.discovery",
-    "candidatador.application",
-    "candidatador.tracking",
-    "candidatador.server",
-    "candidatador.startup",
-    "candidatador.views",
+    "gauntler.core",
+    "gauntler.discovery",
+    "gauntler.application",
+    "gauntler.tracking",
+    "gauntler.server",
+    "gauntler.startup",
+    "gauntler.views",
 ]
 branch = true
 omit = [
-    "*/candidatador/core/browser.py",
-    "*/candidatador/discovery/sources/playwright.py",
+    "*/gauntler/core/browser.py",
+    "*/gauntler/discovery/sources/playwright.py",
 ]
 
 [tool.coverage.report]

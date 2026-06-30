@@ -3,22 +3,22 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "candidatador-full"
+name = "gauntler-full"
 version = "0.1.0"
-description = "Full candidatador bundle — MCP server exposing all tools to Claude"
+description = "Full gauntler bundle — MCP server exposing all tools to Claude"
 license = {text = "AGPL-3.0-only"}
 authors = [{name = "Alberto de Sá Cavalcanti de Albuquerque", email = "albertoalbuquerque01@gmail.com"}]
 requires-python = ">=3.14"
 dependencies = [
-    "candidatador-core>=0.1.0",
-    "candidatador-scan>=0.1.0",
-    "candidatador-apply>=0.1.0",
-    "candidatador-email>=0.1.0",
+    "gauntler-core>=0.1.0",
+    "gauntler-scan>=0.1.0",
+    "gauntler-apply>=0.1.0",
+    "gauntler-email>=0.1.0",
     "fastmcp>=2.0",
 ]
 
 [project.scripts]
-candidatador = "candidatador.server:main"
+gauntler = "gauntler.server:main"
 
 [project.urls]
 Homepage = "https://github.com/albertosca/gauntler"
@@ -26,10 +26,10 @@ Repository = "https://github.com/albertosca/gauntler"
 "Bug Tracker" = "https://github.com/albertosca/gauntler/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["candidatador"]
+packages = ["gauntler"]
 
 [tool.uv.sources]
-candidatador-core = { workspace = true }
-candidatador-scan = { workspace = true }
-candidatador-apply = { workspace = true }
-candidatador-email = { workspace = true }
+gauntler-core = { workspace = true }
+gauntler-scan = { workspace = true }
+gauntler-apply = { workspace = true }
+gauntler-email = { workspace = true }

@@ -1,7 +1,7 @@
 import datetime
 
-from candidatador.core.db import Job, init_db
-from candidatador.views import render_jobs_table
+from gauntler.core.db import Job, init_db
+from gauntler.views import render_jobs_table
 
 
 def _job(tmp_db, **kwargs):

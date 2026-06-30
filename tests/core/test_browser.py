@@ -1,6 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import candidatador.core.browser as browser_mod
+import gauntler.core.browser as browser_mod
 import pytest
 
 _CONFIG = {
@@ -57,10 +57,10 @@ def _make_cdp_mocks():
 async def test_get_context_launches_browser_when_devtools_not_ready():
     mock_pw, mock_playwright, _mock_browser, mock_context, mock_proc = _make_cdp_mocks()
     with (
-        patch("candidatador.core.browser.async_playwright", return_value=mock_pw),
-        patch("candidatador.core.browser.subprocess.Popen", return_value=mock_proc) as popen,
-        patch("candidatador.core.browser._devtools_ready", side_effect=[False, True]),
-        patch("candidatador.core.browser.asyncio.sleep", new=AsyncMock()),
+        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
+        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc) as popen,
+        patch("gauntler.core.browser._devtools_ready", side_effect=[False, True]),
+        patch("gauntler.core.browser.asyncio.sleep", new=AsyncMock()),
     ):
         ctx = await browser_mod.get_context(_CONFIG)
     assert ctx is mock_context
@@ -71,9 +71,9 @@ async def test_get_context_launches_browser_when_devtools_not_ready():
 async def test_get_context_skips_launch_when_devtools_already_ready():
     mock_pw, mock_playwright, _mock_browser, mock_context, mock_proc = _make_cdp_mocks()
     with (
-        patch("candidatador.core.browser.async_playwright", return_value=mock_pw),
-        patch("candidatador.core.browser.subprocess.Popen", return_value=mock_proc) as popen,
-        patch("candidatador.core.browser._devtools_ready", return_value=True),
+        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
+        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc) as popen,
+        patch("gauntler.core.browser._devtools_ready", return_value=True),
     ):
         ctx = await browser_mod.get_context(_CONFIG)
     assert ctx is mock_context
@@ -85,8 +85,8 @@ async def test_get_context_reuses_connected_browser():
     _, _, mock_browser, mock_context, _ = _make_cdp_mocks()
     browser_mod._browser = mock_browser
     with (
-        patch("candidatador.core.browser.async_playwright") as pw,
-        patch("candidatador.core.browser.subprocess.Popen") as popen,
+        patch("gauntler.core.browser.async_playwright") as pw,
+        patch("gauntler.core.browser.subprocess.Popen") as popen,
     ):
         ctx = await browser_mod.get_context(_CONFIG)
     assert ctx is mock_context
@@ -98,9 +98,9 @@ async def test_get_context_passes_cdp_url_and_slow_mo():
     mock_pw, mock_playwright, _, _, mock_proc = _make_cdp_mocks()
     config = {**_CONFIG, "slow_mo_ms": 123}
     with (
-        patch("candidatador.core.browser.async_playwright", return_value=mock_pw),
-        patch("candidatador.core.browser.subprocess.Popen", return_value=mock_proc),
-        patch("candidatador.core.browser._devtools_ready", return_value=True),
+        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
+        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("gauntler.core.browser._devtools_ready", return_value=True),
     ):
         await browser_mod.get_context(config)
     call = mock_playwright.chromium.connect_over_cdp.call_args
@@ -112,9 +112,9 @@ async def test_get_context_creates_session_dir(tmp_path):
     config = {**_CONFIG, "browser_session_dir": str(tmp_path / "new_session")}
     mock_pw, _, _, _, mock_proc = _make_cdp_mocks()
     with (
-        patch("candidatador.core.browser.async_playwright", return_value=mock_pw),
-        patch("candidatador.core.browser.subprocess.Popen", return_value=mock_proc),
-        patch("candidatador.core.browser._devtools_ready", return_value=True),
+        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
+        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("gauntler.core.browser._devtools_ready", return_value=True),
     ):
         await browser_mod.get_context(config)
     assert (tmp_path / "new_session").exists()
@@ -123,10 +123,10 @@ async def test_get_context_creates_session_dir(tmp_path):
 async def test_get_context_raises_when_browser_never_ready():
     mock_pw, _, _, _, mock_proc = _make_cdp_mocks()
     with (
-        patch("candidatador.core.browser.async_playwright", return_value=mock_pw),
-        patch("candidatador.core.browser.subprocess.Popen", return_value=mock_proc),
-        patch("candidatador.core.browser._devtools_ready", return_value=False),
-        patch("candidatador.core.browser.asyncio.sleep", new=AsyncMock()),
+        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
+        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("gauntler.core.browser._devtools_ready", return_value=False),
+        patch("gauntler.core.browser.asyncio.sleep", new=AsyncMock()),
         pytest.raises(RuntimeError, match="Browser"),
     ):
         await browser_mod.get_context(_CONFIG)
@@ -141,9 +141,9 @@ async def test_new_page_returns_page_from_context():
     mock_page = MagicMock()
     mock_context.new_page = AsyncMock(return_value=mock_page)
     with (
-        patch("candidatador.core.browser.async_playwright", return_value=mock_pw),
-        patch("candidatador.core.browser.subprocess.Popen", return_value=mock_proc),
-        patch("candidatador.core.browser._devtools_ready", return_value=True),
+        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
+        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("gauntler.core.browser._devtools_ready", return_value=True),
     ):
         page = await browser_mod.new_page(_CONFIG)
     assert page is mock_page
@@ -208,10 +208,10 @@ async def test_get_context_logs_cdp_connected(caplog):
     mock_pw, _mock_playwright, _mock_browser, _mock_context, mock_proc = _make_cdp_mocks()
 
     with (
-        patch("candidatador.core.browser.async_playwright", return_value=mock_pw),
-        patch("candidatador.core.browser.subprocess.Popen", return_value=mock_proc),
-        patch("candidatador.core.browser._devtools_ready", return_value=True),
-        caplog.at_level(logging.INFO, logger="candidatador.core.browser"),
+        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
+        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("gauntler.core.browser._devtools_ready", return_value=True),
+        caplog.at_level(logging.INFO, logger="gauntler.core.browser"),
     ):
         await browser_mod.get_context(_CONFIG)
 

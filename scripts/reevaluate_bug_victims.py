@@ -25,11 +25,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from candidatador.core.config import load_config, load_profile
-from candidatador.core.db import Job, init_db
-from candidatador.core.llm import make_caller
-from candidatador.core.log import setup as setup_logging
-from candidatador.discovery.evaluator import evaluate_job, should_skip_by_title
+from gauntler.core.config import load_config, load_profile
+from gauntler.core.db import Job, init_db
+from gauntler.core.llm import make_caller
+from gauntler.core.log import setup as setup_logging
+from gauntler.discovery.evaluator import evaluate_job, should_skip_by_title
 
 BUG_MARKER = "evaluation error: claude CLI exited with code 1"
 
@@ -191,7 +191,7 @@ def main() -> None:
     setup_logging()
     config = load_config()
     profile = load_profile()
-    init_db()  # resolve o path via candidatador_home() / CANDIDATADOR_DB_PATH (fonte única em db.py)
+    init_db()  # resolve o path via gauntler_home() / GAUNTLER_DB_PATH (fonte única em db.py)
 
     model = args.model or config.get(
         "eval_model", config.get("llm_model", "claude-haiku-4-5-20251001")
