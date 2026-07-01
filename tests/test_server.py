@@ -2016,6 +2016,57 @@ async def test_add_job_tool_delegates_to_service(tmp_db):
     assert "Stripe" in result or "NEW" in result
 
 
+# ── archive_stale_jobs (MCP tool) ───────────────────────────────────────────
+
+
+async def test_tool_archive_stale_jobs_delegates_and_formats(tmp_db):
+    init_db()
+    from gauntler.discovery.service import ArchiveResult
+    from gauntler.server import archive_stale_jobs
+
+    fake_result = ArchiveResult(
+        archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}],
+        failed_companies=["beta"],
+    )
+    with patch(
+        "gauntler.server.scan_service.archive_stale_jobs",
+        new=AsyncMock(return_value=fake_result),
+    ):
+        result = await archive_stale_jobs()
+
+    assert "acme" in result
+    assert "beta" in result
+
+
+async def test_tool_archive_stale_jobs_passes_filters(tmp_db):
+    init_db()
+    from gauntler.discovery.service import ArchiveResult
+    from gauntler.server import archive_stale_jobs
+
+    mock_service = AsyncMock(return_value=ArchiveResult())
+    with patch("gauntler.server.scan_service.archive_stale_jobs", new=mock_service):
+        await archive_stale_jobs(job_id=123, company=None)
+
+    mock_service.assert_awaited_once()
+    args = mock_service.await_args.args
+    assert args[0] == 123
+    assert args[1] is None
+
+
+async def test_tool_archive_stale_jobs_rejects_both_filters(tmp_db):
+    init_db()
+    from gauntler.discovery.service import ArchiveStaleJobsError
+    from gauntler.server import archive_stale_jobs
+
+    with patch(
+        "gauntler.server.scan_service.archive_stale_jobs",
+        new=AsyncMock(side_effect=ArchiveStaleJobsError("Provide job_id OR company, not both.")),
+    ):
+        result = await archive_stale_jobs(job_id=1, company="acme")
+
+    assert "OR company" in result
+
+
 async def test_setup_email_handles_auth_error(tmp_path):
     """GmailAuthError no OAuth → mensagem amigável (mcp_server.py:278-279)."""
     from gauntler.server import setup_email

@@ -95,6 +95,28 @@ async def add_job(url: str, company: str = "", title: str = "", description: str
 
 
 @mcp.tool()
+async def archive_stale_jobs(job_id: int | None = None, company: str | None = None) -> str:
+    """Detect and archive (status='closed') jobs that disappeared from their source.
+
+    Checks jobs currently in new/reviewed/applying/needs_review against the source's
+    current listing (Greenhouse/Lever/Ashby API, or a LinkedIn page revisit). A company
+    whose check fails (network error, malformed response) is reported explicitly and left
+    untouched — never silently archived by mistake.
+
+    Args:
+        job_id: check only this job (mutually exclusive with company).
+        company: check only jobs from this company, case-insensitive (mutually exclusive
+                 with job_id).
+    """
+    async with _log_tool("archive_stale_jobs"):
+        try:
+            result = await scan_service.archive_stale_jobs(job_id, company, _config)
+        except scan_service.ArchiveStaleJobsError as e:
+            return str(e)
+        return scan_service._format_archive_result(result)
+
+
+@mcp.tool()
 async def list_jobs(status: str = "new", limit: int = 20) -> str:
     """List jobs from DB filtered by status."""
     async with _log_tool("list_jobs"):
