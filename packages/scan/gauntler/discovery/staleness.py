@@ -13,7 +13,7 @@ from gauntler.core import browser
 from gauntler.core.db import Job
 from gauntler.core.log import get_logger
 from gauntler.discovery.sources.base import BaseScanner
-from playwright.async_api import TimeoutError as PlaywrightTimeout
+from playwright.async_api import Error as PlaywrightError
 
 logger = get_logger(__name__)
 
@@ -93,8 +93,9 @@ async def _check_via_linkedin(
                 content = (await page.content()).lower()
                 if any(marker in content for marker in _CLOSED_MARKERS):
                     result.stale.append(job)
-            except PlaywrightTimeout:
-                logger.warning("staleness: linkedin goto timeout for %s", job.url)
-                result.failed_companies.append("linkedin")
+            except PlaywrightError as e:
+                logger.warning("staleness: linkedin goto failed for %s — %s", job.url, e)
+                if "linkedin" not in result.failed_companies:
+                    result.failed_companies.append("linkedin")
     finally:
         await page.close()

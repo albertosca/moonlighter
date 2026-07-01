@@ -134,6 +134,53 @@ async def test_linkedin_goto_timeout_marks_failed(monkeypatch):
     assert result.failed_companies == ["linkedin"]
 
 
+async def test_linkedin_goto_network_error_marks_failed_and_other_groups_continue(monkeypatch):
+    """A non-timeout Playwright error (DNS failure, connection reset, net::ERR_*) must be
+    caught too — it must not abort processing of other (source, company) groups."""
+    from playwright.async_api import Error as PlaywrightError
+
+    linkedin_job = _job(source="linkedin", company="linkedin", url="https://linkedin.com/jobs/1")
+    greenhouse_job = _job(id=2, source="greenhouse", company="acme", url="https://x.com/1")
+    page = AsyncMock()
+    page.goto = AsyncMock(side_effect=PlaywrightError("net::ERR_CONNECTION_RESET"))
+    page.close = AsyncMock()
+    monkeypatch.setattr(
+        "gauntler.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
+    )
+    scanners = {
+        "greenhouse": _scanner(
+            [RawJob(source="greenhouse", company="acme", title="Eng", url="https://x.com/1")]
+        )
+    }
+    result = await find_stale_jobs(
+        {
+            ("linkedin", "linkedin"): [linkedin_job],
+            ("greenhouse", "acme"): [greenhouse_job],
+        },
+        scanners,
+        CONFIG,
+    )
+    assert result.failed_companies == ["linkedin"]
+    assert result.stale == []
+
+
+async def test_linkedin_multiple_failing_jobs_dedup_failed_companies(monkeypatch):
+    """failed_companies must contain 'linkedin' at most once even if several jobs fail."""
+    from playwright.async_api import TimeoutError as PlaywrightTimeout
+
+    job1 = _job(id=1, source="linkedin", company="linkedin", url="https://linkedin.com/jobs/1")
+    job2 = _job(id=2, source="linkedin", company="linkedin", url="https://linkedin.com/jobs/2")
+    page = AsyncMock()
+    page.goto = AsyncMock(side_effect=PlaywrightTimeout("timeout"))
+    page.close = AsyncMock()
+    monkeypatch.setattr(
+        "gauntler.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
+    )
+    result = await find_stale_jobs({("linkedin", "linkedin"): [job1, job2]}, {}, CONFIG)
+    assert result.stale == []
+    assert result.failed_companies == ["linkedin"]
+
+
 def test_staleness_result_defaults_to_empty_lists():
     result = StalenessResult()
     assert result.stale == []
