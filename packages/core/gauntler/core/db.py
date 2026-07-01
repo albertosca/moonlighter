@@ -48,8 +48,9 @@ class Job(BaseModel):
     salary_currency = CharField(null=True)
     salary_source = CharField(null=True)  # 'stated' | 'llm_estimate' | 'third_party'
     salary_notes = TextField(null=True)
-    status = CharField(default="new")  # 'new'|'reviewed'|'applying'|'applied'|'rejected'|'archived'
+    status = CharField(default="new")  # 'new'|'reviewed'|'applying'|'applied'|'rejected'|'archived'|'closed'
     found_at = DateTimeField(default=datetime.datetime.now)
+    closed_at = DateTimeField(null=True)
 
     def get_caveats(self) -> list[str]:
         return json.loads(self.caveats) if self.caveats else []
@@ -103,3 +104,7 @@ def init_db() -> None:
         )
     if "current_stage" not in existing:
         db.execute_sql("ALTER TABLE application ADD COLUMN current_stage VARCHAR(255) NULL")
+    cursor = db.execute_sql("PRAGMA table_info(job)")
+    existing_job_cols = {row[1] for row in cursor.fetchall()}
+    if "closed_at" not in existing_job_cols:
+        db.execute_sql("ALTER TABLE job ADD COLUMN closed_at DATETIME NULL")

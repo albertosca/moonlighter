@@ -144,6 +144,43 @@ def test_job_posted_at_nullable(tmp_db):
     assert any(r.id == job.id for r in results)
 
 
+def test_job_closed_at_is_null_by_default(tmp_db):
+    os.environ["GAUNTLER_DB_PATH"] = tmp_db
+    init_db()
+    job = _make_job()
+    assert job.closed_at is None
+
+
+def test_job_closed_at_stored_and_retrieved(tmp_db):
+    os.environ["GAUNTLER_DB_PATH"] = tmp_db
+    init_db()
+    when = datetime.datetime(2026, 7, 1, 12, 0, 0)
+    job = _make_job(status="closed", closed_at=when)
+    saved = Job.get_by_id(job.id)
+    assert saved.status == "closed"
+    assert saved.closed_at == when
+
+
+def test_init_db_migrates_old_job_table(tmp_db):
+    """Old 'job' table (without closed_at) → init_db adds the column via ALTER TABLE."""
+    from gauntler.core.db import db
+
+    db.init(tmp_db)
+    db.connect(reuse_if_open=True)
+    db.execute_sql("DROP TABLE IF EXISTS job")
+    db.execute_sql(
+        "CREATE TABLE job (id INTEGER PRIMARY KEY, source VARCHAR(50), company VARCHAR(255), "
+        "title VARCHAR(255), url VARCHAR(255) UNIQUE, status VARCHAR(50))"
+    )
+    db.close()
+
+    init_db()  # runs the safe migration
+
+    cursor = db.execute_sql("PRAGMA table_info(job)")
+    cols = {row[1] for row in cursor.fetchall()}
+    assert "closed_at" in cols
+
+
 # --- Application ---
 
 
