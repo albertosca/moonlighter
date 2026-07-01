@@ -71,6 +71,56 @@ async def test_scan_no_new_jobs(tmp_db):
     assert "Nenhuma vaga nova" in result
 
 
+async def test_scan_and_evaluate_reports_archived_stale_jobs(tmp_db):
+    init_db()
+    from gauntler.server import scan_and_evaluate
+
+    # Pre-existing eligible job whose company listing will come back empty → stale.
+    create_job(
+        tmp_db, url="https://boards.greenhouse.io/stale-co/jobs/1", company="stale-co", status="new"
+    )
+
+    with (
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
+    ):
+        for M in (MockGH, MockLV, MockAB):
+            instance = AsyncMock()
+            instance.scan = AsyncMock(return_value=[])
+            M.return_value = instance
+        mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
+        result = await scan_and_evaluate()
+
+    assert "arquivada" in result.lower()
+    job = Job.get(Job.url == "https://boards.greenhouse.io/stale-co/jobs/1")
+    assert job.status == "closed"
+    assert job.closed_at is not None
+
+
+async def test_scan_and_evaluate_no_new_jobs_still_runs_archive_check(tmp_db):
+    """Regression: the 'no new jobs' early-exit message must still show the archive section."""
+    init_db()
+    from gauntler.server import scan_and_evaluate
+
+    with (
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
+    ):
+        for M in (MockGH, MockLV, MockAB):
+            instance = AsyncMock()
+            instance.scan = AsyncMock(return_value=[])
+            M.return_value = instance
+        mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
+        result = await scan_and_evaluate()
+
+    assert "Nenhuma vaga nova" in result
+    assert "Nenhuma vaga fechada encontrada." in result
+
+
 async def test_scan_all_below_threshold(tmp_db):
     init_db()
     from gauntler.discovery.sources.base import RawJob

@@ -254,11 +254,17 @@ async def scan_and_evaluate(
     companies = load_company_list(phase=None if phase == "all" else phase)
     raw_jobs, li_warning = await _collect_raw_jobs(keywords, config, companies)
     new_jobs = _drop_already_seen(raw_jobs)
-    if not new_jobs:
-        return _with_warning("Nenhuma vaga nova encontrada.", li_warning)
 
-    saved, spend_hit = await _evaluate_and_store(new_jobs, config, profile, caller)
-    return _with_warning(_format_report(saved, spend_hit, config["score_threshold"]), li_warning)
+    if new_jobs:
+        saved, spend_hit = await _evaluate_and_store(new_jobs, config, profile, caller)
+        report = _format_report(saved, spend_hit, config["score_threshold"])
+    else:
+        report = "Nenhuma vaga nova encontrada."
+
+    archive_result = await archive_stale_jobs(None, None, config)
+    report = f"{report}\n\n{_format_archive_result(archive_result)}"
+
+    return _with_warning(report, li_warning)
 
 
 async def add_job(
