@@ -8,6 +8,7 @@ config/profile/caller, sem depender da config global carregada no import.
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from gauntler.core.db import Job, ScanLog, init_db
 from gauntler.discovery import service as scan_service
 from gauntler.discovery.evaluator import EvaluationResult
@@ -404,3 +405,166 @@ async def test_scan_batches_jobs_into_one_call(tmp_db):
     assert len(saved) == 4
     assert spend_hit is False
     assert calls["n"] == 1  # 4 vagas, 1 lote, 1 chamada
+
+
+# ── archive_stale_jobs ──────────────────────────────────────────────────────
+
+from gauntler.discovery.service import ArchiveStaleJobsError, archive_stale_jobs  # noqa: E402
+from gauntler.discovery.staleness import StalenessResult  # noqa: E402
+
+
+def _stale_job(tmp_db, **kwargs):
+    defaults = {
+        "source": "greenhouse",
+        "company": "acme",
+        "title": "Engineer",
+        "url": "https://boards.greenhouse.io/acme/jobs/1",
+        "status": "new",
+    }
+    defaults.update(kwargs)
+    return Job.create(**defaults)
+
+
+async def test_archive_stale_jobs_raises_when_job_id_and_company_both_given(tmp_db):
+    init_db()
+    with pytest.raises(ArchiveStaleJobsError):
+        await archive_stale_jobs(1, "acme", CONFIG)
+
+
+async def test_archive_stale_jobs_no_eligible_jobs_returns_empty(tmp_db):
+    init_db()
+    result = await archive_stale_jobs(None, None, CONFIG)
+    assert result.archived == []
+    assert result.failed_companies == []
+
+
+async def test_archive_stale_jobs_marks_stale_job_closed(tmp_db, monkeypatch):
+    init_db()
+    job = _stale_job(tmp_db)
+
+    async def fake_find(jobs_by_company, scanners, config):
+        return StalenessResult(stale=[job], failed_companies=[])
+
+    monkeypatch.setattr("gauntler.discovery.service.find_stale_jobs", fake_find)
+    result = await archive_stale_jobs(None, None, CONFIG)
+
+    saved = Job.get_by_id(job.id)
+    assert saved.status == "closed"
+    assert saved.closed_at is not None
+    assert result.archived == [
+        {"company": "acme", "title": "Engineer", "url": "https://boards.greenhouse.io/acme/jobs/1"}
+    ]
+
+
+async def test_archive_stale_jobs_reports_failed_companies(tmp_db, monkeypatch):
+    init_db()
+    _stale_job(tmp_db)
+
+    async def fake_find(jobs_by_company, scanners, config):
+        return StalenessResult(stale=[], failed_companies=["acme"])
+
+    monkeypatch.setattr("gauntler.discovery.service.find_stale_jobs", fake_find)
+    result = await archive_stale_jobs(None, None, CONFIG)
+
+    assert result.archived == []
+    assert result.failed_companies == ["acme"]
+    # job untouched
+    job = Job.select().where(Job.company == "acme").get()
+    assert job.status == "new"
+    assert job.closed_at is None
+
+
+async def test_archive_stale_jobs_filters_by_job_id(tmp_db, monkeypatch):
+    init_db()
+    target = _stale_job(tmp_db, url="https://boards.greenhouse.io/acme/jobs/1")
+    other = _stale_job(tmp_db, url="https://boards.greenhouse.io/acme/jobs/2")
+
+    seen_groups = []
+
+    async def fake_find(jobs_by_company, scanners, config):
+        seen_groups.append(jobs_by_company)
+        return StalenessResult()
+
+    monkeypatch.setattr("gauntler.discovery.service.find_stale_jobs", fake_find)
+    await archive_stale_jobs(target.id, None, CONFIG)
+
+    jobs_checked = seen_groups[0][("greenhouse", "acme")]
+    assert [j.id for j in jobs_checked] == [target.id]
+    assert other.id not in [j.id for j in jobs_checked]
+
+
+async def test_archive_stale_jobs_filters_by_company_case_insensitive(tmp_db, monkeypatch):
+    init_db()
+    acme_job = _stale_job(tmp_db, company="acme", url="https://x.com/1")
+    _stale_job(tmp_db, company="beta", url="https://x.com/2")
+
+    seen_groups = []
+
+    async def fake_find(jobs_by_company, scanners, config):
+        seen_groups.append(jobs_by_company)
+        return StalenessResult()
+
+    monkeypatch.setattr("gauntler.discovery.service.find_stale_jobs", fake_find)
+    await archive_stale_jobs(None, "ACME", CONFIG)
+
+    jobs_checked = seen_groups[0][("greenhouse", "acme")]
+    assert [j.id for j in jobs_checked] == [acme_job.id]
+
+
+async def test_archive_stale_jobs_excludes_resolved_statuses(tmp_db, monkeypatch):
+    init_db()
+    _stale_job(tmp_db, status="applied", url="https://x.com/1")
+    _stale_job(tmp_db, status="closed", url="https://x.com/2")
+    _stale_job(tmp_db, status="archived", url="https://x.com/3")
+
+    seen_groups = []
+
+    async def fake_find(jobs_by_company, scanners, config):
+        seen_groups.append(jobs_by_company)
+        return StalenessResult()
+
+    monkeypatch.setattr("gauntler.discovery.service.find_stale_jobs", fake_find)
+    await archive_stale_jobs(None, None, CONFIG)
+
+    assert seen_groups[0] == {}
+
+
+# ── _format_archive_result ──────────────────────────────────────────────────
+
+
+def test_format_archive_result_empty():
+    from gauntler.discovery.service import ArchiveResult, _format_archive_result
+
+    assert _format_archive_result(ArchiveResult()) == "Nenhuma vaga fechada encontrada."
+
+
+def test_format_archive_result_archived_only():
+    from gauntler.discovery.service import ArchiveResult, _format_archive_result
+
+    result = ArchiveResult(
+        archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}]
+    )
+    formatted = _format_archive_result(result)
+    assert "1 vaga(s) arquivada(s)" in formatted
+    assert "acme / Engineer — https://x.com/1" in formatted
+
+
+def test_format_archive_result_failed_only():
+    from gauntler.discovery.service import ArchiveResult, _format_archive_result
+
+    result = ArchiveResult(failed_companies=["acme"])
+    formatted = _format_archive_result(result)
+    assert "Nenhuma vaga fechada encontrada." in formatted
+    assert "Não foi possível checar: acme" in formatted
+
+
+def test_format_archive_result_archived_and_failed():
+    from gauntler.discovery.service import ArchiveResult, _format_archive_result
+
+    result = ArchiveResult(
+        archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}],
+        failed_companies=["beta"],
+    )
+    formatted = _format_archive_result(result)
+    assert "1 vaga(s) arquivada(s)" in formatted
+    assert "Não foi possível checar: beta" in formatted

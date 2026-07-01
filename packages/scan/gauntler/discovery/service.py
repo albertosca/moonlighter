@@ -5,6 +5,7 @@ config/profile/caller. A lógica fica aqui, testável isolada.
 """
 
 import asyncio
+import datetime
 import json
 import re
 from typing import Any
@@ -23,6 +24,7 @@ from gauntler.discovery.evaluator import (
 )
 from gauntler.discovery.sources.base import RawJob
 from gauntler.discovery.sources.http import AshbyScanner, GreenhouseScanner, LeverScanner
+from gauntler.discovery.staleness import find_stale_jobs
 from gauntler.views import render_jobs_table
 from peewee import IntegrityError
 
@@ -390,3 +392,83 @@ def _format_add_result(
         f"Caveats:\n{caveats_str}\n"
         f"id={job.id}"
     )
+
+
+# ── archive_stale_jobs ──────────────────────────────────────────────────────
+
+ELIGIBLE_STATUSES = ("new", "reviewed", "applying", "needs_review")
+
+
+class ArchiveStaleJobsError(ValueError):
+    """Raised when job_id and company are both given (mutually exclusive filters)."""
+
+
+class ArchiveResult:
+    """Outcome of an archive_stale_jobs run."""
+
+    def __init__(
+        self, archived: list[dict[str, str]] | None = None, failed_companies: list[str] | None = None
+    ) -> None:
+        self.archived = archived if archived is not None else []
+        self.failed_companies = failed_companies if failed_companies is not None else []
+
+
+def _eligible_jobs_query(job_id: int | None, company: str | None) -> Any:
+    from peewee import fn
+
+    query = Job.select().where(Job.status.in_(ELIGIBLE_STATUSES))
+    if job_id is not None:
+        query = query.where(Job.id == job_id)
+    elif company is not None:
+        query = query.where(fn.LOWER(Job.company) == company.lower())
+    return query
+
+
+def _group_by_source_company(jobs: list[Job]) -> dict[tuple[str, str], list[Job]]:
+    groups: dict[tuple[str, str], list[Job]] = {}
+    for job in jobs:
+        groups.setdefault((job.source, job.company), []).append(job)
+    return groups
+
+
+async def archive_stale_jobs(
+    job_id: int | None, company: str | None, config: dict[str, Any]
+) -> ArchiveResult:
+    """Detects and archives (status='closed') eligible jobs that disappeared from
+    their source. Mutually exclusive filters: job_id, company, or neither (all)."""
+    if job_id is not None and company is not None:
+        raise ArchiveStaleJobsError("Provide job_id OR company, not both.")
+
+    jobs = list(_eligible_jobs_query(job_id, company))
+    jobs_by_company = _group_by_source_company(jobs)
+    scanners: dict[str, Any] = {
+        "greenhouse": GreenhouseScanner(),
+        "lever": LeverScanner(),
+        "ashby": AshbyScanner(),
+    }
+    staleness = await find_stale_jobs(jobs_by_company, scanners, config)
+
+    now = datetime.datetime.now()
+    archived: list[dict[str, str]] = []
+    for job in staleness.stale:
+        job.status = "closed"
+        job.closed_at = now
+        job.save()
+        archived.append({"company": job.company, "title": job.title, "url": job.url})
+
+    return ArchiveResult(archived=archived, failed_companies=staleness.failed_companies)
+
+
+def _format_archive_result(result: ArchiveResult) -> str:
+    if not result.archived and not result.failed_companies:
+        return "Nenhuma vaga fechada encontrada."
+    lines: list[str] = []
+    if result.archived:
+        lines.append(f"{len(result.archived)} vaga(s) arquivada(s) (fechada na fonte):")
+        lines.extend(f"  - {j['company']} / {j['title']} — {j['url']}" for j in result.archived)
+    else:
+        lines.append("Nenhuma vaga fechada encontrada.")
+    if result.failed_companies:
+        lines.append("")
+        lines.append(f"⚠️  Não foi possível checar: {', '.join(result.failed_companies)}")
+    return "\n".join(lines)
