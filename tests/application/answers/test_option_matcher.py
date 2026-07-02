@@ -1,5 +1,4 @@
 import pytest
-
 from gauntler.application.answers.option_matcher import (
     match_option_locally,
     pick_option_with_llm,

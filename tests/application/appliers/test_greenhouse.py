@@ -1,9 +1,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from playwright.async_api import TimeoutError as PlaywrightTimeout
-
 from gauntler.application.appliers.greenhouse import GreenhouseApplier
+from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 
 def make_label_locator(field_mock=None):

@@ -1,8 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from playwright.async_api import TimeoutError as PlaywrightTimeout
-
 from gauntler.application.appliers.lever import LeverApplier
+from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 
 def make_applier(url="https://jobs.lever.co/gitlab/abc-123"):

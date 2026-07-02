@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-
 from gauntler.discovery.sources.http import AshbyScanner, GreenhouseScanner, LeverScanner
 
 GREENHOUSE_RESPONSE = {

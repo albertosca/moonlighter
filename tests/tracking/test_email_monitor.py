@@ -19,7 +19,6 @@ from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from gauntler.core.db import Application, Job, init_db
 
 # ── helpers ───────────────────────────────────────────────────────────────────

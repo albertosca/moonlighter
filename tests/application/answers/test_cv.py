@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from gauntler.application.answers.cv import CVNotFoundError, resolve_cv_path
 
 

@@ -1,7 +1,6 @@
 from unittest.mock import patch
 
 import pytest
-
 from gauntler.application.appliers.ashby import AshbyApplier
 from gauntler.application.appliers.greenhouse import GreenhouseApplier
 from gauntler.application.appliers.lever import LeverApplier

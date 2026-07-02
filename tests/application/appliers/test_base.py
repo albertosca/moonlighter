@@ -2,7 +2,6 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from gauntler.application.appliers.base import ApplicationDraft, _fill_field, generate_answers
 
 MOCK_ANSWERS = json.dumps(
