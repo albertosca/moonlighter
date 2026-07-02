@@ -5,7 +5,7 @@ PROFILE = {
     "phone": "11912345678",
     "email": "maria.pereira@example.com",
     "linkedin": "https://www.linkedin.com/in/mariapereira/",
-    "location": "Belo Horizonte, MG, Brasil",
+    "location": "São Paulo, SP, Brasil",
     # campos genéricos de localização/idioma/disponibilidade
     "country_en": "Brazil",
     "country_pt": "Brasil",
@@ -25,17 +25,17 @@ WA_CONFIG_BRAZIL = {
 
 def test_first_name():
     r = pre_populate_answers(["First Name"], PROFILE)
-    assert r["First Name"] == "Alberto"
+    assert r["First Name"] == "Maria"
 
 
 def test_last_name():
     r = pre_populate_answers(["Last Name"], PROFILE)
-    assert r["Last Name"] == "de Sá Cavalcanti de Albuquerque"
+    assert r["Last Name"] == "de Souza Pereira"
 
 
 def test_preferred_name():
     r = pre_populate_answers(["Preferred First Name"], PROFILE)
-    assert r["Preferred First Name"] == "Alberto"
+    assert r["Preferred First Name"] == "Maria"
 
 
 def test_phone():
@@ -55,7 +55,7 @@ def test_linkedin():
 
 def test_location_city():
     r = pre_populate_answers(["Location (City)"], PROFILE)
-    assert r["Location (City)"] == "Belo Horizonte"
+    assert r["Location (City)"] == "São Paulo"
 
 
 def test_country():
@@ -88,7 +88,7 @@ def test_english_level():
 
 def test_currently_based():
     r = pre_populate_answers(["Where are you currently based?"], PROFILE)
-    assert r["Where are you currently based?"] == "Belo Horizonte"
+    assert r["Where are you currently based?"] == "São Paulo"
 
 
 def test_unknown_field_not_included():
@@ -118,17 +118,17 @@ def test_multiple_fields():
 
 def test_ptbr_nome_first_name():
     r = pre_populate_answers(["Nome"], PROFILE)
-    assert r["Nome"] == "Alberto"
+    assert r["Nome"] == "Maria"
 
 
 def test_ptbr_sobrenome_last_name():
     r = pre_populate_answers(["Sobrenome"], PROFILE)
-    assert r["Sobrenome"] == "de Sá Cavalcanti de Albuquerque"
+    assert r["Sobrenome"] == "de Souza Pereira"
 
 
 def test_ptbr_nome_de_preferencia():
     r = pre_populate_answers(["Nome de preferência"], PROFILE)
-    assert r["Nome de preferência"] == "Alberto"
+    assert r["Nome de preferência"] == "Maria"
 
 
 def test_ptbr_email():
@@ -148,20 +148,20 @@ def test_ptbr_pais_brasil():
 
 def test_ptbr_localizacao_cidade():
     r = pre_populate_answers(["Localização (Cidade)"], PROFILE)
-    assert r["Localização (Cidade)"] == "Belo Horizonte"
+    assert r["Localização (Cidade)"] == "São Paulo"
 
 
 def test_ptbr_strips_asterisk():
     r = pre_populate_answers(["Telefone*", "Nome*", "Sobrenome*"], PROFILE)
     assert r["Telefone*"] == "11912345678"
-    assert r["Nome*"] == "Alberto"
-    assert r["Sobrenome*"] == "de Sá Cavalcanti de Albuquerque"
+    assert r["Nome*"] == "Maria"
+    assert r["Sobrenome*"] == "de Souza Pereira"
 
 
 def test_currently_based_question_fills_city():
     """'Where are you currently based?' continua pré-populando a cidade."""
     r = pre_populate_answers(["Where are you currently based?"], PROFILE)
-    assert r["Where are you currently based?"] == "Belo Horizonte"
+    assert r["Where are you currently based?"] == "São Paulo"
 
 
 def test_currently_based_midsentence_confirmation_not_prepopulated():

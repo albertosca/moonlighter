@@ -416,7 +416,7 @@ PROFILE_WITH_CONTACT = {
     "phone": "11912345678",
     "email": "maria@example.com",
     "linkedin": "https://www.linkedin.com/in/mariapereira/",
-    "location": "Belo Horizonte, MG, Brasil",
+    "location": "São Paulo, SP, Brasil",
 }
 
 
@@ -438,7 +438,7 @@ async def test_generate_answers_prepopulates_contact_fields():
         _caller=capture_caller,
     )
 
-    assert result.answers["First Name"] == "Alberto"
+    assert result.answers["First Name"] == "Maria"
     assert result.answers["Phone"] == "11912345678"
     assert result.answers["Email"] == "maria@example.com"
     assert result.answers["Why here?"] == "Because it's great"
@@ -486,7 +486,7 @@ async def test_generate_answers_all_prepopulated_skips_llm():
     )
 
     assert len(llm_calls) == 0
-    assert result.answers["First Name"] == "Alberto"
+    assert result.answers["First Name"] == "Maria"
     assert result.error is None
 
 
@@ -525,7 +525,7 @@ async def test_generate_answers_logs_start_and_ok(caplog):
             title="SRE",
             description="infra stuff",
             fields=["Por que a Stripe?"],
-            profile={"name": "Alberto"},
+            profile={"name": "Maria"},
             _caller=mock_caller,
         )
 
