@@ -13,6 +13,7 @@ pytest_output.txt
 config.yaml
 profile/
 docs/
+specs/
 company_list.yaml
 blocklist_learned.yaml
 .mcp.json
