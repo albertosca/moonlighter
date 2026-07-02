@@ -1065,6 +1065,98 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
     assert all(sl.job_url in job_urls for sl in ScanLog.select())
 
 
+async def test_scan_non_spend_error_keeps_title_filtered_in_report(tmp_db):
+    """A generic (non-spend-limit) error in evaluate_jobs_batch must not drop the
+    title-filtered jobs already persisted earlier in the same chunk from the report
+    count — they're already saved in the DB, the report must reflect that too."""
+    init_db()
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
+
+    raws = [
+        RawJob(
+            source="greenhouse", company="co", title="Staff Accountant",
+            url="https://x.com/nonspend/1", description="desc",
+        ),
+        RawJob(
+            source="greenhouse", company="co", title="Eng",
+            url="https://x.com/nonspend/2", description="desc",
+        ),
+    ]
+    mock_batch = AsyncMock(side_effect=Exception("unexpected LLM error"))
+
+    with (
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("gauntler.server._config", {
+            "score_threshold": 6.5,
+            "llm_model": "claude-haiku-4-5-20251001",
+            "title_blocklist": ["staff accountant"],
+            "scan_concurrency": 1,
+            "scan_batch_size": 2,
+        }),
+    ):
+        MockGH.return_value.scan = AsyncMock(return_value=raws)
+        MockLV.return_value.scan = AsyncMock(return_value=[])
+        MockAB.return_value.scan = AsyncMock(return_value=[])
+        mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
+        result = await scan_and_evaluate()
+
+    # Already true today: the title-filtered job is persisted regardless of the bug.
+    filtered_job = Job.get(Job.url == "https://x.com/nonspend/1")
+    assert filtered_job.status == "archived"
+    # The bug: the report text undercounts it as 0 instead of 1.
+    assert "1 descartadas por título" in result, (
+        f"esperado a vaga filtrada por título contada no report mesmo com erro "
+        f"não-spend-limit no lote; report: {result!r}"
+    )
+
+
+async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tmp_db):
+    """A bug that crashes evaluate_chunk itself (outside its own try/except, e.g. a
+    _persist failure) must not blow up the whole scan_and_evaluate call — gather's
+    return_exceptions=True catches it, this chunk contributes nothing, other chunks
+    are unaffected."""
+    init_db()
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
+
+    raws = [
+        RawJob(
+            source="greenhouse", company="co", title="Eng",
+            url="https://x.com/crash/1", description="desc",
+        ),
+    ]
+
+    with (
+        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.service.LeverScanner") as MockLV,
+        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service._claim", side_effect=Exception("db corrupted")),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("gauntler.server._config", {
+            "score_threshold": 6.5,
+            "llm_model": "claude-haiku-4-5-20251001",
+            "title_blocklist": [],
+            "scan_concurrency": 1,
+            "scan_batch_size": 5,
+        }),
+    ):
+        MockGH.return_value.scan = AsyncMock(return_value=raws)
+        MockLV.return_value.scan = AsyncMock(return_value=[])
+        MockAB.return_value.scan = AsyncMock(return_value=[])
+        mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
+        result = await scan_and_evaluate()  # must not raise
+
+    assert Job.select().count() == 0
+    assert "0 vagas processadas" in result
+
+
 # ── apply_jobs: missing scenarios ─────────────────────────────────────────────
 
 

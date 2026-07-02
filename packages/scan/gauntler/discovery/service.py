@@ -181,7 +181,11 @@ async def _evaluate_and_store(
                     results.append(_StopScan())
                     return results
                 logger.error("scan: erro inesperado no lote — %s", e)
-                raise
+                # Devolve results (title-filtered jobs já persistidos neste chunk) em
+                # vez de propagar — a exceção crua faria o gather() descartar o chunk
+                # inteiro do relatório, sub-contando vagas que já estão salvas no banco.
+                results.append(_StopScan())
+                return results
 
             for raw, result in zip(to_eval, evals, strict=True):
                 job = _persist(
