@@ -80,7 +80,7 @@ async def _check_via_linkedin(
         page = await browser.new_page(config)
     except Exception as e:
         logger.warning("staleness: linkedin browser launch failed — %s", e)
-        result.failed_companies.append("linkedin")
+        result.failed_companies.append(company)
         return
     try:
         for job in jobs:
@@ -95,7 +95,7 @@ async def _check_via_linkedin(
                     result.stale.append(job)
             except PlaywrightError as e:
                 logger.warning("staleness: linkedin goto failed for %s — %s", job.url, e)
-                if "linkedin" not in result.failed_companies:
-                    result.failed_companies.append("linkedin")
+                if company not in result.failed_companies:
+                    result.failed_companies.append(company)
     finally:
         await page.close()

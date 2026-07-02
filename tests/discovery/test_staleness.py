@@ -181,6 +181,33 @@ async def test_linkedin_multiple_failing_jobs_dedup_failed_companies(monkeypatch
     assert result.failed_companies == ["linkedin"]
 
 
+async def test_linkedin_distinct_companies_reported_under_own_name(monkeypatch):
+    """failed_companies must report the actual company per group, not a generic
+    'linkedin' string — otherwise two distinct failing companies collapse into one
+    indistinguishable entry."""
+    from playwright.async_api import TimeoutError as PlaywrightTimeout
+
+    job_x = _job(id=1, source="linkedin", company="companyX", url="https://linkedin.com/jobs/1")
+    job_y = _job(id=2, source="linkedin", company="companyY", url="https://linkedin.com/jobs/2")
+    page = AsyncMock()
+    page.goto = AsyncMock(side_effect=PlaywrightTimeout("timeout"))
+    page.close = AsyncMock()
+    monkeypatch.setattr(
+        "gauntler.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
+    )
+    result = await find_stale_jobs(
+        {
+            ("linkedin", "companyX"): [job_x],
+            ("linkedin", "companyY"): [job_y],
+        },
+        {},
+        CONFIG,
+    )
+    assert result.stale == []
+    assert set(result.failed_companies) == {"companyX", "companyY"}
+    assert "linkedin" not in result.failed_companies
+
+
 def test_staleness_result_defaults_to_empty_lists():
     result = StalenessResult()
     assert result.stale == []

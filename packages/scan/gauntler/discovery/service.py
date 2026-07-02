@@ -8,6 +8,7 @@ import asyncio
 import datetime
 import json
 import re
+from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
@@ -26,7 +27,7 @@ from gauntler.discovery.sources.base import RawJob
 from gauntler.discovery.sources.http import AshbyScanner, GreenhouseScanner, LeverScanner
 from gauntler.discovery.staleness import find_stale_jobs
 from gauntler.views import render_jobs_table
-from peewee import IntegrityError
+from peewee import IntegrityError, fn
 
 logger = get_logger(__name__)
 
@@ -409,19 +410,15 @@ class ArchiveStaleJobsError(ValueError):
     """Raised when job_id and company are both given (mutually exclusive filters)."""
 
 
+@dataclass
 class ArchiveResult:
     """Outcome of an archive_stale_jobs run."""
 
-    def __init__(
-        self, archived: list[dict[str, str]] | None = None, failed_companies: list[str] | None = None
-    ) -> None:
-        self.archived = archived if archived is not None else []
-        self.failed_companies = failed_companies if failed_companies is not None else []
+    archived: list[dict[str, str]] = field(default_factory=list)
+    failed_companies: list[str] = field(default_factory=list)
 
 
 def _eligible_jobs_query(job_id: int | None, company: str | None) -> Any:
-    from peewee import fn
-
     query = Job.select().where(Job.status.in_(ELIGIBLE_STATUSES))
     if job_id is not None:
         query = query.where(Job.id == job_id)
