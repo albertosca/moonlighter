@@ -17,6 +17,7 @@ class LLMCaller(Protocol):
 # depois, em vez de tratar como erro da vaga.
 SPEND_LIMIT_MARKERS = (
     "spend limit",
+    "session limit",
     "quota",
     "rate limit",
     "too many requests",

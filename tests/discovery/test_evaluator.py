@@ -238,6 +238,25 @@ async def test_evaluate_job_rate_limit_propagates():
         )
 
 
+async def test_evaluate_job_session_limit_propagates():
+    """Claude CLI's real 'session limit' message must also propagate — it's a
+    spend-limit variant, not a per-job error. Regression: is_spend_limit() didn't
+    recognize this phrase, so callers never stopped early on it."""
+
+    async def session_limit_caller(prompt, model, cache_prefix=None):
+        raise Exception("You've hit your session limit · resets 12:40am (America/Sao_Paulo)")
+
+    with pytest.raises(Exception, match="session limit"):
+        await evaluate_job(
+            company="Co",
+            title="Eng",
+            description="desc",
+            profile=PROFILE,
+            model="test",
+            _caller=session_limit_caller,
+        )
+
+
 async def test_evaluate_job_description_capped_at_8000():
     """description longer than 8000 chars is truncated before sending to LLM."""
     long_description = "x" * 10000
