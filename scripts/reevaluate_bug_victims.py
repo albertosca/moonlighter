@@ -27,21 +27,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from gauntler.core.config import load_config, load_profile
 from gauntler.core.db import Job, init_db
-from gauntler.core.llm import make_caller
+from gauntler.core.llm import is_spend_limit, make_caller
 from gauntler.core.log import setup as setup_logging
 from gauntler.discovery.evaluator import evaluate_job, should_skip_by_title
 
 BUG_MARKER = "evaluation error: claude CLI exited with code 1"
-
-QUOTA_MARKERS = (
-    "quota",
-    "rate limit",
-    "too many requests",
-    "overloaded",
-    "429",
-    "usage limit",
-    "spend limit",
-)
 
 
 def _fetch_victims(company: str | None, limit: int | None) -> list[Job]:
@@ -123,8 +113,7 @@ async def _reevaluate(
                     _caller=caller,
                 )
             except Exception as e:
-                err_str = str(e).lower()
-                if any(m in err_str for m in QUOTA_MARKERS):
+                if is_spend_limit(e):
                     stop.set()
                     quota_hit = True
                     async with print_lock:
