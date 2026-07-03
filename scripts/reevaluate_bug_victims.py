@@ -89,6 +89,13 @@ async def _reevaluate(
 
         matched_pattern = should_skip_by_title(job.title, blocklist)
         if matched_pattern:
+            if not dry_run:
+                Job.update(
+                    score=0.0,
+                    score_notes=f"title filtered: {matched_pattern!r}",
+                    caveats="[]",
+                    status="archived",
+                ).where(Job.id == job.id).execute()
             async with print_lock:
                 print(f"{label} -- skip título ({matched_pattern!r})")
                 title_skipped += 1
