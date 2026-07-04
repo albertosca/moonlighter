@@ -99,12 +99,12 @@ async def _set_window_state(page: Page, window_state: str) -> None:
 
 
 async def hide_window(page: Page) -> None:
-    """Minimiza a janela do browser via CDP. Idempotente."""
+    """Minimize the browser window via CDP. Idempotent."""
     await _set_window_state(page, "minimized")
 
 
 async def show_window(page: Page) -> None:
-    """Restaura e foca a janela do browser via CDP. Idempotente."""
+    """Restore and focus the browser window via CDP. Idempotent."""
     await _set_window_state(page, "normal")
 
 
