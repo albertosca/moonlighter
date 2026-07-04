@@ -170,6 +170,39 @@ async def test_save_screenshot_creates_job_subdir(tmp_path):
     assert (tmp_path / "99").is_dir()
 
 
+# ── hide_window / show_window ──────────────────────────────────────────────
+
+
+async def test_hide_window_minimizes_via_cdp():
+    mock_page = MagicMock()
+    mock_cdp = AsyncMock()
+    mock_cdp.send = AsyncMock(side_effect=[{"windowId": 7}, None])
+    mock_page.context.new_cdp_session = AsyncMock(return_value=mock_cdp)
+
+    await browser_mod.hide_window(mock_page)
+
+    mock_cdp.send.assert_any_call("Browser.getWindowForTarget")
+    mock_cdp.send.assert_any_call(
+        "Browser.setWindowBounds",
+        {"windowId": 7, "bounds": {"windowState": "minimized"}},
+    )
+
+
+async def test_show_window_restores_via_cdp():
+    mock_page = MagicMock()
+    mock_cdp = AsyncMock()
+    mock_cdp.send = AsyncMock(side_effect=[{"windowId": 3}, None])
+    mock_page.context.new_cdp_session = AsyncMock(return_value=mock_cdp)
+
+    await browser_mod.show_window(mock_page)
+
+    mock_cdp.send.assert_any_call("Browser.getWindowForTarget")
+    mock_cdp.send.assert_any_call(
+        "Browser.setWindowBounds",
+        {"windowId": 3, "bounds": {"windowState": "normal"}},
+    )
+
+
 # ── close ─────────────────────────────────────────────────────────────────────
 
 

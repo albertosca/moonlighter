@@ -89,6 +89,25 @@ async def save_screenshot(page: Page, job_id: int, step: str, config: dict[str, 
     return path
 
 
+async def _set_window_state(page: Page, window_state: str) -> None:
+    cdp = await page.context.new_cdp_session(page)
+    target_info = await cdp.send("Browser.getWindowForTarget")
+    await cdp.send(
+        "Browser.setWindowBounds",
+        {"windowId": target_info["windowId"], "bounds": {"windowState": window_state}},
+    )
+
+
+async def hide_window(page: Page) -> None:
+    """Minimiza a janela do browser via CDP. Idempotente."""
+    await _set_window_state(page, "minimized")
+
+
+async def show_window(page: Page) -> None:
+    """Restaura e foca a janela do browser via CDP. Idempotente."""
+    await _set_window_state(page, "normal")
+
+
 async def close() -> None:
     global _playwright, _browser, _browser_process
     if _browser:
