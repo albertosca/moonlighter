@@ -208,6 +208,7 @@ async def test_fill_application_fills_stops_persists(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
     assert "PREENCHIDA" in result
@@ -256,9 +257,13 @@ async def test_fill_application_reports_failed_fields(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.hide_window = AsyncMock()
+        mock_browser.show_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
     assert "falha" in result.lower() and "X" in result
+    mock_browser.hide_window.assert_awaited_once()
+    mock_browser.show_window.assert_awaited_once()
 
 
 async def test_fill_application_no_draft(tmp_db, tmp_path):
@@ -281,6 +286,7 @@ async def test_fill_application_unknown_ats(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
     assert "ATS não reconhecido" in result
@@ -303,10 +309,13 @@ async def test_fill_application_handles_exception(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.hide_window = AsyncMock()
+        mock_browser.show_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
     assert "Erro ao preencher" in result
     assert "falha inesperada" in result
+    mock_browser.show_window.assert_awaited_once()
 
 
 # ── submit_application: branches ────────────────────────────────────────────

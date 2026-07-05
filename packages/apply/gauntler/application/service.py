@@ -370,6 +370,7 @@ async def fill_application(
         return f"⚠️  {e}\n🚫 Não preenchi — não vou subir um CV errado."
 
     page = await browser.new_page(config)
+    await browser.hide_window(page)
     try:
         result = await _fill_open_page(page, job, final_answers, cv_path, config, profile)
         if result is None:
@@ -380,9 +381,14 @@ async def fill_application(
         app.email_ref = ref
         app.updated_at = datetime.now()
         app.save()
-        return _render_filled(job, fill_status, config)
+        message = _render_filled(job, fill_status, config)
+        if any(s.startswith("failed") for s in fill_status.values()):
+            await browser.show_window(page)
+            message += "\n🖥️  Abri o browser — dá uma olhada e ajusta manualmente se precisar."
+        return message
     except Exception as e:
-        return f"⚠️  Erro ao preencher vaga #{job.id}: {e}"
+        await browser.show_window(page)
+        return f"⚠️  Erro ao preencher vaga #{job.id}: {e}\n🖥️  Abri o browser — dá uma olhada."
     finally:
         await page.close()
 
