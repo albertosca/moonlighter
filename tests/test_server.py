@@ -578,6 +578,7 @@ async def test_confirm_apply_success(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.fill_form = AsyncMock()
@@ -647,6 +648,7 @@ async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = MagicMock()
         mock_applier.fill_form = fake_fill
@@ -689,6 +691,7 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
         ),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = MagicMock()
         mock_applier.fill_form = fake_fill
@@ -720,6 +723,8 @@ async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.hide_window = AsyncMock()
+        mock_browser.show_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = MagicMock()
         mock_applier.fill_form = AsyncMock(side_effect=Exception("browser crash"))
@@ -733,6 +738,8 @@ async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
     job_fresh = Job.get_by_id(job.id)
     assert job_fresh.status == "reviewed"
     assert "Erro" in result or "⚠️" in result
+    mock_browser.hide_window.assert_awaited_once()
+    mock_browser.show_window.assert_awaited_once()
 
 
 # ── retry_apply ───────────────────────────────────────────────────────────────
@@ -761,6 +768,7 @@ async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.fill_form = AsyncMock()
@@ -1300,6 +1308,8 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.hide_window = AsyncMock()
+        mock_browser.show_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.fill_form = AsyncMock()
@@ -1313,6 +1323,8 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
     assert "screenshot" in result.lower() or "04-submitted" in result
     # 'failed' é re-tentável → volta para rascunho
     assert Application.get_by_id(app.id).status == "draft"
+    mock_browser.hide_window.assert_awaited_once()
+    mock_browser.show_window.assert_awaited_once()
 
 
 async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db, tmp_path):
@@ -1332,6 +1344,8 @@ async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db,
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.hide_window = AsyncMock()
+        mock_browser.show_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.fill_form = AsyncMock()
@@ -1348,6 +1362,8 @@ async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db,
     assert Job.get_by_id(job.id).status == "needs_review"
     assert "04-submitted" in result  # aponta o screenshot
     assert "update_status" in result  # instrui o próximo passo humano
+    mock_browser.hide_window.assert_awaited_once()
+    mock_browser.show_window.assert_awaited_once()
 
 
 async def test_retry_apply_refuses_needs_review(tmp_db):
@@ -1392,6 +1408,7 @@ async def test_confirm_apply_unknown_ats(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         from gauntler.server import confirm_apply
 
@@ -1433,6 +1450,7 @@ async def test_confirm_apply_linkedin_calls_extract_fields(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         from gauntler.server import confirm_apply
 
@@ -1649,6 +1667,7 @@ async def test_confirm_apply_generates_6_char_ref(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         applier = AsyncMock()
         applier.fill_form = AsyncMock()
@@ -1682,6 +1701,7 @@ async def test_confirm_apply_ref_is_url_safe(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         applier = AsyncMock()
         applier.fill_form = AsyncMock()
@@ -1715,6 +1735,7 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
             patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
         ):
             mock_browser.new_page = AsyncMock(return_value=page)
+            mock_browser.hide_window = AsyncMock()
             mock_browser.save_screenshot = AsyncMock()
             applier = AsyncMock()
             applier.fill_form = AsyncMock()
@@ -1924,6 +1945,7 @@ async def test_confirm_apply_archives_on_success(tmp_db, tmp_path):
         patch("gauntler.application.service.archive_screenshots") as mock_archive,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.fill_form = AsyncMock()

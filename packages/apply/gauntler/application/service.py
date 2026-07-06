@@ -248,6 +248,7 @@ async def _submit_on_page(
     profile: dict[str, Any],
 ) -> str:
     page = await browser.new_page(config)
+    await browser.hide_window(page)
     try:
         result = await _fill_open_page(page, job, answers, cv_path, config, profile)
         if result is None:
@@ -257,11 +258,14 @@ async def _submit_on_page(
         await browser.save_screenshot(page, job.id, "04-submitted", config)
         shot = _screenshot_path(job.id, "04-submitted", config)
         if isinstance(outcome, str) and outcome.startswith("failed"):
+            await browser.show_window(page)
             return _record_failed(app, job.id, outcome, fill_status, shot)
         if outcome == "unverified":
+            await browser.show_window(page)
             return _record_unverified(app, job, answers, ref, shot)
         return _record_submitted(app, job, answers, ref, config)
     except Exception as e:
+        await browser.show_window(page)
         app.status = "draft"
         app.save()
         Job.update(status="reviewed").where(Job.id == job.id).execute()

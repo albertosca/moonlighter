@@ -128,6 +128,7 @@ async def test_confirm_apply_without_email_config_skips_alias(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.confirm_apply(job.id, None, cfg, PROFILE)
     assert "submetida e confirmada" in result
@@ -148,6 +149,7 @@ async def test_confirm_apply_logs_failed_fields_but_submits(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.confirm_apply(job.id, None, cfg, PROFILE)
     assert "submetida e confirmada" in result
@@ -347,6 +349,7 @@ async def test_submit_application_refills_and_submits(tmp_db, tmp_path):
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.submit_application(job.id, cfg, PROFILE)
     assert "submetida e confirmada" in result
