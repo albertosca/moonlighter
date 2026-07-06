@@ -320,6 +320,62 @@ async def test_fill_application_handles_exception(tmp_db, tmp_path):
     mock_browser.show_window.assert_awaited_once()
 
 
+async def test_confirm_apply_survives_hide_window_failure(tmp_db, tmp_path):
+    """hide_window (best-effort) lançando antes do try não deve derrubar o fluxo nem
+    impedir o submit — a page continua sendo usada e fechada normalmente."""
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/hidefail")
+    Application.create(job=job, status="draft", form_data='{"Name": "Alberto"}')
+    cv = tmp_path / "cv.pdf"
+    cv.write_text("x")
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    applier = _confirm_mocks(job, fill_status={"Name": "filled"})
+    with (
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
+    ):
+        page = _page(job.url)
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.hide_window = AsyncMock(side_effect=RuntimeError("cdp down"))
+        mock_browser.save_screenshot = AsyncMock()
+        result = await apply_service.confirm_apply(job.id, None, cfg, PROFILE)
+    assert "submetida e confirmada" in result
+    page.close.assert_awaited_once()
+
+
+async def test_confirm_apply_survives_show_window_failure_on_exception(tmp_db, tmp_path):
+    """Se show_window (best-effort) lançar dentro do handler de exceção genérica de
+    _submit_on_page, o erro do CDP não deve mascarar o erro original nem pular o
+    revert de estado — confirm_apply continua devolvendo a mensagem amigável e
+    revertendo app/job."""
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/cdpdown")
+    Application.create(job=job, status="draft", form_data='{"Name": "Alberto"}')
+    cv = tmp_path / "cv.pdf"
+    cv.write_text("x")
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    with (
+        patch("gauntler.application.service.browser") as mock_browser,
+        patch(
+            "gauntler.application.service._fill_open_page",
+            new=AsyncMock(side_effect=RuntimeError("falha inesperada")),
+        ),
+        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
+    ):
+        mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.hide_window = AsyncMock()
+        mock_browser.show_window = AsyncMock(side_effect=RuntimeError("cdp down"))
+        mock_browser.save_screenshot = AsyncMock()
+        result = await apply_service.confirm_apply(job.id, None, cfg, PROFILE)
+    assert "Erro ao submeter" in result
+    assert "falha inesperada" in result
+    saved = Application.get(Application.job == job)
+    assert saved.status == "draft"
+    assert Job.get_by_id(job.id).status == "reviewed"
+    mock_browser.show_window.assert_awaited_once()
+
+
 # ── submit_application: branches ────────────────────────────────────────────
 
 

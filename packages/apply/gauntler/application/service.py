@@ -30,6 +30,22 @@ logger = get_logger(__name__)
 _APPLIER_CLASSES = [LinkedInApplier, GreenhouseApplier, LeverApplier, AshbyApplier]
 
 
+async def _hide_window_safe(page: Page) -> None:
+    """Best-effort: a CDP window-state failure must never break the apply flow."""
+    try:
+        await browser.hide_window(page)
+    except Exception as e:
+        logger.debug("hide_window failed (non-critical): %s", e)
+
+
+async def _show_window_safe(page: Page) -> None:
+    """Best-effort: a CDP window-state failure must never break the apply flow."""
+    try:
+        await browser.show_window(page)
+    except Exception as e:
+        logger.debug("show_window failed (non-critical): %s", e)
+
+
 async def detect_applier(
     page: Page, config: dict[str, Any], profile: dict[str, Any]
 ) -> BaseApplier | None:
@@ -248,7 +264,7 @@ async def _submit_on_page(
     profile: dict[str, Any],
 ) -> str:
     page = await browser.new_page(config)
-    await browser.hide_window(page)
+    await _hide_window_safe(page)
     try:
         result = await _fill_open_page(page, job, answers, cv_path, config, profile)
         if result is None:
@@ -258,14 +274,14 @@ async def _submit_on_page(
         await browser.save_screenshot(page, job.id, "04-submitted", config)
         shot = _screenshot_path(job.id, "04-submitted", config)
         if isinstance(outcome, str) and outcome.startswith("failed"):
-            await browser.show_window(page)
+            await _show_window_safe(page)
             return _record_failed(app, job.id, outcome, fill_status, shot)
         if outcome == "unverified":
-            await browser.show_window(page)
+            await _show_window_safe(page)
             return _record_unverified(app, job, answers, ref, shot)
         return _record_submitted(app, job, answers, ref, config)
     except Exception as e:
-        await browser.show_window(page)
+        await _show_window_safe(page)
         app.status = "draft"
         app.save()
         Job.update(status="reviewed").where(Job.id == job.id).execute()
@@ -374,7 +390,7 @@ async def fill_application(
         return f"⚠️  {e}\n🚫 Não preenchi — não vou subir um CV errado."
 
     page = await browser.new_page(config)
-    await browser.hide_window(page)
+    await _hide_window_safe(page)
     try:
         result = await _fill_open_page(page, job, final_answers, cv_path, config, profile)
         if result is None:
@@ -387,11 +403,11 @@ async def fill_application(
         app.save()
         message = _render_filled(job, fill_status, config)
         if any(s.startswith("failed") for s in fill_status.values()):
-            await browser.show_window(page)
+            await _show_window_safe(page)
             message += "\n🖥️  Abri o browser — dá uma olhada e ajusta manualmente se precisar."
         return message
     except Exception as e:
-        await browser.show_window(page)
+        await _show_window_safe(page)
         return f"⚠️  Erro ao preencher vaga #{job.id}: {e}\n🖥️  Abri o browser — dá uma olhada."
     finally:
         await page.close()
