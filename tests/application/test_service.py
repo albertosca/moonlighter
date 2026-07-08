@@ -204,12 +204,13 @@ async def test_fill_application_fills_stops_persists(tmp_db, tmp_path):
     cv.write_text("x")
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     applier = _confirm_mocks(job, fill_status={"Name": "filled"})
+    page = _page(job.url)
     with (
         patch("gauntler.application.service.browser") as mock_browser,
         patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
-        mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
@@ -220,6 +221,7 @@ async def test_fill_application_fills_stops_persists(tmp_db, tmp_path):
     saved = Application.get(Application.job == job)
     assert saved.status == "filled"
     assert saved.email_ref is not None  # ref persistido
+    page.close.assert_awaited_once()  # sem falha => fecha normal
 
 
 async def test_fill_application_blocks_on_needs_review(tmp_db, tmp_path):
@@ -253,12 +255,13 @@ async def test_fill_application_reports_failed_fields(tmp_db, tmp_path):
     cv.write_text("x")
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     applier = _confirm_mocks(job, fill_status={"Name": "filled", "X": "failed:not_found"})
+    page = _page(job.url)
     with (
         patch("gauntler.application.service.browser") as mock_browser,
         patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
-        mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
         mock_browser.show_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
@@ -266,6 +269,7 @@ async def test_fill_application_reports_failed_fields(tmp_db, tmp_path):
     assert "falha" in result.lower() and "X" in result
     mock_browser.hide_window.assert_awaited_once()
     mock_browser.show_window.assert_awaited_once()
+    page.close.assert_not_awaited()  # aba fica aberta pro humano mexer
 
 
 async def test_fill_application_no_draft(tmp_db, tmp_path):
@@ -282,16 +286,18 @@ async def test_fill_application_unknown_ats(tmp_db, tmp_path):
     cv = tmp_path / "cv.pdf"
     cv.write_text("x")
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    page = _page(job.url)
     with (
         patch("gauntler.application.service.browser") as mock_browser,
         patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)),
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
-        mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
     assert "ATS não reconhecido" in result
+    page.close.assert_awaited_once()  # ATS desconhecido não precisa de ajuda humana
 
 
 async def test_fill_application_handles_exception(tmp_db, tmp_path):
@@ -302,6 +308,7 @@ async def test_fill_application_handles_exception(tmp_db, tmp_path):
     cv = tmp_path / "cv.pdf"
     cv.write_text("x")
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    page = _page(job.url)
     with (
         patch("gauntler.application.service.browser") as mock_browser,
         patch(
@@ -310,13 +317,14 @@ async def test_fill_application_handles_exception(tmp_db, tmp_path):
         ),
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
-        mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
         mock_browser.show_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
     assert "Erro ao preencher" in result
     assert "falha inesperada" in result
+    page.close.assert_not_awaited()  # aba fica aberta pro humano mexer
     mock_browser.show_window.assert_awaited_once()
 
 

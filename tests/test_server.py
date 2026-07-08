@@ -593,6 +593,7 @@ async def test_confirm_apply_success(tmp_db, tmp_path):
     job_fresh = Job.get_by_id(job.id)
     assert job_fresh.status == "applied"
     assert "✓" in result or "submetida" in result
+    page.close.assert_awaited_once()  # sucesso não precisa de ajuda humana
 
 
 async def test_confirm_apply_no_application(tmp_db):
@@ -740,6 +741,7 @@ async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
     assert "Erro" in result or "⚠️" in result
     mock_browser.hide_window.assert_awaited_once()
     mock_browser.show_window.assert_awaited_once()
+    page.close.assert_not_awaited()  # aba fica aberta pro humano mexer
 
 
 # ── retry_apply ───────────────────────────────────────────────────────────────
@@ -1325,6 +1327,7 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
     assert Application.get_by_id(app.id).status == "draft"
     mock_browser.hide_window.assert_awaited_once()
     mock_browser.show_window.assert_awaited_once()
+    page.close.assert_not_awaited()  # aba fica aberta pro humano mexer
 
 
 async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db, tmp_path):
@@ -1364,6 +1367,7 @@ async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db,
     assert "update_status" in result  # instrui o próximo passo humano
     mock_browser.hide_window.assert_awaited_once()
     mock_browser.show_window.assert_awaited_once()
+    page.close.assert_not_awaited()  # aba fica aberta pro humano mexer
 
 
 async def test_retry_apply_refuses_needs_review(tmp_db):
