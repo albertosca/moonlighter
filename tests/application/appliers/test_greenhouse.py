@@ -568,7 +568,7 @@ async def test_select_custom_option_clicks_and_selects():
         result = await applier._select_custom_option(element, "Status", "Yes")
 
     assert result is True
-    applier._click_option_exact.assert_awaited_with("Yes")  # clicou a opção exata
+    applier._click_option_exact.assert_awaited_with("Yes", element, [])  # clicou a opção exata
     applier.page.keyboard.press.assert_not_called()
 
 
@@ -599,7 +599,7 @@ async def test_select_custom_option_uses_llm_for_descriptive_options():
 
     assert result is True
     applier._llm_pick.assert_awaited_once()
-    applier._click_option_exact.assert_awaited_with("Native or bilingual proficiency")
+    applier._click_option_exact.assert_awaited_with("Native or bilingual proficiency", element, [])
     element.type.assert_not_called()  # NÃO digitou (select estático) — sem Enter cego
     element.press.assert_not_called()  # NÃO deu Enter cego
 
@@ -629,7 +629,7 @@ async def test_select_custom_option_async_typeahead_types_then_matches():
 
     assert result is True
     element.type.assert_awaited()  # digitou para carregar (async)
-    applier._click_option_exact.assert_awaited_with("Belo Horizonte, Brazil")
+    applier._click_option_exact.assert_awaited_with("Belo Horizonte, Brazil", element, [])
     applier._llm_pick.assert_not_called()  # match local resolveu, sem LLM
 
 
@@ -662,6 +662,30 @@ async def test_select_custom_option_handles_exception():
         result = await applier._select_custom_option(element, "Status", "Yes")
 
     assert result is False
+
+
+async def test_select_custom_option_snapshots_before_opening_menu():
+    """_select_custom_option tira o snapshot de opções ANTES de abrir o menu, e passa
+    esse snapshot pra _visible_options/_click_option_exact (usado no fallback da
+    Abordagem C — exclui widgets sempre-montados como poluição)."""
+    applier = make_applier()
+    element = MagicMock()
+    element.click = AsyncMock()
+    element.scroll_into_view_if_needed = AsyncMock()
+    applier._option_texts_snapshot = AsyncMock(return_value=["Afghanistan+93"])
+    applier._visible_options = AsyncMock(return_value=["Yes", "No"])
+    applier._click_option_exact = AsyncMock(return_value=True)
+    applier._selected_value = AsyncMock(return_value="Yes")
+    applier.page.keyboard = MagicMock()
+    applier.page.keyboard.press = AsyncMock()
+
+    with patch("asyncio.sleep", new=AsyncMock()):
+        result = await applier._select_custom_option(element, "Status", "Yes")
+
+    assert result is True
+    applier._option_texts_snapshot.assert_awaited_once()
+    applier._visible_options.assert_awaited_with(element, ["Afghanistan+93"])
+    applier._click_option_exact.assert_awaited_with("Yes", element, ["Afghanistan+93"])
 
 
 # ── _fill_custom_element() ────────────────────────────────────────────────────
@@ -1076,25 +1100,57 @@ async def test_scoped_locator_none_on_locator_exception():
 
 async def test_visible_options_returns_normalized_texts():
     applier = make_applier()
+    element = MagicMock()  # sem get_attribute configurado -> _field_id retorna None
     loc = MagicMock()
     loc.first.wait_for = AsyncMock()
     loc.all_inner_texts = AsyncMock(return_value=["Yes", "  No  ", "   "])
     applier.page.locator = MagicMock(return_value=loc)
-    assert await applier._visible_options() == ["Yes", "No"]
+    assert await applier._visible_options(element) == ["Yes", "No"]
 
 
 async def test_visible_options_empty_when_wait_times_out():
     applier = make_applier()
+    element = MagicMock()
     loc = MagicMock()
     loc.first.wait_for = AsyncMock(side_effect=Exception("timeout"))
     applier.page.locator = MagicMock(return_value=loc)
-    assert await applier._visible_options() == []
+    assert await applier._visible_options(element) == []
 
 
 async def test_visible_options_empty_on_locator_exception():
     applier = make_applier()
+    element = MagicMock()
     applier.page.locator = MagicMock(side_effect=Exception("boom"))
-    assert await applier._visible_options() == []
+    assert await applier._visible_options(element) == []
+
+
+async def test_visible_options_uses_id_scoped_locator_when_available():
+    """Abordagem A: locator escopado pelo id do campo acha opções -> usa ele direto,
+    ignora poluição do seletor amplo (ex: lista de países do telefone)."""
+    applier = make_applier()
+    element = MagicMock()
+    element.get_attribute = AsyncMock(return_value="question_123")
+    scoped = MagicMock()
+    scoped.count = AsyncMock(return_value=2)
+    scoped.all_inner_texts = AsyncMock(return_value=["Yes", "No"])
+    applier.page.locator = MagicMock(return_value=scoped)
+    assert await applier._visible_options(element) == ["Yes", "No"]
+
+
+async def test_visible_options_falls_back_to_diff_when_no_scoped_match():
+    """Abordagem C: sem locator escopado (id ausente), cai pro seletor amplo e exclui
+    textos já presentes ANTES de abrir o menu (poluição de widgets sempre-montados)."""
+    applier = make_applier()
+    element = MagicMock()
+    element.get_attribute = AsyncMock(return_value=None)  # sem id -> sem Abordagem A
+    broad = MagicMock()
+    broad.first.wait_for = AsyncMock()
+    broad.all_inner_texts = AsyncMock(
+        return_value=["Afghanistan+93", "Albania+355", "Yes", "No"]
+    )
+    applier.page.locator = MagicMock(return_value=broad)
+    before_texts = ["Afghanistan+93", "Albania+355"]  # já existiam antes de abrir o menu
+    assert await applier._visible_options(element, before_texts) == ["Yes", "No"]
 
 
 # ── _click_option_exact (real) ──────────────────────────────────────────────
@@ -1102,6 +1158,7 @@ async def test_visible_options_empty_on_locator_exception():
 
 async def test_click_option_exact_clicks_matching_option():
     applier = make_applier()
+    element = MagicMock()
     opt0 = MagicMock()
     opt0.inner_text = AsyncMock(return_value="No")
     opt1 = MagicMock()
@@ -1112,25 +1169,66 @@ async def test_click_option_exact_clicks_matching_option():
     loc.count = AsyncMock(return_value=2)
     loc.nth = MagicMock(side_effect=lambda i: objs[i])
     applier.page.locator = MagicMock(return_value=loc)
-    assert await applier._click_option_exact("Yes") is True
+    assert await applier._click_option_exact("Yes", element) is True
     opt1.click.assert_awaited_once()
 
 
 async def test_click_option_exact_returns_false_when_no_match():
     applier = make_applier()
+    element = MagicMock()
     opt = MagicMock()
     opt.inner_text = AsyncMock(return_value="Maybe")
     loc = MagicMock()
     loc.count = AsyncMock(return_value=1)
     loc.nth = MagicMock(return_value=opt)
     applier.page.locator = MagicMock(return_value=loc)
-    assert await applier._click_option_exact("Yes") is False
+    assert await applier._click_option_exact("Yes", element) is False
 
 
 async def test_click_option_exact_returns_false_on_exception():
     applier = make_applier()
+    element = MagicMock()
     applier.page.locator = MagicMock(side_effect=Exception("boom"))
-    assert await applier._click_option_exact("Yes") is False
+    assert await applier._click_option_exact("Yes", element) is False
+
+
+async def test_click_option_exact_uses_id_scoped_locator_when_available():
+    applier = make_applier()
+    element = MagicMock()
+    element.get_attribute = AsyncMock(return_value="question_123")
+    opt0 = MagicMock()
+    opt0.inner_text = AsyncMock(return_value="No")
+    opt1 = MagicMock()
+    opt1.inner_text = AsyncMock(return_value="Yes")
+    opt1.click = AsyncMock()
+    scoped = MagicMock()
+    scoped.count = AsyncMock(return_value=2)
+    scoped.nth = MagicMock(side_effect=lambda i: [opt0, opt1][i])
+    applier.page.locator = MagicMock(return_value=scoped)
+    assert await applier._click_option_exact("Yes", element) is True
+    opt1.click.assert_awaited_once()
+
+
+async def test_click_option_exact_falls_back_and_ignores_pollution():
+    """Abordagem C: sem locator escopado, usa o seletor amplo normalmente — a
+    exclusão de before_texts não impede o match real (só ignoraria se o TEXTO da
+    poluição fosse idêntico ao da resposta, o que não acontece na prática: países
+    vs Yes/No)."""
+    applier = make_applier()
+    element = MagicMock()
+    element.get_attribute = AsyncMock(return_value=None)
+    country = MagicMock()
+    country.inner_text = AsyncMock(return_value="Afghanistan+93")
+    real = MagicMock()
+    real.inner_text = AsyncMock(return_value="Yes")
+    real.click = AsyncMock()
+    loc = MagicMock()
+    loc.count = AsyncMock(return_value=2)
+    loc.nth = MagicMock(side_effect=lambda i: [country, real][i])
+    applier.page.locator = MagicMock(return_value=loc)
+    result = await applier._click_option_exact("Yes", element, ["Afghanistan+93"])
+    assert result is True
+    real.click.assert_awaited_once()
 
 
 # ── _llm_pick (real) ────────────────────────────────────────────────────────

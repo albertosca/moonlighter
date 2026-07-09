@@ -225,9 +225,14 @@ class GreenhouseApplier(BaseApplier):
         escolhidos pela lista completa sem digitar; só digita quando não há opções
         estáticas (select async/typeahead que carrega ao digitar)."""
         try:
+            before_texts = await self._option_texts_snapshot()
             await self._open_menu(element)
-            options = await self._visible_options() or await self._type_and_reload(element, answer)
-            if options and await self._choose_and_click(element, label_text, answer, options):
+            options = await self._visible_options(
+                element, before_texts
+            ) or await self._type_and_reload(element, answer, before_texts)
+            if options and await self._choose_and_click(
+                element, label_text, answer, options, before_texts
+            ):
                 return True
 
             logger.warning(
@@ -289,17 +294,24 @@ class GreenhouseApplier(BaseApplier):
                 await element.evaluate("el => el.focus()")  # clique interceptado por overlay
         await asyncio.sleep(0.4)
 
-    async def _type_and_reload(self, element: Any, answer: str) -> list[str]:
+    async def _type_and_reload(
+        self, element: Any, answer: str, before_texts: list[str] | None = None
+    ) -> list[str]:
         """Select async/typeahead (ex: cidade): digitar carrega as opções."""
         try:
             await element.type(answer, delay=30)
             await asyncio.sleep(0.7)
         except Exception:
             pass
-        return await self._visible_options()
+        return await self._visible_options(element, before_texts)
 
     async def _choose_and_click(
-        self, element: Any, label_text: str, answer: str, options: list[str]
+        self,
+        element: Any,
+        label_text: str,
+        answer: str,
+        options: list[str],
+        before_texts: list[str] | None = None,
     ) -> bool:
         """Escolhe a opção (match local; senão LLM entre as opções reais), clica a
         EXATA e verifica a seleção. Sem escolha confirmada → False."""
@@ -308,35 +320,57 @@ class GreenhouseApplier(BaseApplier):
         choice = match_option_locally(answer, options) or await self._llm_pick(
             label_text, answer, options
         )
-        if choice and await self._click_option_exact(choice):
+        if choice and await self._click_option_exact(choice, element, before_texts or []):
             await asyncio.sleep(0.2)
             if await self._selected_value(element):
                 return True
         return False
 
-    async def _visible_options(self) -> list[str]:
-        """Textos das opções do dropdown aberto. Usa locator com auto-wait (as opções
-        do react-select renderizam com delay) — um querySelectorAll único pegaria a
-        lista ainda vazia."""
+    async def _visible_options(
+        self, element: Any, before_texts: list[str] | None = None
+    ) -> list[str]:
+        """Textos das opções do dropdown aberto. Abordagem A: locator escopado pelo id
+        do campo (react-select instanceId) — usa direto, sem risco de poluição. Sem
+        isso, cai pro seletor amplo com auto-wait (as opções do react-select renderizam
+        com delay) e exclui qualquer texto já presente em `before_texts` (Abordagem C —
+        widgets sempre-montados, ex: lista de países do telefone, não contam)."""
         try:
+            scoped = await self._scoped_locator(element)
+            if scoped is not None:
+                texts = await scoped.all_inner_texts()
+                return [re.sub(r"\s+", " ", t).strip() for t in texts if t and t.strip()][:300]
+
             loc = self.page.locator(self._OPTION_SELECTOR)
             try:
                 await loc.first.wait_for(state="visible", timeout=2000)
             except Exception:
                 return []
             texts = await loc.all_inner_texts()
-            return [re.sub(r"\s+", " ", t).strip() for t in texts if t and t.strip()][:300]
+            cleaned = [re.sub(r"\s+", " ", t).strip() for t in texts if t and t.strip()]
+            exclude = set(before_texts or [])
+            return [t for t in cleaned if t not in exclude][:300]
         except Exception:
             return []
 
-    async def _click_option_exact(self, text: str) -> bool:
-        """Clica na opção cujo texto normalizado é EXATAMENTE `text` (via locator)."""
+    async def _click_option_exact(
+        self, text: str, element: Any, before_texts: list[str] | None = None
+    ) -> bool:
+        """Clica na opção cujo texto normalizado é EXATAMENTE `text`. Abordagem A:
+        dentro do locator escopado pelo id do campo. Sem isso, cai pro seletor amplo
+        (Abordagem C), ignorando textos já presentes em `before_texts`."""
         try:
             want = re.sub(r"\s+", " ", text or "").strip().lower()
-            loc = self.page.locator(self._OPTION_SELECTOR)
+            scoped = await self._scoped_locator(element)
+            loc = scoped if scoped is not None else self.page.locator(self._OPTION_SELECTOR)
+            exclude = (
+                set()
+                if scoped is not None
+                else {re.sub(r"\s+", " ", t).strip().lower() for t in (before_texts or [])}
+            )
             for i in range(await loc.count()):
                 option = loc.nth(i)
-                if re.sub(r"\s+", " ", await option.inner_text()).strip().lower() == want:
+                t = re.sub(r"\s+", " ", await option.inner_text()).strip().lower()
+                if t == want and t not in exclude:
                     await option.click()
                     return True
             return False
