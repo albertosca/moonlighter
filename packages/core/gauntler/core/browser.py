@@ -14,12 +14,28 @@ _playwright: Any = None
 _browser: Browser | None = None
 _browser_process: subprocess.Popen[bytes] | None = None
 
-_DEBUG_PORT = 9222
+_DEVTOOLS_PORT_FILE = "DevToolsActivePort"
 
 
-def _devtools_ready() -> bool:
+def _read_devtools_port(session_dir: Path) -> int | None:
+    """Lê a porta que o Chromium escolheu para --remote-debugging-port=0 do
+    arquivo DevToolsActivePort que ele escreve dentro do NOSSO user-data-dir
+    (S-03). None se o arquivo ainda não existe ou está malformado (browser
+    ainda subindo) — nunca confiamos numa porta fixa nem em "o que quer que
+    responda" numa porta conhecida."""
+    port_file = session_dir / _DEVTOOLS_PORT_FILE
+    if not port_file.exists():
+        return None
     try:
-        urllib.request.urlopen(f"http://localhost:{_DEBUG_PORT}/json/version", timeout=1)
+        first_line = port_file.read_text().splitlines()[0]
+        return int(first_line)
+    except (IndexError, ValueError):
+        return None
+
+
+def _devtools_ready(port: int) -> bool:
+    try:
+        urllib.request.urlopen(f"http://localhost:{port}/json/version", timeout=1)
         return True
     except Exception:
         return False
@@ -29,15 +45,21 @@ async def _first_or_new_context(browser: Browser) -> BrowserContext:
     return browser.contexts[0] if browser.contexts else await browser.new_context()
 
 
-async def _launch_browser(config: dict[str, Any], session_dir: Path) -> None:
-    """Sobe o browser (Chrome/Chromium/Brave) com a porta de debug e espera o
-    DevTools responder (até 30s)."""
+async def _launch_browser(config: dict[str, Any], session_dir: Path) -> int:
+    """Sobe o browser (Chrome/Chromium/Brave) numa porta de debug ALEATÓRIA
+    escolhida pelo próprio SO (--remote-debugging-port=0) e devolve a porta
+    real, lida de DevToolsActivePort dentro do NOSSO user-data-dir (S-03) —
+    nunca uma porta fixa, e nunca "o que quer que responda": a porta vem de um
+    arquivo que só o processo que acabamos de lançar escreve."""
     global _browser_process
-    logger.info("Launching browser on port %d", _DEBUG_PORT)
+    port_file = session_dir / _DEVTOOLS_PORT_FILE
+    port_file.unlink(missing_ok=True)  # descarta porta de uma sessão anterior morta
+
+    logger.info("Launching browser (random debug port)")
     _browser_process = subprocess.Popen(
         [
             browser_executable(config),
-            f"--remote-debugging-port={_DEBUG_PORT}",
+            "--remote-debugging-port=0",
             f"--user-data-dir={session_dir}",
             "--no-first-run",
         ],
@@ -45,12 +67,13 @@ async def _launch_browser(config: dict[str, Any], session_dir: Path) -> None:
         stderr=subprocess.DEVNULL,
     )
     for _ in range(60):
-        if _devtools_ready():
-            return
+        port = _read_devtools_port(session_dir)
+        if port is not None and _devtools_ready(port):
+            return port
         await asyncio.sleep(0.5)
     _browser_process.kill()
     _browser_process = None
-    raise RuntimeError(f"Browser não ficou disponível na porta {_DEBUG_PORT} em 30s")
+    raise RuntimeError("Browser não ficou disponível (DevToolsActivePort) em 30s")
 
 
 async def get_context(config: dict[str, Any]) -> BrowserContext:
@@ -62,12 +85,13 @@ async def get_context(config: dict[str, Any]) -> BrowserContext:
 
     session_dir = Path(config["browser_session_dir"]).expanduser()
     session_dir.mkdir(parents=True, exist_ok=True)
-    if not _devtools_ready():
-        await _launch_browser(config, session_dir)
+    port = _read_devtools_port(session_dir)
+    if port is None or not _devtools_ready(port):
+        port = await _launch_browser(config, session_dir)
 
     _playwright = await async_playwright().start()
     _browser = await _playwright.chromium.connect_over_cdp(
-        f"http://localhost:{_DEBUG_PORT}",
+        f"http://localhost:{port}",
         slow_mo=config.get("slow_mo_ms", 300),
     )
     logger.info("CDP connected")
