@@ -243,6 +243,42 @@ class GreenhouseApplier(BaseApplier):
             logger.warning("_select_custom_option: '%s' exception — %s", label_text, e)
             return False
 
+    async def _option_texts_snapshot(self) -> list[str]:
+        """Textos de TODAS as opções que já batem com _OPTION_SELECTOR ANTES de abrir
+        o menu — usado como exclusão no fallback amplo (Abordagem C), pra não confundir
+        widgets sempre-montados (ex: lista de países do telefone) com as opções reais
+        do dropdown que acabou de abrir."""
+        try:
+            loc = self.page.locator(self._OPTION_SELECTOR)
+            texts = await loc.all_inner_texts()
+            return [re.sub(r"\s+", " ", t).strip() for t in texts if t and t.strip()]
+        except Exception:
+            return []
+
+    async def _field_id(self, element: Any) -> str | None:
+        try:
+            field_id = await element.get_attribute("id")
+            return field_id or None
+        except Exception:
+            return None
+
+    async def _scoped_locator(self, element: Any) -> Any | None:
+        """Locator escopado pelo instanceId do react-select (Abordagem A) — o Greenhouse
+        usa o próprio id do campo como prefixo das opções (ex: id do campo
+        'question_67357342' -> opções com id 'react-select-question_67357342-option-N').
+        None se o campo não tem id ou se não há match com esse prefixo (cai pro
+        fallback amplo em _visible_options/_click_option_exact)."""
+        field_id = await self._field_id(element)
+        if not field_id:
+            return None
+        loc = self.page.locator(f'[id^="react-select-{field_id}-option"]')
+        try:
+            if await loc.count() > 0:
+                return loc
+        except Exception:
+            pass
+        return None
+
     async def _open_menu(self, element: Any) -> None:
         with contextlib.suppress(Exception):
             await element.scroll_into_view_if_needed()

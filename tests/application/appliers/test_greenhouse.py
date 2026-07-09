@@ -982,6 +982,87 @@ async def test_choose_and_click_false_when_value_not_verified():
     assert result is False
 
 
+# ── helpers de escopo (_option_texts_snapshot, _field_id, _scoped_locator) ──
+
+
+async def test_option_texts_snapshot_returns_cleaned_texts():
+    applier = make_applier()
+    loc = MagicMock()
+    loc.all_inner_texts = AsyncMock(return_value=["Afghanistan+93", "  Albania+355  ", "   "])
+    applier.page.locator = MagicMock(return_value=loc)
+    assert await applier._option_texts_snapshot() == ["Afghanistan+93", "Albania+355"]
+
+
+async def test_option_texts_snapshot_empty_on_exception():
+    applier = make_applier()
+    applier.page.locator = MagicMock(side_effect=Exception("boom"))
+    assert await applier._option_texts_snapshot() == []
+
+
+async def test_field_id_returns_attribute():
+    applier = make_applier()
+    element = MagicMock()
+    element.get_attribute = AsyncMock(return_value="question_123")
+    assert await applier._field_id(element) == "question_123"
+
+
+async def test_field_id_none_when_missing():
+    applier = make_applier()
+    element = MagicMock()
+    element.get_attribute = AsyncMock(return_value=None)
+    assert await applier._field_id(element) is None
+
+
+async def test_field_id_none_on_exception():
+    """Elemento mock sem get_attribute configurado (MagicMock puro) levanta
+    TypeError ao ser usado com await — tratado como 'sem id', cai pro fallback amplo."""
+    applier = make_applier()
+    element = MagicMock()
+    assert await applier._field_id(element) is None
+
+
+async def test_scoped_locator_returns_locator_when_matches_found():
+    applier = make_applier()
+    element = MagicMock()
+    element.get_attribute = AsyncMock(return_value="question_123")
+    scoped = MagicMock()
+    scoped.count = AsyncMock(return_value=2)
+    applier.page.locator = MagicMock(return_value=scoped)
+    result = await applier._scoped_locator(element)
+    assert result is scoped
+    applier.page.locator.assert_called_with('[id^="react-select-question_123-option"]')
+
+
+async def test_scoped_locator_none_when_no_field_id():
+    applier = make_applier()
+    element = MagicMock()
+    element.get_attribute = AsyncMock(return_value=None)
+    applier.page.locator = MagicMock()
+    result = await applier._scoped_locator(element)
+    assert result is None
+    applier.page.locator.assert_not_called()  # nem tenta o locator sem id
+
+
+async def test_scoped_locator_none_when_zero_matches():
+    applier = make_applier()
+    element = MagicMock()
+    element.get_attribute = AsyncMock(return_value="question_123")
+    scoped = MagicMock()
+    scoped.count = AsyncMock(return_value=0)
+    applier.page.locator = MagicMock(return_value=scoped)
+    assert await applier._scoped_locator(element) is None
+
+
+async def test_scoped_locator_none_on_count_exception():
+    applier = make_applier()
+    element = MagicMock()
+    element.get_attribute = AsyncMock(return_value="question_123")
+    scoped = MagicMock()
+    scoped.count = AsyncMock(side_effect=Exception("boom"))
+    applier.page.locator = MagicMock(return_value=scoped)
+    assert await applier._scoped_locator(element) is None
+
+
 # ── _visible_options (real) ─────────────────────────────────────────────────
 
 
