@@ -1063,6 +1063,14 @@ async def test_scoped_locator_none_on_count_exception():
     assert await applier._scoped_locator(element) is None
 
 
+async def test_scoped_locator_none_on_locator_exception():
+    applier = make_applier()
+    element = MagicMock()
+    element.get_attribute = AsyncMock(return_value="question_123")
+    applier.page.locator = MagicMock(side_effect=Exception("malformed selector"))
+    assert await applier._scoped_locator(element) is None
+
+
 # ── _visible_options (real) ─────────────────────────────────────────────────
 
 

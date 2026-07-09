@@ -271,8 +271,8 @@ class GreenhouseApplier(BaseApplier):
         field_id = await self._field_id(element)
         if not field_id:
             return None
-        loc = self.page.locator(f'[id^="react-select-{field_id}-option"]')
         try:
+            loc = self.page.locator(f'[id^="react-select-{field_id}-option"]')
             if await loc.count() > 0:
                 return loc
         except Exception:
