@@ -40,7 +40,12 @@ def test_make_caller_unknown_backend_falls_back_to_api():
 # ── _call_cli ─────────────────────────────────────────────────────────────────
 
 
-async def test_call_cli_returns_stdout():
+async def test_call_cli_uses_sandbox_argv_and_stdin():
+    """S-01/S-02/S-14/S-15: the prompt is never in argv (kills ps disclosure and
+    argument injection at once); the CLI is spawned with an explicit no-tool,
+    no-MCP, no-session-persistence, no-CLAUDE.md posture."""
+    from gauntler.core.llm import _CLI_SANDBOX_ARGS
+
     mock_proc = MagicMock()
     mock_proc.returncode = 0
     mock_proc.communicate = AsyncMock(return_value=(b"hello from claude\n", b""))
@@ -52,12 +57,66 @@ async def test_call_cli_returns_stdout():
 
     assert result == "hello from claude\n"
     args, kwargs = mock_exec.call_args
-    assert args == ("claude", "-p", "my prompt")
-    assert kwargs["stdin"] == asyncio.subprocess.DEVNULL
+    assert args == ("claude", *_CLI_SANDBOX_ARGS, "-p")
+    assert "my prompt" not in args  # o prompt NUNCA vai em argv
+    assert kwargs["stdin"] == asyncio.subprocess.PIPE
     assert kwargs["stdout"] == asyncio.subprocess.PIPE
     assert kwargs["stderr"] == asyncio.subprocess.PIPE
-    # ANTHROPIC_API_KEY must be stripped so the CLI uses the claude.ai session
     assert "ANTHROPIC_API_KEY" not in kwargs["env"]
+    # communicate() recebe o prompt via stdin, não via argv
+    communicate_kwargs = mock_proc.communicate.call_args.kwargs
+    assert communicate_kwargs["input"] == b"my prompt"
+
+
+async def test_call_cli_sandbox_args_contents():
+    """Cada flag do lockdown é load-bearing (validado empiricamente no canário) —
+    trava a lista exata para que uma edição futura não a afrouxe silenciosamente."""
+    from gauntler.core.llm import _CLI_SANDBOX_ARGS
+
+    assert "--safe-mode" in _CLI_SANDBOX_ARGS
+    assert "--no-session-persistence" in _CLI_SANDBOX_ARGS
+    assert "--strict-mcp-config" in _CLI_SANDBOX_ARGS
+    tools_idx = _CLI_SANDBOX_ARGS.index("--tools")
+    assert _CLI_SANDBOX_ARGS[tools_idx + 1] == ""
+    mcp_idx = _CLI_SANDBOX_ARGS.index("--mcp-config")
+    assert _CLI_SANDBOX_ARGS[mcp_idx + 1] == '{"mcpServers":{}}'
+    assert "--bare" not in _CLI_SANDBOX_ARGS  # --bare mata OAuth/keychain — proibido
+
+
+async def test_call_cli_cwd_is_neutral_workdir(tmp_path, monkeypatch):
+    """cwd nunca é o repositório — é um diretório dedicado dentro de GAUNTLER_HOME."""
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    mock_proc = MagicMock()
+    mock_proc.returncode = 0
+    mock_proc.communicate = AsyncMock(return_value=(b"ok", b""))
+
+    with patch(
+        "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+    ) as mock_exec:
+        await _call_cli("prompt", "model")
+
+    kwargs = mock_exec.call_args.kwargs
+    assert kwargs["cwd"] == str(tmp_path / "cli-workdir")
+
+
+def test_cli_workdir_created_with_0700(tmp_path, monkeypatch):
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    from gauntler.core.llm import _cli_workdir
+
+    workdir = _cli_workdir()
+    assert workdir.exists()
+    assert oct(workdir.stat().st_mode)[-3:] == "700"
+
+
+def test_cli_workdir_is_idempotent(tmp_path, monkeypatch):
+    """Chamar duas vezes não falha nem recria o diretório."""
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    from gauntler.core.llm import _cli_workdir
+
+    first = _cli_workdir()
+    second = _cli_workdir()
+    assert first == second
+    assert first.exists()
 
 
 async def test_call_cli_ignores_model_param():
@@ -71,8 +130,10 @@ async def test_call_cli_ignores_model_param():
     ) as mock_exec:
         await _call_cli("prompt", "claude-opus-99")
 
-    call_args = mock_exec.call_args[0]
+    call_args = mock_exec.call_args.args
     assert "claude-opus-99" not in call_args
+    communicate_kwargs = mock_proc.communicate.call_args.kwargs
+    assert b"claude-opus-99" not in communicate_kwargs["input"]
 
 
 async def test_call_cli_raises_on_nonzero_exit():
@@ -109,7 +170,7 @@ async def test_call_cli_stderr_truncated_to_300_chars():
 
 
 async def test_call_cli_empty_prompt_still_calls_subprocess():
-    """Empty prompt is passed as-is to subprocess."""
+    """Empty prompt is passed as-is, via stdin."""
     mock_proc = MagicMock()
     mock_proc.returncode = 0
     mock_proc.communicate = AsyncMock(return_value=(b"response", b""))
@@ -120,8 +181,7 @@ async def test_call_cli_empty_prompt_still_calls_subprocess():
         result = await _call_cli("", "model")
 
     assert result == "response"
-    call_args = mock_exec.call_args[0]
-    assert "" in call_args
+    assert mock_proc.communicate.call_args.kwargs["input"] == b""
 
 
 # ── _make_api_caller ──────────────────────────────────────────────────────────
@@ -288,34 +348,40 @@ async def test_make_api_caller_raises_on_non_text_block():
 
 async def test_cli_concatenates_cache_prefix():
     """cache_prefix é concatenado ao prompt no backend cli."""
-    captured: dict[str, str] = {}
+    captured: dict[str, bytes] = {}
 
-    async def fake_exec(*args: object, **kwargs: object) -> MagicMock:
-        captured["prompt"] = args[2]  # claude, -p, <prompt>
-        proc = MagicMock()
-        proc.returncode = 0
-        proc.communicate = AsyncMock(return_value=(b"ok", b""))
-        return proc
+    async def fake_communicate(*args: object, **kwargs: object) -> tuple[bytes, bytes]:
+        captured["input"] = kwargs["input"]  # type: ignore[assignment]
+        return (b"ok", b"")
 
-    with patch("gauntler.core.llm.asyncio.create_subprocess_exec", new=fake_exec):
+    mock_proc = MagicMock()
+    mock_proc.returncode = 0
+    mock_proc.communicate = fake_communicate
+
+    with patch(
+        "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+    ):
         await _call_cli("DYN", "m", cache_prefix="STATIC")
-    assert captured["prompt"] == "STATIC\n\nDYN"
+    assert captured["input"] == b"STATIC\n\nDYN"
 
 
 async def test_cli_no_cache_prefix_keeps_prompt_unchanged():
     """cache_prefix=None (default) mantém o comportamento original no cli."""
-    captured: dict[str, str] = {}
+    captured: dict[str, bytes] = {}
 
-    async def fake_exec(*args: object, **kwargs: object) -> MagicMock:
-        captured["prompt"] = args[2]
-        proc = MagicMock()
-        proc.returncode = 0
-        proc.communicate = AsyncMock(return_value=(b"ok", b""))
-        return proc
+    async def fake_communicate(*args: object, **kwargs: object) -> tuple[bytes, bytes]:
+        captured["input"] = kwargs["input"]  # type: ignore[assignment]
+        return (b"ok", b"")
 
-    with patch("gauntler.core.llm.asyncio.create_subprocess_exec", new=fake_exec):
+    mock_proc = MagicMock()
+    mock_proc.returncode = 0
+    mock_proc.communicate = fake_communicate
+
+    with patch(
+        "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+    ):
         await _call_cli("PROMPT_ONLY", "m")
-    assert captured["prompt"] == "PROMPT_ONLY"
+    assert captured["input"] == b"PROMPT_ONLY"
 
 
 async def test_api_uses_cache_control_block():
