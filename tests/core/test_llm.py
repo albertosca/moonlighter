@@ -175,9 +175,7 @@ async def test_call_cli_empty_prompt_still_calls_subprocess():
     mock_proc.returncode = 0
     mock_proc.communicate = AsyncMock(return_value=(b"response", b""))
 
-    with patch(
-        "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
-    ) as mock_exec:
+    with patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
         result = await _call_cli("", "model")
 
     assert result == "response"
