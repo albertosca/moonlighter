@@ -79,3 +79,23 @@ def test_setup_without_rich_falls_back_silently(tmp_path, monkeypatch):
         log_mod.setup(log_path=str(tmp_path / "app.log"))
     finally:
         root.handlers[:] = saved  # restaura o logger global compartilhado
+
+
+def test_setup_uses_rotating_file_handler(tmp_path):
+    """S-07: app.log must rotate — was unbounded (3.4MB and growing in prod)."""
+    from logging.handlers import RotatingFileHandler
+
+    from gauntler.core import log as log_mod
+
+    log_mod._initialized = False
+    root = logging.getLogger("gauntler")
+    for h in root.handlers[:]:
+        root.removeHandler(h)
+
+    log_path = str(tmp_path / "test.log")
+    log_mod.setup(log_path=log_path)
+
+    handlers = [h for h in root.handlers if isinstance(h, RotatingFileHandler)]
+    assert len(handlers) == 1
+    assert handlers[0].maxBytes == 10_000_000
+    assert handlers[0].backupCount == 3

@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from gauntler.core.config import gauntler_home, load_company_list, load_config, load_profile
@@ -268,3 +269,51 @@ def test_scan_batch_size_default(tmp_path, monkeypatch):
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     from gauntler.core.config import load_config
     assert load_config()["scan_batch_size"] == 5
+
+
+# --- harden_permissions (S-07) ---
+
+
+def test_harden_permissions_chmods_files_0600(tmp_path, monkeypatch):
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    (tmp_path / "gauntler.db").write_text("x")
+    (tmp_path / "gauntler.db").chmod(0o644)
+    from gauntler.core.config import harden_permissions
+
+    warnings = harden_permissions()
+    assert warnings == []
+    assert oct((tmp_path / "gauntler.db").stat().st_mode)[-3:] == "600"
+
+
+def test_harden_permissions_chmods_dirs_0700(tmp_path, monkeypatch):
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    (tmp_path / "browser-session").mkdir()
+    (tmp_path / "browser-session").chmod(0o755)
+    from gauntler.core.config import harden_permissions
+
+    harden_permissions()
+    assert oct((tmp_path / "browser-session").stat().st_mode)[-3:] == "700"
+
+
+def test_harden_permissions_skips_missing_files(tmp_path, monkeypatch):
+    """No real files in GAUNTLER_HOME → nothing to fix, no error."""
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    from gauntler.core.config import harden_permissions
+
+    assert harden_permissions() == []
+
+
+def test_harden_permissions_warns_on_chmod_failure_without_raising(tmp_path, monkeypatch):
+    """A permission error must never crash the server's startup — it becomes
+    a warning, not an exception."""
+    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    (tmp_path / "profile.yaml").write_text("x")
+    (tmp_path / "browser-session").mkdir()
+    from gauntler.core import config as config_mod
+
+    with patch.object(config_mod.Path, "chmod", side_effect=OSError("read-only fs")):
+        warnings = config_mod.harden_permissions()
+
+    assert len(warnings) >= 2
+    assert any("profile.yaml" in w or "permiss" in w.lower() for w in warnings)
+    assert any("browser-session" in w or "permiss" in w.lower() for w in warnings)

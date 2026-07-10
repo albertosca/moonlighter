@@ -7,7 +7,7 @@ from pathlib import Path
 
 from gauntler.application import service as apply_service
 from gauntler.core import browser as _browser_mod
-from gauntler.core.config import load_company_list, load_config, load_profile
+from gauntler.core.config import harden_permissions, load_company_list, load_config, load_profile
 from gauntler.core.db import Application, Job, init_db
 from gauntler.core.llm import make_caller
 from gauntler.core.log import get_logger as _get_logger
@@ -36,6 +36,7 @@ except FileNotFoundError:  # pragma: no cover - fallback de import sem profile.y
 _companies = load_company_list()
 init_db()
 _llm_caller = make_caller(_config)
+_permission_warnings = harden_permissions()
 
 
 def _log_tool(name: str) -> AbstractAsyncContextManager[None]:
@@ -54,6 +55,8 @@ def _log_tool(name: str) -> AbstractAsyncContextManager[None]:
 
 
 _startup_warnings = validate_startup(_config, _profile)
+for _msg in _permission_warnings:  # pragma: no cover - prints warnings at server import time
+    print(f"⚠️  {_msg}", flush=True)
 for _w in _startup_warnings:  # pragma: no cover - print de avisos no import do servidor
     _prefix = "🚫" if _w.level == "error" else "⚠️ "
     print(f"{_prefix} {_w.message}", flush=True)

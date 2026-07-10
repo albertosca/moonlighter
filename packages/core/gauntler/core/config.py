@@ -151,3 +151,32 @@ def load_company_list(path: str | Path | None = None, phase: str | None = None) 
         else:
             result[source] = []
     return result
+
+
+_HARDEN_FILES = ("gauntler.db", "profile.yaml", "config.yaml", "app.log", "blocklist_learned.yaml")
+_HARDEN_DIRS = ("browser-session", "screenshots")
+
+
+def harden_permissions() -> list[str]:
+    """Set 0600/0700 on the sensitive files/subdirectories under ~/.gauntler
+    (S-07): gauntler.db, profile.yaml and config.yaml carry full PII;
+    browser-session/ holds cookies equivalent to LinkedIn credentials.
+    Best-effort and never raises — a permission error becomes a warning,
+    since the server must stay up even on an unusual filesystem/ACL setup."""
+    home = gauntler_home()
+    warnings: list[str] = []
+    for name in _HARDEN_FILES:
+        path = home / name
+        if path.exists():
+            try:
+                path.chmod(0o600)
+            except OSError as e:
+                warnings.append(f"could not restrict permissions on {path}: {e}")
+    for name in _HARDEN_DIRS:
+        path = home / name
+        if path.exists():
+            try:
+                path.chmod(0o700)
+            except OSError as e:
+                warnings.append(f"could not restrict permissions on {path}: {e}")
+    return warnings

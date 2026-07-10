@@ -1,4 +1,5 @@
 import logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 _initialized = False
@@ -22,15 +23,21 @@ def setup(log_path: str | None = None) -> None:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    fh = logging.FileHandler(resolved, encoding="utf-8")
+    # S-07: app.log ran with no rotation (3.4MB and growing in production) —
+    # cap at 10MB x 3 backups.
+    fh = RotatingFileHandler(resolved, maxBytes=10_000_000, backupCount=3, encoding="utf-8")
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(fmt)
     root.addHandler(fh)
 
     try:
+        from rich.console import Console
         from rich.logging import RichHandler
 
-        rh = RichHandler(level=logging.INFO, show_path=False, rich_tracebacks=False)
+        rh = RichHandler(
+            console=Console(stderr=True), level=logging.INFO, show_path=False,
+            rich_tracebacks=False,
+        )
         root.addHandler(rh)
     except ImportError:
         pass  # rich opcional
