@@ -994,6 +994,18 @@ async def test_evaluate_job_invalid_salary_source_becomes_none():
     assert result.salary_source is None
 
 
+async def test_evaluate_job_non_hashable_salary_source_becomes_none():
+    """S-05: a non-string (unhashable) salary_source from the LLM must not crash
+    the validator — it becomes None like any other invalid value, never raises."""
+    caller = _make_caller(json.dumps({
+        "score": 7.0, "score_notes": "x", "caveats": [],
+        "salary_min": None, "salary_max": None, "salary_currency": None,
+        "salary_source": ["stated"],
+    }))
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.salary_source is None
+
+
 async def test_evaluate_job_overlong_salary_currency_is_truncated():
     caller = _make_caller(
         json.dumps(

@@ -172,7 +172,7 @@ def _as_salary_currency(value: Any) -> str | None:
 
 def _as_salary_source(value: Any) -> str | None:
     """Strict whitelist — any value outside the known set becomes None."""
-    return value if value in _VALID_SALARY_SOURCES else None
+    return value if isinstance(value, str) and value in _VALID_SALARY_SOURCES else None
 
 
 def _parse_batch(raw: str, n: int) -> list[EvaluationResult] | None:
