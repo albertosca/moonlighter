@@ -26,7 +26,7 @@ def test_confirm_write_sim_returns_true():
 
 
 def test_confirm_write_empty_input_defaults_to_false():
-    """S-10: silêncio nunca é consentimento — o default é 'não'."""
+    """S-10: silence is never consent — the default is 'no'."""
     bb = _bb()
     with patch("builtins.input", return_value=""):
         assert bb._confirm_write(["recruiter"]) is False
@@ -39,7 +39,7 @@ def test_confirm_write_no_returns_false():
 
 
 async def test_run_skips_write_without_confirmation(tmp_path, monkeypatch):
-    """assume_yes=False + usuário recusa → blocklist_learned.yaml nunca é escrito."""
+    """assume_yes=False and the user declines -> blocklist_learned.yaml is never written."""
     bb = _bb()
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
 
@@ -60,7 +60,7 @@ async def test_run_skips_write_without_confirmation(tmp_path, monkeypatch):
 
 
 async def test_run_writes_with_yes_flag_and_never_prompts(tmp_path, monkeypatch):
-    """assume_yes=True grava sem NUNCA chamar input() (uso não-interativo)."""
+    """assume_yes=True writes without EVER calling input() (non-interactive use)."""
     bb = _bb()
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
 
@@ -81,7 +81,7 @@ async def test_run_writes_with_yes_flag_and_never_prompts(tmp_path, monkeypatch)
 
 
 async def test_run_dry_run_never_prompts_either(tmp_path, monkeypatch):
-    """--dry-run nunca escreve nem pergunta, independente de assume_yes."""
+    """--dry-run never writes or prompts, regardless of assume_yes."""
     bb = _bb()
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
 

@@ -112,9 +112,9 @@ def _save_learned(patterns: list[str]) -> None:
 
 
 def _confirm_write(patterns: list[str]) -> bool:
-    """Pede confirmação explícita antes de mesclar padrões propostos pelo LLM no
-    blocklist real (S-10) — um padrão hallucinado amplo demais filtra vagas
-    boas em silêncio; silêncio do usuário NUNCA é consentimento."""
+    """Ask for explicit confirmation before merging LLM-proposed patterns into
+    the real blocklist (S-10) — an over-broad hallucinated pattern silently
+    filters out good jobs; the user's silence must NEVER count as consent."""
     print(f"\n{len(patterns)} padrão(ões) novo(s) prestes a ser gravado(s):")
     for p in patterns:
         print(f"  - {p!r}")
