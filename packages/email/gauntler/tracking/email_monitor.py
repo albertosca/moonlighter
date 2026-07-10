@@ -293,7 +293,7 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
         ref = extract_ref(message["to"], base_address)
         app, match_type = _resolve_application(ref, classification)
         if app is not None:
-            _advance_application(app, classification, match_type)
+            _advance_application(app, classification, match_type, stages)
             updates.append(_make_update(classification, match_type))
         else:
             updates.append(_make_update(classification, "incerto"))
@@ -311,13 +311,22 @@ def _register_new_stage(
         email_cfg["interview_stages"] = stages
 
 
-def _advance_application(app: Any, classification: dict[str, Any], match_type: str) -> None:
-    """Avança a Application no funil (só para frente) e anota o evento."""
+def _advance_application(
+    app: Any, classification: dict[str, Any], match_type: str, stages: list[str]
+) -> None:
+    """Advances the Application through the funnel (forward only) and notes
+    the event.
+
+    current_stage is only written if the value is in the list of known stages
+    (which already includes any new_stage legitimately registered by
+    _register_new_stage BEFORE this call) — a stage outside that list is
+    hallucination/injection and is silently discarded (S-05)."""
     new_status = _TYPE_TO_STATUS.get(classification["type"])
     if new_status and _status_rank(new_status) > _status_rank(app.status):
         app.status = new_status
-    if classification.get("stage"):
-        app.current_stage = classification["stage"]
+    stage = classification.get("stage")
+    if stage and stage in stages:
+        app.current_stage = stage
 
     today = datetime.date.today().strftime("%Y-%m-%d")
     summary = classification.get("summary", "")

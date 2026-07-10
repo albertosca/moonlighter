@@ -1270,6 +1270,94 @@ class TestSyncResponses:
         app_refreshed = Application.get_by_id(app.id)
         assert app_refreshed.updated_at > old_time
 
+    async def test_hallucinated_stage_not_in_known_list_is_ignored(self, tmp_db):
+        """S-05: a 'stage' outside the known list (and that isn't a declared
+        new_stage) is never written to current_stage — mitigates hallucination
+        via prompt injection (S-04) even if it escapes the delimiter."""
+        init_db()
+        job = _make_job(tmp_db)
+        app = _make_application(job, status="submitted", email_ref="hal001", current_stage=None)
+
+        classify_result = {
+            "type": "interview",
+            "stage": "made_up_stage_not_registered",
+            "new_stage": None,
+            "company": "Anthropic",
+            "job_title": "Senior Engineer",
+            "summary": "Tentativa de estágio inventado.",
+        }
+        message = {
+            "to": "candidaturas+hal001@gmail.com",
+            "from_": "hr@anthropic.com",
+            "subject": "Update",
+            "body": "x",
+        }
+
+        with (
+            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
+            patch(
+                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                return_value=[{"id": "msg0", "threadId": "t0"}],
+            ),
+            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch(
+                "gauntler.tracking.email_monitor.classify_response",
+                new=AsyncMock(return_value=classify_result),
+            ),
+            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+        ):
+            from gauntler.tracking.email_monitor import sync_responses
+
+            await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
+
+        app_refreshed = Application.get_by_id(app.id)
+        assert app_refreshed.status == "interviews"  # the type still advances (it's trustworthy)
+        assert app_refreshed.current_stage is None  # the made-up stage is discarded
+
+    async def test_legitimately_registered_new_stage_is_accepted(self, tmp_db):
+        """A declared new_stage (registered via _register_new_stage BEFORE
+        _advance_application runs) must be accepted — it's not hallucination,
+        it's a deliberate feature."""
+        init_db()
+        job = _make_job(tmp_db)
+        app = _make_application(job, status="submitted", email_ref="ns001", current_stage=None)
+
+        classify_result = {
+            "type": "interview",
+            "stage": "pair_programming",
+            "new_stage": "pair_programming",
+            "company": "Anthropic",
+            "job_title": "Senior Engineer",
+            "summary": "Sessão de pair programming.",
+        }
+        message = {
+            "to": "candidaturas+ns001@gmail.com",
+            "from_": "hr@anthropic.com",
+            "subject": "Pair session",
+            "body": "x",
+        }
+
+        with (
+            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
+            patch(
+                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                return_value=[{"id": "msg0", "threadId": "t0"}],
+            ),
+            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch(
+                "gauntler.tracking.email_monitor.classify_response",
+                new=AsyncMock(return_value=classify_result),
+            ),
+            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+        ):
+            from gauntler.tracking.email_monitor import sync_responses
+
+            await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
+
+        assert Application.get_by_id(app.id).current_stage == "pair_programming"
+
     async def test_every_email_recorded_locally_without_gmail_writes(self, tmp_db):
         """Read-only por padrão: nenhum email é tocado no Gmail; cada um é registrado
         localmente em ProcessedEmail."""
