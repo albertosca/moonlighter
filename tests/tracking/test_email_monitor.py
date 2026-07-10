@@ -754,6 +754,114 @@ class TestSetupGmailService:
         mock_creds.refresh.assert_called_once()
         assert Path(token_path).read_text() == '{"token": "refreshed"}'
 
+    def test_required_scope_defaults_to_readonly(self):
+        from gauntler.tracking.email_monitor import SCOPE_READONLY, _required_scope
+
+        assert _required_scope({}) == SCOPE_READONLY
+        assert _required_scope({"email": {"mark_processed": False}}) == SCOPE_READONLY
+
+    def test_required_scope_is_modify_when_opted_in(self):
+        from gauntler.tracking.email_monitor import SCOPE_MODIFY, _required_scope
+
+        assert _required_scope({"email": {"mark_processed": True}}) == SCOPE_MODIFY
+
+    def test_setup_gmail_service_warns_on_broader_scope_than_needed(self, tmp_path, caplog):
+        """S-08: a token with gmail.modify when only gmail.readonly is required (the
+        default, mark_processed=false) triggers a one-time warning — never
+        auto-revoke, just say so plainly."""
+        import logging
+
+        from gauntler.tracking.email_monitor import setup_gmail_service
+
+        token_path = str(tmp_path / "gmail-token.json")
+        config = {
+            "email": {
+                "credentials_path": str(tmp_path / "gmail-client.json"),
+                "token_path": token_path,
+                "mark_processed": False,
+            }
+        }
+
+        mock_creds = MagicMock()
+        mock_creds.valid = True
+        mock_creds.expired = False
+        mock_creds.scopes = ["https://www.googleapis.com/auth/gmail.modify"]
+
+        with (
+            patch("gauntler.tracking.email_monitor.Credentials") as MockCreds,
+            patch("gauntler.tracking.email_monitor.build") as mock_build,
+            patch("os.path.exists", return_value=True),
+            caplog.at_level(logging.WARNING, logger="gauntler.tracking.email_monitor"),
+        ):
+            MockCreds.from_authorized_user_file.return_value = mock_creds
+            mock_build.return_value = MagicMock()
+            setup_gmail_service(config)
+
+        assert "setup_email" in caplog.text
+
+    def test_setup_gmail_service_no_warning_when_scope_already_matches(self, tmp_path, caplog):
+        import logging
+
+        from gauntler.tracking.email_monitor import setup_gmail_service
+
+        token_path = str(tmp_path / "gmail-token.json")
+        config = {
+            "email": {
+                "credentials_path": str(tmp_path / "gmail-client.json"),
+                "token_path": token_path,
+                "mark_processed": False,
+            }
+        }
+
+        mock_creds = MagicMock()
+        mock_creds.valid = True
+        mock_creds.expired = False
+        mock_creds.scopes = ["https://www.googleapis.com/auth/gmail.readonly"]
+
+        with (
+            patch("gauntler.tracking.email_monitor.Credentials") as MockCreds,
+            patch("gauntler.tracking.email_monitor.build") as mock_build,
+            patch("os.path.exists", return_value=True),
+            caplog.at_level(logging.WARNING, logger="gauntler.tracking.email_monitor"),
+        ):
+            MockCreds.from_authorized_user_file.return_value = mock_creds
+            mock_build.return_value = MagicMock()
+            setup_gmail_service(config)
+
+        assert caplog.text == ""
+
+    def test_setup_gmail_service_no_warning_when_scopes_attr_is_a_mock(self, tmp_path, caplog):
+        """Defensive: a mocked/unconfigured .scopes attribute (not a real list) must
+        never be iterated — the mismatch check is a no-op in that case."""
+        import logging
+
+        from gauntler.tracking.email_monitor import setup_gmail_service
+
+        token_path = str(tmp_path / "gmail-token.json")
+        config = {
+            "email": {
+                "credentials_path": str(tmp_path / "gmail-client.json"),
+                "token_path": token_path,
+            }
+        }
+
+        mock_creds = MagicMock()
+        mock_creds.valid = True
+        mock_creds.expired = False
+        # .scopes NOT explicitly configured — it's a MagicMock, not a real list
+
+        with (
+            patch("gauntler.tracking.email_monitor.Credentials") as MockCreds,
+            patch("gauntler.tracking.email_monitor.build") as mock_build,
+            patch("os.path.exists", return_value=True),
+            caplog.at_level(logging.WARNING, logger="gauntler.tracking.email_monitor"),
+        ):
+            MockCreds.from_authorized_user_file.return_value = mock_creds
+            mock_build.return_value = MagicMock()
+            setup_gmail_service(config)  # must not hang or raise
+
+        assert caplog.text == ""
+
 
 # ── sync_responses (integração real com banco) ────────────────────────────────
 

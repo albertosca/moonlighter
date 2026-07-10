@@ -317,7 +317,7 @@ async def setup_email() -> str:
             )
 
         try:
-            _run_gmail_oauth(creds_path, token_path)
+            _run_gmail_oauth(creds_path, token_path, config)
             setup_gmail_service(config)
             return "✓ Autenticação Gmail configurada com sucesso."
         except GmailAuthError as e:

@@ -33,7 +33,8 @@ try:
 except ImportError:  # pragma: no cover - fallback de import opcional (oauthlib)
     InstalledAppFlow = None
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
+SCOPE_READONLY = "https://www.googleapis.com/auth/gmail.readonly"
+SCOPE_MODIFY = "https://www.googleapis.com/auth/gmail.modify"
 
 # Ordem canônica de avanço no funil — o status só anda para frente, nunca regride.
 _STATUS_ORDER = ["draft", "submitted", "screening", "interviews", "offer", "rejected"]
@@ -55,6 +56,32 @@ class GmailAuthError(Exception):
 # ── Gmail API: autenticação e leitura ───────────────────────────────────────
 
 
+def _required_scope(config: dict[str, Any]) -> str:
+    """gmail.modify only when the operator opts into marking messages
+    read/labeled (email.mark_processed=true); readonly by default — the sync
+    is 100% read-only save for that opt-in (S-08, least-privilege principle)."""
+    email_cfg = config.get("email", {})
+    return SCOPE_MODIFY if email_cfg.get("mark_processed", False) else SCOPE_READONLY
+
+
+def _warn_if_scope_mismatch(creds: Any, required_scope: str) -> None:
+    """The saved token may carry a broader scope than currently needed
+    (e.g. an old token with gmail.modify when mark_processed=false only needs
+    gmail.readonly). Never revokes on its own — just warns, once, clearly
+    (S-08). Defensive: only acts if .scopes is actually a real sequence."""
+    granted = getattr(creds, "scopes", None)
+    if not isinstance(granted, (list, set, tuple)):
+        return
+    granted_set = set(granted)
+    if required_scope not in granted_set and SCOPE_MODIFY in granted_set:
+        logger.warning(
+            "Gmail token tem escopo mais amplo (%s) do que o necessário (%s). "
+            "Rode setup_email() para re-consentir com o escopo mínimo.",
+            ", ".join(sorted(granted_set)),
+            required_scope,
+        )
+
+
 def setup_gmail_service(config: dict[str, Any]) -> Any:
     """Carrega credentials + token OAuth2 e devolve o resource do Gmail API.
     Levanta GmailAuthError com mensagem clara se o token não existe; faz refresh
@@ -72,11 +99,13 @@ def setup_gmail_service(config: dict[str, Any]) -> Any:
             "Token Gmail não encontrado. Rode setup_email() primeiro para autorizar o acesso."
         )
 
-    creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)  # type: ignore[no-untyped-call]
+    required_scope = _required_scope(config)
+    creds = Credentials.from_authorized_user_file(str(token_path), [required_scope])  # type: ignore[no-untyped-call]
     if not creds.valid and creds.expired and creds.refresh_token:
         creds.refresh(Request())
         token_path.write_text(creds.to_json())
 
+    _warn_if_scope_mismatch(creds, required_scope)
     return build("gmail", "v1", credentials=creds)
 
 
@@ -410,13 +439,16 @@ def _match_by_company_title(company: str | None, job_title: str | None) -> Any:
     return results[0] if len(results) == 1 else None
 
 
-def _run_gmail_oauth(credentials_path: str, token_path: str) -> None:
+def _run_gmail_oauth(
+    credentials_path: str, token_path: str, config: dict[str, Any] | None = None
+) -> None:
     """Executa o fluxo OAuth2 interativo e salva o token."""
     if InstalledAppFlow is None:
         raise GmailAuthError(
             "google-auth-oauthlib não instalado. Rode: pip install google-auth-oauthlib"
         )
-    flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
+    scope = _required_scope(config or {})
+    flow = InstalledAppFlow.from_client_secrets_file(credentials_path, [scope])
     creds = flow.run_local_server(port=0)
     expanded = Path(token_path).expanduser()
     expanded.parent.mkdir(parents=True, exist_ok=True)
