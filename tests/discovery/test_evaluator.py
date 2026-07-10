@@ -854,3 +854,178 @@ async def test_evaluate_job_passes_cache_prefix():
     assert captured["prefix"] is not None and "python" in captured["prefix"]
     assert "JD aqui" in captured["dynamic"]
     assert "JD aqui" not in captured["prefix"]  # vaga não está no prefixo cacheável
+
+
+# ── S-05: output validation (range/type clamping) ───────────────────────────
+
+
+async def test_evaluate_job_score_above_10_is_clamped():
+    """A score above the valid range is clamped to 10.0, never trusted verbatim."""
+    caller = _make_caller(json.dumps({"score": 99, "score_notes": "n", "caveats": []}))
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.score == 10.0
+
+
+async def test_evaluate_job_negative_score_is_clamped():
+    caller = _make_caller(json.dumps({"score": -5, "score_notes": "n", "caveats": []}))
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.score == 0.0
+
+
+async def test_evaluate_job_infinite_score_becomes_zero():
+    """A string LLM output like "Infinity" parses via float() to inf — must be rejected."""
+    caller = _make_caller(json.dumps({"score": "Infinity", "score_notes": "n", "caveats": []}))
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.score == 0.0
+
+
+async def test_evaluate_job_nan_score_becomes_zero():
+    caller = _make_caller(json.dumps({"score": "NaN", "score_notes": "n", "caveats": []}))
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.score == 0.0
+
+
+async def test_evaluate_job_negative_salary_becomes_none():
+    caller = _make_caller(
+        json.dumps(
+            {
+                "score": 7.0,
+                "score_notes": "x",
+                "caveats": [],
+                "salary_min": -100,
+                "salary_max": None,
+                "salary_currency": None,
+                "salary_source": None,
+            }
+        )
+    )
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.salary_min is None
+
+
+async def test_evaluate_job_non_integer_salary_becomes_none():
+    caller = _make_caller(
+        json.dumps(
+            {
+                "score": 7.0,
+                "score_notes": "x",
+                "caveats": [],
+                "salary_min": "a lot of money",
+                "salary_max": None,
+                "salary_currency": None,
+                "salary_source": None,
+            }
+        )
+    )
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.salary_min is None
+
+
+async def test_evaluate_job_bool_salary_becomes_none():
+    """bool is an int subclass in Python — must be explicitly rejected."""
+    caller = _make_caller(
+        json.dumps(
+            {
+                "score": 7.0,
+                "score_notes": "x",
+                "caveats": [],
+                "salary_min": True,
+                "salary_max": None,
+                "salary_currency": None,
+                "salary_source": None,
+            }
+        )
+    )
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.salary_min is None
+
+
+async def test_evaluate_job_float_salary_with_integer_value_is_accepted():
+    caller = _make_caller(
+        json.dumps(
+            {
+                "score": 7.0,
+                "score_notes": "x",
+                "caveats": [],
+                "salary_min": 150000.0,
+                "salary_max": None,
+                "salary_currency": None,
+                "salary_source": None,
+            }
+        )
+    )
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.salary_min == 150000
+
+
+async def test_evaluate_job_non_integer_float_salary_becomes_none():
+    caller = _make_caller(
+        json.dumps(
+            {
+                "score": 7.0,
+                "score_notes": "x",
+                "caveats": [],
+                "salary_min": 150000.5,
+                "salary_max": None,
+                "salary_currency": None,
+                "salary_source": None,
+            }
+        )
+    )
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.salary_min is None
+
+
+async def test_evaluate_job_invalid_salary_source_becomes_none():
+    caller = _make_caller(
+        json.dumps(
+            {
+                "score": 7.0,
+                "score_notes": "x",
+                "caveats": [],
+                "salary_min": None,
+                "salary_max": None,
+                "salary_currency": None,
+                "salary_source": "definitely_made_up",
+            }
+        )
+    )
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.salary_source is None
+
+
+async def test_evaluate_job_overlong_salary_currency_is_truncated():
+    caller = _make_caller(
+        json.dumps(
+            {
+                "score": 7.0,
+                "score_notes": "x",
+                "caveats": [],
+                "salary_min": None,
+                "salary_max": None,
+                "salary_currency": "USD (estimated, converted from EUR at today's rate)",
+                "salary_source": None,
+            }
+        )
+    )
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.salary_currency is not None
+    assert len(result.salary_currency) <= 10
+
+
+async def test_evaluate_job_blank_salary_currency_becomes_none():
+    caller = _make_caller(
+        json.dumps(
+            {
+                "score": 7.0,
+                "score_notes": "x",
+                "caveats": [],
+                "salary_min": None,
+                "salary_max": None,
+                "salary_currency": "   ",
+                "salary_source": None,
+            }
+        )
+    )
+    result = await evaluate_job(company="C", title="T", description=JD, profile=PROFILE, _caller=caller)
+    assert result.salary_currency is None
