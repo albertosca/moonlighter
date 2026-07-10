@@ -51,34 +51,116 @@ def _make_cdp_mocks():
     return mock_pw_instance, mock_playwright, mock_browser, mock_context, mock_process
 
 
+# ── _read_devtools_port (S-03: real filesystem behavior, no mocks) ────────────
+
+
+def test_read_devtools_port_parses_first_line(tmp_path):
+    port_file = tmp_path / "DevToolsActivePort"
+    port_file.write_text("54321\n/devtools/browser/abc-123\n")
+    assert browser_mod._read_devtools_port(tmp_path) == 54321
+
+
+def test_read_devtools_port_missing_file_returns_none(tmp_path):
+    assert browser_mod._read_devtools_port(tmp_path) is None
+
+
+def test_read_devtools_port_malformed_content_returns_none(tmp_path):
+    port_file = tmp_path / "DevToolsActivePort"
+    port_file.write_text("not-a-port\n")
+    assert browser_mod._read_devtools_port(tmp_path) is None
+
+
+def test_read_devtools_port_empty_file_returns_none(tmp_path):
+    port_file = tmp_path / "DevToolsActivePort"
+    port_file.write_text("")
+    assert browser_mod._read_devtools_port(tmp_path) is None
+
+
+# ── _launch_browser ────────────────────────────────────────────────────────────
+
+
+async def test_launch_browser_uses_random_port_flag(tmp_path):
+    mock_proc = MagicMock()
+    mock_proc.kill = MagicMock()
+    with (
+        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc) as popen,
+        patch("gauntler.core.browser._read_devtools_port", side_effect=[None, 9333]),
+        patch("gauntler.core.browser._devtools_ready", return_value=True),
+    ):
+        port = await browser_mod._launch_browser(_CONFIG, tmp_path)
+    assert port == 9333
+    launch_args = popen.call_args.args[0]
+    assert "--remote-debugging-port=0" in launch_args
+    assert not any(a.startswith("--remote-debugging-port=9222") for a in launch_args)
+
+
+async def test_launch_browser_deletes_stale_port_file_before_launch(tmp_path):
+    """A leftover DevToolsActivePort from a dead session must never be trusted —
+    it's deleted before the new process starts, so a crashed launch can't
+    silently reconnect to a stale/foreign port (S-03)."""
+    stale = tmp_path / "DevToolsActivePort"
+    stale.write_text("11111\n/devtools/browser/stale\n")
+    mock_proc = MagicMock()
+    mock_proc.kill = MagicMock()
+
+    with (
+        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("gauntler.core.browser._read_devtools_port", return_value=None),
+        patch("gauntler.core.browser.asyncio.sleep", new=AsyncMock()),
+        pytest.raises(RuntimeError),
+    ):
+        await browser_mod._launch_browser(_CONFIG, tmp_path)
+
+    assert not stale.exists()
+
+
+async def test_launch_browser_raises_when_port_never_appears(tmp_path):
+    mock_proc = MagicMock()
+    mock_proc.kill = MagicMock()
+    with (
+        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("gauntler.core.browser._read_devtools_port", return_value=None),
+        patch("gauntler.core.browser.asyncio.sleep", new=AsyncMock()),
+        pytest.raises(RuntimeError, match="Browser"),
+    ):
+        await browser_mod._launch_browser(_CONFIG, tmp_path)
+    mock_proc.kill.assert_called_once()
+
+
 # ── get_context ───────────────────────────────────────────────────────────────
 
 
-async def test_get_context_launches_browser_when_devtools_not_ready():
+async def test_get_context_launches_browser_when_devtools_not_ready(tmp_path):
     mock_pw, mock_playwright, _mock_browser, mock_context, mock_proc = _make_cdp_mocks()
+    config = {**_CONFIG, "browser_session_dir": str(tmp_path)}
     with (
         patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
         patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc) as popen,
-        patch("gauntler.core.browser._devtools_ready", side_effect=[False, True]),
+        patch("gauntler.core.browser._read_devtools_port", side_effect=[None, 9333]),
+        patch("gauntler.core.browser._devtools_ready", return_value=True),
         patch("gauntler.core.browser.asyncio.sleep", new=AsyncMock()),
     ):
-        ctx = await browser_mod.get_context(_CONFIG)
+        ctx = await browser_mod.get_context(config)
     assert ctx is mock_context
     popen.assert_called_once()
     mock_playwright.chromium.connect_over_cdp.assert_called_once()
+    assert "9333" in mock_playwright.chromium.connect_over_cdp.call_args.args[0]
 
 
-async def test_get_context_skips_launch_when_devtools_already_ready():
+async def test_get_context_skips_launch_when_devtools_already_ready(tmp_path):
     mock_pw, mock_playwright, _mock_browser, mock_context, mock_proc = _make_cdp_mocks()
+    config = {**_CONFIG, "browser_session_dir": str(tmp_path)}
     with (
         patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
         patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc) as popen,
+        patch("gauntler.core.browser._read_devtools_port", return_value=9222),
         patch("gauntler.core.browser._devtools_ready", return_value=True),
     ):
-        ctx = await browser_mod.get_context(_CONFIG)
+        ctx = await browser_mod.get_context(config)
     assert ctx is mock_context
-    popen.assert_not_called()  # browser já estava de pé
+    popen.assert_not_called()  # browser já estava de pé, na porta que JÁ é nossa
     mock_playwright.chromium.connect_over_cdp.assert_called_once()
+    assert "9222" in mock_playwright.chromium.connect_over_cdp.call_args.args[0]
 
 
 async def test_get_context_reuses_connected_browser():
@@ -94,17 +176,18 @@ async def test_get_context_reuses_connected_browser():
     popen.assert_not_called()
 
 
-async def test_get_context_passes_cdp_url_and_slow_mo():
+async def test_get_context_passes_cdp_url_and_slow_mo(tmp_path):
     mock_pw, mock_playwright, _, _, mock_proc = _make_cdp_mocks()
-    config = {**_CONFIG, "slow_mo_ms": 123}
+    config = {**_CONFIG, "slow_mo_ms": 123, "browser_session_dir": str(tmp_path)}
     with (
         patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
         patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("gauntler.core.browser._read_devtools_port", return_value=9444),
         patch("gauntler.core.browser._devtools_ready", return_value=True),
     ):
         await browser_mod.get_context(config)
     call = mock_playwright.chromium.connect_over_cdp.call_args
-    assert f"{browser_mod._DEBUG_PORT}" in call.args[0]
+    assert "9444" in call.args[0]
     assert call.kwargs["slow_mo"] == 123
 
 
@@ -114,38 +197,42 @@ async def test_get_context_creates_session_dir(tmp_path):
     with (
         patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
         patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("gauntler.core.browser._read_devtools_port", return_value=9555),
         patch("gauntler.core.browser._devtools_ready", return_value=True),
     ):
         await browser_mod.get_context(config)
     assert (tmp_path / "new_session").exists()
 
 
-async def test_get_context_raises_when_browser_never_ready():
+async def test_get_context_raises_when_browser_never_ready(tmp_path):
     mock_pw, _, _, _, mock_proc = _make_cdp_mocks()
+    config = {**_CONFIG, "browser_session_dir": str(tmp_path)}
     with (
         patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
         patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
-        patch("gauntler.core.browser._devtools_ready", return_value=False),
+        patch("gauntler.core.browser._read_devtools_port", return_value=None),
         patch("gauntler.core.browser.asyncio.sleep", new=AsyncMock()),
         pytest.raises(RuntimeError, match="Browser"),
     ):
-        await browser_mod.get_context(_CONFIG)
+        await browser_mod.get_context(config)
     mock_proc.kill.assert_called_once()  # cleanup do processo travado
 
 
 # ── new_page ──────────────────────────────────────────────────────────────────
 
 
-async def test_new_page_returns_page_from_context():
+async def test_new_page_returns_page_from_context(tmp_path):
     mock_pw, _, _, mock_context, mock_proc = _make_cdp_mocks()
     mock_page = MagicMock()
     mock_context.new_page = AsyncMock(return_value=mock_page)
+    config = {**_CONFIG, "browser_session_dir": str(tmp_path)}
     with (
         patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
         patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("gauntler.core.browser._read_devtools_port", return_value=9666),
         patch("gauntler.core.browser._devtools_ready", return_value=True),
     ):
-        page = await browser_mod.new_page(_CONFIG)
+        page = await browser_mod.new_page(config)
     assert page is mock_page
 
 
@@ -234,18 +321,20 @@ async def test_close_is_idempotent_when_already_closed():
     await browser_mod.close()  # should not raise
 
 
-async def test_get_context_logs_cdp_connected(caplog):
+async def test_get_context_logs_cdp_connected(caplog, tmp_path):
     """get_context() deve logar 'CDP connected' quando conecta com sucesso."""
     import logging
 
     mock_pw, _mock_playwright, _mock_browser, _mock_context, mock_proc = _make_cdp_mocks()
+    config = {**_CONFIG, "browser_session_dir": str(tmp_path)}
 
     with (
         patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
         patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("gauntler.core.browser._read_devtools_port", return_value=9777),
         patch("gauntler.core.browser._devtools_ready", return_value=True),
         caplog.at_level(logging.INFO, logger="gauntler.core.browser"),
     ):
-        await browser_mod.get_context(_CONFIG)
+        await browser_mod.get_context(config)
 
     assert "CDP connected" in caplog.text
