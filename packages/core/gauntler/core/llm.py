@@ -48,12 +48,12 @@ def make_caller(config: dict[str, Any]) -> LLMCaller:
     return _make_api_caller()
 
 
-# Postura de sandbox validada empiricamente (canário, 2026-07-09 —
-# specs/2026-07-09-s2-canary-experiment-results.md): sem isso, o `-p` default lê
-# qualquer arquivo do disco sem prompt de permissão, enxerga 168 tools MCP da
-# conta e injeta o CLAUDE.md global do Alberto em toda avaliação de vaga.
-# --bare NUNCA entra aqui: desliga OAuth/keychain, que é a autenticação de
-# assinatura que o backend 'cli' inteiro existe para usar.
+# Sandbox posture validated empirically (canary experiment, 2026-07-09 —
+# specs/2026-07-09-s2-canary-experiment-results.md): without this, the default
+# `-p` reads any file on disk with no permission prompt, sees 168 account MCP
+# tools, and injects the operator's global CLAUDE.md into every job evaluation.
+# --bare NEVER goes here: it disables OAuth/keychain, the subscription auth
+# the entire 'cli' backend exists to use.
 _CLI_SANDBOX_ARGS: tuple[str, ...] = (
     "--safe-mode",
     "--no-session-persistence",
@@ -66,8 +66,8 @@ _CLI_SANDBOX_ARGS: tuple[str, ...] = (
 
 
 def _cli_workdir() -> Path:
-    """cwd dedicado e neutro para o subprocesso do CLI — nunca o repositório
-    (S-02): um cwd sem valor nenhum para um agente comprometido explorar."""
+    """Dedicated, neutral cwd for the CLI subprocess — never the repository
+    (S-02): a cwd with nothing of value for a compromised agent to explore."""
     workdir = gauntler_home() / "cli-workdir"
     workdir.mkdir(parents=True, exist_ok=True)
     workdir.chmod(0o700)
@@ -82,10 +82,10 @@ async def _call_cli(prompt: str, model: str, cache_prefix: str | None = None) ->
     O cache_prefix é concatenado antes do prompt (o CLI não expõe cache_control);
     o efeito de cache real só existe no backend api.
 
-    O prompt vai por STDIN, nunca por argv (S-01): remove a exposição em `ps` e
-    torna a injeção de argumento estrutturalmente impossível (não há prompt em
-    argv para virar flag). O subprocesso roda com um conjunto explícito de
-    flags de bloqueio (S-02/S-14/S-15) e num cwd neutro fora do repositório.
+    The prompt goes over STDIN, never argv (S-01): this removes the exposure in
+    `ps` and makes argument injection structurally impossible (there's no prompt
+    in argv to become a flag). The subprocess runs with an explicit set of
+    lockdown flags (S-02/S-14/S-15) and in a neutral cwd outside the repository.
     """
     full = f"{cache_prefix}\n\n{prompt}" if cache_prefix is not None else prompt
     # Strip ANTHROPIC_API_KEY so the CLI uses the claude.ai session (subscription)
