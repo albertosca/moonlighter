@@ -1338,6 +1338,11 @@ class TestSyncResponses:
             "body": "x",
         }
 
+        config = {
+            **self.CONFIG,
+            "email": {**self.CONFIG["email"], "interview_stages": list(BASE_STAGES)},
+        }
+
         with (
             patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
@@ -1354,7 +1359,7 @@ class TestSyncResponses:
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
-            await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
+            await sync_responses(config, _make_llm_caller(classify_result))
 
         assert Application.get_by_id(app.id).current_stage == "pair_programming"
 
