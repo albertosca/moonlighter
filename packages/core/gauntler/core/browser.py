@@ -18,11 +18,11 @@ _DEVTOOLS_PORT_FILE = "DevToolsActivePort"
 
 
 def _read_devtools_port(session_dir: Path) -> int | None:
-    """Lê a porta que o Chromium escolheu para --remote-debugging-port=0 do
-    arquivo DevToolsActivePort que ele escreve dentro do NOSSO user-data-dir
-    (S-03). None se o arquivo ainda não existe ou está malformado (browser
-    ainda subindo) — nunca confiamos numa porta fixa nem em "o que quer que
-    responda" numa porta conhecida."""
+    """Read the port Chromium chose for --remote-debugging-port=0 from the
+    DevToolsActivePort file it writes inside OUR OWN user-data-dir (S-03).
+    None if the file doesn't exist yet or is malformed (browser still starting
+    up) — we never trust a fixed port nor "whatever answers" on a known
+    port."""
     port_file = session_dir / _DEVTOOLS_PORT_FILE
     if not port_file.exists():
         return None
@@ -46,14 +46,14 @@ async def _first_or_new_context(browser: Browser) -> BrowserContext:
 
 
 async def _launch_browser(config: dict[str, Any], session_dir: Path) -> int:
-    """Sobe o browser (Chrome/Chromium/Brave) numa porta de debug ALEATÓRIA
-    escolhida pelo próprio SO (--remote-debugging-port=0) e devolve a porta
-    real, lida de DevToolsActivePort dentro do NOSSO user-data-dir (S-03) —
-    nunca uma porta fixa, e nunca "o que quer que responda": a porta vem de um
-    arquivo que só o processo que acabamos de lançar escreve."""
+    """Launch the browser (Chrome/Chromium/Brave) on a RANDOM debug port
+    chosen by the OS itself (--remote-debugging-port=0), and return the real
+    port, read from DevToolsActivePort inside OUR OWN user-data-dir (S-03) —
+    never a fixed port, and never "whatever answers": the port comes from a
+    file that only the process we just launched writes."""
     global _browser_process
     port_file = session_dir / _DEVTOOLS_PORT_FILE
-    port_file.unlink(missing_ok=True)  # descarta porta de uma sessão anterior morta
+    port_file.unlink(missing_ok=True)  # discard the port from a previous dead session
 
     logger.info("Launching browser (random debug port)")
     _browser_process = subprocess.Popen(
