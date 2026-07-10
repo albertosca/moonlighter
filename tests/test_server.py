@@ -1892,6 +1892,36 @@ async def test_sync_email_responses_empty_inbox(tmp_db):
     assert "nenhum" in result.lower() or "0" in result or "vazio" in result.lower()
 
 
+async def test_sync_email_responses_flags_fuzzy_match_as_suggestion(tmp_db):
+    """S-06: the sync_email_responses report must tell the human a fuzzy match
+    was NOT applied and needs manual update_status confirmation."""
+    init_db()
+    from gauntler.server import sync_email_responses
+
+    with patch(
+        "gauntler.server.sync_responses",
+        new=AsyncMock(
+            return_value=[
+                {
+                    "company": "Stripe",
+                    "title": "Backend Engineer",
+                    "type": "interview",
+                    "stage": "technical_interview",
+                    "match_type": "fuzzy",
+                    "summary": "x",
+                    "suggested_job_id": 42,
+                    "needs_confirmation": True,
+                }
+            ]
+        ),
+    ):
+        result = await sync_email_responses()
+
+    assert "update_status" in result
+    assert "42" in result
+    assert "⚠️" in result
+
+
 def test_mcp_server_initializes_logging():
     """Importar o mcp_server não deve explodir e deve ter setup de logging configurado."""
     import gauntler.core.log as log_mod

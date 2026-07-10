@@ -838,7 +838,11 @@ class TestSyncResponses:
         assert ProcessedEmail.select().where(ProcessedEmail.message_id == "msg0").exists()
         assert len(updates) == 1
 
-    async def test_email_without_ref_fuzzy_match_by_company_and_title(self, tmp_db):
+    async def test_email_without_ref_fuzzy_match_is_suggestion_only(self, tmp_db):
+        """S-06: fuzzy match (no +ref) never mutates the pipeline — it's a
+        suggestion the human must confirm via update_status. Anyone who knows a
+        real company name can otherwise forge a rejection/interview email that
+        silently mutates a real application."""
         init_db()
         job = _make_job(tmp_db, company="Stripe", title="Backend Engineer")
         app = _make_application(job, status="submitted", email_ref=None)
@@ -874,11 +878,58 @@ class TestSyncResponses:
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
-            await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
+            updates = await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
         app_refreshed = Application.get_by_id(app.id)
-        assert app_refreshed.status == "interviews"
-        assert "match: fuzzy" in app_refreshed.notes
+        assert app_refreshed.status == "submitted"  # NOT mutated
+        assert len(updates) == 1
+        assert updates[0]["match_type"] == "fuzzy"
+        assert updates[0]["needs_confirmation"] is True
+        assert updates[0]["suggested_job_id"] == job.id
+
+    async def test_fuzzy_rejection_never_auto_rejects(self, tmp_db):
+        """The exact S-06 attack: a forged rejection naming a real company,
+        without the +ref alias, must never flip a real application to the
+        terminal 'rejected' status."""
+        init_db()
+        job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
+        app = _make_application(job, status="submitted", email_ref=None)
+
+        message = {
+            "to": BASE_EMAIL,
+            "from_": "someone@example.com",
+            "subject": "Sua candidatura",
+            "body": "Infelizmente não avançaremos com sua candidatura para Senior Engineer.",
+        }
+        classify_result = {
+            "type": "rejection",
+            "stage": None,
+            "new_stage": None,
+            "company": "Anthropic",
+            "job_title": "Senior Engineer",
+            "summary": "Rejeição forjada, sem ref.",
+        }
+
+        with (
+            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
+            patch(
+                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                return_value=[{"id": "msg0", "threadId": "t0"}],
+            ),
+            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch(
+                "gauntler.tracking.email_monitor.classify_response",
+                new=AsyncMock(return_value=classify_result),
+            ),
+            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+        ):
+            from gauntler.tracking.email_monitor import sync_responses
+
+            updates = await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
+
+        assert Application.get_by_id(app.id).status == "submitted"  # NEVER turns rejected without ref
+        assert updates[0]["needs_confirmation"] is True
 
     async def test_ambiguous_match_marks_incerto_in_notes(self, tmp_db):
         init_db()

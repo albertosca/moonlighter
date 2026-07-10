@@ -292,9 +292,11 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
 
         ref = extract_ref(message["to"], base_address)
         app, match_type = _resolve_application(ref, classification)
-        if app is not None:
+        if app is not None and match_type == "ref":
             _advance_application(app, classification, match_type, stages)
             updates.append(_make_update(classification, match_type))
+        elif app is not None:  # match_type == "fuzzy" — suggestion only (S-06)
+            updates.append(_make_suggestion(app, classification, match_type))
         else:
             updates.append(_make_update(classification, "incerto"))
         mark_done(msg_id)
@@ -345,6 +347,15 @@ def _make_update(classification: dict[str, Any], match_type: str) -> dict[str, A
         "match_type": match_type,
         "summary": classification.get("summary", ""),
     }
+
+
+def _make_suggestion(app: Any, classification: dict[str, Any], match_type: str) -> dict[str, Any]:
+    """Fuzzy-match suggestion — never mutates the Application, only signals
+    for human review via update_status (S-06)."""
+    update = _make_update(classification, match_type)
+    update["suggested_job_id"] = app.job_id
+    update["needs_confirmation"] = True
+    return update
 
 
 def _status_rank(status: str) -> int:

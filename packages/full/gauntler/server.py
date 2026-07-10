@@ -348,9 +348,13 @@ async def sync_email_responses() -> str:
             stage = u.get("stage") or ""
             match_type = u.get("match_type", "")
             stage_str = f" → {stage}" if stage else ""
-            lines.append(
-                f"- **{company}** / {title}: `{msg_type}`{stage_str} (match: {match_type})"
-            )
+            line = f"- **{company}** / {title}: `{msg_type}`{stage_str} (match: {match_type})"
+            if u.get("needs_confirmation"):
+                line += (
+                    f" — ⚠️ sugestão não aplicada; confirme com "
+                    f"update_status(job_id={u['suggested_job_id']}, status=...)"
+                )
+            lines.append(line)
 
         return "\n".join(lines)
 
