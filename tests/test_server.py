@@ -468,6 +468,23 @@ async def test_get_job_without_posted_at(tmp_db):
     assert "n/d" in result
 
 
+async def test_get_job_description_is_framed_as_external_data(tmp_db):
+    """S-09: scraped job text flows into an MCP tool response read by the
+    orchestrating Claude session — frame it unambiguously as data, never
+    instructions, so a posting can't try to talk directly to the orchestrator."""
+    init_db()
+    job = create_job(
+        tmp_db, url="https://x.com/gj6", description="A normal job description."
+    )
+    from gauntler.server import get_job
+
+    result = await get_job(id=job.id)
+    import re
+
+    assert re.search(r"<job_description_[0-9a-f]{8}>", result)
+    assert "A normal job description." in result
+
+
 # ── apply_jobs ────────────────────────────────────────────────────────────────
 
 

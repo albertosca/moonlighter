@@ -12,6 +12,7 @@ from gauntler.core.db import Application, Job, init_db
 from gauntler.core.llm import make_caller
 from gauntler.core.log import get_logger as _get_logger
 from gauntler.core.log import setup as _setup_logging
+from gauntler.core.parsing import wrap_untrusted
 from gauntler.discovery import service as scan_service
 from gauntler.startup import validate_startup
 from gauntler.tracking.email_monitor import (
@@ -155,7 +156,7 @@ async def get_job(id: int) -> str:
         if caveats:
             lines.append(f"**Caveats:** {', '.join(caveats)}")
         lines.append(f"\n**Por quê esse score:** {job.score_notes}")
-        lines.append(f"\n---\n{job.description or '(sem descrição)'}")
+        lines.append(f"\n---\n{wrap_untrusted('job_description', job.description or '(sem descrição)')}")
         return "\n".join(lines)
 
 
