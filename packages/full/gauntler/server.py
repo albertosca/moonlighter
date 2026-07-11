@@ -1,4 +1,5 @@
 import contextlib
+import sys
 import time as _time
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
@@ -56,10 +57,10 @@ def _log_tool(name: str) -> AbstractAsyncContextManager[None]:
 
 _startup_warnings = validate_startup(_config, _profile)
 for _msg in _permission_warnings:  # pragma: no cover - prints warnings at server import time
-    print(f"⚠️  {_msg}", flush=True)
+    print(f"⚠️  {_msg}", file=sys.stderr, flush=True)
 for _w in _startup_warnings:  # pragma: no cover - print de avisos no import do servidor
     _prefix = "🚫" if _w.level == "error" else "⚠️ "
-    print(f"{_prefix} {_w.message}", flush=True)
+    print(f"{_prefix} {_w.message}", file=sys.stderr, flush=True)
 
 
 @mcp.tool()

@@ -99,3 +99,24 @@ def test_setup_uses_rotating_file_handler(tmp_path):
     assert len(handlers) == 1
     assert handlers[0].maxBytes == 10_000_000
     assert handlers[0].backupCount == 3
+
+
+def test_rich_handler_writes_to_stderr_not_stdout(tmp_path, capsys):
+    """S-13: on a stdio MCP server, stdout IS the JSON-RPC channel — a log line
+    at the wrong moment corrupts protocol framing. Nothing but the protocol may
+    write to stdout."""
+    from gauntler.core import log as log_mod
+
+    log_mod._initialized = False
+    root = logging.getLogger("gauntler")
+    for h in root.handlers[:]:
+        root.removeHandler(h)
+
+    log_path = str(tmp_path / "app.log")
+    log_mod.setup(log_path=log_path)
+
+    logger = log_mod.get_logger("gauntler.stdout_test")
+    logger.info("this must never reach stdout")
+
+    captured = capsys.readouterr()
+    assert "this must never reach stdout" not in captured.out
