@@ -111,6 +111,17 @@ def _save_learned(patterns: list[str]) -> None:
     )
 
 
+def _confirm_write(patterns: list[str]) -> bool:
+    """Ask for explicit confirmation before merging LLM-proposed patterns into
+    the real blocklist (S-10) — an over-broad hallucinated pattern silently
+    filters out good jobs; the user's silence must NEVER count as consent."""
+    print(f"\n{len(patterns)} padrão(ões) novo(s) prestes a ser gravado(s):")
+    for p in patterns:
+        print(f"  - {p!r}")
+    answer = input("Confirma a gravação? [y/N] ").strip().lower()
+    return answer in ("y", "yes", "s", "sim")
+
+
 def _fetch_low_scorers(threshold: float, company: str | None) -> dict[str, list[str]]:
     """Returns {company: [title, ...]} for archived jobs with 0 < score <= threshold."""
     query = (
@@ -160,8 +171,13 @@ async def _propose_for_company(
 
 
 async def _run(
-    threshold: float, company_filter: str | None, dry_run: bool, model: str, config: dict,
-    profile: dict
+    threshold: float,
+    company_filter: str | None,
+    dry_run: bool,
+    model: str,
+    config: dict,
+    profile: dict,
+    assume_yes: bool,
 ) -> None:
     caller = make_caller(config)
     grouped = _fetch_low_scorers(threshold, company_filter)
@@ -207,6 +223,9 @@ async def _run(
         print()
 
     if all_new and not dry_run:
+        if not assume_yes and not _confirm_write(all_new):
+            print("Cancelado — nada foi gravado.")
+            return
         _save_learned(all_new)
         print(f"✓ {len(all_new)} padrão(ões) gravado(s) em blocklist_learned.yaml")
     elif dry_run and all_new:
@@ -224,6 +243,15 @@ def main() -> None:
     )
     parser.add_argument("--dry-run", action="store_true", help="Não grava no arquivo")
     parser.add_argument("--company", help="Processa só uma empresa")
+    parser.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help=(
+            "Grava os padrões aprovados sem pedir confirmação (S-10: por padrão, "
+            "sempre confirma antes de mesclar no blocklist real)."
+        ),
+    )
     args = parser.parse_args()
 
     setup_logging()
@@ -239,7 +267,7 @@ def main() -> None:
     print(f"Modelo: {model}  |  blocklist_learned: {learned_path}")
     print()
 
-    asyncio.run(_run(args.threshold, args.company, args.dry_run, model, config, profile))
+    asyncio.run(_run(args.threshold, args.company, args.dry_run, model, config, profile, args.yes))
 
 
 if __name__ == "__main__":
