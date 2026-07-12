@@ -280,8 +280,8 @@ class GreenhouseApplier(BaseApplier):
             loc = self.page.locator(f'[id^="react-select-{field_id}-option"]')
             if await loc.count() > 0:
                 return loc
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("scoped locator lookup failed for %r: %s", field_id, e)
         return None
 
     async def _open_menu(self, element: Any) -> None:
@@ -301,8 +301,8 @@ class GreenhouseApplier(BaseApplier):
         try:
             await element.type(answer, delay=30)
             await asyncio.sleep(0.7)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("typeahead typing failed: %s", e)
         return await self._visible_options(element, before_texts)
 
     async def _choose_and_click(
