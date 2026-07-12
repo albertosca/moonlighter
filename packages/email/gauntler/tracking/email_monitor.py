@@ -317,11 +317,10 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
             mark_done(msg_id)
             continue
 
-        _register_new_stage(classification.get("new_stage"), stages, email_cfg)
-
         ref = extract_ref(message["to"], base_address)
         app, match_type = _resolve_application(ref, classification)
         if app is not None and match_type == "ref":
+            _register_new_stage(classification.get("new_stage"), stages, email_cfg)
             _advance_application(app, classification, match_type, stages)
             updates.append(_make_update(classification, match_type))
         elif app is not None:  # match_type == "fuzzy" — suggestion only (S-06)

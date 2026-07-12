@@ -1299,6 +1299,52 @@ class TestSyncResponses:
 
         assert "pair_programming" in config["email"]["interview_stages"]
 
+    async def test_fuzzy_match_never_registers_a_new_stage(self, tmp_db):
+        """S-06 hardening: a spoofed email (no ref) that proposes a new_stage
+        must not get it registered into the shared interview_stages config —
+        only a ref-confirmed match may influence anything, including stage
+        registration."""
+        init_db()
+        job = _make_job(tmp_db, company="Stripe", title="Backend Engineer")
+        _make_application(job, status="submitted", email_ref=None)
+
+        message = {
+            "to": BASE_EMAIL,
+            "from_": "someone@example.com",
+            "subject": "Update",
+            "body": "Moving forward with a custom_spoofed_stage for Backend Engineer.",
+        }
+        classify_result = {
+            "type": "interview",
+            "stage": "custom_spoofed_stage",
+            "new_stage": "custom_spoofed_stage",
+            "company": "Stripe",
+            "job_title": "Backend Engineer",
+            "summary": "Spoofed stage proposal.",
+        }
+
+        config = {**self.CONFIG, "email": {**self.CONFIG["email"], "interview_stages": list(BASE_STAGES)}}
+
+        with (
+            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
+            patch(
+                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                return_value=[{"id": "msg0", "threadId": "t0"}],
+            ),
+            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch(
+                "gauntler.tracking.email_monitor.classify_response",
+                new=AsyncMock(return_value=classify_result),
+            ),
+            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+        ):
+            from gauntler.tracking.email_monitor import sync_responses
+
+            await sync_responses(config, _make_llm_caller(classify_result))
+
+        assert "custom_spoofed_stage" not in config["email"]["interview_stages"]
+
     async def test_notes_include_date_and_match_type(self, tmp_db):
         init_db()
         job = _make_job(tmp_db)
