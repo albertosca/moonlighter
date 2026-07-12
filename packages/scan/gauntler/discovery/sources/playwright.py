@@ -112,6 +112,6 @@ class LinkedInScanner(BaseScanner):
             if desc_el:
                 text = (await desc_el.inner_text()).strip()
                 return text or None
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("description fetch failed: %s", e)
         return None
