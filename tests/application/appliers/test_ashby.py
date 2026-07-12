@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from gauntler.application.appliers.ashby import AshbyApplier
@@ -220,9 +221,15 @@ async def test_fill_form_skips_when_field_missing():
         await applier.fill_form({"Q": "A"}, cv_path="")
 
 
-async def test_fill_form_swallows_exceptions():
-    """query_selector lança em todo o fluxo → fill e upload engolem a exceção."""
+async def test_fill_form_swallows_exceptions(caplog):
+    """query_selector raises throughout the flow -> both the field loop and the CV
+    upload swallow the exception, and both log it at debug level."""
     applier = make_applier()
     applier.page.query_selector = AsyncMock(side_effect=Exception("boom"))
-    with patch("asyncio.sleep", new=AsyncMock()):
+    with (
+        patch("asyncio.sleep", new=AsyncMock()),
+        caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.ashby"),
+    ):
         await applier.fill_form({"Q": "A"}, cv_path="/cv.pdf")
+    assert "skipping field 'Q'" in caplog.text
+    assert "CV upload failed" in caplog.text
