@@ -50,6 +50,7 @@ def _canonical_country(value: str) -> str | None:
         return "united states"
     return None
 
+
 # Detecta o tipo de campo. authorization e sponsorship são respondidos de forma
 # OPOSTA conforme o país.
 _AUTHORIZED_RE = re.compile(

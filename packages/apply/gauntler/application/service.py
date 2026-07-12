@@ -432,7 +432,9 @@ def _render_filled(job: Job, fill_status: dict[str, str], config: dict[str, Any]
     if failed:
         lines.append(f"⚠️  Campos com falha de preenchimento: {', '.join(failed)}")
     lines.append(f"→ Para submeter: `submit_application({job.id})`")
-    lines.append(f'→ Para editar e re-preencher: `fill_application({job.id}, answers={{"campo": "valor"}})`')
+    lines.append(
+        f'→ Para editar e re-preencher: `fill_application({job.id}, answers={{"campo": "valor"}})`'
+    )
     return "\n".join(lines)
 
 

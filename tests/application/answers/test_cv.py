@@ -47,6 +47,7 @@ def test_resolve_cv_path_relative_resolved_from_gauntler_home(monkeypatch, tmp_p
     cv_file.write_bytes(b"x")
     config = {"cv": {"default": "cvs/general.pdf"}}
     from gauntler.core.config import gauntler_home
+
     result = resolve_cv_path("stripe", config)
     assert result == str(gauntler_home() / "cvs" / "general.pdf")
     assert Path(result).exists()

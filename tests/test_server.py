@@ -24,8 +24,10 @@ def make_eval_result(score=8.0):
 
 def _batch_of(result):
     """Mock de evaluate_jobs_batch que devolve [result] para cada vaga do lote."""
+
     async def _batch(jobs, profile, model, caller):
         return [result for _ in jobs]
+
     return _batch
 
 
@@ -172,7 +174,9 @@ async def test_scan_above_threshold_shows_table(tmp_db):
             "gauntler.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
         ),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
+        patch(
+            "gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -267,7 +271,9 @@ async def test_scan_saves_salary_fields(tmp_db):
             "gauntler.discovery.service.evaluate_jobs_batch",
             new=_batch_of(eval_result),
         ),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
+        patch(
+            "gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -473,9 +479,7 @@ async def test_get_job_description_is_framed_as_external_data(tmp_db):
     orchestrating Claude session — frame it unambiguously as data, never
     instructions, so a posting can't try to talk directly to the orchestrator."""
     init_db()
-    job = create_job(
-        tmp_db, url="https://x.com/gj6", description="A normal job description."
-    )
+    job = create_job(tmp_db, url="https://x.com/gj6", description="A normal job description.")
     from gauntler.server import get_job
 
     result = await get_job(id=job.id)
@@ -541,9 +545,7 @@ async def test_apply_jobs_unknown_ats(tmp_db):
     page = make_mock_page(url="https://unknownats.com/jobs/1")
     with (
         patch("gauntler.application.service.browser") as mock_browser,
-        patch(
-            "gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)
-        ),
+        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
@@ -805,6 +807,7 @@ async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
 
 async def test_fill_application_tool_delegates_to_service(monkeypatch):
     import gauntler.server as server
+
     called = {}
 
     async def fake_fill(job_id, answers, config, profile):
@@ -819,6 +822,7 @@ async def test_fill_application_tool_delegates_to_service(monkeypatch):
 
 async def test_submit_application_tool_delegates_to_service(monkeypatch):
     import gauntler.server as server
+
     called = {}
 
     async def fake_submit(job_id, config, profile):
@@ -1017,13 +1021,16 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
-        patch("gauntler.server._config", {
-            "score_threshold": 6.5,
-            "llm_model": "claude-haiku-4-5-20251001",
-            "title_blocklist": [],
-            "scan_concurrency": 1,
-            "scan_batch_size": 4,
-        }),
+        patch(
+            "gauntler.server._config",
+            {
+                "score_threshold": 6.5,
+                "llm_model": "claude-haiku-4-5-20251001",
+                "title_blocklist": [],
+                "scan_concurrency": 1,
+                "scan_batch_size": 4,
+            },
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1068,13 +1075,16 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
-        patch("gauntler.server._config", {
-            "score_threshold": 6.5,
-            "llm_model": "claude-haiku-4-5-20251001",
-            "title_blocklist": [],
-            "scan_concurrency": 1,
-            "scan_batch_size": 5,
-        }),
+        patch(
+            "gauntler.server._config",
+            {
+                "score_threshold": 6.5,
+                "llm_model": "claude-haiku-4-5-20251001",
+                "title_blocklist": [],
+                "scan_concurrency": 1,
+                "scan_batch_size": 5,
+            },
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1103,12 +1113,18 @@ async def test_scan_non_spend_error_keeps_title_filtered_in_report(tmp_db):
 
     raws = [
         RawJob(
-            source="greenhouse", company="co", title="Staff Accountant",
-            url="https://x.com/nonspend/1", description="desc",
+            source="greenhouse",
+            company="co",
+            title="Staff Accountant",
+            url="https://x.com/nonspend/1",
+            description="desc",
         ),
         RawJob(
-            source="greenhouse", company="co", title="Eng",
-            url="https://x.com/nonspend/2", description="desc",
+            source="greenhouse",
+            company="co",
+            title="Eng",
+            url="https://x.com/nonspend/2",
+            description="desc",
         ),
     ]
     mock_batch = AsyncMock(side_effect=Exception("unexpected LLM error"))
@@ -1120,13 +1136,16 @@ async def test_scan_non_spend_error_keeps_title_filtered_in_report(tmp_db):
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
-        patch("gauntler.server._config", {
-            "score_threshold": 6.5,
-            "llm_model": "claude-haiku-4-5-20251001",
-            "title_blocklist": ["staff accountant"],
-            "scan_concurrency": 1,
-            "scan_batch_size": 2,
-        }),
+        patch(
+            "gauntler.server._config",
+            {
+                "score_threshold": 6.5,
+                "llm_model": "claude-haiku-4-5-20251001",
+                "title_blocklist": ["staff accountant"],
+                "scan_concurrency": 1,
+                "scan_batch_size": 2,
+            },
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1155,8 +1174,11 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tmp
 
     raws = [
         RawJob(
-            source="greenhouse", company="co", title="Eng",
-            url="https://x.com/crash/1", description="desc",
+            source="greenhouse",
+            company="co",
+            title="Eng",
+            url="https://x.com/crash/1",
+            description="desc",
         ),
     ]
 
@@ -1167,13 +1189,16 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tmp
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service._claim", side_effect=Exception("db corrupted")),
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
-        patch("gauntler.server._config", {
-            "score_threshold": 6.5,
-            "llm_model": "claude-haiku-4-5-20251001",
-            "title_blocklist": [],
-            "scan_concurrency": 1,
-            "scan_batch_size": 5,
-        }),
+        patch(
+            "gauntler.server._config",
+            {
+                "score_threshold": 6.5,
+                "llm_model": "claude-haiku-4-5-20251001",
+                "title_blocklist": [],
+                "scan_concurrency": 1,
+                "scan_batch_size": 5,
+            },
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1424,9 +1449,7 @@ async def test_confirm_apply_unknown_ats(tmp_db, tmp_path):
 
     with (
         patch("gauntler.application.service.browser") as mock_browser,
-        patch(
-            "gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)
-        ),
+        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)),
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
@@ -1652,7 +1675,9 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
             "gauntler.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
         ),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}),
+        patch(
+            "gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -2043,9 +2068,12 @@ def _scan_patches(raw_jobs, eval_mock):
             **{"new_page": AsyncMock(side_effect=Exception("no browser"))},
         )
     )
+
     async def _batch(jobs, profile, model, caller):
         # Chama eval_mock por vaga; erros (spend limit) propagam para evaluate_chunk.
-        return [await eval_mock(j.company, j.title, j.description, profile, model, caller) for j in jobs]
+        return [
+            await eval_mock(j.company, j.title, j.description, profile, model, caller) for j in jobs
+        ]
 
     stack.enter_context(patch("gauntler.discovery.service.evaluate_jobs_batch", new=_batch))
     stack.enter_context(
@@ -2247,9 +2275,7 @@ async def test_setup_email_handles_auth_error(tmp_path):
                 "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
             },
         ),
-        patch(
-            "gauntler.server._run_gmail_oauth", side_effect=GmailAuthError("token inválido")
-        ),
+        patch("gauntler.server._run_gmail_oauth", side_effect=GmailAuthError("token inválido")),
     ):
         result = await setup_email()
     assert "Gmail" in result and "token inválido" in result

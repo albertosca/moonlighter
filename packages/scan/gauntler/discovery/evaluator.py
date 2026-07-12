@@ -14,7 +14,13 @@ logger = get_logger(__name__)
 # (name/phone/email/linkedin) e education/publications não influenciam o score e
 # só inflam o prompt — ficam de fora.
 _EVAL_PROFILE_KEYS = (
-    "criteria", "skills", "headline", "summary", "preferences", "languages", "experience",
+    "criteria",
+    "skills",
+    "headline",
+    "summary",
+    "preferences",
+    "languages",
+    "experience",
 )
 
 
@@ -71,6 +77,7 @@ def _eval_suffix(company: str, title: str, description: str) -> str:
 @dataclass(frozen=True)
 class EvalInput:
     """Entrada para avaliação em lote: company, title, description."""
+
     company: str
     title: str
     description: str
@@ -139,7 +146,7 @@ def _as_float(value: Any) -> float:
     the listing lands in the ranking."""
     try:
         score = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 0.0
     if not math.isfinite(score):
         return 0.0
@@ -238,8 +245,7 @@ async def _eval_each(
 ) -> list[EvaluationResult]:
     """Fallback: avalia vaga a vaga (sequencial). Spend-limit em qualquer uma propaga."""
     return [
-        await evaluate_job(j.company, j.title, j.description, profile, model, caller)
-        for j in jobs
+        await evaluate_job(j.company, j.title, j.description, profile, model, caller) for j in jobs
     ]
 
 

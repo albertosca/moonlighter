@@ -103,8 +103,12 @@ async def test_add_job_http_exception_returns_error(tmp_db):
 async def test_add_job_dedup_existing_job(tmp_db):
     init_db()
     Job.create(
-        source="manual", company="Stripe", title="Eng", url="https://x.com/5",
-        score=8.0, status="new",
+        source="manual",
+        company="Stripe",
+        title="Eng",
+        url="https://x.com/5",
+        score=8.0,
+        status="new",
     )
     ScanLog.create(job_url="https://x.com/5", source="manual")
     result = await scan_service.add_job(
@@ -280,9 +284,7 @@ async def test_scan_linkedin_session_expired_adds_warning(tmp_db):
     init_db()
     from gauntler.discovery.sources.playwright import LinkedInSessionExpiredError
 
-    result = await _run_scan(
-        [_raw(2)], linkedin_exc=LinkedInSessionExpiredError("sessão expirada")
-    )
+    result = await _run_scan([_raw(2)], linkedin_exc=LinkedInSessionExpiredError("sessão expirada"))
     assert "LinkedIn" in result
 
 
@@ -344,7 +346,13 @@ class _Tracker:
 async def test_scan_concurrency_is_capped(tmp_db):
     init_db()
     caller = _Tracker()
-    config = {"score_threshold": 6.5, "eval_model": "m", "scan_concurrency": 2, "scan_batch_size": 1, "title_blocklist": []}
+    config = {
+        "score_threshold": 6.5,
+        "eval_model": "m",
+        "scan_concurrency": 2,
+        "scan_batch_size": 1,
+        "title_blocklist": [],
+    }
     jobs = [_raw(i) for i in range(6)]
     saved, spend_hit = await scan_service._evaluate_and_store(jobs, config, {}, caller)
     assert len(saved) == 6
@@ -360,7 +368,13 @@ async def test_scan_stops_before_llm_after_spend_limit(tmp_db):
         calls["n"] += 1
         raise RuntimeError("spend limit reached")
 
-    config = {"score_threshold": 6.5, "eval_model": "m", "scan_concurrency": 1, "scan_batch_size": 1, "title_blocklist": []}
+    config = {
+        "score_threshold": 6.5,
+        "eval_model": "m",
+        "scan_concurrency": 1,
+        "scan_batch_size": 1,
+        "title_blocklist": [],
+    }
     jobs = [_raw(i) for i in range(5)]
     _saved, spend_hit = await scan_service._evaluate_and_store(jobs, config, {}, caller)
     assert spend_hit is True
@@ -379,8 +393,11 @@ async def test_scan_chunk_skips_already_claimed_job(tmp_db):
         raise AssertionError("LLM não deve ser chamado para vaga já reservada")
 
     config = {
-        "score_threshold": 6.5, "eval_model": "m",
-        "scan_concurrency": 5, "scan_batch_size": 5, "title_blocklist": [],
+        "score_threshold": 6.5,
+        "eval_model": "m",
+        "scan_concurrency": 5,
+        "scan_batch_size": 5,
+        "title_blocklist": [],
     }
     saved, spend_hit = await scan_service._evaluate_and_store([_raw(99)], config, {}, caller)
     assert saved == []
@@ -394,11 +411,18 @@ async def test_scan_batches_jobs_into_one_call(tmp_db):
 
     async def caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:
         calls["n"] += 1
-        return '[' + ", ".join('{"score": 8.0, "score_notes": "ok", "caveats": []}' for _ in range(4)) + ']'
+        return (
+            "["
+            + ", ".join('{"score": 8.0, "score_notes": "ok", "caveats": []}' for _ in range(4))
+            + "]"
+        )
 
     config = {
-        "score_threshold": 6.5, "eval_model": "m",
-        "scan_concurrency": 5, "scan_batch_size": 4, "title_blocklist": [],
+        "score_threshold": 6.5,
+        "eval_model": "m",
+        "scan_concurrency": 5,
+        "scan_batch_size": 4,
+        "title_blocklist": [],
     }
     jobs = [_raw(i) for i in range(4)]
     saved, spend_hit = await scan_service._evaluate_and_store(jobs, config, {}, caller)

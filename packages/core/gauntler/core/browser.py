@@ -29,7 +29,7 @@ def _read_devtools_port(session_dir: Path) -> int | None:
     try:
         first_line = port_file.read_text().splitlines()[0]
         return int(first_line)
-    except (IndexError, ValueError):
+    except IndexError, ValueError:
         return None
 
 

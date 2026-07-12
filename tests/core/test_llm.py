@@ -356,9 +356,7 @@ async def test_cli_concatenates_cache_prefix():
     mock_proc.returncode = 0
     mock_proc.communicate = fake_communicate
 
-    with patch(
-        "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
-    ):
+    with patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
         await _call_cli("DYN", "m", cache_prefix="STATIC")
     assert captured["input"] == b"STATIC\n\nDYN"
 
@@ -375,9 +373,7 @@ async def test_cli_no_cache_prefix_keeps_prompt_unchanged():
     mock_proc.returncode = 0
     mock_proc.communicate = fake_communicate
 
-    with patch(
-        "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
-    ):
+    with patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
         await _call_cli("PROMPT_ONLY", "m")
     assert captured["input"] == b"PROMPT_ONLY"
 

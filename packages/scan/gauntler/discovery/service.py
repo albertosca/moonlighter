@@ -31,6 +31,7 @@ from peewee import IntegrityError, fn
 
 logger = get_logger(__name__)
 
+
 class _StopScan:
     """Sentinela devolvida por uma coroutine que detectou spend limit e parou."""
 
@@ -154,8 +155,11 @@ async def _evaluate_and_store(
                 matched = should_skip_by_title(raw.title, blocklist)
                 if matched:
                     job = _persist(
-                        raw, score=0.0, score_notes=f"title filtered: {matched!r}",
-                        caveats="[]", status="archived",
+                        raw,
+                        score=0.0,
+                        score_notes=f"title filtered: {matched!r}",
+                        caveats="[]",
+                        status="archived",
                     )
                     if job is not None:
                         results.append(job)
@@ -171,7 +175,9 @@ async def _evaluate_and_store(
                         EvalInput(r.company, r.title, r.description or f"{r.title} at {r.company}")
                         for r in to_eval
                     ],
-                    profile, model, caller,
+                    profile,
+                    model,
+                    caller,
                 )
             except Exception as e:
                 for raw in to_eval:
@@ -189,9 +195,13 @@ async def _evaluate_and_store(
 
             for raw, result in zip(to_eval, evals, strict=True):
                 job = _persist(
-                    raw, score=result.score, score_notes=result.score_notes,
-                    caveats=json.dumps(result.caveats), salary_min=result.salary_min,
-                    salary_max=result.salary_max, salary_currency=result.salary_currency,
+                    raw,
+                    score=result.score,
+                    score_notes=result.score_notes,
+                    caveats=json.dumps(result.caveats),
+                    salary_min=result.salary_min,
+                    salary_max=result.salary_max,
+                    salary_currency=result.salary_currency,
                     salary_source=result.salary_source,
                     status="new" if result.score >= threshold else "archived",
                 )

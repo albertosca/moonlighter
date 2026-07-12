@@ -44,9 +44,7 @@ async def test_run_skips_write_without_confirmation(tmp_path, monkeypatch):
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
 
     async def fake_propose(company, titles, threshold, caller, model, profile):
-        return [
-            {"pattern": "recruiter", "examples": ["Recruiter"], "safe": True, "reasoning": "x"}
-        ]
+        return [{"pattern": "recruiter", "examples": ["Recruiter"], "safe": True, "reasoning": "x"}]
 
     with (
         patch.object(bb, "_fetch_low_scorers", return_value={"Acme": ["Recruiter"]}),
@@ -65,9 +63,7 @@ async def test_run_writes_with_yes_flag_and_never_prompts(tmp_path, monkeypatch)
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
 
     async def fake_propose(company, titles, threshold, caller, model, profile):
-        return [
-            {"pattern": "recruiter", "examples": ["Recruiter"], "safe": True, "reasoning": "x"}
-        ]
+        return [{"pattern": "recruiter", "examples": ["Recruiter"], "safe": True, "reasoning": "x"}]
 
     with (
         patch.object(bb, "_fetch_low_scorers", return_value={"Acme": ["Recruiter"]}),
@@ -86,9 +82,7 @@ async def test_run_dry_run_never_prompts_either(tmp_path, monkeypatch):
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
 
     async def fake_propose(company, titles, threshold, caller, model, profile):
-        return [
-            {"pattern": "recruiter", "examples": ["Recruiter"], "safe": True, "reasoning": "x"}
-        ]
+        return [{"pattern": "recruiter", "examples": ["Recruiter"], "safe": True, "reasoning": "x"}]
 
     with (
         patch.object(bb, "_fetch_low_scorers", return_value={"Acme": ["Recruiter"]}),

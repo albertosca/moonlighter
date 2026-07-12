@@ -35,9 +35,7 @@ from gauntler.core.log import setup as setup_logging
 from gauntler.core.parsing import _extract_json
 
 
-def _make_proposal_prompt(
-    company: str, threshold: float, titles_block: str, profile: dict
-) -> str:
+def _make_proposal_prompt(company: str, threshold: float, titles_block: str, profile: dict) -> str:
     name = profile.get("name", "the candidate")
     level = profile.get("level", "senior software engineer")
     skills = ", ".join((profile.get("top_skills") or [])[:4]) or "software engineering"
@@ -77,6 +75,7 @@ Return a JSON array (no markdown):
 
 Return [] if no safe patterns can be identified.\
 """
+
 
 QUOTA_MARKERS = (
     "spend limit",
@@ -198,7 +197,9 @@ async def _run(
     for company, titles in sorted(grouped.items(), key=lambda x: -len(x[1])):
         print(f"▶ {company} ({len(titles)} vagas)...")
         try:
-            proposals = await _propose_for_company(company, titles, threshold, caller, model, profile)
+            proposals = await _propose_for_company(
+                company, titles, threshold, caller, model, profile
+            )
         except Exception as e:
             if any(m in str(e).lower() for m in QUOTA_MARKERS):
                 print(f"🚫 COTA ATINGIDA — parando. Erro: {e}")

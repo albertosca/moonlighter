@@ -27,8 +27,9 @@ def _scanner(return_value):
 async def test_job_still_in_listing_is_not_stale():
     job = _job(url="https://x.com/1")
     scanners = {
-        "greenhouse": _scanner([RawJob(source="greenhouse", company="acme", title="Eng",
-                                        url="https://x.com/1")])
+        "greenhouse": _scanner(
+            [RawJob(source="greenhouse", company="acme", title="Eng", url="https://x.com/1")]
+        )
     }
     result = await find_stale_jobs({("greenhouse", "acme"): [job]}, scanners, CONFIG)
     assert result.stale == []

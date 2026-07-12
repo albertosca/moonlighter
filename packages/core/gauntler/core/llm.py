@@ -11,9 +11,8 @@ from gauntler.core.config import gauntler_home
 class LLMCaller(Protocol):
     """Protocolo do caller LLM: aceita prompt, model e cache_prefix opcional."""
 
-    async def __call__(
-        self, prompt: str, model: str, cache_prefix: str | None = None
-    ) -> str: ...
+    async def __call__(self, prompt: str, model: str, cache_prefix: str | None = None) -> str: ...
+
 
 # Sinais de que o LLM esgotou cota/limite de gasto — vale parar o scan e re-tentar
 # depois, em vez de tratar como erro da vaga.

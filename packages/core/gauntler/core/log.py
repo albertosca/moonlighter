@@ -35,7 +35,9 @@ def setup(log_path: str | None = None) -> None:
         from rich.logging import RichHandler
 
         rh = RichHandler(
-            console=Console(stderr=True), level=logging.INFO, show_path=False,
+            console=Console(stderr=True),
+            level=logging.INFO,
+            show_path=False,
             rich_tracebacks=False,
         )
         root.addHandler(rh)

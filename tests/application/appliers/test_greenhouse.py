@@ -1166,9 +1166,7 @@ async def test_visible_options_falls_back_to_diff_when_no_scoped_match():
     element.get_attribute = AsyncMock(return_value=None)  # sem id -> sem Abordagem A
     broad = MagicMock()
     broad.first.wait_for = AsyncMock()
-    broad.all_inner_texts = AsyncMock(
-        return_value=["Afghanistan+93", "Albania+355", "Yes", "No"]
-    )
+    broad.all_inner_texts = AsyncMock(return_value=["Afghanistan+93", "Albania+355", "Yes", "No"])
     applier.page.locator = MagicMock(return_value=broad)
     before_texts = ["Afghanistan+93", "Albania+355"]  # já existiam antes de abrir o menu
     assert await applier._visible_options(element, before_texts) == ["Yes", "No"]
