@@ -5,7 +5,6 @@ WA_CONFIG = {
         "citizenship_country": "brazil",
         "authorized_answer": "Yes",
         "not_authorized_answer": "No",
-        "needs_review_sentinel": "__NEEDS_REVIEW__",
     }
 }
 
@@ -71,7 +70,6 @@ WA_CONFIG_EMPTY_CITIZENSHIP = {
         "citizenship_country": "",
         "authorized_answer": "Yes",
         "not_authorized_answer": "No",
-        "needs_review_sentinel": "__NEEDS_REVIEW__",
     }
 }
 
@@ -79,7 +77,6 @@ WA_CONFIG_NO_CITIZENSHIP = {
     "work_authorization": {
         "authorized_answer": "Yes",
         "not_authorized_answer": "No",
-        "needs_review_sentinel": "__NEEDS_REVIEW__",
     }
 }
 

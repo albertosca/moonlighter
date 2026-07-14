@@ -757,7 +757,14 @@ async def test_generate_answers_sends_at_most_the_cap_to_the_llm():
     assert f"{_MAX_LLM_FIELDS}: Field {_MAX_LLM_FIELDS}" not in captured["prompt"]
 
 
-async def test_generate_answers_respects_custom_sentinel_from_config():
+async def test_generate_answers_unanswered_field_blocks_submission_gate():
+    """The sentinel is not configurable (removed knob: a diverging value would let a
+    literal string reach a real form field with no operator stop). This test proves
+    the two halves that must agree actually do: the producer (generate_answers, for
+    a field the LLM omits) emits the same constant the consumer (service._pending_
+    review_message, the submission gate) checks for."""
+    from gauntler.application.service import _pending_review_message
+
     async def caller(prompt, model):
         return "{}"
 
@@ -768,9 +775,10 @@ async def test_generate_answers_respects_custom_sentinel_from_config():
         fields=["Field A"],
         profile={},
         _caller=caller,
-        config={"work_authorization": {"needs_review_sentinel": "__CHECK_ME__"}},
+        config={},
     )
-    assert draft.answers["Field A"] == "__CHECK_ME__"
+    assert draft.answers["Field A"] == "__NEEDS_REVIEW__"
+    assert _pending_review_message(job_id=1, answers=draft.answers) is not None
 
 
 async def test_generate_answers_pre_populated_still_wins_over_llm():

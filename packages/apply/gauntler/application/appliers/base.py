@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import yaml
+from gauntler.core.config import NEEDS_REVIEW_SENTINEL
 from gauntler.core.llm import LLMCaller, _make_api_caller
 from gauntler.core.log import get_logger
 from gauntler.core.parsing import _extract_json, wrap_untrusted
@@ -273,12 +274,7 @@ async def generate_answers(
 
     # Anything the LLM did not answer — omitted, unresolvable, or over the cap — stops in
     # front of the operator instead of going into the form blank.
-    sentinel: str = (
-        (config or {})
-        .get("work_authorization", {})
-        .get("needs_review_sentinel", "__NEEDS_REVIEW__")
-    )
-    unanswered = {f: sentinel for f in remaining_fields if f not in llm_answers}
+    unanswered = {f: NEEDS_REVIEW_SENTINEL for f in remaining_fields if f not in llm_answers}
 
     # Pre-populated tem prioridade sobre o LLM para campos de contato.
     answers = {**unanswered, **llm_answers, **pre_populated}
