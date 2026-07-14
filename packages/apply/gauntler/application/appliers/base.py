@@ -292,18 +292,28 @@ def _resolve_answer_keys(raw: dict[str, Any], fields: list[str]) -> dict[str, st
     model ignoring the index instruction and echoing the label is a benign, recoverable
     off-contract case). Anything else is dropped: a key the model invented must never
     reach the answer dict, because that dict is persisted and shown to the operator.
+
+    The index check is restricted to ASCII digits: `str.isdigit()` also accepts Unicode
+    digits (e.g. superscripts like "²") that `int()` cannot parse, and letting that
+    raise here would blow up the whole batch in `_ask_llm` instead of just dropping the
+    one bad key. Same rule protects us from Python 3.11+'s int-string conversion length
+    limit on an absurdly long numeric-looking key.
     """
     by_label = set(fields)
     resolved: dict[str, str] = {}
     for key, value in raw.items():
         label: str | None = None
-        if isinstance(key, str) and key.isdigit() and int(key) < len(fields):
+        if isinstance(key, str) and key.isascii() and key.isdigit() and int(key) < len(fields):
             label = fields[int(key)]
         elif key in by_label:
             label = key
         if label is None:
             logger.warning("LLM returned an unresolvable answer key, dropping it: %r", key)
             continue
+        if label in resolved:
+            logger.warning(
+                "duplicate form field label collides on resolve, overwriting answer: %r", label
+            )
         resolved[label] = str(value)
     return resolved
 

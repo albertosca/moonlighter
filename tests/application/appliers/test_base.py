@@ -389,6 +389,35 @@ async def test_ask_llm_drops_invented_key():
     assert answers == {}
 
 
+async def test_ask_llm_unicode_digit_key_does_not_nuke_the_batch():
+    """A key.isdigit()-true but int()-unparseable key (e.g. a superscript) must be dropped
+    like any other unresolvable key, not raised out of _resolve_answer_keys and swallowed
+    by _ask_llm's outer except — which would discard the whole batch including good answers."""
+
+    async def caller(prompt, model):
+        return '{"0": "legit answer", "²": "weird"}'
+
+    answers, err = await _ask_llm(["Field A"], "Acme", "T", "body", {}, "m", caller)
+    assert err is None
+    assert answers == {"Field A": "legit answer"}
+
+
+async def test_ask_llm_duplicate_label_collision_is_logged(caplog):
+    """extract_fields() does not dedupe labels, so two raw keys can resolve to the same
+    label. The collapsing itself is expected (answers is label-keyed), but it must never
+    happen silently."""
+    import logging
+
+    async def caller(prompt, model):
+        return '{"0": "first", "Field A": "second"}'
+
+    with caplog.at_level(logging.WARNING, logger="gauntler.application.appliers.base"):
+        answers, err = await _ask_llm(["Field A"], "Acme", "T", "body", {}, "m", caller)
+    assert err is None
+    assert answers == {"Field A": "second"}
+    assert "duplicate form field label" in caplog.text
+
+
 async def test_ask_llm_hostile_label_cannot_escape_the_wrapper():
     """The injection this whole task exists to stop: a field label that tries to close the
     wrapper and issue instructions. wrap_untrusted strips the literal tag; the nonce makes the
