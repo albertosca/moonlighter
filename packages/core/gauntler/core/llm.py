@@ -1,5 +1,6 @@
 import asyncio
 import os
+import shutil
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -90,8 +91,14 @@ async def _call_cli(prompt: str, model: str, cache_prefix: str | None = None) ->
     # Strip ANTHROPIC_API_KEY so the CLI uses the claude.ai session (subscription)
     # instead of the API key (which requires separate API credits).
     env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+    exe = shutil.which("claude")
+    if exe is None:
+        raise RuntimeError(
+            "the `claude` CLI was not found on PATH. Install it, or put it on PATH — "
+            "this project uses the CLI backend (the claude.ai subscription), not an API key."
+        )
     proc = await asyncio.create_subprocess_exec(
-        "claude",
+        exe,
         *_CLI_SANDBOX_ARGS,
         "-p",
         stdin=asyncio.subprocess.PIPE,

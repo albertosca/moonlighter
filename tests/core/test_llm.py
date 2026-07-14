@@ -1,10 +1,23 @@
 import asyncio
 import inspect
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from anthropic.types import TextBlock
 from gauntler.core.llm import LLMCaller, _call_cli, _make_api_caller, make_caller
+
+
+@pytest.fixture(autouse=True)
+def _fake_claude_on_path():
+    """Tests must not depend on whether `claude` happens to be installed on the
+    machine running them (it never is in CI). Fix `shutil.which` to a stable
+    fake path for every test in this module; tests that need a different
+    resolution (found elsewhere, or absent) patch it explicitly, which
+    overrides this outer patch for their duration."""
+    with patch("gauntler.core.llm.shutil.which", return_value="/usr/local/bin/claude"):
+        yield
+
 
 # ── make_caller factory ───────────────────────────────────────────────────────
 
@@ -50,14 +63,17 @@ async def test_call_cli_uses_sandbox_argv_and_stdin():
     mock_proc.returncode = 0
     mock_proc.communicate = AsyncMock(return_value=(b"hello from claude\n", b""))
 
-    with patch(
-        "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
-    ) as mock_exec:
+    with (
+        patch(
+            "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+        ) as mock_exec,
+        patch("gauntler.core.llm.shutil.which", return_value="/usr/local/bin/claude"),
+    ):
         result = await _call_cli("my prompt", "ignored-model")
 
     assert result == "hello from claude\n"
     args, kwargs = mock_exec.call_args
-    assert args == ("claude", *_CLI_SANDBOX_ARGS, "-p")
+    assert args == ("/usr/local/bin/claude", *_CLI_SANDBOX_ARGS, "-p")
     assert "my prompt" not in args  # o prompt NUNCA vai em argv
     assert kwargs["stdin"] == asyncio.subprocess.PIPE
     assert kwargs["stdout"] == asyncio.subprocess.PIPE
@@ -180,6 +196,44 @@ async def test_call_cli_empty_prompt_still_calls_subprocess():
 
     assert result == "response"
     assert mock_proc.communicate.call_args.kwargs["input"] == b""
+
+
+async def test_cli_launch_invariants():
+    """Ruff's S (flake8-bandit) rules do not analyze asyncio.create_subprocess_exec, so the
+    lint gate is blind to this call. This test is the gate instead: it locks the properties
+    the S rules would have enforced if they understood the API."""
+    mock_proc = MagicMock()
+    mock_proc.communicate = AsyncMock(return_value=(b"answer", b""))
+    mock_proc.returncode = 0
+
+    with (
+        patch(
+            "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+        ) as mock_exec,
+        patch("gauntler.core.llm.shutil.which", return_value="/usr/local/bin/claude"),
+    ):
+        await _call_cli("the prompt", "model")
+
+    args = mock_exec.call_args.args
+    kwargs = mock_exec.call_args.kwargs
+    # 1. Absolute path, not a bare name resolved through PATH.
+    assert args[0] == "/usr/local/bin/claude"
+    assert Path(args[0]).is_absolute()
+    # 2. List form: every argument passed positionally, never one joined string.
+    assert all(isinstance(a, str) for a in args)
+    # 3. No shell, ever.
+    assert "shell" not in kwargs
+    # 4. The prompt is not in argv — it goes over stdin (S-01).
+    assert "the prompt" not in args
+    assert kwargs["stdin"] is asyncio.subprocess.PIPE
+
+
+async def test_call_cli_errors_clearly_when_claude_is_not_on_path():
+    with (
+        patch("gauntler.core.llm.shutil.which", return_value=None),
+        pytest.raises(RuntimeError, match="claude"),
+    ):
+        await _call_cli("the prompt", "model")
 
 
 # ── _make_api_caller ──────────────────────────────────────────────────────────
