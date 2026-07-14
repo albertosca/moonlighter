@@ -37,7 +37,6 @@ work_authorization:
   citizenship_country: ""
   authorized_answer: "Yes"
   not_authorized_answer: "No"
-  needs_review_sentinel: "__NEEDS_REVIEW__"
 
 # CV per company (paths relative to GAUNTLER_HOME). 'default' is used when a
 # company has no entry. by_company matches the company name case-insensitively.
