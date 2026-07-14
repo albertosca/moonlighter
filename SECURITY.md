@@ -35,11 +35,24 @@ whole security story.
 - The DOM of ATS application pages.
 - Email bodies fetched during application tracking.
 
-Untrusted content is wrapped in nonce-tagged delimiters before it reaches an LLM prompt
-(`wrap_untrusted`), and everything the LLM returns from such a prompt is validated against a
-closed set or clamped to a valid range before it can influence a decision. The LLM subprocess
-itself runs with no tools, no MCP servers, no session persistence, and a neutral working
-directory, so a successful injection has nothing to reach for.
+The job description and email bodies are wrapped in nonce-tagged delimiters
+(`wrap_untrusted`) before they reach an LLM prompt. Scraped form-field labels and dropdown
+option texts — also untrusted, sourced from the ATS page DOM — currently reach the prompt
+unwrapped (`packages/apply/gauntler/application/appliers/base.py`,
+`packages/apply/gauntler/application/answers/option_matcher.py`); closing that gap is tracked
+as follow-up work, not covered by this document's guarantees.
+
+Output validation is not uniform either. Evaluation scores are clamped to a valid range and
+salary source and email-pipeline stage are checked against a closed set. The dropdown-picker
+LLM returns an index rather than free text, so the chosen value is always constrained to a
+real on-page option. The free-text answers an LLM writes into application form fields,
+however, are not closed-set validated or clamped — they are typed into the form as returned.
+A human operator reviews and explicitly confirms before any application is actually
+submitted, which gates that gap at the point of consequence.
+
+The LLM subprocess itself runs with no tools, no MCP servers, no session persistence, and a
+neutral working directory, so a successful prompt injection has nothing to reach for beyond
+whatever a given prompt already validates or a human catches at confirmation.
 
 ## Known Accepted Risk
 
