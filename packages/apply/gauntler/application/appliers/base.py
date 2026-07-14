@@ -41,6 +41,12 @@ SUCCESS_TEXT_MARKERS = (
 )
 SUCCESS_URL_MARKERS = ("thank", "confirmation", "submitted", "success")
 
+# An application form is a human artifact; a form with more fields than this is either
+# pathological or hostile. We answer the first _MAX_LLM_FIELDS and flag the rest for the
+# operator — bounding the prompt by field COUNT rather than by truncating characters, which
+# would silently drop fields off the end of the block.
+_MAX_LLM_FIELDS = 60
+
 
 async def _confirm_submitted(page: Page, extra_text_markers: tuple[str, ...] = ()) -> bool:
     """
@@ -247,19 +253,35 @@ async def generate_answers(
         job_remote_type=job_remote_type,
     )
     remaining_fields = [f for f in fields if f not in pre_populated]
-    logger.info(
-        "→ pre-populated %d campos, LLM responde %d", len(pre_populated), len(remaining_fields)
-    )
+    to_ask = remaining_fields[:_MAX_LLM_FIELDS]
+    overflow = remaining_fields[_MAX_LLM_FIELDS:]
+    if overflow:
+        logger.warning(
+            "form has %d fields to answer, over the %d cap: %d flagged for review",
+            len(remaining_fields),
+            _MAX_LLM_FIELDS,
+            len(overflow),
+        )
+    logger.info("→ pre-populated %d campos, LLM responde %d", len(pre_populated), len(to_ask))
 
     llm_answers: dict[str, str] = {}
     llm_error: str | None = None
-    if remaining_fields:
+    if to_ask:
         llm_answers, llm_error = await _ask_llm(
-            remaining_fields, company, title, description, profile, model, _caller
+            to_ask, company, title, description, profile, model, _caller
         )
 
+    # Anything the LLM did not answer — omitted, unresolvable, or over the cap — stops in
+    # front of the operator instead of going into the form blank.
+    sentinel: str = (
+        (config or {})
+        .get("work_authorization", {})
+        .get("needs_review_sentinel", "__NEEDS_REVIEW__")
+    )
+    unanswered = {f: sentinel for f in remaining_fields if f not in llm_answers}
+
     # Pre-populated tem prioridade sobre o LLM para campos de contato.
-    answers = {**llm_answers, **pre_populated}
+    answers = {**unanswered, **llm_answers, **pre_populated}
     return ApplicationDraft(job_id=job_id, answers=answers, form_fields=fields, error=llm_error)
 
 

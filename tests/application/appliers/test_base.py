@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from gauntler.application.appliers.base import (
+    _MAX_LLM_FIELDS,
     ApplicationDraft,
     _ask_llm,
     _fill_field,
@@ -55,7 +56,8 @@ def test_application_draft_serialization():
 
 
 async def test_generate_answers_malformed_json():
-    """LLM returns invalid JSON → ApplicationDraft with error, empty answers."""
+    """LLM returns invalid JSON → ApplicationDraft with error, unanswered field flagged
+    for review (not silently dropped)."""
     result = await generate_answers(
         company="Co",
         title="Eng",
@@ -67,7 +69,7 @@ async def test_generate_answers_malformed_json():
     )
     assert isinstance(result, ApplicationDraft)
     assert result.error is not None
-    assert result.answers == {}
+    assert result.answers == {"Q1": "__NEEDS_REVIEW__"}
 
 
 async def test_generate_answers_llm_exception():
@@ -634,6 +636,107 @@ async def test_generate_answers_prepopulated_overrides_llm():
 
     # Pre-populated (sem +55) deve vencer o LLM
     assert result.answers["Phone"] == "11912345678"
+
+
+# ── generate_answers: field cap and needs-review sentinel ─────────────────────
+
+
+async def test_generate_answers_marks_unanswered_field_for_review():
+    """A field the model omits must stop in front of the operator, not go in blank."""
+
+    async def caller(prompt, model):
+        return '{"0": "answered"}'  # field 1 omitted
+
+    draft = await generate_answers(
+        company="Acme",
+        title="T",
+        description="body",
+        fields=["Field A", "Field B"],
+        profile={},
+        _caller=caller,
+        config={},
+    )
+    assert draft.answers["Field A"] == "answered"
+    assert draft.answers["Field B"] == "__NEEDS_REVIEW__"
+
+
+async def test_generate_answers_marks_overflow_fields_for_review():
+    """A form with more fields than the cap: the overflow is flagged, never dropped."""
+
+    async def caller(prompt, model):
+        # Answer every field it was actually asked about.
+        return json.dumps({str(i): "a" for i in range(_MAX_LLM_FIELDS)})
+
+    fields = [f"Field {i}" for i in range(_MAX_LLM_FIELDS + 3)]
+    draft = await generate_answers(
+        company="Acme",
+        title="T",
+        description="body",
+        fields=fields,
+        profile={},
+        _caller=caller,
+        config={},
+    )
+    assert len(draft.answers) == len(fields)  # nothing lost
+    assert draft.answers["Field 0"] == "a"
+    for i in range(_MAX_LLM_FIELDS, _MAX_LLM_FIELDS + 3):
+        assert draft.answers[f"Field {i}"] == "__NEEDS_REVIEW__"
+
+
+async def test_generate_answers_sends_at_most_the_cap_to_the_llm():
+    captured = {}
+
+    async def caller(prompt, model):
+        captured["prompt"] = prompt
+        return "{}"
+
+    fields = [f"Field {i}" for i in range(_MAX_LLM_FIELDS + 5)]
+    await generate_answers(
+        company="Acme",
+        title="T",
+        description="body",
+        fields=fields,
+        profile={},
+        _caller=caller,
+        config={},
+    )
+    # The overflow fields were never sent.
+    assert f"{_MAX_LLM_FIELDS}: Field {_MAX_LLM_FIELDS}" not in captured["prompt"]
+
+
+async def test_generate_answers_respects_custom_sentinel_from_config():
+    async def caller(prompt, model):
+        return "{}"
+
+    draft = await generate_answers(
+        company="Acme",
+        title="T",
+        description="body",
+        fields=["Field A"],
+        profile={},
+        _caller=caller,
+        config={"work_authorization": {"needs_review_sentinel": "__CHECK_ME__"}},
+    )
+    assert draft.answers["Field A"] == "__CHECK_ME__"
+
+
+async def test_generate_answers_pre_populated_still_wins_over_llm():
+    """Pre-existing invariant — must not regress: a pre-populated field is not asked of the
+    LLM, and is not overwritten by it or by the review sentinel."""
+
+    async def caller(prompt, model):
+        return "{}"
+
+    draft = await generate_answers(
+        company="Acme",
+        title="T",
+        description="body",
+        fields=["First Name"],
+        profile={"name": "Alberto Cavalcanti"},
+        _caller=caller,
+        config={},
+    )
+    assert draft.answers["First Name"] != "__NEEDS_REVIEW__"
 
 
 @pytest.mark.asyncio
