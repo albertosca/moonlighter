@@ -315,7 +315,13 @@ def _resolve_answer_keys(raw: dict[str, Any], fields: list[str]) -> dict[str, st
         elif key in by_label:
             label = key
         if label is None:
-            logger.warning("LLM returned an unresolvable answer key, dropping it: %r", key)
+            # Truncate before logging: `key` is untrusted model output, unbounded in
+            # length. Logging it raw let a multi-MB key balloon app.log by the same
+            # multi-MB amount per occurrence — the warning must stay visible, but what
+            # it writes to disk needs a bound.
+            logger.warning(
+                "LLM returned an unresolvable answer key, dropping it: %r", str(key)[:120]
+            )
             continue
         if label in resolved:
             logger.warning(
