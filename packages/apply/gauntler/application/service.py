@@ -20,6 +20,7 @@ from gauntler.application.appliers.greenhouse import GreenhouseApplier
 from gauntler.application.appliers.lever import LeverApplier
 from gauntler.application.appliers.linkedin import LinkedInApplier
 from gauntler.core import browser
+from gauntler.core.config import NEEDS_REVIEW_SENTINEL
 from gauntler.core.db import Application, Job
 from gauntler.core.llm import LLMCaller
 from gauntler.core.log import get_logger
@@ -153,7 +154,7 @@ def _render_draft(job_id: int, job: Job, draft: Any) -> str:
         lines.append(f"⚠️ Erro ao gerar respostas: {draft.error}")
 
     needs_review = [
-        field for field, answer in draft.answers.items() if answer == "__NEEDS_REVIEW__"
+        field for field, answer in draft.answers.items() if answer == NEEDS_REVIEW_SENTINEL
     ]
     if needs_review:
         lines.append(
@@ -167,7 +168,7 @@ def _render_draft(job_id: int, job: Job, draft: Any) -> str:
         )
 
     for field, answer in draft.answers.items():
-        if answer != "__NEEDS_REVIEW__":
+        if answer != NEEDS_REVIEW_SENTINEL:
             lines.append(f"\n**{field}**\n{answer}")
     lines.append(f"\nPara aprovar e candidatar: `confirm_apply(job_id={job_id})`")
     lines.append('Para editar: passe `answers={"campo": "nova resposta"}` no confirm_apply')
@@ -211,7 +212,7 @@ def _load_draft(job_id: int) -> tuple[Job, Application] | None:
 
 def _pending_review_message(job_id: int, answers: dict[str, str]) -> str | None:
     """Bloqueia o envio enquanto houver campos de autorização aguardando decisão."""
-    pending = [k for k, v in answers.items() if v == "__NEEDS_REVIEW__"]
+    pending = [k for k, v in answers.items() if v == NEEDS_REVIEW_SENTINEL]
     if not pending:
         return None
     bullets = "\n".join(f"  - {k}" for k in pending)

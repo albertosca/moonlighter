@@ -8,6 +8,8 @@ um chute (responder errado sobre autorização é mentir).
 import re
 from typing import Any
 
+from gauntler.core.config import NEEDS_REVIEW_SENTINEL
+
 # Países/cidades que permitem inferência confiante. Lista curta de propósito:
 # preferimos __NEEDS_REVIEW__ a um falso positivo.
 _BRAZIL_MARKERS = (
@@ -85,7 +87,7 @@ def resolve_work_auth(field_label: str, country: str | None, config: dict[str, A
     citizenship = _canonical_country(wa.get("citizenship_country") or "")
     yes: str = wa.get("authorized_answer", "Yes")
     no: str = wa.get("not_authorized_answer", "No")
-    review: str = wa.get("needs_review_sentinel", "__NEEDS_REVIEW__")
+    review: str = NEEDS_REVIEW_SENTINEL
 
     is_auth = bool(_AUTHORIZED_RE.search(field_label))
     is_sponsor = bool(_SPONSORSHIP_RE.search(field_label))

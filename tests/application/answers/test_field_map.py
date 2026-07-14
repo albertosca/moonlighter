@@ -18,7 +18,6 @@ WA_CONFIG_BRAZIL = {
         "citizenship_country": "brazil",
         "authorized_answer": "Yes",
         "not_authorized_answer": "No",
-        "needs_review_sentinel": "__NEEDS_REVIEW__",
     }
 }
 
