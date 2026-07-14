@@ -296,14 +296,25 @@ def _resolve_answer_keys(raw: dict[str, Any], fields: list[str]) -> dict[str, st
     The index check is restricted to ASCII digits: `str.isdigit()` also accepts Unicode
     digits (e.g. superscripts like "²") that `int()` cannot parse, and letting that
     raise here would blow up the whole batch in `_ask_llm` instead of just dropping the
-    one bad key. Same rule protects us from Python 3.11+'s int-string conversion length
-    limit on an absurdly long numeric-looking key.
+    one bad key. We also cap the key's length before converting: `fields` never exceeds
+    `_MAX_LLM_FIELDS` (60) entries, so a valid index needs at most as many digits as
+    `len(fields)` itself. A numeric-looking key longer than that is treated as
+    unresolvable rather than handed to `int()`, which raises `ValueError` on Python
+    3.11+ once a numeric string exceeds ~4300 digits — without this cap that error
+    would escape unresolved keys and abort the whole answer batch in `_ask_llm`.
     """
     by_label = set(fields)
     resolved: dict[str, str] = {}
+    max_index_digits = len(str(len(fields)))
     for key, value in raw.items():
         label: str | None = None
-        if isinstance(key, str) and key.isascii() and key.isdigit() and int(key) < len(fields):
+        if (
+            isinstance(key, str)
+            and key.isascii()
+            and key.isdigit()
+            and len(key) <= max_index_digits
+            and int(key) < len(fields)
+        ):
             label = fields[int(key)]
         elif key in by_label:
             label = key

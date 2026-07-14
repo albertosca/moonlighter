@@ -8,6 +8,7 @@ from gauntler.application.appliers.base import (
     ApplicationDraft,
     _ask_llm,
     _fill_field,
+    _resolve_answer_keys,
     generate_answers,
 )
 
@@ -396,6 +397,29 @@ async def test_ask_llm_unicode_digit_key_does_not_nuke_the_batch():
 
     async def caller(prompt, model):
         return '{"0": "legit answer", "²": "weird"}'
+
+    answers, err = await _ask_llm(["Field A"], "Acme", "T", "body", {}, "m", caller)
+    assert err is None
+    assert answers == {"Field A": "legit answer"}
+
+
+def test_resolve_answer_keys_drops_overlong_numeric_key_without_raising():
+    """A numeric-looking key far longer than any real index (e.g. 5000 digits) must not
+    reach int(): on Python 3.11+ that raises ValueError once a numeric string exceeds
+    ~4300 digits, which would otherwise escape _resolve_answer_keys uncaught and abort
+    the whole answer batch in _ask_llm. It must be dropped like any other unresolvable
+    key, leaving the valid answer intact."""
+    raw = {"0": "legit answer", "9" * 5000: "junk"}
+    resolved = _resolve_answer_keys(raw, ["Field A"])
+    assert resolved == {"Field A": "legit answer"}
+
+
+async def test_ask_llm_overlong_numeric_key_does_not_nuke_the_batch():
+    """Same regression as above, exercised through _ask_llm end-to-end: the over-long
+    numeric key must not blow up the outer except and discard the entire response."""
+
+    async def caller(prompt, model):
+        return json.dumps({"0": "legit answer", "9" * 5000: "junk"})
 
     answers, err = await _ask_llm(["Field A"], "Acme", "T", "body", {}, "m", caller)
     assert err is None
