@@ -69,9 +69,7 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
     Returns:
         dict with merged config (defaults + overrides)
     """
-    config_path = (
-        Path(config_path) if config_path is not None else gauntler_home() / "config.yaml"
-    )
+    config_path = Path(config_path) if config_path is not None else gauntler_home() / "config.yaml"
     home = gauntler_home()
     config: dict[str, Any] = {
         **DEFAULTS,

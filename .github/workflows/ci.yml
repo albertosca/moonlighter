@@ -20,6 +20,8 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.7.6"
 
       - name: Install dependencies
         run: uv sync --all-packages
@@ -42,3 +44,28 @@ jobs:
 
       - name: Tests (unit, coverage gate 100%)
         run: uv run pytest -m "not e2e"
+
+  security-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.7.6"
+
+      - name: Install dependencies
+        run: uv sync --all-packages
+
+      - name: Export the locked dependency set
+        run: uv export --no-hashes --frozen -o requirements.txt
+
+      - name: Security audit (pip-audit against the lockfile)
+        run: uv run --with pip-audit pip-audit --requirement requirements.txt

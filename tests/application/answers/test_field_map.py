@@ -71,7 +71,9 @@ def test_visa_field_unknown_country_needs_review():
 
 def test_visa_field_brazil_location_answers_no():
     fields = ["Will you require visa sponsorship?"]
-    r = pre_populate_answers(fields, PROFILE, config=WA_CONFIG_BRAZIL, job_location="São Paulo, Brazil")
+    r = pre_populate_answers(
+        fields, PROFILE, config=WA_CONFIG_BRAZIL, job_location="São Paulo, Brazil"
+    )
     assert r[fields[0]] == "No"
 
 

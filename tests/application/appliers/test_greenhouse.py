@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -633,6 +634,24 @@ async def test_select_custom_option_async_typeahead_types_then_matches():
     applier._llm_pick.assert_not_called()  # match local resolveu, sem LLM
 
 
+async def test_type_and_reload_logs_when_typing_raises(caplog):
+    """Typing into an async/typeahead select can raise (element detached, overlay);
+    the failure is swallowed on purpose -- we still fall through to reading the
+    visible options -- but it must be logged."""
+    applier = make_applier()
+    element = MagicMock()
+    element.type = AsyncMock(side_effect=Exception("boom"))
+    with (
+        patch("asyncio.sleep", new=AsyncMock()),
+        patch.object(
+            type(applier), "_visible_options", new=AsyncMock(return_value=["Belo Horizonte"])
+        ),
+        caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.greenhouse"),
+    ):
+        assert await applier._type_and_reload(element, "BH") == ["Belo Horizonte"]
+    assert "typeahead typing failed" in caplog.text
+
+
 async def test_select_custom_option_presses_escape_when_no_match():
     """_select_custom_option pressiona Escape e loga opções quando não acha match."""
     applier = make_applier()
@@ -1077,14 +1096,16 @@ async def test_scoped_locator_none_when_zero_matches():
     assert await applier._scoped_locator(element) is None
 
 
-async def test_scoped_locator_none_on_count_exception():
+async def test_scoped_locator_none_on_count_exception(caplog):
     applier = make_applier()
     element = MagicMock()
     element.get_attribute = AsyncMock(return_value="question_123")
     scoped = MagicMock()
     scoped.count = AsyncMock(side_effect=Exception("boom"))
     applier.page.locator = MagicMock(return_value=scoped)
-    assert await applier._scoped_locator(element) is None
+    with caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.greenhouse"):
+        assert await applier._scoped_locator(element) is None
+    assert "scoped locator lookup failed" in caplog.text
 
 
 async def test_scoped_locator_none_on_locator_exception():
@@ -1145,9 +1166,7 @@ async def test_visible_options_falls_back_to_diff_when_no_scoped_match():
     element.get_attribute = AsyncMock(return_value=None)  # sem id -> sem Abordagem A
     broad = MagicMock()
     broad.first.wait_for = AsyncMock()
-    broad.all_inner_texts = AsyncMock(
-        return_value=["Afghanistan+93", "Albania+355", "Yes", "No"]
-    )
+    broad.all_inner_texts = AsyncMock(return_value=["Afghanistan+93", "Albania+355", "Yes", "No"])
     applier.page.locator = MagicMock(return_value=broad)
     before_texts = ["Afghanistan+93", "Albania+355"]  # já existiam antes de abrir o menu
     assert await applier._visible_options(element, before_texts) == ["Yes", "No"]

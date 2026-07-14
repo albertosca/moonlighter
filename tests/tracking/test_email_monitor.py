@@ -928,7 +928,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed") as mock_mark,
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -982,7 +984,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed"),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1030,13 +1034,17 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed"),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
             updates = await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
-        assert Application.get_by_id(app.id).status == "submitted"  # NEVER turns rejected without ref
+        assert (
+            Application.get_by_id(app.id).status == "submitted"
+        )  # NEVER turns rejected without ref
         assert updates[0]["needs_confirmation"] is True
 
     async def test_ambiguous_match_marks_incerto_in_notes(self, tmp_db):
@@ -1073,7 +1081,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed"),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1114,7 +1124,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed"),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1157,7 +1169,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed"),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1198,7 +1212,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed"),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1238,7 +1254,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed") as mock_mark,
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1291,7 +1309,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed"),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1323,7 +1343,10 @@ class TestSyncResponses:
             "summary": "Spoofed stage proposal.",
         }
 
-        config = {**self.CONFIG, "email": {**self.CONFIG["email"], "interview_stages": list(BASE_STAGES)}}
+        config = {
+            **self.CONFIG,
+            "email": {**self.CONFIG["email"], "interview_stages": list(BASE_STAGES)},
+        }
 
         with (
             patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
@@ -1337,7 +1360,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed"),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1377,7 +1402,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed"),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1423,7 +1450,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed"),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1466,7 +1495,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed"),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1510,7 +1541,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed"),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1560,7 +1593,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed"),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1632,7 +1667,9 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("gauntler.tracking.email_monitor.mark_processed") as mock_mark,
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 
@@ -1679,7 +1716,9 @@ class TestSyncResponses:
         with (
             patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch("gauntler.tracking.email_monitor.fetch_unread_messages", return_value=[]),
-            patch("gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"),
+            patch(
+                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
         ):
             from gauntler.tracking.email_monitor import sync_responses
 

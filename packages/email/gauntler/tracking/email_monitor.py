@@ -236,9 +236,9 @@ async def classify_response(
     new_stage, company, job_title, summary. Falha de parsing → type='unrelated'."""
     stages_str = ", ".join(stages)
     email_body = (
-        f'De: {message.get("from_", "")}\n'
-        f'Assunto: {message.get("subject", "")}\n'
-        f'Corpo:\n{message.get("body", "")}'
+        f"De: {message.get('from_', '')}\n"
+        f"Assunto: {message.get('subject', '')}\n"
+        f"Corpo:\n{message.get('body', '')}"
     )
     prompt = f"""Você é um assistente que analisa emails de processo seletivo.
 

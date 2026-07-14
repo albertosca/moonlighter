@@ -48,7 +48,9 @@ class Job(BaseModel):
     salary_currency = CharField(null=True)
     salary_source = CharField(null=True)  # 'stated' | 'llm_estimate' | 'third_party'
     salary_notes = TextField(null=True)
-    status = CharField(default="new")  # 'new'|'reviewed'|'applying'|'needs_review'|'applied'|'rejected'|'archived'|'closed'
+    status = CharField(
+        default="new"
+    )  # 'new'|'reviewed'|'applying'|'needs_review'|'applied'|'rejected'|'archived'|'closed'
     found_at = DateTimeField(default=datetime.datetime.now)
     closed_at = DateTimeField(null=True)
 

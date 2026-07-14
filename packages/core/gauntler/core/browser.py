@@ -29,7 +29,7 @@ def _read_devtools_port(session_dir: Path) -> int | None:
     try:
         first_line = port_file.read_text().splitlines()[0]
         return int(first_line)
-    except (IndexError, ValueError):
+    except IndexError, ValueError:
         return None
 
 
@@ -56,7 +56,10 @@ async def _launch_browser(config: dict[str, Any], session_dir: Path) -> int:
     port_file.unlink(missing_ok=True)  # discard the port from a previous dead session
 
     logger.info("Launching browser (random debug port)")
-    _browser_process = subprocess.Popen(
+    # S603: browser_executable(config) is the operator's local YAML config, which the
+    # trust model treats as trusted input -- never reachable from scraped job text, ATS
+    # DOM, or email bodies. See specs/2026-07-09-security-audit-findings.md ("Trust model").
+    _browser_process = subprocess.Popen(  # noqa: S603
         [
             browser_executable(config),
             "--remote-debugging-port=0",

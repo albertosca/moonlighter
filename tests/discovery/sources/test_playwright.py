@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -183,13 +184,15 @@ class TestFetchDescription:
         result = await scanner._fetch_description(card)
         assert result is None
 
-    async def test_returns_none_when_click_raises(self):
+    async def test_returns_none_when_click_raises(self, caplog):
         scanner, _page = self._make_scanner()
         card = MagicMock()
         card.click = AsyncMock(side_effect=Exception("element detached"))
 
-        result = await scanner._fetch_description(card)
+        with caplog.at_level(logging.DEBUG, logger="gauntler.discovery.sources.playwright"):
+            result = await scanner._fetch_description(card)
         assert result is None
+        assert "description fetch failed" in caplog.text
 
     async def test_description_populated_in_scan_result(self):
         """Quando _fetch_description retorna texto, RawJob.description é preenchido."""

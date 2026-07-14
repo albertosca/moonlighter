@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from gauntler.application.appliers.linkedin import LinkedInApplier
@@ -223,7 +224,7 @@ async def test_fill_form_uploads_cv_via_modal_selector():
     assert any(".jobs-easy-apply-modal" in s and "file" in s for s in selectors_used)
 
 
-async def test_fill_form_exception_continues_to_next_field():
+async def test_fill_form_exception_continues_to_next_field(caplog):
     """Exception on one field doesn't prevent subsequent fields from being filled."""
     applier = make_applier()
     filled = []
@@ -249,10 +250,14 @@ async def test_fill_form_exception_continues_to_next_field():
 
     applier.page.query_selector = qs
 
-    with patch("asyncio.sleep", new=AsyncMock()):
+    with (
+        patch("asyncio.sleep", new=AsyncMock()),
+        caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.linkedin"),
+    ):
         await applier.fill_form({"Field1": "v1", "Field2": "v2"}, cv_path="")
 
     assert "v2" in filled
+    assert "skipping field 'Field1'" in caplog.text
 
 
 # ── submit() — multi-step ─────────────────────────────────────────────────────
@@ -451,7 +456,7 @@ async def test_fill_form_skips_when_field_missing():
         await applier.fill_form({"Q": "A"}, cv_path="")
 
 
-async def test_fill_form_swallows_cv_upload_exception():
+async def test_fill_form_swallows_cv_upload_exception(caplog):
     """Exceção ao subir o CV é engolida (74-75)."""
     applier = make_applier()
     file_input = MagicMock()
@@ -461,5 +466,9 @@ async def test_fill_form_swallows_cv_upload_exception():
         return file_input if "file" in selector else None
 
     applier.page.query_selector = qs
-    with patch("asyncio.sleep", new=AsyncMock()):
+    with (
+        patch("asyncio.sleep", new=AsyncMock()),
+        caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.linkedin"),
+    ):
         await applier.fill_form({}, cv_path="/cv.pdf")
+    assert "CV upload failed" in caplog.text

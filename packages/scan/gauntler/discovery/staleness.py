@@ -42,9 +42,7 @@ async def find_stale_jobs(
         elif source == "linkedin":
             await _check_via_linkedin(company, jobs, config, result)
         else:
-            result.failed_companies.append(
-                f"{company} (source {source!r} has no listing check)"
-            )
+            result.failed_companies.append(f"{company} (source {source!r} has no listing check)")
     return result
 
 

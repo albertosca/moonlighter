@@ -1,7 +1,10 @@
 import asyncio
 
 from gauntler.application.appliers.base import BaseApplier
+from gauntler.core.log import get_logger
 from playwright.async_api import TimeoutError as PlaywrightTimeout
+
+logger = get_logger(__name__)
 
 
 class AshbyApplier(BaseApplier):
@@ -44,15 +47,16 @@ class AshbyApplier(BaseApplier):
 
                         await _fill_field(field, answer)
                         await asyncio.sleep(0.3)
-            except Exception:
+            except Exception as e:
+                logger.debug("skipping field %r: %s", label_text, e)
                 continue
         try:
             file_input = await self.page.query_selector("input[type='file']")
             if file_input and cv_path:
                 await file_input.set_input_files(cv_path)
                 await asyncio.sleep(1)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("CV upload failed: %s", e)
 
     async def submit(self) -> str:
         from gauntler.application.appliers.base import classify_submit_outcome

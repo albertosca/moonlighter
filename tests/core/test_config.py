@@ -100,7 +100,9 @@ def test_browser_executable_prefers_browser_path():
 def test_browser_executable_falls_back_to_legacy_brave_path():
     from gauntler.core.config import browser_executable
 
-    assert browser_executable({"browser_path": "", "brave_path": "/legacy/brave"}) == "/legacy/brave"
+    assert (
+        browser_executable({"browser_path": "", "brave_path": "/legacy/brave"}) == "/legacy/brave"
+    )
     assert browser_executable({"brave_path": "/legacy/brave"}) == "/legacy/brave"
     assert browser_executable({}) == ""
 
@@ -238,13 +240,7 @@ def test_load_company_list_mixed_value_shapes(tmp_path):
 def test_load_company_list_with_phase_filter(tmp_path):
     """Quando phase é especificado, retorna apenas os slugs daquela fase."""
     company_file = tmp_path / "company_list.yaml"
-    company_file.write_text(
-        "greenhouse:\n"
-        "  phase1:\n"
-        "    - stripe\n"
-        "  phase2:\n"
-        "    - linear\n"
-    )
+    company_file.write_text("greenhouse:\n  phase1:\n    - stripe\n  phase2:\n    - linear\n")
     result = load_company_list(path=str(company_file), phase="phase1")
     assert result["greenhouse"] == ["stripe"]
 
@@ -255,6 +251,7 @@ def test_load_company_list_with_phase_filter(tmp_path):
 def test_scan_concurrency_default(tmp_path, monkeypatch):
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     from gauntler.core.config import load_config
+
     assert load_config()["scan_concurrency"] == 5
 
 
@@ -262,12 +259,14 @@ def test_scan_concurrency_override(tmp_path, monkeypatch):
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text("scan_concurrency: 3\n")
     from gauntler.core.config import load_config
+
     assert load_config()["scan_concurrency"] == 3
 
 
 def test_scan_batch_size_default(tmp_path, monkeypatch):
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     from gauntler.core.config import load_config
+
     assert load_config()["scan_batch_size"] == 5
 
 

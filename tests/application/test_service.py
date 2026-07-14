@@ -170,7 +170,9 @@ async def test_fill_open_page_fills_and_screenshots_without_submit(tmp_db, tmp_p
         patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
     ):
         mock_browser.save_screenshot = AsyncMock()
-        result = await apply_service._fill_open_page(page, job, {"Name": "Alberto"}, "/tmp/cv.pdf", cfg, PROFILE)
+        result = await apply_service._fill_open_page(
+            page, job, {"Name": "Alberto"}, "/tmp/cv.pdf", cfg, PROFILE
+        )
     assert result is not None
     returned_applier, fill_status = result
     assert returned_applier is applier
@@ -189,7 +191,9 @@ async def test_fill_open_page_returns_none_for_unknown_ats(tmp_db, tmp_path):
         patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)),
     ):
         mock_browser.save_screenshot = AsyncMock()
-        result = await apply_service._fill_open_page(_page(job.url), job, {}, "/tmp/cv.pdf", cfg, PROFILE)
+        result = await apply_service._fill_open_page(
+            _page(job.url), job, {}, "/tmp/cv.pdf", cfg, PROFILE
+        )
     assert result is None
 
 
