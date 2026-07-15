@@ -1,5 +1,6 @@
 import contextlib
 import json
+import secrets
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
@@ -372,14 +373,25 @@ async def _ask_llm(
     """
     body = f"Company: {company}\nTitle: {title}\nDescription: {description}"
     numbered = "\n".join(f"{i}: {f}" for i, f in enumerate(fields))
+    # A per-call canary planted in the profile block. If it comes back in an answer, the
+    # model copied the profile block into its output instead of writing prose about it —
+    # the signature of profile exfiltration.
+    canary = f"__CANARY_{secrets.token_hex(8)}__"
+    profile_block = {**profile_for_answers(profile), "_verification_token": canary}
     prompt = ANSWER_PROMPT.format(
-        profile_yaml=yaml.dump(profile_for_answers(profile), allow_unicode=True),
+        profile_yaml=yaml.dump(profile_block, allow_unicode=True),
         wrapped_job=wrap_untrusted("job_posting", body, cap=4000),
         wrapped_fields=wrap_untrusted("form_fields", numbered),
     )
     try:
         raw: dict[str, Any] = json.loads(_extract_json(await caller(prompt, model)))
         answers = _resolve_answer_keys(raw, fields)
+        if any(canary in v for v in answers.values()):
+            logger.warning(
+                "canary leaked into an LLM answer — discarding all answers for this job "
+                "(profile-exfiltration signature)"
+            )
+            return {}, "canary detected in LLM output; answers discarded"
         logger.info("→ LLM answers ok (%d respostas)", len(answers))
         return answers, None
     except Exception as e:

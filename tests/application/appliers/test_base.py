@@ -999,3 +999,50 @@ async def test_ask_llm_prompt_excludes_operator_secrets():
     assert "PHONE_MARKER" not in p and "EMAIL_MARKER" not in p  # contact gone
     assert "987654" not in p  # salary gone
     assert "COMPETITOR_MARKER" not in p  # targets gone
+
+
+async def test_ask_llm_canary_absent_is_normal():
+    """No canary echoed → answers returned, and the canary key never leaks into output."""
+    captured = {}
+
+    async def caller(prompt, model):
+        captured["prompt"] = prompt
+        return '{"0": "a clean answer"}'
+
+    answers, err = await _ask_llm(["Why us?"], "Acme", "T", "body", {"summary": "s"}, "m", caller)
+    assert err is None
+    assert answers == {"Why us?": "a clean answer"}
+    # The canary lives in the prompt but never in the answers.
+    assert "_verification_token" not in str(answers)
+
+
+async def test_ask_llm_canary_echoed_hard_fails_the_job():
+    """The model copies the profile block (canary and all) into an answer — the signature of
+    exfiltration. Discard everything, set an error, type nothing."""
+    seen = {}
+
+    async def caller(prompt, model):
+        # Extract the canary the caller planted in the prompt and echo it back.
+        import re as _re
+
+        token = _re.search(r"__CANARY_[0-9a-f]+__", prompt).group()
+        seen["token"] = token
+        return '{"0": "here is the profile: ' + token + ' ..."}'
+
+    answers, err = await _ask_llm(["Why us?"], "Acme", "T", "body", {"summary": "s"}, "m", caller)
+    assert answers == {}
+    assert err is not None and "canary" in err.lower()
+
+
+async def test_ask_llm_canary_is_unique_per_call():
+    tokens = []
+
+    async def caller(prompt, model):
+        import re as _re
+
+        tokens.append(_re.search(r"__CANARY_[0-9a-f]+__", prompt).group())
+        return "{}"
+
+    await _ask_llm(["f"], "A", "T", "b", {}, "m", caller)
+    await _ask_llm(["f"], "A", "T", "b", {}, "m", caller)
+    assert tokens[0] != tokens[1]
