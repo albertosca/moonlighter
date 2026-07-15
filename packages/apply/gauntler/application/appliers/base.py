@@ -219,6 +219,7 @@ class ApplicationDraft:
     answers: dict[str, str]
     form_fields: list[str]
     error: str | None = None
+    pre_populated_fields: frozenset[str] = frozenset()
 
 
 class BaseApplier(ABC):
@@ -301,7 +302,13 @@ async def generate_answers(
 
     # Pre-populated tem prioridade sobre o LLM para campos de contato.
     answers = {**unanswered, **llm_answers, **pre_populated}
-    return ApplicationDraft(job_id=job_id, answers=answers, form_fields=fields, error=llm_error)
+    return ApplicationDraft(
+        job_id=job_id,
+        answers=answers,
+        form_fields=fields,
+        error=llm_error,
+        pre_populated_fields=frozenset(pre_populated),
+    )
 
 
 def _resolve_answer_keys(raw: dict[str, Any], fields: list[str]) -> dict[str, str]:

@@ -6,8 +6,10 @@ config/profile/caller. A lógica fica aqui, testável isolada.
 """
 
 import json
+import re
 import secrets
 import shutil
+import statistics
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -27,6 +29,28 @@ from gauntler.core.log import get_logger
 from playwright.async_api import Page
 
 logger = get_logger(__name__)
+
+_URL_RE = re.compile(r"https?://", re.IGNORECASE)
+_EMAIL_RE = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
+_PHONE_RE = re.compile(r"(?:\+?\d[\s\-().]*){9,}")
+
+
+def _anomaly_reasons(answer: str, other_answers: list[str]) -> list[str]:
+    """Reasons a free-text answer looks like exfiltration. Empty list = clean.
+    Flags are advisory (they highlight, never block)."""
+    reasons: list[str] = []
+    if _URL_RE.search(answer):
+        reasons.append("contains a URL")
+    if _EMAIL_RE.search(answer):
+        reasons.append("contains an email address")
+    if _PHONE_RE.search(answer):
+        reasons.append("contains a phone number")
+    if len(other_answers) >= 3:
+        median = statistics.median(len(a) for a in other_answers)
+        if median > 0 and len(answer) > 3 * median:
+            reasons.append("disproportionately long")
+    return reasons
+
 
 _APPLIER_CLASSES = [LinkedInApplier, GreenhouseApplier, LeverApplier, AshbyApplier]
 
@@ -166,6 +190,24 @@ def _render_draft(job_id: int, job: Job, draft: Any) -> str:
             f"Responda no confirm_apply: "
             f'`confirm_apply(job_id={job_id}, answers={{"<campo>": "Yes/No"}})`'
         )
+
+    scannable = {
+        f: a
+        for f, a in draft.answers.items()
+        if a != NEEDS_REVIEW_SENTINEL and f not in draft.pre_populated_fields
+    }
+    flagged: list[str] = []
+    for field, answer in scannable.items():
+        peers = [a for g, a in scannable.items() if g != field]
+        reasons = _anomaly_reasons(answer, peers)
+        if reasons:
+            flagged.append(f"  - **{field}**: {', '.join(reasons)}")
+    if flagged:
+        lines.append(
+            "\n⚠️ REVISE COM ATENÇÃO — respostas com sinais de exfiltração "
+            "(pode ser conteúdo injetado pela vaga):"
+        )
+        lines += flagged
 
     for field, answer in draft.answers.items():
         if answer != NEEDS_REVIEW_SENTINEL:

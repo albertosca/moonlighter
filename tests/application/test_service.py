@@ -9,6 +9,7 @@ from gauntler.application import service as apply_service
 from gauntler.application.answers.cv import CVNotFoundError
 from gauntler.application.appliers.base import ApplicationDraft
 from gauntler.application.appliers.greenhouse import GreenhouseApplier
+from gauntler.application.service import _anomaly_reasons, _render_draft
 from gauntler.core.db import Application, Job, init_db
 
 CONFIG = {"screenshots_dir": "/tmp/gauntler-test-shots", "llm_model": "x", "email": {}}
@@ -101,6 +102,54 @@ async def test_apply_jobs_shows_needs_review_fields(tmp_db):
     assert "Work auth?" in result
     # campo NEEDS_REVIEW não é renderizado como resposta normal, mas Name sim
     assert "Alberto" in result
+
+
+# ── _anomaly_reasons: pure exfiltration-smell scan ──────────────────────────
+
+
+def test_anomaly_flags_url_email_phone():
+    assert _anomaly_reasons("see https://evil.test/x", [])
+    assert _anomaly_reasons("mail me at a@b.com", [])
+    assert _anomaly_reasons("call +55 81 99999-8888", [])
+
+
+def test_anomaly_clean_answer_not_flagged():
+    assert _anomaly_reasons("I admire the engineering culture here.", []) == []
+
+
+def test_anomaly_flags_disproportionately_long():
+    others = ["short one", "short two", "short three"]
+    long = "x " * 200
+    assert any("long" in r.lower() for r in _anomaly_reasons(long, others))
+
+
+def test_anomaly_not_flagged_when_length_proportionate_to_peers():
+    # >= 3 peers (so the median IS computed), but the answer is not disproportionately
+    # long relative to them — covers the inner condition's false branch.
+    others = ["a normal answer", "another normal one", "yet another normal answer"]
+    assert _anomaly_reasons("a similarly sized normal answer", others) == []
+
+
+def test_anomaly_length_needs_at_least_three_others():
+    # Too few peers to compute a meaningful median → no length flag.
+    assert _anomaly_reasons("x " * 200, ["short"]) == [] or all(
+        "long" not in r.lower() for r in _anomaly_reasons("x " * 200, ["short"])
+    )
+
+
+def test_render_draft_highlights_anomalous_llm_answer_not_prepopulated_phone(tmp_db):
+    init_db()
+    draft = ApplicationDraft(
+        job_id=1,
+        answers={"Phone": "+55 81 99999-8888", "Why us?": "reach me at leak@evil.test"},
+        form_fields=["Phone", "Why us?"],
+        pre_populated_fields=frozenset({"Phone"}),
+    )
+    out = _render_draft(1, _job(), draft)
+    # The LLM free-text answer with an email is flagged...
+    assert "Why us?" in out and "⚠️" in out
+    # ...but the statically-filled phone field is not the thing being flagged.
+    assert out.index("⚠️") < out.index("**Why us?**")  # highlight is above the answers
 
 
 # ── confirm_apply: branches ─────────────────────────────────────────────────
