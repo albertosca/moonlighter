@@ -336,3 +336,33 @@ def test_compensation_philosophy_essay_not_prepopulated():
     label = "Compensation philosophy: what motivates you?"
     out = pre_populate_answers([label], {"preferences": {"salary_target_brl_monthly": 40000}})
     assert label not in out
+
+
+def test_salary_essay_hidden_in_parenthetical_not_prepopulated():
+    """The trailing parenthetical is for short currency/period notes ('(BRL)'), not a
+    place to smuggle an essay. A long parenthetical must not let an essay label through
+    to the bare-number fill — the same silent-degradation class, via the paren vector."""
+    prof = {"preferences": {"salary_target_brl_monthly": 40000}}
+    for label in (
+        "Salary (please describe your history and reasoning in detail)",
+        "Compensation (explain your philosophy and past negotiations)",
+    ):
+        out = pre_populate_answers([label], prof)
+        assert label not in out
+
+
+def test_salary_short_currency_parenthetical_still_prepopulated():
+    """The legitimate short-note case must keep working after bounding the paren."""
+    prof = {"preferences": {"salary_target_brl_monthly": 40000}}
+    for label in ("Salary expectation (BRL)", "Salary (BRL)", "Salary (monthly)"):
+        out = pre_populate_answers([label], prof)
+        assert out[label] == "40000"
+
+
+def test_ptbr_pretensoes_salariais_plural_matches():
+    """Plural 'Pretensões salariais' is as common a BR phrasing as the singular the
+    docstring targets — the qualifier must accept the plural agreement form."""
+    out = pre_populate_answers(
+        ["Pretensões salariais"], {"preferences": {"salary_target_brl_monthly": 40000}}
+    )
+    assert out["Pretensões salariais"] == "40000"

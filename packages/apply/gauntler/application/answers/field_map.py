@@ -49,21 +49,24 @@ _RULES: list[tuple[str, _RuleFn]] = [
     (r"^(website|portfolio|personal\s+site)", lambda p: p.get("website") or ""),
     # Compensation — filled statically so the salary figure never reaches the LLM (E2).
     # The label must be a short *value* question: an optional lead (desired/expected/…),
-    # the keyword, an optional whitelisted value-qualifier (expectation/range/salarial/…),
-    # then end-of-label (allowing a trailing parenthetical/colon). Anchoring on both ends
-    # with a qualifier whitelist is what rejects essay labels that merely START with the
-    # keyword — "Salary history — describe…" and "Compensation philosophy: …" continue
+    # the keyword, an optional whitelisted value-qualifier (expectation/range/salari…/…),
+    # then end-of-label (allowing a SHORT trailing parenthetical/colon). Anchoring on both
+    # ends with a qualifier whitelist is what rejects essay labels that merely START with
+    # the keyword — "Salary history — describe…" and "Compensation philosophy: …" continue
     # into a non-whitelisted word, so they never reach `$` and fall through to the LLM.
-    # Two earlier versions failed here: an unanchored one over-matched mid-sentence
-    # mentions, and a start-only-anchored one still swallowed these start-anchored essays
-    # (both silently replacing the field with a bare number). See the field_map test file
-    # for all regression cases.
+    # The parenthetical is bounded to 15 chars: it exists for short currency/period notes
+    # ("(BRL)", "(monthly)"), and an unbounded `[^)]*` reopened the essay over-match by
+    # letting "Salary (please describe your history…)" slip through. Three earlier versions
+    # failed here: unanchored over-matched mid-sentence mentions; start-only-anchored still
+    # swallowed start-anchored essays; and an unbounded parenthetical smuggled essays in
+    # parens — all silently replacing the field with a bare number. See the field_map test
+    # file for every regression case.
     (
         r"^(?:(?:desired|expected|current|target)\s+)?"
         r"(?:salary|compensation|pay|pretens\w*|remunera\w*)"
-        r"(?:\s+(?:expectations?|requirements?|range|salarial|pretendid\w*|desejad\w*"
+        r"(?:\s+(?:expectations?|requirements?|range|salari\w*|pretendid\w*|desejad\w*"
         r"|mensa(?:l|is)|monthly|anual|annual|target|desired|expected))*"
-        r"(?:\s*\([^)]*\))?\s*:?\s*$",
+        r"(?:\s*\([^)]{0,15}\))?\s*:?\s*$",
         _salary_expectation,
     ),
     # Contato (PT-BR) — "preferência" e "sobrenome" ANTES de "^nome" (ordem importa)
