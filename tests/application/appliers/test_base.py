@@ -10,6 +10,7 @@ from gauntler.application.appliers.base import (
     _fill_field,
     _resolve_answer_keys,
     generate_answers,
+    profile_for_answers,
 )
 
 MOCK_ANSWERS = json.dumps(
@@ -938,3 +939,63 @@ async def test_generate_answers_builds_default_caller_when_none():
         )
     mock_factory.assert_called_once()
     assert result.answers["Q"] == "A"
+
+
+def test_profile_for_answers_keeps_only_prose_keys():
+    full = {
+        "name": "Alberto X",
+        "phone": "5581999",
+        "email": "a@b.com",
+        "linkedin": "in/x",
+        "website": "x.com",
+        "headline": "Staff Eng",
+        "summary": "...",
+        "skills": ["rust"],
+        "experience": [{"a": 1}],
+        "education": [{"b": 2}],
+        "languages": ["pt"],
+        "publications": ["p"],
+        "preferences": {"salary_target_brl_monthly": 40000},
+        "criteria": {"priority_targets": ["Nubank"]},
+    }
+    reduced = profile_for_answers(full)
+    assert set(reduced) == {
+        "headline",
+        "summary",
+        "skills",
+        "experience",
+        "education",
+        "languages",
+        "publications",
+    }
+    # The secrets are gone.
+    assert "phone" not in reduced and "email" not in reduced
+    assert "preferences" not in reduced and "criteria" not in reduced
+
+
+def test_profile_for_answers_omits_absent_keys():
+    reduced = profile_for_answers({"summary": "s"})
+    assert reduced == {"summary": "s"}
+
+
+async def test_ask_llm_prompt_excludes_operator_secrets():
+    captured = {}
+
+    async def caller(prompt, model):
+        captured["prompt"] = prompt
+        return '{"0": "answer"}'
+
+    profile = {
+        "summary": "SUMMARY_MARKER",
+        "skills": ["SKILL_MARKER"],
+        "phone": "PHONE_MARKER_5581",
+        "email": "EMAIL_MARKER@x.com",
+        "preferences": {"salary_target_brl_monthly": 987654},
+        "criteria": {"priority_targets": ["COMPETITOR_MARKER_CORP"]},
+    }
+    await _ask_llm(["Why us?"], "Acme", "T", "body", profile, "m", caller)
+    p = captured["prompt"]
+    assert "SUMMARY_MARKER" in p and "SKILL_MARKER" in p  # prose kept
+    assert "PHONE_MARKER" not in p and "EMAIL_MARKER" not in p  # contact gone
+    assert "987654" not in p  # salary gone
+    assert "COMPETITOR_MARKER" not in p  # targets gone

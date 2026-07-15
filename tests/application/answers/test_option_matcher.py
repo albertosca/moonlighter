@@ -189,3 +189,29 @@ async def test_pick_option_hostile_option_text_cannot_escape_the_wrapper():
     assert "</options>" not in captured["prompt"]
     # And the return is still constrained to a real on-page option.
     assert result == hostile
+
+
+@pytest.mark.asyncio
+async def test_pick_option_prompt_excludes_operator_secrets():
+    captured = {}
+
+    async def caller(prompt, model):
+        captured["prompt"] = prompt
+        return "0"
+
+    profile = {
+        "summary": "SUMMARY_MARKER",
+        "phone": "PHONE_MARKER_5581",
+        "preferences": {"salary_target_brl_monthly": 987654},
+    }
+    await pick_option_with_llm(
+        label="Country?",
+        answer="Brazil",
+        options=["Brazil", "Chile"],
+        profile=profile,
+        caller=caller,
+        model="m",
+    )
+    p = captured["prompt"]
+    assert "SUMMARY_MARKER" in p
+    assert "PHONE_MARKER" not in p and "987654" not in p

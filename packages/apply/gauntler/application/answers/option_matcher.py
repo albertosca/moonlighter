@@ -12,6 +12,7 @@ import re
 from difflib import SequenceMatcher
 from typing import Any
 
+from gauntler.application.appliers.base import profile_for_answers
 from gauntler.core.llm import LLMCaller
 from gauntler.core.parsing import wrap_untrusted
 
@@ -107,7 +108,9 @@ async def pick_option_with_llm(
         prompt = _PICK_PROMPT.format(
             label=wrap_untrusted("field_label", label),
             answer=answer,
-            profile=yaml.dump(profile, allow_unicode=True) if profile else "(none)",
+            profile=yaml.dump(profile_for_answers(profile), allow_unicode=True)
+            if profile
+            else "(none)",
             options=wrap_untrusted("options", options_text),
         )
         raw = await caller(prompt, model)
