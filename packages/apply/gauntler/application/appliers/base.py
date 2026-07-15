@@ -375,7 +375,9 @@ async def _ask_llm(
     numbered = "\n".join(f"{i}: {f}" for i, f in enumerate(fields))
     # A per-call canary planted in the profile block. If it comes back in an answer, the
     # model copied the profile block into its output instead of writing prose about it —
-    # the signature of profile exfiltration.
+    # the signature of profile exfiltration. This is a verbatim-substring check: a model
+    # instructed to split or lightly mutate the token evades it. Accepted for now — verbatim
+    # copying is the realistic failure mode; this is a detector, not an airtight gate.
     canary = f"__CANARY_{secrets.token_hex(8)}__"
     profile_block = {**profile_for_answers(profile), "_verification_token": canary}
     prompt = ANSWER_PROMPT.format(
