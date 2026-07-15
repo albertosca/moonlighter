@@ -33,7 +33,7 @@ def _city(profile: dict[str, Any]) -> str:
 
 def _salary_expectation(profile: dict[str, Any]) -> str:
     target = (profile.get("preferences") or {}).get("salary_target_brl_monthly")
-    return str(target) if target else ""
+    return str(target) if target is not None else ""
 
 
 # Cada entrada: (padrão regex no label, callable(profile) -> str)
@@ -48,9 +48,16 @@ _RULES: list[tuple[str, _RuleFn]] = [
     (r"linkedin", lambda p: p.get("linkedin") or ""),
     (r"^(website|portfolio|personal\s+site)", lambda p: p.get("website") or ""),
     # Compensation — filled statically so the salary figure never reaches the LLM (E2).
-    # Not start-anchored: labels commonly lead with "Desired compensation" / "Expected salary".
+    # Start-anchored on the keyword itself, OR on "desired/expected + keyword" — this
+    # matches short value-style labels ("Salary expectation", "Desired compensation",
+    # "Expected pay") but NOT long interrogative/essay labels where the keyword only
+    # appears mid-sentence ("What is your view on salary transparency?", "Please
+    # describe your desired pay range and reasoning"). A previous non-anchored version
+    # over-matched those essay fields and silently replaced them with a bare number
+    # before the LLM ever saw them — see field_map test file for the regression cases.
     (
-        r"salary|compensation|pretens|remunera|desired\s+pay|expected\s+(salary|pay)",
+        r"^(salary|compensation|pretens|remunera)"
+        r"|^(desired|expected)\s+(salary|compensation|pay)",
         _salary_expectation,
     ),
     # Contato (PT-BR) — "preferência" e "sobrenome" ANTES de "^nome" (ordem importa)

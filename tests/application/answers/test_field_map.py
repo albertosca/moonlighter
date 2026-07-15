@@ -264,3 +264,58 @@ def test_compensation_field_matches_too():
 def test_salary_field_absent_preference_yields_empty():
     out = pre_populate_answers(["Salary expectation"], {})
     assert out["Salary expectation"] == ""
+
+
+def test_expected_salary_matches():
+    profile = {"preferences": {"salary_target_brl_monthly": 40000}}
+    out = pre_populate_answers(["Expected salary"], profile)
+    assert out["Expected salary"] == "40000"
+
+
+def test_expected_pay_matches():
+    profile = {"preferences": {"salary_target_brl_monthly": 40000}}
+    out = pre_populate_answers(["Expected pay"], profile)
+    assert out["Expected pay"] == "40000"
+
+
+def test_compensation_alone_matches():
+    profile = {"preferences": {"salary_target_brl_monthly": 40000}}
+    out = pre_populate_answers(["Compensation"], profile)
+    assert out["Compensation"] == "40000"
+
+
+def test_ptbr_pretensao_salarial_matches():
+    profile = {"preferences": {"salary_target_brl_monthly": 40000}}
+    out = pre_populate_answers(["Pretensão salarial"], profile)
+    assert out["Pretensão salarial"] == "40000"
+
+
+def test_ptbr_remuneracao_matches():
+    profile = {"preferences": {"salary_target_brl_monthly": 40000}}
+    out = pre_populate_answers(["Remuneração"], profile)
+    assert out["Remuneração"] == "40000"
+
+
+def test_salary_transparency_essay_not_prepopulated():
+    """Long interrogative label that merely mentions 'salary' mid-sentence must NOT
+    be replaced by a bare number — it should fall through to the LLM."""
+    label = "What is your view on salary transparency?"
+    out = pre_populate_answers([label], {"preferences": {"salary_target_brl_monthly": 40000}})
+    assert label not in out
+
+
+def test_desired_pay_essay_not_prepopulated():
+    """'desired ... pay' appears, but not as the leading 'desired pay' value label —
+    this is an essay prompt and must be left for the LLM."""
+    label = "Please describe your desired pay range and reasoning"
+    out = pre_populate_answers([label], {"preferences": {"salary_target_brl_monthly": 40000}})
+    assert label not in out
+
+
+def test_salary_target_zero_yields_zero_string():
+    """An explicit salary_target_brl_monthly of 0 must yield '0', not '' — 0 is a
+    configured (if unusual) value, not 'unconfigured'."""
+    out = pre_populate_answers(
+        ["Salary expectation"], {"preferences": {"salary_target_brl_monthly": 0}}
+    )
+    assert out["Salary expectation"] == "0"
