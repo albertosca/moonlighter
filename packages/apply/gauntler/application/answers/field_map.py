@@ -31,6 +31,11 @@ def _city(profile: dict[str, Any]) -> str:
     return loc.split(",")[0].strip()
 
 
+def _salary_expectation(profile: dict[str, Any]) -> str:
+    target = (profile.get("preferences") or {}).get("salary_target_brl_monthly")
+    return str(target) if target else ""
+
+
 # Cada entrada: (padrão regex no label, callable(profile) -> str)
 # Os padrões são case-insensitive e combinam substring.
 _RULES: list[tuple[str, _RuleFn]] = [
@@ -42,6 +47,12 @@ _RULES: list[tuple[str, _RuleFn]] = [
     (r"^e-?mail", lambda p: p.get("email") or ""),
     (r"linkedin", lambda p: p.get("linkedin") or ""),
     (r"^(website|portfolio|personal\s+site)", lambda p: p.get("website") or ""),
+    # Compensation — filled statically so the salary figure never reaches the LLM (E2).
+    # Not start-anchored: labels commonly lead with "Desired compensation" / "Expected salary".
+    (
+        r"salary|compensation|pretens|remunera|desired\s+pay|expected\s+(salary|pay)",
+        _salary_expectation,
+    ),
     # Contato (PT-BR) — "preferência" e "sobrenome" ANTES de "^nome" (ordem importa)
     (r"nome\s+de\s+prefer|prefer.*nome", _first_name),
     (r"^sobrenome", _last_name),
@@ -76,9 +87,16 @@ _COMPILED: list[tuple[re.Pattern[str], _RuleFn]] = [
 
 
 def _static_answer(label: str, profile: dict[str, Any]) -> str | None:
-    """Resposta da primeira regra estática que casa o label (vazia conta como sem match)."""
+    """Resposta da primeira regra estática que casa o label (vazia conta como sem match).
+
+    Exceção: `_salary_expectation` sempre responde, mesmo vazia — o objetivo é que o
+    campo de salário NUNCA caia pro LLM decidir (E2: a figura nunca deve chegar ao
+    prompt), então mesmo sem preferência configurada o resultado é "" e não None.
+    """
     for pattern, fn in _COMPILED:
         if pattern.search(label):
+            if fn is _salary_expectation:
+                return fn(profile)
             return fn(profile) or None
     return None
 
