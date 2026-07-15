@@ -244,3 +244,23 @@ def test_english_level_from_profile():
     profile = {**PROFILE_NO_LOCALE, "english_level": "Native"}
     r = pre_populate_answers(["English level"], profile)
     assert r["English level"] == "Native"
+
+
+# ── Compensation (E2) — filled statically so the salary figure never reaches the LLM ──
+
+
+def test_salary_field_filled_from_preferences():
+    profile = {"preferences": {"salary_target_brl_monthly": 40000}}
+    out = pre_populate_answers(["Salary expectation"], profile)
+    assert out["Salary expectation"] == "40000"
+
+
+def test_compensation_field_matches_too():
+    profile = {"preferences": {"salary_target_brl_monthly": 40000}}
+    out = pre_populate_answers(["Desired compensation"], profile)
+    assert out["Desired compensation"] == "40000"
+
+
+def test_salary_field_absent_preference_yields_empty():
+    out = pre_populate_answers(["Salary expectation"], {})
+    assert out["Salary expectation"] == ""
