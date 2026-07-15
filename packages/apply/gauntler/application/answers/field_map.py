@@ -48,16 +48,22 @@ _RULES: list[tuple[str, _RuleFn]] = [
     (r"linkedin", lambda p: p.get("linkedin") or ""),
     (r"^(website|portfolio|personal\s+site)", lambda p: p.get("website") or ""),
     # Compensation — filled statically so the salary figure never reaches the LLM (E2).
-    # Start-anchored on the keyword itself, OR on "desired/expected + keyword" — this
-    # matches short value-style labels ("Salary expectation", "Desired compensation",
-    # "Expected pay") but NOT long interrogative/essay labels where the keyword only
-    # appears mid-sentence ("What is your view on salary transparency?", "Please
-    # describe your desired pay range and reasoning"). A previous non-anchored version
-    # over-matched those essay fields and silently replaced them with a bare number
-    # before the LLM ever saw them — see field_map test file for the regression cases.
+    # The label must be a short *value* question: an optional lead (desired/expected/…),
+    # the keyword, an optional whitelisted value-qualifier (expectation/range/salarial/…),
+    # then end-of-label (allowing a trailing parenthetical/colon). Anchoring on both ends
+    # with a qualifier whitelist is what rejects essay labels that merely START with the
+    # keyword — "Salary history — describe…" and "Compensation philosophy: …" continue
+    # into a non-whitelisted word, so they never reach `$` and fall through to the LLM.
+    # Two earlier versions failed here: an unanchored one over-matched mid-sentence
+    # mentions, and a start-only-anchored one still swallowed these start-anchored essays
+    # (both silently replacing the field with a bare number). See the field_map test file
+    # for all regression cases.
     (
-        r"^(salary|compensation|pretens|remunera)"
-        r"|^(desired|expected)\s+(salary|compensation|pay)",
+        r"^(?:(?:desired|expected|current|target)\s+)?"
+        r"(?:salary|compensation|pay|pretens\w*|remunera\w*)"
+        r"(?:\s+(?:expectations?|requirements?|range|salarial|pretendid\w*|desejad\w*"
+        r"|mensa(?:l|is)|monthly|anual|annual|target|desired|expected))*"
+        r"(?:\s*\([^)]*\))?\s*:?\s*$",
         _salary_expectation,
     ),
     # Contato (PT-BR) — "preferência" e "sobrenome" ANTES de "^nome" (ordem importa)

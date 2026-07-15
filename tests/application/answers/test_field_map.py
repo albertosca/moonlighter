@@ -319,3 +319,20 @@ def test_salary_target_zero_yields_zero_string():
         ["Salary expectation"], {"preferences": {"salary_target_brl_monthly": 0}}
     )
     assert out["Salary expectation"] == "0"
+
+
+def test_salary_history_essay_not_prepopulated():
+    """A label that *starts* with 'Salary' but continues into an essay ('history —
+    describe...') is not a value question — filling it with the bare target number is
+    silent degradation. It must fall through to the LLM."""
+    label = "Salary history — describe your last 3 roles"
+    out = pre_populate_answers([label], {"preferences": {"salary_target_brl_monthly": 40000}})
+    assert label not in out
+
+
+def test_compensation_philosophy_essay_not_prepopulated():
+    """Same class, start-anchored on 'Compensation': 'Compensation philosophy: what
+    motivates you?' is an essay prompt, not a compensation *value* field."""
+    label = "Compensation philosophy: what motivates you?"
+    out = pre_populate_answers([label], {"preferences": {"salary_target_brl_monthly": 40000}})
+    assert label not in out
