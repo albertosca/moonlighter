@@ -31,7 +31,10 @@ from playwright.async_api import Page
 logger = get_logger(__name__)
 
 _URL_RE = re.compile(r"https?://", re.IGNORECASE)
-_EMAIL_RE = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
+# Bounded quantifiers (RFC-ish local/domain/TLD sizes) on purpose: the unbounded form
+# `[^\s@]+@[^\s@]+\.[^\s@]+` backtracks quadratically on a long non-matching run, and this
+# runs on attacker-shaped LLM output — the very thing this branch defends against.
+_EMAIL_RE = re.compile(r"[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,24}")
 _PHONE_RE = re.compile(r"(?:\+?\d[\s\-().]*){9,}")
 
 

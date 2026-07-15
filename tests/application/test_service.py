@@ -132,9 +132,18 @@ def test_anomaly_not_flagged_when_length_proportionate_to_peers():
 
 def test_anomaly_length_needs_at_least_three_others():
     # Too few peers to compute a meaningful median → no length flag.
-    assert _anomaly_reasons("x " * 200, ["short"]) == [] or all(
-        "long" not in r.lower() for r in _anomaly_reasons("x " * 200, ["short"])
-    )
+    assert all("long" not in r.lower() for r in _anomaly_reasons("x " * 200, ["short"]))
+
+
+def test_anomaly_email_scan_is_linear_on_hostile_long_input():
+    # A long non-matching run (no '@') must not trigger quadratic backtracking in the
+    # email regex — the answer being scanned is attacker-shapeable LLM output. With the
+    # unbounded pattern this call took seconds and grew super-linearly; the bounded
+    # pattern resolves it in well under the timeout. We assert on behavior (not flagged
+    # as an email, no crash) — completing at all is the regression guard.
+    hostile = "a" * 100_000
+    reasons = _anomaly_reasons(hostile, [])
+    assert "contains an email address" not in reasons
 
 
 def test_render_draft_highlights_anomalous_llm_answer_not_prepopulated_phone(tmp_db):
