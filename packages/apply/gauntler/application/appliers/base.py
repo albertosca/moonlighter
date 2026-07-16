@@ -14,6 +14,14 @@ from playwright.async_api import Page
 
 logger = get_logger(__name__)
 
+# Answer sentinels that must never be typed into a form field: pre-fill markers and
+# the review sentinel. Shared by every applier so the guard cannot drift per-site.
+_SKIP_SENTINELS = {"__SKIP__", "__MANUAL_UPLOAD_REQUIRED__", NEEDS_REVIEW_SENTINEL}
+
+
+def _is_skip(answer: str) -> bool:
+    return not answer or answer in _SKIP_SENTINELS
+
 
 async def _query_labels_with_fallback(page: Page, selectors: list[str]) -> list[Any]:
     """

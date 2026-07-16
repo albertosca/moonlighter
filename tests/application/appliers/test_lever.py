@@ -110,6 +110,33 @@ async def test_fill_form_uploads_cv():
     file_input.set_input_files.assert_called_once_with("/cv.pdf")
 
 
+async def test_fill_form_skips_sentinel_answers():
+    """A sentinel answer (e.g. __NEEDS_REVIEW__) must never be typed into the form.
+
+    field.evaluate/get_attribute are configured (mirroring test_fill_form_fills_labeled_fields)
+    so that, absent the skip guard, _fill_field would actually run and call field.fill —
+    without this, an unconfigured MagicMock.evaluate() raises TypeError on await, which the
+    surrounding try/except swallows, making the assertion pass for the wrong reason.
+    """
+    applier = make_applier()
+    label = MagicMock()
+    label.get_attribute = AsyncMock(return_value="q1")
+    field = MagicMock()
+    field.fill = AsyncMock()
+    field.evaluate = AsyncMock(return_value="input")
+    field.get_attribute = AsyncMock(return_value="text")
+
+    async def qs(selector):
+        if "label" in selector:
+            return label
+        return field
+
+    applier.page.query_selector = qs
+    with patch("asyncio.sleep", new=AsyncMock()):
+        await applier.fill_form({"Q1": "__NEEDS_REVIEW__"}, cv_path="")
+    field.fill.assert_not_called()
+
+
 async def test_fill_form_skips_missing_label():
     """No crash and no fill when label not found."""
     applier = make_applier()

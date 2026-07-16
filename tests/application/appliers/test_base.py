@@ -6,14 +6,17 @@ import pytest
 from gauntler.application.appliers.base import (
     _MAX_LABEL_LEN,
     _MAX_LLM_FIELDS,
+    _SKIP_SENTINELS,
     ApplicationDraft,
     _ask_llm,
     _cap_label,
     _fill_field,
+    _is_skip,
     _resolve_answer_keys,
     generate_answers,
     profile_for_answers,
 )
+from gauntler.core.config import NEEDS_REVIEW_SENTINEL
 
 MOCK_ANSWERS = json.dumps(
     {
@@ -1091,3 +1094,20 @@ async def test_ask_llm_canary_is_unique_per_call():
     await _ask_llm(["f"], "A", "T", "b", {}, "m", caller)
     await _ask_llm(["f"], "A", "T", "b", {}, "m", caller)
     assert tokens[0] != tokens[1]
+
+
+# ── _is_skip / _SKIP_SENTINELS: shared predicate for every applier ────────────
+
+
+def test_is_skip_covers_all_sentinels():
+    assert _is_skip("")
+    assert _is_skip("__SKIP__")
+    assert _is_skip("__MANUAL_UPLOAD_REQUIRED__")
+    assert _is_skip(NEEDS_REVIEW_SENTINEL)
+    assert not _is_skip("real answer")
+
+
+def test_skip_sentinels_membership():
+    assert NEEDS_REVIEW_SENTINEL in _SKIP_SENTINELS
+    assert "__SKIP__" in _SKIP_SENTINELS
+    assert "__MANUAL_UPLOAD_REQUIRED__" in _SKIP_SENTINELS

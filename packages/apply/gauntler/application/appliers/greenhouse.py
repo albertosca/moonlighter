@@ -3,15 +3,11 @@ import contextlib
 import re
 from typing import Any
 
-from gauntler.application.appliers.base import BaseApplier
-from gauntler.core.config import NEEDS_REVIEW_SENTINEL
+from gauntler.application.appliers.base import BaseApplier, _is_skip
 from gauntler.core.log import get_logger
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 logger = get_logger(__name__)
-
-# Sentinelas de resposta que não devem ser preenchidas no formulário.
-_SKIP_SENTINELS = {"__SKIP__", "__MANUAL_UPLOAD_REQUIRED__", NEEDS_REVIEW_SENTINEL}
 
 # Labels da área de upload de CV/currículo — o anexo é tratado por _upload_cv, então
 # não devem ir pro LLM como campos de texto (senão recebem resposta-lixo).
@@ -23,10 +19,6 @@ _UPLOAD_LABELS = {
     "enter manually",
     "informe manualmente",
 }
-
-
-def _is_skip(answer: str) -> bool:
-    return not answer or answer in _SKIP_SENTINELS
 
 
 def _log_fill_stats(status: dict[str, str]) -> None:

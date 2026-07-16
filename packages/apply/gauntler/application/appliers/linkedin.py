@@ -1,6 +1,6 @@
 import asyncio
 
-from gauntler.application.appliers.base import BaseApplier
+from gauntler.application.appliers.base import BaseApplier, _is_skip
 from gauntler.core.log import get_logger
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
@@ -51,6 +51,9 @@ class LinkedInApplier(BaseApplier):
 
     async def fill_form(self, answers: dict[str, str], cv_path: str) -> None:
         for label_text, answer in answers.items():
+            if _is_skip(answer):
+                logger.debug("skipping sentinel answer for %r", label_text)
+                continue
             try:
                 label = await self.page.query_selector(
                     f".jobs-easy-apply-modal label:text-is('{label_text}')"
