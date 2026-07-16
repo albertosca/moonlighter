@@ -339,17 +339,19 @@ _STAGE_ALLOWED = re.compile(r"[^a-z0-9]+")
 
 
 def _sanitize_stage(raw: str | None) -> str | None:
-    """Normalize an LLM-proposed stage to a bounded ``[a-z0-9-]`` slug.
+    """Normalize an LLM-proposed stage to a bounded ``[a-z0-9_]`` slug.
 
     An email is untrusted input: a prompt-injected classification can propose an
-    arbitrary ``new_stage``. Reducing it to a lowercase hyphen slug of at most
+    arbitrary ``new_stage``. Reducing it to a lowercase snake_case slug of at most
     ``_MAX_STAGE_LEN`` chars strips special characters and bounds length, so a
-    persisted stage cannot carry a payload back into a later prompt. Returns
+    persisted stage cannot carry a payload back into a later prompt. Snake_case
+    matches this project's stage naming convention (e.g. ``phone_screening``),
+    so a newly registered stage matches the same email's ``stage`` value. Returns
     ``None`` when nothing usable remains or the slug is over-length.
     """
     if not raw:
         return None
-    slug = _STAGE_ALLOWED.sub("-", raw.lower()).strip("-")
+    slug = _STAGE_ALLOWED.sub("_", raw.lower()).strip("_")
     if not slug or len(slug) > _MAX_STAGE_LEN:
         return None
     return slug

@@ -498,20 +498,20 @@ class TestSanitizeStage:
     def test_normalizes_to_slug(self):
         from gauntler.tracking.email_monitor import _sanitize_stage
 
-        assert _sanitize_stage("Technical Screen") == "technical-screen"
-        assert _sanitize_stage("  Final   Round  ") == "final-round"
+        assert _sanitize_stage("Technical Screen") == "technical_screen"
+        assert _sanitize_stage("  Final   Round  ") == "final_round"
 
     def test_strips_disallowed_chars(self):
         from gauntler.tracking.email_monitor import _sanitize_stage
 
         # Injection payload collapses to an inert bounded slug.
-        # Special chars like <>, {}, : are replaced with hyphens; alphanumeric chars survive.
-        assert _sanitize_stage("IGNORE ALL: <b>{instructions}</b>") == "ignore-all-b-instructions-b"
+        # Special chars like <>, {}, : are replaced with underscores; alphanumeric chars survive.
+        assert _sanitize_stage("IGNORE ALL: <b>{instructions}</b>") == "ignore_all_b_instructions_b"
 
-    def test_collapses_and_trims_hyphens(self):
+    def test_collapses_and_trims_underscores(self):
         from gauntler.tracking.email_monitor import _sanitize_stage
 
-        assert _sanitize_stage("--a__b!!c--") == "a-b-c"
+        assert _sanitize_stage("--a__b!!c--") == "a_b_c"
 
     def test_over_length_rejected(self):
         from gauntler.tracking.email_monitor import _sanitize_stage
@@ -536,8 +536,8 @@ class TestRegisterNewStageBounds:
         stages = ["applied"]
         email_cfg: dict = {}
         _register_new_stage("Technical Screen", stages, email_cfg)
-        assert stages == ["applied", "technical-screen"]
-        assert email_cfg["interview_stages"] == ["applied", "technical-screen"]
+        assert stages == ["applied", "technical_screen"]
+        assert email_cfg["interview_stages"] == ["applied", "technical_screen"]
 
     def test_rejects_unsanitizable(self):
         from gauntler.tracking.email_monitor import _register_new_stage
@@ -551,10 +551,10 @@ class TestRegisterNewStageBounds:
     def test_does_not_duplicate_after_sanitize(self):
         from gauntler.tracking.email_monitor import _register_new_stage
 
-        stages = ["technical-screen"]
+        stages = ["technical_screen"]
         email_cfg: dict = {}
         _register_new_stage("Technical  Screen", stages, email_cfg)
-        assert stages == ["technical-screen"]
+        assert stages == ["technical_screen"]
 
     def test_count_cap_blocks_further_growth(self):
         from gauntler.tracking.email_monitor import _MAX_STAGES, _register_new_stage
@@ -1399,7 +1399,7 @@ class TestSyncResponses:
 
             await sync_responses(config, _make_llm_caller(classify_result))
 
-        assert "pair-programming" in config["email"]["interview_stages"]
+        assert "pair_programming" in config["email"]["interview_stages"]
 
     async def test_fuzzy_match_never_registers_a_new_stage(self, tmp_db):
         """S-06 hardening: a spoofed email (no ref) that proposes a new_stage
@@ -1636,28 +1636,25 @@ class TestSyncResponses:
         assert app_refreshed.current_stage is None  # the made-up stage is discarded
 
     async def test_legitimately_registered_new_stage_is_accepted(self, tmp_db):
-        """When a raw stage from the LLM exactly matches a known stage in the list
-        (i.e., it's already in the config or was just registered), it is accepted.
-        Note: _register_new_stage stores the SANITIZED form, so raw stages that
-        differ in form (e.g., underscores vs hyphens) won't match — only exact
-        matches in the original stages list are written."""
+        """A declared new_stage (registered via _register_new_stage BEFORE
+        _advance_application runs) must be accepted — it's not hallucination,
+        it's a deliberate feature."""
         init_db()
         job = _make_job(tmp_db)
         app = _make_application(job, status="submitted", email_ref="ns001", current_stage=None)
 
-        # Use a stage that's already in BASE_STAGES (exact match)
         classify_result = {
             "type": "interview",
-            "stage": "technical_interview",
-            "new_stage": None,
+            "stage": "pair_programming",
+            "new_stage": "pair_programming",
             "company": "Anthropic",
             "job_title": "Senior Engineer",
-            "summary": "Sessão técnica.",
+            "summary": "Sessão de pair programming.",
         }
         message = {
             "to": "candidaturas+ns001@gmail.com",
             "from_": "hr@anthropic.com",
-            "subject": "Tech interview",
+            "subject": "Pair session",
             "body": "x",
         }
 
@@ -1686,7 +1683,7 @@ class TestSyncResponses:
 
             await sync_responses(config, _make_llm_caller(classify_result))
 
-        assert Application.get_by_id(app.id).current_stage == "technical_interview"
+        assert Application.get_by_id(app.id).current_stage == "pair_programming"
 
     async def test_every_email_recorded_locally_without_gmail_writes(self, tmp_db):
         """Read-only por padrão: nenhum email é tocado no Gmail; cada um é registrado
