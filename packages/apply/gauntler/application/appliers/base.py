@@ -49,6 +49,18 @@ SUCCESS_URL_MARKERS = ("thank", "confirmation", "submitted", "success")
 # would silently drop fields off the end of the block.
 _MAX_LLM_FIELDS = 60
 
+# A form label is a short question; a longer one is scraped junk or a hostile
+# oversized field. The job body is already capped (cap=4000); labels get the same
+# treatment so 60 giant labels cannot balloon the prompt. Truncation is prompt-only
+# — the original label is preserved for index→label mapping in _resolve_answer_keys.
+_MAX_LABEL_LEN = 1000
+
+
+def _cap_label(label: str) -> str:
+    if len(label) <= _MAX_LABEL_LEN:
+        return label
+    return label[:_MAX_LABEL_LEN] + "…[truncated]"
+
 
 async def _confirm_submitted(page: Page, extra_text_markers: tuple[str, ...] = ()) -> bool:
     """
@@ -379,7 +391,7 @@ async def _ask_llm(
     keeps its label-keyed contract.
     """
     body = f"Company: {company}\nTitle: {title}\nDescription: {description}"
-    numbered = "\n".join(f"{i}: {f}" for i, f in enumerate(fields))
+    numbered = "\n".join(f"{i}: {_cap_label(f)}" for i, f in enumerate(fields))
     # A per-call canary planted in the profile block. If it comes back in an answer, the
     # model copied the profile block into its output instead of writing prose about it —
     # the signature of profile exfiltration. This is a verbatim-substring check: a model

@@ -4,9 +4,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from gauntler.application.appliers.base import (
+    _MAX_LABEL_LEN,
     _MAX_LLM_FIELDS,
     ApplicationDraft,
     _ask_llm,
+    _cap_label,
     _fill_field,
     _resolve_answer_keys,
     generate_answers,
@@ -588,6 +590,49 @@ class TestFillField:
         field.is_checked = AsyncMock(return_value=False)
         await _fill_field(field, "true")
         field.click.assert_called_once()
+
+
+# ── _cap_label: truncate oversized labels in the prompt ──────────────────────
+
+
+class TestCapLabel:
+    def test_short_label_unchanged(self):
+        assert _cap_label("Full Name") == "Full Name"
+
+    def test_at_limit_unchanged(self):
+        s = "x" * _MAX_LABEL_LEN
+        assert _cap_label(s) == s
+
+    def test_over_limit_truncated_with_marker(self):
+        s = "x" * (_MAX_LABEL_LEN + 500)
+        out = _cap_label(s)
+        assert out == "x" * _MAX_LABEL_LEN + "…[truncated]"
+        assert len(out) == _MAX_LABEL_LEN + len("…[truncated]")
+
+
+async def test_ask_llm_truncates_giant_label_in_prompt_but_maps_full_label():
+    captured = {}
+
+    async def fake_caller(prompt, model):
+        captured["prompt"] = prompt
+        return '{"0": "answer-for-giant"}'
+
+    giant = "Q" * 100_000
+    answers, err = await _ask_llm(
+        fields=[giant],
+        company="Acme",
+        title="Engineer",
+        description="desc",
+        profile={"name": "A B"},
+        model="m",
+        caller=fake_caller,
+    )
+    assert err is None
+    # Prompt bounded: the raw 100k label is not present verbatim.
+    assert giant not in captured["prompt"]
+    assert "…[truncated]" in captured["prompt"]
+    # Answer maps back to the ORIGINAL full label, not the truncated one.
+    assert answers == {giant: "answer-for-giant"}
 
 
 # ── generate_answers: pré-população via field_map ─────────────────────────────
