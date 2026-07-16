@@ -1,4 +1,4 @@
-from gauntler.application.answers.field_map import pre_populate_answers
+from gauntler.application.answers.field_map import _static_answer, pre_populate_answers
 
 PROFILE = {
     "name": "Maria de Souza Pereira",
@@ -366,3 +366,46 @@ def test_ptbr_pretensoes_salariais_plural_matches():
         ["Pretensões salariais"], {"preferences": {"salary_target_brl_monthly": 40000}}
     )
     assert out["Pretensões salariais"] == "40000"
+
+
+# ── Salary Coverage E3 — wider lead words and bare PT keywords ──
+
+
+class TestSalaryCoverageE3:
+    """Coverage tests for salary auto-fill with additional lead words and PT-BR keywords."""
+
+    @staticmethod
+    def salary_profile():
+        """Profile fixture with salary_target_brl_monthly for E3 tests."""
+        return {"preferences": {"salary_target_brl_monthly": 25000}}
+
+    # New: leading value words.
+    def test_minimum_salary_fills(self):
+        salary_profile = self.salary_profile()
+        assert _static_answer("Minimum salary", salary_profile) == "25000"
+
+    def test_base_compensation_fills(self):
+        salary_profile = self.salary_profile()
+        assert _static_answer("Base compensation", salary_profile) == "25000"
+
+    def test_total_compensation_fills(self):
+        salary_profile = self.salary_profile()
+        assert _static_answer("Total compensation", salary_profile) == "25000"
+
+    # New: bare PT keywords.
+    def test_ptbr_bare_salario_fills(self):
+        salary_profile = self.salary_profile()
+        assert _static_answer("Salário", salary_profile) == "25000"
+
+    def test_ptbr_faixa_salarial_fills(self):
+        salary_profile = self.salary_profile()
+        assert _static_answer("Faixa salarial", salary_profile) == "25000"
+
+    # Invariant: essays starting with a keyword still fall through to the LLM.
+    def test_ptbr_salario_essay_not_prepopulated(self):
+        salary_profile = self.salary_profile()
+        assert _static_answer("Salário: conte sua história salarial", salary_profile) is None
+
+    def test_minimum_salary_essay_not_prepopulated(self):
+        salary_profile = self.salary_profile()
+        assert _static_answer("Minimum salary you would accept and why", salary_profile) is None

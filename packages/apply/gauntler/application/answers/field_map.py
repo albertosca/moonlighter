@@ -48,7 +48,7 @@ _RULES: list[tuple[str, _RuleFn]] = [
     (r"linkedin", lambda p: p.get("linkedin") or ""),
     (r"^(website|portfolio|personal\s+site)", lambda p: p.get("website") or ""),
     # Compensation — filled statically so the salary figure never reaches the LLM (E2).
-    # The label must be a short *value* question: an optional lead (desired/expected/…),
+    # The label must be a short *value* question: an optional lead (desired/expected/…/minimum/base/total),
     # the keyword, an optional whitelisted value-qualifier (expectation/range/salari…/…),
     # then end-of-label (allowing a SHORT trailing parenthetical/colon). Anchoring on both
     # ends with a qualifier whitelist is what rejects essay labels that merely START with
@@ -59,11 +59,12 @@ _RULES: list[tuple[str, _RuleFn]] = [
     # letting "Salary (please describe your history…)" slip through. Three earlier versions
     # failed here: unanchored over-matched mid-sentence mentions; start-only-anchored still
     # swallowed start-anchored essays; and an unbounded parenthetical smuggled essays in
-    # parens — all silently replacing the field with a bare number. See the field_map test
-    # file for every regression case.
+    # parens — all silently replacing the field with a bare number. Also supports bare PT-BR
+    # keywords (Salário, Faixa salarial) to match form labels in Portuguese without a lead word.
+    # See the field_map test file for every regression case.
     (
-        r"^(?:(?:desired|expected|current|target)\s+)?"
-        r"(?:salary|compensation|pay|pretens\w*|remunera\w*)"
+        r"^(?:(?:desired|expected|current|target|minimum|base|total)\s+)?"
+        r"(?:salary|compensation|pay|pretens\w*|remunera\w*|sal[aá]rio|faixa\s+salarial)"
         r"(?:\s+(?:expectations?|requirements?|range|salari\w*|pretendid\w*|desejad\w*"
         r"|mensa(?:l|is)|monthly|anual|annual|target|desired|expected))*"
         r"(?:\s*\([^)]{0,15}\))?\s*:?\s*$",
