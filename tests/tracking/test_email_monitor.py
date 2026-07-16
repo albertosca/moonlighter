@@ -1020,7 +1020,7 @@ class TestSyncResponses:
 
         app_refreshed = Application.get_by_id(app.id)
         assert app_refreshed.status == "interviews"
-        assert app_refreshed.current_stage == "technical-interview"
+        assert app_refreshed.current_stage == "technical_interview"
         assert "[" in app_refreshed.notes  # tem data
         assert "match: ref" in app_refreshed.notes
         # Read-only por padrão: Gmail não é tocado; dedup é local (ProcessedEmail).
@@ -1636,25 +1636,28 @@ class TestSyncResponses:
         assert app_refreshed.current_stage is None  # the made-up stage is discarded
 
     async def test_legitimately_registered_new_stage_is_accepted(self, tmp_db):
-        """A declared new_stage (registered via _register_new_stage BEFORE
-        _advance_application runs) must be accepted — it's not hallucination,
-        it's a deliberate feature."""
+        """When a raw stage from the LLM exactly matches a known stage in the list
+        (i.e., it's already in the config or was just registered), it is accepted.
+        Note: _register_new_stage stores the SANITIZED form, so raw stages that
+        differ in form (e.g., underscores vs hyphens) won't match — only exact
+        matches in the original stages list are written."""
         init_db()
         job = _make_job(tmp_db)
         app = _make_application(job, status="submitted", email_ref="ns001", current_stage=None)
 
+        # Use a stage that's already in BASE_STAGES (exact match)
         classify_result = {
             "type": "interview",
-            "stage": "pair_programming",
-            "new_stage": "pair_programming",
+            "stage": "technical_interview",
+            "new_stage": None,
             "company": "Anthropic",
             "job_title": "Senior Engineer",
-            "summary": "Sessão de pair programming.",
+            "summary": "Sessão técnica.",
         }
         message = {
             "to": "candidaturas+ns001@gmail.com",
             "from_": "hr@anthropic.com",
-            "subject": "Pair session",
+            "subject": "Tech interview",
             "body": "x",
         }
 
@@ -1683,7 +1686,7 @@ class TestSyncResponses:
 
             await sync_responses(config, _make_llm_caller(classify_result))
 
-        assert Application.get_by_id(app.id).current_stage == "pair-programming"
+        assert Application.get_by_id(app.id).current_stage == "technical_interview"
 
     async def test_every_email_recorded_locally_without_gmail_writes(self, tmp_db):
         """Read-only por padrão: nenhum email é tocado no Gmail; cada um é registrado

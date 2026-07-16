@@ -291,9 +291,7 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
     service = setup_gmail_service(config)
     email_cfg = config["email"]
     base_address = email_cfg["address"]
-    # Load and sanitize stages: both existing and newly registered stages must use
-    # the same normalized form to ensure consistent matching in _advance_application.
-    stages = [_sanitize_stage(s) or s for s in email_cfg.get("interview_stages", [])]
+    stages = list(email_cfg.get("interview_stages", []))
     model = config.get("llm_model", "claude-sonnet-4-6")
 
     # O sync é 100% LEITURA no Gmail por padrão: o dedup vive numa tabela local
@@ -387,10 +385,8 @@ def _advance_application(
     if new_status and _status_rank(new_status) > _status_rank(app.status):
         app.status = new_status
     stage = classification.get("stage")
-    if stage:
-        sanitized_stage = _sanitize_stage(stage)
-        if sanitized_stage and sanitized_stage in stages:
-            app.current_stage = sanitized_stage
+    if stage and stage in stages:
+        app.current_stage = stage
 
     today = datetime.date.today().strftime("%Y-%m-%d")
     summary = classification.get("summary", "")
