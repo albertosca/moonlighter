@@ -291,7 +291,9 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
     service = setup_gmail_service(config)
     email_cfg = config["email"]
     base_address = email_cfg["address"]
-    stages = list(email_cfg.get("interview_stages", []))
+    # Load and sanitize stages: both existing and newly registered stages must use
+    # the same normalized form to ensure consistent matching in _advance_application.
+    stages = [_sanitize_stage(s) or s for s in email_cfg.get("interview_stages", [])]
     model = config.get("llm_model", "claude-sonnet-4-6")
 
     # O sync é 100% LEITURA no Gmail por padrão: o dedup vive numa tabela local
@@ -332,13 +334,43 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
     return updates
 
 
+_MAX_STAGE_LEN = 40
+_MAX_STAGES = 40
+
+_STAGE_ALLOWED = re.compile(r"[^a-z0-9]+")
+
+
+def _sanitize_stage(raw: str | None) -> str | None:
+    """Normalize an LLM-proposed stage to a bounded ``[a-z0-9-]`` slug.
+
+    An email is untrusted input: a prompt-injected classification can propose an
+    arbitrary ``new_stage``. Reducing it to a lowercase hyphen slug of at most
+    ``_MAX_STAGE_LEN`` chars strips special characters and bounds length, so a
+    persisted stage cannot carry a payload back into a later prompt. Returns
+    ``None`` when nothing usable remains or the slug is over-length.
+    """
+    if not raw:
+        return None
+    slug = _STAGE_ALLOWED.sub("-", raw.lower()).strip("-")
+    if not slug or len(slug) > _MAX_STAGE_LEN:
+        return None
+    return slug
+
+
 def _register_new_stage(
     new_stage: str | None, stages: list[str], email_cfg: dict[str, Any]
 ) -> None:
-    """Aprende um estágio inédito proposto pelo LLM, persistindo na config em memória."""
-    if new_stage and new_stage not in stages:
-        stages.append(new_stage)
-        email_cfg["interview_stages"] = stages
+    """Learn a novel stage proposed by the LLM, persisting it to the in-memory config.
+
+    The candidate is sanitized to a bounded slug (untrusted email input) and only
+    registered while the stage list is below ``_MAX_STAGES``, so a hostile email
+    cannot inject arbitrary text or grow the config without bound.
+    """
+    slug = _sanitize_stage(new_stage)
+    if slug is None or slug in stages or len(stages) >= _MAX_STAGES:
+        return
+    stages.append(slug)
+    email_cfg["interview_stages"] = stages
 
 
 def _advance_application(
@@ -355,8 +387,10 @@ def _advance_application(
     if new_status and _status_rank(new_status) > _status_rank(app.status):
         app.status = new_status
     stage = classification.get("stage")
-    if stage and stage in stages:
-        app.current_stage = stage
+    if stage:
+        sanitized_stage = _sanitize_stage(stage)
+        if sanitized_stage and sanitized_stage in stages:
+            app.current_stage = sanitized_stage
 
     today = datetime.date.today().strftime("%Y-%m-%d")
     summary = classification.get("summary", "")

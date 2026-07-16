@@ -484,6 +484,88 @@ class TestPromptInjectionHardening:
         assert "injected_field" not in result
 
 
+# ── sanitize_stage ───────────────────────────────────────────────────────────
+
+
+class TestSanitizeStage:
+    def test_none_and_empty_return_none(self):
+        from gauntler.tracking.email_monitor import _sanitize_stage
+
+        assert _sanitize_stage(None) is None
+        assert _sanitize_stage("") is None
+        assert _sanitize_stage("   ") is None
+
+    def test_normalizes_to_slug(self):
+        from gauntler.tracking.email_monitor import _sanitize_stage
+
+        assert _sanitize_stage("Technical Screen") == "technical-screen"
+        assert _sanitize_stage("  Final   Round  ") == "final-round"
+
+    def test_strips_disallowed_chars(self):
+        from gauntler.tracking.email_monitor import _sanitize_stage
+
+        # Injection payload collapses to an inert bounded slug.
+        # Special chars like <>, {}, : are replaced with hyphens; alphanumeric chars survive.
+        assert _sanitize_stage("IGNORE ALL: <b>{instructions}</b>") == "ignore-all-b-instructions-b"
+
+    def test_collapses_and_trims_hyphens(self):
+        from gauntler.tracking.email_monitor import _sanitize_stage
+
+        assert _sanitize_stage("--a__b!!c--") == "a-b-c"
+
+    def test_over_length_rejected(self):
+        from gauntler.tracking.email_monitor import _sanitize_stage
+
+        assert _sanitize_stage("x" * 41) is None
+
+    def test_at_length_limit_accepted(self):
+        from gauntler.tracking.email_monitor import _sanitize_stage
+
+        assert _sanitize_stage("x" * 40) == "x" * 40
+
+    def test_all_disallowed_returns_none(self):
+        from gauntler.tracking.email_monitor import _sanitize_stage
+
+        assert _sanitize_stage("!@#$%^&*()") is None
+
+
+class TestRegisterNewStageBounds:
+    def test_registers_sanitized_slug_not_raw(self):
+        from gauntler.tracking.email_monitor import _register_new_stage
+
+        stages = ["applied"]
+        email_cfg: dict = {}
+        _register_new_stage("Technical Screen", stages, email_cfg)
+        assert stages == ["applied", "technical-screen"]
+        assert email_cfg["interview_stages"] == ["applied", "technical-screen"]
+
+    def test_rejects_unsanitizable(self):
+        from gauntler.tracking.email_monitor import _register_new_stage
+
+        stages = ["applied"]
+        email_cfg: dict = {}
+        _register_new_stage("!@#$", stages, email_cfg)
+        assert stages == ["applied"]
+        assert "interview_stages" not in email_cfg
+
+    def test_does_not_duplicate_after_sanitize(self):
+        from gauntler.tracking.email_monitor import _register_new_stage
+
+        stages = ["technical-screen"]
+        email_cfg: dict = {}
+        _register_new_stage("Technical  Screen", stages, email_cfg)
+        assert stages == ["technical-screen"]
+
+    def test_count_cap_blocks_further_growth(self):
+        from gauntler.tracking.email_monitor import _MAX_STAGES, _register_new_stage
+
+        stages = [f"s{i}" for i in range(_MAX_STAGES)]
+        email_cfg: dict = {}
+        _register_new_stage("new-one", stages, email_cfg)
+        assert len(stages) == _MAX_STAGES
+        assert "new-one" not in stages
+
+
 # ── parse_message ─────────────────────────────────────────────────────────────
 
 
@@ -938,7 +1020,7 @@ class TestSyncResponses:
 
         app_refreshed = Application.get_by_id(app.id)
         assert app_refreshed.status == "interviews"
-        assert app_refreshed.current_stage == "technical_interview"
+        assert app_refreshed.current_stage == "technical-interview"
         assert "[" in app_refreshed.notes  # tem data
         assert "match: ref" in app_refreshed.notes
         # Read-only por padrão: Gmail não é tocado; dedup é local (ProcessedEmail).
@@ -1317,7 +1399,7 @@ class TestSyncResponses:
 
             await sync_responses(config, _make_llm_caller(classify_result))
 
-        assert "pair_programming" in config["email"]["interview_stages"]
+        assert "pair-programming" in config["email"]["interview_stages"]
 
     async def test_fuzzy_match_never_registers_a_new_stage(self, tmp_db):
         """S-06 hardening: a spoofed email (no ref) that proposes a new_stage
@@ -1601,7 +1683,7 @@ class TestSyncResponses:
 
             await sync_responses(config, _make_llm_caller(classify_result))
 
-        assert Application.get_by_id(app.id).current_stage == "pair_programming"
+        assert Application.get_by_id(app.id).current_stage == "pair-programming"
 
     async def test_every_email_recorded_locally_without_gmail_writes(self, tmp_db):
         """Read-only por padrão: nenhum email é tocado no Gmail; cada um é registrado
