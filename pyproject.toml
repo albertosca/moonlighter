@@ -44,6 +44,7 @@ source_pkgs = [
     "gauntler.server",
     "gauntler.startup",
     "gauntler.views",
+    "gauntler._tool_logging",
 ]
 branch = true
 omit = [
