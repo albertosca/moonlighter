@@ -67,6 +67,83 @@ DEFAULTS = {
 _PATH_KEYS = ("browser_session_dir", "screenshots_dir")
 
 
+class ConfigError(Exception):
+    """Raised when config.yaml has an unknown key or a value of the wrong type."""
+
+
+# (type, ...) — a tuple of acceptable types; bool is excluded from int keys explicitly.
+_INT = (int,)
+_NUM = (int, float)
+
+# Top-level key -> acceptable types. Nested dict blocks use a sub-schema below.
+_CONFIG_SCHEMA: dict[str, tuple[type, ...]] = {
+    "browser_path": (str,),
+    "brave_path": (str,),
+    "browser_session_dir": (str,),
+    "screenshots_dir": (str,),
+    "score_threshold": _NUM,
+    "slow_mo_ms": _INT,
+    "scan_concurrency": _INT,
+    "scan_batch_size": _INT,
+    "llm_model": (str,),
+    "eval_model": (str,),
+    "llm_backend": (str,),
+    "title_blocklist": (list,),
+    "cv": (dict,),
+    "work_authorization": (dict,),
+    "email": (dict,),
+}
+
+_CV_SCHEMA: dict[str, tuple[type, ...]] = {"default": (str,), "by_company": (dict,)}
+_WORK_AUTH_SCHEMA: dict[str, tuple[type, ...]] = {
+    "citizenship_country": (str,),
+    "authorized_answer": (str,),
+    "not_authorized_answer": (str,),
+}
+_EMAIL_SCHEMA: dict[str, tuple[type, ...]] = {
+    "address": (str,),
+    "credentials_path": (str,),
+    "token_path": (str,),
+    "processed_label": (str,),
+    "mark_processed": (bool,),
+    "interview_stages": (list,),
+}
+_NESTED_SCHEMAS = {
+    "cv": _CV_SCHEMA,
+    "work_authorization": _WORK_AUTH_SCHEMA,
+    "email": _EMAIL_SCHEMA,
+}
+
+
+def _check_type(key: str, value: Any, types: tuple[type, ...]) -> None:
+    # bool is a subclass of int; reject it where int is required (and bool is not listed).
+    if isinstance(value, bool) and bool not in types:
+        raise ConfigError(
+            f"config key '{key}' must be {', '.join(t.__name__ for t in types)}, got bool"
+        )
+    if not isinstance(value, types):
+        raise ConfigError(
+            f"config key '{key}' must be {', '.join(t.__name__ for t in types)}, "
+            f"got {type(value).__name__}"
+        )
+
+
+def validate_config(config: dict[str, Any]) -> None:
+    """Strict, closed-schema validation. Raises ConfigError on the first unknown key or
+    wrong-typed value (naming the key). Runs after the DEFAULTS merge, so an omitted key is
+    filled by defaults and never fails here — only wrong types and unknown extras fail."""
+    for key, value in config.items():
+        if key not in _CONFIG_SCHEMA:
+            raise ConfigError(f"unknown config key '{key}'")
+        _check_type(key, value, _CONFIG_SCHEMA[key])
+        sub_schema = _NESTED_SCHEMAS.get(key)
+        if sub_schema is not None:
+            for sub_key, sub_value in value.items():
+                if sub_key not in sub_schema:
+                    raise ConfigError(f"unknown config key '{key}.{sub_key}'")
+                _check_type(f"{key}.{sub_key}", sub_value, sub_schema[sub_key])
+
+
 def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
     """
     Load configuration from YAML file, merging with defaults.

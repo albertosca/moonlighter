@@ -2,7 +2,15 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from gauntler.core.config import gauntler_home, load_company_list, load_config, load_profile
+import yaml
+from gauntler.core.config import (
+    ConfigError,
+    gauntler_home,
+    load_company_list,
+    load_config,
+    load_profile,
+    validate_config,
+)
 
 
 def test_load_config_defaults(tmp_path):
@@ -300,6 +308,72 @@ def test_harden_permissions_skips_missing_files(tmp_path, monkeypatch):
     from gauntler.core.config import harden_permissions
 
     assert harden_permissions() == []
+
+
+def _valid_config():
+    # A fully-populated, valid config (defaults + the optional blocks).
+    return load_config()  # DEFAULTS-merged, no user file in test env → valid baseline
+
+
+class TestValidateConfig:
+    def test_valid_config_passes(self):
+        validate_config(_valid_config())  # must not raise
+
+    def test_wrong_type_scalar_raises_naming_key(self):
+        cfg = _valid_config()
+        cfg["scan_concurrency"] = "five"
+        with pytest.raises(ConfigError, match="scan_concurrency"):
+            validate_config(cfg)
+
+    def test_bool_rejected_where_int_required(self):
+        cfg = _valid_config()
+        cfg["slow_mo_ms"] = True
+        with pytest.raises(ConfigError, match="slow_mo_ms"):
+            validate_config(cfg)
+
+    def test_unknown_top_level_key_raises(self):
+        cfg = _valid_config()
+        cfg["scan_concurrancy"] = 5  # typo
+        with pytest.raises(ConfigError, match="scan_concurrancy"):
+            validate_config(cfg)
+
+    def test_unknown_email_subkey_raises(self):
+        cfg = _valid_config()
+        cfg["email"] = {"address": "a@b.com", "unexpected": 1}
+        with pytest.raises(ConfigError, match=r"email.unexpected"):
+            validate_config(cfg)
+
+    def test_title_blocklist_must_be_list(self):
+        cfg = _valid_config()
+        cfg["title_blocklist"] = "senior"
+        with pytest.raises(ConfigError, match="title_blocklist"):
+            validate_config(cfg)
+
+    def test_cv_must_be_dict(self):
+        cfg = _valid_config()
+        cfg["cv"] = "cv.pdf"
+        with pytest.raises(ConfigError, match="cv"):
+            validate_config(cfg)
+
+    def test_score_threshold_accepts_int_and_float(self):
+        cfg = _valid_config()
+        cfg["score_threshold"] = 7
+        validate_config(cfg)
+        cfg["score_threshold"] = 7.5
+        validate_config(cfg)
+
+    def test_omitted_optional_block_passes(self):
+        cfg = _valid_config()
+        cfg.pop("email", None)  # email is optional
+        validate_config(cfg)
+
+    def test_example_config_validates(self):
+        from gauntler.core.config import DEFAULTS
+
+        example = Path(__file__).resolve().parents[2] / "config.example.yaml"
+        user = yaml.safe_load(example.read_text()) or {}
+        merged = {**DEFAULTS, "browser_session_dir": "x", "screenshots_dir": "y", **user}
+        validate_config(merged)  # must not raise
 
 
 def test_harden_permissions_warns_on_chmod_failure_without_raising(tmp_path, monkeypatch):
