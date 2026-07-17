@@ -19,3 +19,12 @@ async def test_lifespan_rejects_invalid_config(tmp_db, monkeypatch):
     with pytest.raises(ConfigError):
         async with lifespan(mcp):
             pass  # must raise before yielding
+
+
+async def test_lifespan_prints_permission_warnings(tmp_db, monkeypatch, capsys):
+    import gauntler.server as server
+
+    monkeypatch.setattr(server, "harden_permissions", lambda: ["could not chmod ~/.gauntler"])
+    async with lifespan(mcp) as ctx:
+        assert ctx.permission_warnings == ["could not chmod ~/.gauntler"]
+    assert "could not chmod ~/.gauntler" in capsys.readouterr().err

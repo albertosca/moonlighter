@@ -59,7 +59,7 @@ async def lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     init_db()
     permission_warnings = harden_permissions()
     startup_warnings = validate_startup(config, profile)
-    for msg in permission_warnings:  # pragma: no cover - only hit on an OSError while chmod'ing
+    for msg in permission_warnings:
         print(f"⚠️  {msg}", file=sys.stderr, flush=True)
     for w in startup_warnings:
         prefix = "🚫" if w.level == "error" else "⚠️ "
