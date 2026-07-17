@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from gauntler._tool_logging import tool_logged
 from gauntler.application import service as apply_service
 from gauntler.core import browser as _browser_mod
 from gauntler.core.config import (
@@ -31,7 +32,8 @@ from gauntler.tracking.email_monitor import (
     sync_responses,
 )
 from gauntler.views import render_jobs_table
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.session import ServerSession
 
 
 @dataclass(frozen=True)
@@ -114,7 +116,10 @@ for _w in _startup_warnings:  # pragma: no cover - print de avisos no import do 
 
 
 @mcp.tool()
-async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
+@tool_logged
+async def scan_and_evaluate(
+    keywords: str = "", phase: str = "phase1", *, ctx: Context[ServerSession, AppContext, Any]
+) -> str:
     """Scan job boards, evaluate with LLM, return new jobs above threshold.
 
     Por padrão escaneia só a fase 1 (empresas BR prioritárias) para economizar tokens.
@@ -125,12 +130,22 @@ async def scan_and_evaluate(keywords: str = "", phase: str = "phase1") -> str:
         phase: "phase1" (padrão/BR), "phase2" (remote-first global),
                "phase3" (big techs), ou "all" (tudo)
     """
-    async with _log_tool("scan_and_evaluate"):
-        return await scan_service.scan_and_evaluate(keywords, phase, _config, _profile, _llm_caller)
+    app = ctx.request_context.lifespan_context
+    return await scan_service.scan_and_evaluate(
+        keywords, phase, app.config, app.profile, app.llm_caller
+    )
 
 
 @mcp.tool()
-async def add_job(url: str, company: str = "", title: str = "", description: str = "") -> str:
+@tool_logged
+async def add_job(
+    url: str,
+    company: str = "",
+    title: str = "",
+    description: str = "",
+    *,
+    ctx: Context[ServerSession, AppContext, Any],
+) -> str:
     """Avalia uma vaga fornecida manualmente e salva no banco.
 
     Útil para vagas do LinkedIn, posts de emprego, ou qualquer fonte não suportada
@@ -143,14 +158,20 @@ async def add_job(url: str, company: str = "", title: str = "", description: str
         title: Título da vaga (ex: "Senior Software Engineer")
         description: Texto da descrição da vaga. Se vazio, tenta buscar automaticamente.
     """
-    async with _log_tool("add_job"):
-        return await scan_service.add_job(
-            url, company, title, description, _config, _profile, _llm_caller
-        )
+    app = ctx.request_context.lifespan_context
+    return await scan_service.add_job(
+        url, company, title, description, app.config, app.profile, app.llm_caller
+    )
 
 
 @mcp.tool()
-async def archive_stale_jobs(job_id: int | None = None, company: str | None = None) -> str:
+@tool_logged
+async def archive_stale_jobs(
+    job_id: int | None = None,
+    company: str | None = None,
+    *,
+    ctx: Context[ServerSession, AppContext, Any],
+) -> str:
     """Detect and archive (status='closed') jobs that disappeared from their source.
 
     Checks jobs currently in new/reviewed/applying/needs_review against the source's
@@ -163,12 +184,12 @@ async def archive_stale_jobs(job_id: int | None = None, company: str | None = No
         company: check only jobs from this company, case-insensitive (mutually exclusive
                  with job_id).
     """
-    async with _log_tool("archive_stale_jobs"):
-        try:
-            result = await scan_service.archive_stale_jobs(job_id, company, _config)
-        except scan_service.ArchiveStaleJobsError as e:
-            return str(e)
-        return scan_service._format_archive_result(result)
+    app = ctx.request_context.lifespan_context
+    try:
+        result = await scan_service.archive_stale_jobs(job_id, company, app.config)
+    except scan_service.ArchiveStaleJobsError as e:
+        return str(e)
+    return scan_service._format_archive_result(result)
 
 
 @mcp.tool()
@@ -219,18 +240,19 @@ async def get_job(id: int) -> str:
 
 
 @mcp.tool()
-async def login(platform: str = "linkedin") -> str:
+@tool_logged
+async def login(platform: str = "linkedin", *, ctx: Context[ServerSession, AppContext, Any]) -> str:
     """Open the browser for manual login. Session is saved and reused in future scans."""
-    async with _log_tool("login"):
-        if platform != "linkedin":
-            return f"Platform '{platform}' not supported yet. Supported: linkedin"
-        page = await _browser_mod.new_page(_config)
-        await page.goto("https://www.linkedin.com/login")
-        return (
-            "Browser aberto em linkedin.com/login. "
-            "Faça login manualmente. "
-            "A sessão será salva automaticamente em ~/.gauntler/browser-session/"
-        )
+    app = ctx.request_context.lifespan_context
+    if platform != "linkedin":
+        return f"Platform '{platform}' not supported yet. Supported: linkedin"
+    page = await _browser_mod.new_page(app.config)
+    await page.goto("https://www.linkedin.com/login")
+    return (
+        "Browser aberto em linkedin.com/login. "
+        "Faça login manualmente. "
+        "A sessão será salva automaticamente em ~/.gauntler/browser-session/"
+    )
 
 
 @mcp.tool()

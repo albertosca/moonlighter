@@ -7,6 +7,8 @@ from gauntler.application.appliers.linkedin import LinkedInApplier
 from gauntler.core.db import Application, Job, ScanLog, init_db
 from gauntler.discovery.evaluator import EvaluationResult
 
+from tests._context import make_test_context
+
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -69,7 +71,7 @@ async def test_scan_no_new_jobs(tmp_db):
             instance.scan = AsyncMock(return_value=[])
             M.return_value = instance
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        result = await scan_and_evaluate()
+        result = await scan_and_evaluate(ctx=make_test_context())
     assert "Nenhuma vaga nova" in result
 
 
@@ -93,7 +95,7 @@ async def test_scan_and_evaluate_reports_archived_stale_jobs(tmp_db):
             instance.scan = AsyncMock(return_value=[])
             M.return_value = instance
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        result = await scan_and_evaluate()
+        result = await scan_and_evaluate(ctx=make_test_context())
 
     assert "arquivada" in result.lower()
     job = Job.get(Job.url == "https://boards.greenhouse.io/stale-co/jobs/1")
@@ -117,7 +119,7 @@ async def test_scan_and_evaluate_no_new_jobs_still_runs_archive_check(tmp_db):
             instance.scan = AsyncMock(return_value=[])
             M.return_value = instance
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        result = await scan_and_evaluate()
+        result = await scan_and_evaluate(ctx=make_test_context())
 
     assert "Nenhuma vaga nova" in result
     assert "Nenhuma vaga fechada encontrada." in result
@@ -146,7 +148,7 @@ async def test_scan_all_below_threshold(tmp_db):
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        result = await scan_and_evaluate()
+        result = await scan_and_evaluate(ctx=make_test_context())
     assert "threshold" in result.lower()
     # Job should be archived because score=4.0 is below the default threshold=6.5
     job = Job.get(Job.url == "https://x.com/1")
@@ -182,7 +184,7 @@ async def test_scan_above_threshold_shows_table(tmp_db):
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        result = await scan_and_evaluate()
+        result = await scan_and_evaluate(ctx=make_test_context())
     assert "Stripe" in result
     assert "Sr Eng" in result
 
@@ -206,7 +208,7 @@ async def test_scan_dedup_against_scan_log(tmp_db):
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        result = await scan_and_evaluate()
+        result = await scan_and_evaluate(ctx=make_test_context())
     # evaluate_jobs_batch genuinamente não chamado: scanner retornou a vaga mas
     # o dedup (ScanLog pré-existente) a filtrou antes de chegar em _evaluate_and_store.
     mock_batch.assert_not_called()
@@ -236,7 +238,7 @@ async def test_scan_linkedin_failure_doesnt_block(tmp_db):
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("LinkedIn not available"))
-        result = await scan_and_evaluate()
+        result = await scan_and_evaluate(ctx=make_test_context())
     # Falha do LinkedIn não bloqueia os resultados HTTP; vaga com score=8.0 acima do threshold.
     assert "co" in result or "Eng" in result or "vagas" in result.lower()
 
@@ -279,7 +281,7 @@ async def test_scan_saves_salary_fields(tmp_db):
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        await scan_and_evaluate()
+        await scan_and_evaluate(ctx=make_test_context())
     job = Job.get(Job.url == "https://x.com/5")
     assert job.salary_min == 180000
     assert job.salary_currency == "USD"
@@ -312,7 +314,7 @@ async def test_scan_saves_caveats_as_json(tmp_db):
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        await scan_and_evaluate()
+        await scan_and_evaluate(ctx=make_test_context())
     job = Job.get(Job.url == "https://x.com/6")
     caveats = json.loads(job.caveats)
     assert "US only" in caveats
@@ -342,7 +344,7 @@ async def test_scan_status_archived_if_below_threshold(tmp_db):
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        await scan_and_evaluate()
+        await scan_and_evaluate(ctx=make_test_context())
     # score=3.0 injetado via evaluate_jobs_batch → status genuinamente "archived"
     job = Job.get(Job.url == "https://x.com/7")
     assert job.status == "archived"
@@ -976,7 +978,7 @@ async def test_scan_concurrent_batch_all_processed(tmp_db):
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        await scan_and_evaluate()
+        await scan_and_evaluate(ctx=make_test_context())
     # chunking assertion: 15 jobs / batch_size=5 → exactly 3 calls to evaluate_jobs_batch
     assert mock_batch.call_count == 3, (
         f"esperado 3 chunks, mas evaluate_jobs_batch foi chamado {mock_batch.call_count}× "
@@ -1021,22 +1023,22 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
-        patch(
-            "gauntler.server._config",
-            {
-                "score_threshold": 6.5,
-                "llm_model": "claude-haiku-4-5-20251001",
-                "title_blocklist": [],
-                "scan_concurrency": 1,
-                "scan_batch_size": 4,
-            },
-        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        await scan_and_evaluate()
+        await scan_and_evaluate(
+            ctx=make_test_context(
+                config={
+                    "score_threshold": 6.5,
+                    "llm_model": "claude-haiku-4-5-20251001",
+                    "title_blocklist": [],
+                    "scan_concurrency": 1,
+                    "scan_batch_size": 4,
+                }
+            )
+        )
 
     job_urls = {j.url for j in Job.select()}
     orphans = [sl.job_url for sl in ScanLog.select() if sl.job_url not in job_urls]
@@ -1075,22 +1077,22 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
-        patch(
-            "gauntler.server._config",
-            {
-                "score_threshold": 6.5,
-                "llm_model": "claude-haiku-4-5-20251001",
-                "title_blocklist": [],
-                "scan_concurrency": 1,
-                "scan_batch_size": 5,
-            },
-        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        await scan_and_evaluate()
+        await scan_and_evaluate(
+            ctx=make_test_context(
+                config={
+                    "score_threshold": 6.5,
+                    "llm_model": "claude-haiku-4-5-20251001",
+                    "title_blocklist": [],
+                    "scan_concurrency": 1,
+                    "scan_batch_size": 5,
+                }
+            )
+        )
 
     # Com scan_concurrency=1 o stop impede que batches 2 e 3 chamem o LLM.
     # call_count deve ser 1 (não 3 = total de batches).
@@ -1136,22 +1138,22 @@ async def test_scan_non_spend_error_keeps_title_filtered_in_report(tmp_db):
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
-        patch(
-            "gauntler.server._config",
-            {
-                "score_threshold": 6.5,
-                "llm_model": "claude-haiku-4-5-20251001",
-                "title_blocklist": ["staff accountant"],
-                "scan_concurrency": 1,
-                "scan_batch_size": 2,
-            },
-        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        result = await scan_and_evaluate()
+        result = await scan_and_evaluate(
+            ctx=make_test_context(
+                config={
+                    "score_threshold": 6.5,
+                    "llm_model": "claude-haiku-4-5-20251001",
+                    "title_blocklist": ["staff accountant"],
+                    "scan_concurrency": 1,
+                    "scan_batch_size": 2,
+                }
+            )
+        )
 
     # Already true today: the title-filtered job is persisted regardless of the bug.
     filtered_job = Job.get(Job.url == "https://x.com/nonspend/1")
@@ -1189,22 +1191,22 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tmp
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service._claim", side_effect=Exception("db corrupted")),
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
-        patch(
-            "gauntler.server._config",
-            {
-                "score_threshold": 6.5,
-                "llm_model": "claude-haiku-4-5-20251001",
-                "title_blocklist": [],
-                "scan_concurrency": 1,
-                "scan_batch_size": 5,
-            },
-        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        result = await scan_and_evaluate()  # must not raise
+        result = await scan_and_evaluate(
+            ctx=make_test_context(
+                config={
+                    "score_threshold": 6.5,
+                    "llm_model": "claude-haiku-4-5-20251001",
+                    "title_blocklist": [],
+                    "scan_concurrency": 1,
+                    "scan_batch_size": 5,
+                }
+            )
+        )  # must not raise
 
     assert Job.select().count() == 0
     assert "0 vagas processadas" in result
@@ -1526,7 +1528,7 @@ async def test_login_unsupported_platform(tmp_db):
     init_db()
     from gauntler.server import login
 
-    result = await login(platform="github")
+    result = await login(platform="github", ctx=make_test_context())
     assert "not supported" in result or "suport" in result.lower() or "github" in result.lower()
 
 
@@ -1538,7 +1540,7 @@ async def test_login_linkedin_returns_instruction(tmp_db):
         mock_browser.new_page = AsyncMock(return_value=page)
         from gauntler.server import login
 
-        result = await login(platform="linkedin")
+        result = await login(platform="linkedin", ctx=make_test_context())
     assert "linkedin" in result.lower()
     page.goto.assert_called_once()
 
@@ -1644,7 +1646,7 @@ async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
         MockLI.return_value.scan = AsyncMock(
             side_effect=LinkedInSessionExpiredError("Sessão expirada.")
         )
-        result = await scan_and_evaluate()
+        result = await scan_and_evaluate(ctx=make_test_context())
 
     assert "LinkedIn" in result
     assert "expirada" in result or "login" in result.lower()
@@ -1686,7 +1688,7 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
         MockLI.return_value.scan = AsyncMock(
             side_effect=LinkedInSessionExpiredError("Sessão expirada.")
         )
-        result = await scan_and_evaluate()
+        result = await scan_and_evaluate(ctx=make_test_context())
 
     assert "Stripe" in result  # vaga HTTP aparece
     assert "LinkedIn" in result  # aviso aparece também
@@ -2103,7 +2105,7 @@ async def test_scan_concurrent_calls_evaluate_same_url_only_once(tmp_db):
 
     with _scan_patches([raw], eval_mock):
         # Fire 5 concurrent scans for the same job
-        await asyncio.gather(*[scan_and_evaluate() for _ in range(5)])
+        await asyncio.gather(*[scan_and_evaluate(ctx=make_test_context()) for _ in range(5)])
 
     # LLM must have been called exactly once despite 5 concurrent scans
     assert eval_mock.call_count == 1
@@ -2128,7 +2130,7 @@ async def test_scan_spend_limit_releases_scan_log_claim(tmp_db):
     failing_eval = AsyncMock(side_effect=spend_limit_err)
 
     with _scan_patches([raw], failing_eval):
-        result = await scan_and_evaluate()
+        result = await scan_and_evaluate(ctx=make_test_context())
 
     # Não levanta — reporta o limite no texto de retorno.
     assert "spend limit" in result.lower() or "interrompido" in result.lower()
@@ -2149,7 +2151,7 @@ async def test_scan_already_in_scan_log_skips_llm(tmp_db):
     eval_mock = AsyncMock(return_value=make_eval_result(score=8.0))
 
     with _scan_patches([raw], eval_mock):
-        await scan_and_evaluate()
+        await scan_and_evaluate(ctx=make_test_context())
 
     eval_mock.assert_not_called()
 
@@ -2205,7 +2207,11 @@ async def test_add_job_tool_delegates_to_service(tmp_db):
         new=AsyncMock(return_value=make_eval_result(8.0)),
     ):
         result = await add_job(
-            url="https://x.com/manual/tool/1", company="Stripe", title="Eng", description="desc"
+            url="https://x.com/manual/tool/1",
+            company="Stripe",
+            title="Eng",
+            description="desc",
+            ctx=make_test_context(),
         )
     assert "Stripe" in result or "NEW" in result
 
@@ -2226,7 +2232,7 @@ async def test_tool_archive_stale_jobs_delegates_and_formats(tmp_db):
         "gauntler.server.scan_service.archive_stale_jobs",
         new=AsyncMock(return_value=fake_result),
     ):
-        result = await archive_stale_jobs()
+        result = await archive_stale_jobs(ctx=make_test_context())
 
     assert "acme" in result
     assert "beta" in result
@@ -2239,7 +2245,7 @@ async def test_tool_archive_stale_jobs_passes_filters(tmp_db):
 
     mock_service = AsyncMock(return_value=ArchiveResult())
     with patch("gauntler.server.scan_service.archive_stale_jobs", new=mock_service):
-        await archive_stale_jobs(job_id=123, company=None)
+        await archive_stale_jobs(job_id=123, company=None, ctx=make_test_context())
 
     mock_service.assert_awaited_once()
     args = mock_service.await_args.args
@@ -2256,7 +2262,7 @@ async def test_tool_archive_stale_jobs_rejects_both_filters(tmp_db):
         "gauntler.server.scan_service.archive_stale_jobs",
         new=AsyncMock(side_effect=ArchiveStaleJobsError("Provide job_id OR company, not both.")),
     ):
-        result = await archive_stale_jobs(job_id=1, company="acme")
+        result = await archive_stale_jobs(job_id=1, company="acme", ctx=make_test_context())
 
     assert "OR company" in result
 
