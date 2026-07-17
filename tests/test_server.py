@@ -527,7 +527,7 @@ async def test_apply_jobs_creates_draft(tmp_db):
         mock_detect.return_value = mock_applier
         from gauntler.server import apply_jobs
 
-        result = await apply_jobs(ids=[job.id])
+        result = await apply_jobs(ids=[job.id], ctx=make_test_context())
     app = Application.get(Application.job == job)
     assert app.status == "draft"
     assert "Q" in result or "Rascunho" in result
@@ -537,7 +537,7 @@ async def test_apply_jobs_job_not_found(tmp_db):
     init_db()
     from gauntler.server import apply_jobs
 
-    result = await apply_jobs(ids=[99999])
+    result = await apply_jobs(ids=[99999], ctx=make_test_context())
     assert "não encontrada" in result
 
 
@@ -553,7 +553,7 @@ async def test_apply_jobs_unknown_ats(tmp_db):
         mock_browser.save_screenshot = AsyncMock()
         from gauntler.server import apply_jobs
 
-        result = await apply_jobs(ids=[job.id])
+        result = await apply_jobs(ids=[job.id], ctx=make_test_context())
     assert "ATS não reconhecido" in result
 
 
@@ -577,7 +577,7 @@ async def test_apply_jobs_updates_job_status(tmp_db):
         mock_detect.return_value = mock_applier
         from gauntler.server import apply_jobs
 
-        await apply_jobs(ids=[job.id])
+        await apply_jobs(ids=[job.id], ctx=make_test_context())
     job_fresh = Job.get_by_id(job.id)
     assert job_fresh.status == "applying"
 
@@ -608,7 +608,7 @@ async def test_confirm_apply_success(tmp_db, tmp_path):
         mock_detect.return_value = mock_applier
         from gauntler.server import confirm_apply
 
-        result = await confirm_apply(job_id=job.id)
+        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
 
     app_fresh = Application.get_by_id(app.id)
     assert app_fresh.status == "submitted"
@@ -624,7 +624,7 @@ async def test_confirm_apply_no_application(tmp_db):
     # No application created
     from gauntler.server import confirm_apply
 
-    result = await confirm_apply(job_id=job.id)
+    result = await confirm_apply(job_id=job.id, ctx=make_test_context())
     assert "sem rascunho" in result or "não encontrada" in result
 
 
@@ -632,7 +632,7 @@ async def test_confirm_apply_job_not_found(tmp_db):
     init_db()
     from gauntler.server import confirm_apply
 
-    result = await confirm_apply(job_id=88888)
+    result = await confirm_apply(job_id=88888, ctx=make_test_context())
     assert "não encontrada" in result or "sem rascunho" in result
 
 
@@ -646,7 +646,7 @@ async def test_confirm_apply_cv_not_found(tmp_db):
     ):
         from gauntler.server import confirm_apply
 
-        result = await confirm_apply(job_id=job.id)
+        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
     assert "CV" in result and "não encontrado" in result
     # não submeteu — status não vira applied
     assert Job.get_by_id(job.id).status != "applied"
@@ -679,7 +679,7 @@ async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
         mock_detect.return_value = mock_applier
         from gauntler.server import confirm_apply
 
-        await confirm_apply(job_id=job.id, answers={"Q1": "overridden"})
+        await confirm_apply(job_id=job.id, answers={"Q1": "overridden"}, ctx=make_test_context())
 
     assert fill_calls[0]["Q1"] == "overridden"
     assert fill_calls[0]["Q2"] == "original2"
@@ -708,10 +708,6 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
         patch("gauntler.application.service.browser") as mock_browser,
         patch("gauntler.application.service.detect_applier") as mock_detect,
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
-        patch(
-            "gauntler.server._config",
-            {"email": {"address": test_email}, "screenshots_dir": str(tmp_path)},
-        ),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -723,7 +719,12 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
         from gauntler.application.answers.email_alias import build_email_alias
         from gauntler.server import confirm_apply
 
-        await confirm_apply(job_id=job.id)
+        await confirm_apply(
+            job_id=job.id,
+            ctx=make_test_context(
+                config={"email": {"address": test_email}, "screenshots_dir": str(tmp_path)}
+            ),
+        )
 
     app_fresh = Application.get_by_id(app.id)
     assert app_fresh.email_ref  # ref foi gerado
@@ -754,7 +755,7 @@ async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
         mock_detect.return_value = mock_applier
         from gauntler.server import confirm_apply
 
-        result = await confirm_apply(job_id=job.id)
+        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
 
     app_fresh = Application.get_by_id(app.id)
     assert app_fresh.status == "draft"
@@ -774,7 +775,7 @@ async def test_retry_apply_no_draft(tmp_db):
     job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ra1")
     from gauntler.server import retry_apply
 
-    result = await retry_apply(job_id=job.id)
+    result = await retry_apply(job_id=job.id, ctx=make_test_context())
     assert "apply_jobs" in result or "primeiro" in result
 
 
@@ -800,7 +801,7 @@ async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
         mock_detect.return_value = mock_applier
         from gauntler.server import retry_apply
 
-        result = await retry_apply(job_id=job.id)
+        result = await retry_apply(job_id=job.id, ctx=make_test_context())
     assert "submetida" in result or "✓" in result
 
 
@@ -817,7 +818,7 @@ async def test_fill_application_tool_delegates_to_service(monkeypatch):
         return "preenchida"
 
     monkeypatch.setattr(server.apply_service, "fill_application", fake_fill)
-    result = await server.fill_application(42, {"campo": "v"})
+    result = await server.fill_application(42, {"campo": "v"}, ctx=make_test_context())
     assert result == "preenchida"
     assert called["args"] == (42, {"campo": "v"})
 
@@ -832,7 +833,7 @@ async def test_submit_application_tool_delegates_to_service(monkeypatch):
         return "submetida"
 
     monkeypatch.setattr(server.apply_service, "submit_application", fake_submit)
-    result = await server.submit_application(42)
+    result = await server.submit_application(42, ctx=make_test_context())
     assert result == "submetida"
     assert called["id"] == 42
 
@@ -1235,7 +1236,7 @@ async def test_apply_jobs_linkedin_not_easy_apply(tmp_db):
         mock_browser.save_screenshot = AsyncMock()
         from gauntler.server import apply_jobs
 
-        result = await apply_jobs(ids=[job.id])
+        result = await apply_jobs(ids=[job.id], ctx=make_test_context())
 
     assert "Easy Apply" in result or "easy apply" in result.lower()
 
@@ -1262,7 +1263,7 @@ async def test_apply_jobs_llm_error_still_creates_draft(tmp_db):
         mock_detect.return_value = mock_applier
         from gauntler.server import apply_jobs
 
-        result = await apply_jobs(ids=[job.id])
+        result = await apply_jobs(ids=[job.id], ctx=make_test_context())
 
     app = Application.get(Application.job == job)
     assert app is not None
@@ -1292,7 +1293,7 @@ async def test_apply_jobs_updates_existing_draft(tmp_db):
         mock_detect.return_value = mock_applier
         from gauntler.server import apply_jobs
 
-        await apply_jobs(ids=[job.id])
+        await apply_jobs(ids=[job.id], ctx=make_test_context())
 
     app_fresh = Application.get_by_id(existing_app.id)
     data = json.loads(app_fresh.form_data)
@@ -1330,7 +1331,7 @@ async def test_apply_jobs_exception_continues_to_next(tmp_db):
         mock_browser.save_screenshot = AsyncMock()
         from gauntler.server import apply_jobs
 
-        result = await apply_jobs(ids=[job1.id, job2.id])
+        result = await apply_jobs(ids=[job1.id, job2.id], ctx=make_test_context())
 
     # Job 2 should have been processed despite job 1 crashing
     assert Application.select().where(Application.job == job2).count() == 1
@@ -1364,7 +1365,7 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
         mock_detect.return_value = mock_applier
         from gauntler.server import confirm_apply
 
-        result = await confirm_apply(job_id=job.id)
+        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
 
     assert "⚠️" in result or "falhou" in result.lower() or "Submissão" in result
     assert "screenshot" in result.lower() or "04-submitted" in result
@@ -1401,7 +1402,7 @@ async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db,
         mock_detect.return_value = mock_applier
         from gauntler.server import confirm_apply
 
-        result = await confirm_apply(job_id=job.id)
+        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
 
     app_fresh = Application.get_by_id(app.id)
     assert app_fresh.status == "needs_review"  # NÃO submitted
@@ -1425,7 +1426,7 @@ async def test_retry_apply_refuses_needs_review(tmp_db):
     create_application(job, status="needs_review")
     from gauntler.server import retry_apply
 
-    result = await retry_apply(job_id=job.id)
+    result = await retry_apply(job_id=job.id, ctx=make_test_context())
     assert "needs_review" in result or "revis" in result.lower()
     assert "update_status" in result
 
@@ -1459,7 +1460,7 @@ async def test_confirm_apply_unknown_ats(tmp_db, tmp_path):
         mock_browser.save_screenshot = AsyncMock()
         from gauntler.server import confirm_apply
 
-        result = await confirm_apply(job_id=job.id)
+        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
 
     assert "ATS" in result and "reconhecido" in result
 
@@ -1501,7 +1502,7 @@ async def test_confirm_apply_linkedin_calls_extract_fields(tmp_db, tmp_path):
         mock_browser.save_screenshot = AsyncMock()
         from gauntler.server import confirm_apply
 
-        await confirm_apply(job_id=job.id)
+        await confirm_apply(job_id=job.id, ctx=make_test_context())
 
     assert len(extract_calls) == 1
 
@@ -1722,7 +1723,7 @@ async def test_confirm_apply_generates_6_char_ref(tmp_db, tmp_path):
         applier.fill_form = AsyncMock()
         applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = applier
-        await confirm_apply(job_id=job.id)
+        await confirm_apply(job_id=job.id, ctx=make_test_context())
 
     saved = Application.get_by_id(app.id)
     assert saved.email_ref is not None
@@ -1756,7 +1757,7 @@ async def test_confirm_apply_ref_is_url_safe(tmp_db, tmp_path):
         applier.fill_form = AsyncMock()
         applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = applier
-        await confirm_apply(job_id=job.id)
+        await confirm_apply(job_id=job.id, ctx=make_test_context())
 
     saved = Application.get_by_id(app.id)
     assert re.match(r"^[A-Za-z0-9_-]{6}$", saved.email_ref)
@@ -1790,7 +1791,7 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
             applier.fill_form = AsyncMock()
             applier.submit = AsyncMock(return_value="submitted")
             mock_detect.return_value = applier
-            await confirm_apply(job_id=job.id)
+            await confirm_apply(job_id=job.id, ctx=make_test_context())
 
         refs.add(Application.get(Application.job == job).email_ref)
 
@@ -2032,7 +2033,7 @@ async def test_confirm_apply_archives_on_success(tmp_db, tmp_path):
         mock_detect.return_value = mock_applier
         from gauntler.server import confirm_apply
 
-        await confirm_apply(job_id=job.id)
+        await confirm_apply(job_id=job.id, ctx=make_test_context())
 
     mock_archive.assert_called_once_with(job.id, mock_archive.call_args[0][1])
 
@@ -2172,7 +2173,7 @@ async def test_confirm_apply_aborts_when_cv_missing(tmp_db):
     ):
         from gauntler.server import confirm_apply
 
-        result = await confirm_apply(job_id=job.id)
+        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
     assert "CV" in result and ("não" in result or "nao" in result)
     assert Job.get_by_id(job.id).status != "applied"
 
@@ -2189,7 +2190,7 @@ async def test_confirm_apply_aborts_on_pending_needs_review(tmp_db, tmp_path):
     create_application(job, form_data='{"Authorized to work?": "__NEEDS_REVIEW__"}')
     from gauntler.server import confirm_apply
 
-    result = await confirm_apply(job_id=job.id)
+    result = await confirm_apply(job_id=job.id, ctx=make_test_context())
     assert "NÃO submetida" in result or "decisão" in result.lower()
     assert Job.get_by_id(job.id).status != "applied"
 

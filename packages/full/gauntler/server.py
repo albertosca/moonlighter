@@ -256,54 +256,69 @@ async def login(platform: str = "linkedin", *, ctx: Context[ServerSession, AppCo
 
 
 @mcp.tool()
-async def apply_jobs(ids: list[int]) -> str:
+@tool_logged
+async def apply_jobs(ids: list[int], *, ctx: Context[ServerSession, AppContext, Any]) -> str:
     """
     Start application flow for given job IDs.
     Opens each job in the browser, extracts form fields, generates LLM answers.
     Returns draft answers for review before submission.
     """
-    async with _log_tool("apply_jobs"):
-        return await apply_service.apply_jobs(ids, _config, _profile, _llm_caller)
+    app = ctx.request_context.lifespan_context
+    return await apply_service.apply_jobs(ids, app.config, app.profile, app.llm_caller)
 
 
 @mcp.tool()
-async def confirm_apply(job_id: int, answers: dict[str, str] | None = None) -> str:
+@tool_logged
+async def confirm_apply(
+    job_id: int,
+    answers: dict[str, str] | None = None,
+    *,
+    ctx: Context[ServerSession, AppContext, Any],
+) -> str:
     """
     Submit the application for a job.
     job_id: ID of the job (must have a draft Application in DB)
     answers: optional dict of {field: answer} overrides merged into the saved draft
     """
-    async with _log_tool("confirm_apply"):
-        return await apply_service.confirm_apply(job_id, answers, _config, _profile)
+    app = ctx.request_context.lifespan_context
+    return await apply_service.confirm_apply(job_id, answers, app.config, app.profile)
 
 
 @mcp.tool()
-async def fill_application(job_id: int, answers: dict[str, str] | None = None) -> str:
+@tool_logged
+async def fill_application(
+    job_id: int,
+    answers: dict[str, str] | None = None,
+    *,
+    ctx: Context[ServerSession, AppContext, Any],
+) -> str:
     """
     Fill the application form and STOP before submitting (review the 03-filled
     screenshot, then call submit_application). Does not submit.
     job_id: ID of the job (must have a draft Application in DB)
     answers: optional {field: answer} overrides merged into the saved draft
     """
-    async with _log_tool("fill_application"):
-        return await apply_service.fill_application(job_id, answers, _config, _profile)
+    app = ctx.request_context.lifespan_context
+    return await apply_service.fill_application(job_id, answers, app.config, app.profile)
 
 
 @mcp.tool()
-async def submit_application(job_id: int) -> str:
+@tool_logged
+async def submit_application(job_id: int, *, ctx: Context[ServerSession, AppContext, Any]) -> str:
     """
     Submit an already-filled application (must have been filled via fill_application).
     Re-fills from the saved answers and submits.
     """
-    async with _log_tool("submit_application"):
-        return await apply_service.submit_application(job_id, _config, _profile)
+    app = ctx.request_context.lifespan_context
+    return await apply_service.submit_application(job_id, app.config, app.profile)
 
 
 @mcp.tool()
-async def retry_apply(job_id: int) -> str:
+@tool_logged
+async def retry_apply(job_id: int, *, ctx: Context[ServerSession, AppContext, Any]) -> str:
     """Retry a failed application. Reuses stored draft answers."""
-    async with _log_tool("retry_apply"):
-        return await apply_service.retry_apply(job_id, _config, _profile)
+    app = ctx.request_context.lifespan_context
+    return await apply_service.retry_apply(job_id, app.config, app.profile)
 
 
 @mcp.tool()
