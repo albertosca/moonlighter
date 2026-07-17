@@ -358,7 +358,7 @@ async def test_list_jobs_default_new(tmp_db):
     create_job(tmp_db, url="https://x.com/lj1", status="new", score=8.0)
     from gauntler.server import list_jobs
 
-    result = await list_jobs(status="new")
+    result = await list_jobs(status="new", ctx=make_test_context())
     assert "Stripe" in result
 
 
@@ -368,7 +368,7 @@ async def test_list_jobs_filtered_by_status(tmp_db):
     create_job(tmp_db, url="https://x.com/lj3", status="new", score=8.0, company="Vercel")
     from gauntler.server import list_jobs
 
-    result = await list_jobs(status="reviewed")
+    result = await list_jobs(status="reviewed", ctx=make_test_context())
     assert "Linear" in result
     assert "Vercel" not in result
 
@@ -385,7 +385,7 @@ async def test_list_jobs_limit(tmp_db):
         )
     from gauntler.server import list_jobs
 
-    result = await list_jobs(status="new", limit=3)
+    result = await list_jobs(status="new", limit=3, ctx=make_test_context())
     # Verify it returned without error
     assert result is not None
     assert len(result) > 0
@@ -395,8 +395,8 @@ async def test_list_jobs_empty(tmp_db):
     init_db()
     from gauntler.server import list_jobs
 
-    result = await list_jobs(status="offer")
-    assert "Nenhuma vaga" in result
+    result = await list_jobs(status="offer", ctx=make_test_context())
+    assert "No jobs" in result
 
 
 async def test_list_jobs_ordered_by_score_desc(tmp_db):
@@ -405,7 +405,7 @@ async def test_list_jobs_ordered_by_score_desc(tmp_db):
     create_job(tmp_db, url="https://x.com/lj-hi", status="new", score=9.5, company="HighScore")
     from gauntler.server import list_jobs
 
-    result = await list_jobs(status="new")
+    result = await list_jobs(status="new", ctx=make_test_context())
     # HighScore should appear before LowScore in the output
     assert result.index("HighScore") < result.index("LowScore")
 
@@ -418,7 +418,7 @@ async def test_get_job_existing(tmp_db):
     job = create_job(tmp_db, url="https://x.com/gj1")
     from gauntler.server import get_job
 
-    result = await get_job(id=job.id)
+    result = await get_job(id=job.id, ctx=make_test_context())
     assert "Stripe" in result
     assert "Engineer" in result
     assert str(job.id) in result or "8.0" in result
@@ -428,8 +428,8 @@ async def test_get_job_nonexistent(tmp_db):
     init_db()
     from gauntler.server import get_job
 
-    result = await get_job(id=99999)
-    assert "não encontrada" in result
+    result = await get_job(id=99999, ctx=make_test_context())
+    assert "not found" in result
 
 
 async def test_get_job_with_caveats(tmp_db):
@@ -437,7 +437,7 @@ async def test_get_job_with_caveats(tmp_db):
     job = create_job(tmp_db, url="https://x.com/gj2", caveats='["US only"]')
     from gauntler.server import get_job
 
-    result = await get_job(id=job.id)
+    result = await get_job(id=job.id, ctx=make_test_context())
     assert "US only" in result
 
 
@@ -453,7 +453,7 @@ async def test_get_job_with_salary(tmp_db):
     )
     from gauntler.server import get_job
 
-    result = await get_job(id=job.id)
+    result = await get_job(id=job.id, ctx=make_test_context())
     assert "150" in result or "200" in result
 
 
@@ -462,9 +462,9 @@ async def test_get_job_without_salary(tmp_db):
     job = create_job(tmp_db, url="https://x.com/gj4")
     from gauntler.server import get_job
 
-    result = await get_job(id=job.id)
+    result = await get_job(id=job.id, ctx=make_test_context())
     # Should not crash; salary line absent
-    assert "não encontrada" not in result
+    assert "not found" not in result
 
 
 async def test_get_job_without_posted_at(tmp_db):
@@ -472,8 +472,8 @@ async def test_get_job_without_posted_at(tmp_db):
     job = create_job(tmp_db, url="https://x.com/gj5", posted_at=None)
     from gauntler.server import get_job
 
-    result = await get_job(id=job.id)
-    assert "n/d" in result
+    result = await get_job(id=job.id, ctx=make_test_context())
+    assert "n/a" in result
 
 
 async def test_get_job_description_is_framed_as_external_data(tmp_db):
@@ -484,7 +484,7 @@ async def test_get_job_description_is_framed_as_external_data(tmp_db):
     job = create_job(tmp_db, url="https://x.com/gj6", description="A normal job description.")
     from gauntler.server import get_job
 
-    result = await get_job(id=job.id)
+    result = await get_job(id=job.id, ctx=make_test_context())
     import re
 
     assert re.search(r"<job_description_[0-9a-f]{8}>", result)
@@ -845,7 +845,7 @@ async def test_get_pipeline_empty(tmp_db):
     init_db()
     from gauntler.server import get_pipeline
 
-    result = await get_pipeline()
+    result = await get_pipeline(ctx=make_test_context())
     assert "0" in result or "Total" in result
 
 
@@ -857,7 +857,7 @@ async def test_get_pipeline_groups_by_status(tmp_db):
     create_application(job2, status="interviews")
     from gauntler.server import get_pipeline
 
-    result = await get_pipeline()
+    result = await get_pipeline(ctx=make_test_context())
     assert "Submitted" in result or "submitted" in result.lower()
     assert "Interview" in result or "interview" in result.lower()
 
@@ -868,7 +868,7 @@ async def test_get_pipeline_shows_next_action(tmp_db):
     create_application(job, status="submitted", next_action="follow up em 2026-06-01")
     from gauntler.server import get_pipeline
 
-    result = await get_pipeline()
+    result = await get_pipeline(ctx=make_test_context())
     assert "follow up" in result
 
 
@@ -878,7 +878,7 @@ async def test_get_pipeline_skips_empty_statuses(tmp_db):
     create_application(job, status="submitted")
     from gauntler.server import get_pipeline
 
-    result = await get_pipeline()
+    result = await get_pipeline(ctx=make_test_context())
     # "Offer" section should not appear since no offer apps
     assert "## Offer" not in result
 
@@ -892,7 +892,7 @@ async def test_update_status_success(tmp_db):
     create_application(job)
     from gauntler.server import update_status
 
-    result = await update_status(job_id=job.id, status="screening")
+    result = await update_status(job_id=job.id, status="screening", ctx=make_test_context())
     app = Application.get(Application.job == job)
     assert app.status == "screening"
     assert "screening" in result
@@ -904,7 +904,12 @@ async def test_update_status_with_notes(tmp_db):
     create_application(job)
     from gauntler.server import update_status
 
-    await update_status(job_id=job.id, status="interviews", notes="Scheduled for Monday")
+    await update_status(
+        job_id=job.id,
+        status="interviews",
+        notes="Scheduled for Monday",
+        ctx=make_test_context(),
+    )
     app = Application.get(Application.job == job)
     assert "Scheduled for Monday" in app.notes
 
@@ -915,7 +920,9 @@ async def test_update_status_with_next_action(tmp_db):
     create_application(job)
     from gauntler.server import update_status
 
-    result = await update_status(job_id=job.id, status="screening", next_action="Call Friday")
+    result = await update_status(
+        job_id=job.id, status="screening", next_action="Call Friday", ctx=make_test_context()
+    )
     app = Application.get(Application.job == job)
     assert app.next_action == "Call Friday"
     assert "Call Friday" in result
@@ -925,16 +932,16 @@ async def test_update_status_invalid(tmp_db):
     init_db()
     from gauntler.server import update_status
 
-    result = await update_status(job_id=1, status="banana")
-    assert "inválido" in result or "Status" in result
+    result = await update_status(job_id=1, status="banana", ctx=make_test_context())
+    assert "Invalid" in result or "Status" in result
 
 
 async def test_update_status_job_not_found(tmp_db):
     init_db()
     from gauntler.server import update_status
 
-    result = await update_status(job_id=77777, status="screening")
-    assert "não encontrada" in result
+    result = await update_status(job_id=77777, status="screening", ctx=make_test_context())
+    assert "not found" in result
 
 
 async def test_update_status_no_application(tmp_db):
@@ -943,8 +950,8 @@ async def test_update_status_no_application(tmp_db):
     # No application
     from gauntler.server import update_status
 
-    result = await update_status(job_id=job.id, status="screening")
-    assert "candidatura" in result or "não encontrada" in result
+    result = await update_status(job_id=job.id, status="screening", ctx=make_test_context())
+    assert "application" in result or "not found" in result
 
 
 # ── scan_and_evaluate: batch processing ───────────────────────────────────────
@@ -1437,7 +1444,7 @@ async def test_get_pipeline_shows_needs_review(tmp_db):
     create_application(job, status="needs_review")
     from gauntler.server import get_pipeline
 
-    result = await get_pipeline()
+    result = await get_pipeline(ctx=make_test_context())
     assert "needs_review" in result.lower() or "revis" in result.lower()
 
 
@@ -1516,9 +1523,9 @@ async def test_get_job_score_null(tmp_db):
     job = create_job(tmp_db, url="https://x.com/gj-null-score", score=None)
     from gauntler.server import get_job
 
-    result = await get_job(id=job.id)
+    result = await get_job(id=job.id, ctx=make_test_context())
     assert "—" in result
-    assert "não encontrada" not in result
+    assert "not found" not in result
 
 
 # ── login ─────────────────────────────────────────────────────────────────────
@@ -1563,7 +1570,7 @@ async def test_list_jobs_salary_estimate_shows_asterisk(tmp_db):
     )
     from gauntler.server import list_jobs
 
-    result = await list_jobs(status="new")
+    result = await list_jobs(status="new", ctx=make_test_context())
     assert " *" in result
 
 
@@ -1581,7 +1588,7 @@ async def test_list_jobs_salary_min_only_shows_plus(tmp_db):
     )
     from gauntler.server import list_jobs
 
-    result = await list_jobs(status="new")
+    result = await list_jobs(status="new", ctx=make_test_context())
     assert "k+" in result or "120" in result
 
 
@@ -1599,7 +1606,7 @@ async def test_get_pipeline_total_count(tmp_db):
     create_application(job3, status="rejected")
     from gauntler.server import get_pipeline
 
-    result = await get_pipeline()
+    result = await get_pipeline(ctx=make_test_context())
     assert "3" in result
 
 
@@ -1803,55 +1810,49 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
 
 
 async def test_setup_email_calls_gmail_flow():
-    """setup_email deve iniciar o fluxo OAuth e confirmar sucesso."""
+    """setup_email should start the OAuth flow and confirm success."""
     from gauntler.server import setup_email
 
+    test_config = {
+        "email": {
+            "address": "candidaturas@gmail.com",
+            "credentials_path": "~/.gauntler/gmail-client.json",
+            "token_path": "~/.gauntler/gmail-token.json",
+        }
+    }
     with (
         patch("gauntler.server.setup_gmail_service") as mock_setup,
-        patch(
-            "gauntler.server.load_config",
-            return_value={
-                "email": {
-                    "address": "candidaturas@gmail.com",
-                    "credentials_path": "~/.gauntler/gmail-client.json",
-                    "token_path": "~/.gauntler/gmail-token.json",
-                }
-            },
-        ),
         patch("gauntler.server._run_gmail_oauth") as mock_oauth,
         patch("os.path.exists", return_value=True),
     ):
         mock_oauth.return_value = None
         mock_setup.return_value = MagicMock()
-        result = await setup_email()
+        result = await setup_email(ctx=make_test_context(config=test_config))
 
-    assert "sucesso" in result.lower() or "configurad" in result.lower()
+    assert "success" in result.lower() or "configured" in result.lower()
 
 
 async def test_setup_email_raises_friendly_error_when_client_json_missing():
-    """setup_email deve retornar mensagem clara se gmail-client.json não existe."""
+    """setup_email should return a clear message if gmail-client.json does not exist."""
     from gauntler.server import setup_email
 
-    with patch(
-        "gauntler.server.load_config",
-        return_value={
-            "email": {
-                "address": "candidaturas@gmail.com",
-                "credentials_path": "/nonexistent/gmail-client.json",
-                "token_path": "~/.gauntler/gmail-token.json",
-            }
-        },
-    ):
-        result = await setup_email()
+    test_config = {
+        "email": {
+            "address": "candidaturas@gmail.com",
+            "credentials_path": "/nonexistent/gmail-client.json",
+            "token_path": "~/.gauntler/gmail-token.json",
+        }
+    }
+    result = await setup_email(ctx=make_test_context(config=test_config))
 
-    assert "client" in result.lower() or "credential" in result.lower() or "erro" in result.lower()
+    assert "client" in result.lower() or "credential" in result.lower() or "error" in result.lower()
 
 
 # ── email: sync_email_responses MCP tool ─────────────────────────────────────
 
 
 async def test_sync_email_responses_returns_summary(tmp_db):
-    """sync_email_responses deve chamar sync_responses e retornar resumo legível."""
+    """sync_email_responses should call sync_responses and return a readable summary."""
     init_db()
     from gauntler.server import sync_email_responses
 
@@ -1871,54 +1872,45 @@ async def test_sync_email_responses_returns_summary(tmp_db):
             "match_type": "fuzzy",
         },
     ]
+    test_config = {
+        "email": {
+            "address": "candidaturas@gmail.com",
+            "credentials_path": "~/.gauntler/gmail-client.json",
+            "token_path": "~/.gauntler/gmail-token.json",
+            "processed_label": "gauntler/processed",
+            "interview_stages": [],
+        },
+        "llm_model": "claude-sonnet-4-6",
+    }
 
-    with (
-        patch("gauntler.server.sync_responses", new=AsyncMock(return_value=fake_updates)),
-        patch(
-            "gauntler.server.load_config",
-            return_value={
-                "email": {
-                    "address": "candidaturas@gmail.com",
-                    "credentials_path": "~/.gauntler/gmail-client.json",
-                    "token_path": "~/.gauntler/gmail-token.json",
-                    "processed_label": "gauntler/processed",
-                    "interview_stages": [],
-                },
-                "llm_model": "claude-sonnet-4-6",
-            },
-        ),
-    ):
-        result = await sync_email_responses()
+    with patch("gauntler.server.sync_responses", new=AsyncMock(return_value=fake_updates)):
+        result = await sync_email_responses(ctx=make_test_context(config=test_config))
 
     assert "Anthropic" in result
     assert "Stripe" in result
-    assert "2" in result or "dois" in result.lower() or len(result) > 10
+    assert "2" in result or len(result) > 10
 
 
 async def test_sync_email_responses_empty_inbox(tmp_db):
-    """sync_email_responses com inbox vazia deve retornar mensagem adequada."""
+    """sync_email_responses with an empty inbox should return an appropriate message."""
     init_db()
     from gauntler.server import sync_email_responses
 
-    with (
-        patch("gauntler.server.sync_responses", new=AsyncMock(return_value=[])),
-        patch(
-            "gauntler.server.load_config",
-            return_value={
-                "email": {
-                    "address": "candidaturas@gmail.com",
-                    "credentials_path": "~/.gauntler/gmail-client.json",
-                    "token_path": "~/.gauntler/gmail-token.json",
-                    "processed_label": "gauntler/processed",
-                    "interview_stages": [],
-                },
-                "llm_model": "claude-sonnet-4-6",
-            },
-        ),
-    ):
-        result = await sync_email_responses()
+    test_config = {
+        "email": {
+            "address": "candidaturas@gmail.com",
+            "credentials_path": "~/.gauntler/gmail-client.json",
+            "token_path": "~/.gauntler/gmail-token.json",
+            "processed_label": "gauntler/processed",
+            "interview_stages": [],
+        },
+        "llm_model": "claude-sonnet-4-6",
+    }
 
-    assert "nenhum" in result.lower() or "0" in result or "vazio" in result.lower()
+    with patch("gauntler.server.sync_responses", new=AsyncMock(return_value=[])):
+        result = await sync_email_responses(ctx=make_test_context(config=test_config))
+
+    assert "no new" in result.lower() or "0" in result
 
 
 async def test_sync_email_responses_flags_fuzzy_match_as_suggestion(tmp_db):
@@ -1944,7 +1936,7 @@ async def test_sync_email_responses_flags_fuzzy_match_as_suggestion(tmp_db):
             ]
         ),
     ):
-        result = await sync_email_responses()
+        result = await sync_email_responses(ctx=make_test_context())
 
     assert "update_status" in result
     assert "42" in result
@@ -2269,39 +2261,29 @@ async def test_tool_archive_stale_jobs_rejects_both_filters(tmp_db):
 
 
 async def test_setup_email_handles_auth_error(tmp_path):
-    """GmailAuthError no OAuth → mensagem amigável (mcp_server.py:278-279)."""
+    """GmailAuthError during OAuth → friendly message (server.py setup_email)."""
     from gauntler.server import setup_email
     from gauntler.tracking.email_monitor import GmailAuthError
 
     creds = tmp_path / "gmail-client.json"
     creds.write_text("{}")
-    with (
-        patch(
-            "gauntler.server.load_config",
-            return_value={
-                "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
-            },
-        ),
-        patch("gauntler.server._run_gmail_oauth", side_effect=GmailAuthError("token inválido")),
-    ):
-        result = await setup_email()
-    assert "Gmail" in result and "token inválido" in result
+    test_config = {
+        "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
+    }
+    with patch("gauntler.server._run_gmail_oauth", side_effect=GmailAuthError("invalid token")):
+        result = await setup_email(ctx=make_test_context(config=test_config))
+    assert "Gmail" in result and "invalid token" in result
 
 
 async def test_setup_email_handles_unexpected_error(tmp_path):
-    """Exceção inesperada no OAuth → mensagem de erro inesperado (mcp_server.py:280-281)."""
+    """Unexpected exception during OAuth → unexpected-error message (server.py setup_email)."""
     from gauntler.server import setup_email
 
     creds = tmp_path / "gmail-client.json"
     creds.write_text("{}")
-    with (
-        patch(
-            "gauntler.server.load_config",
-            return_value={
-                "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
-            },
-        ),
-        patch("gauntler.server._run_gmail_oauth", side_effect=RuntimeError("boom")),
-    ):
-        result = await setup_email()
-    assert "inesperado" in result.lower()
+    test_config = {
+        "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
+    }
+    with patch("gauntler.server._run_gmail_oauth", side_effect=RuntimeError("boom")):
+        result = await setup_email(ctx=make_test_context(config=test_config))
+    assert "unexpected" in result.lower()
