@@ -3,19 +3,27 @@ import sys
 import time as _time
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from gauntler.application import service as apply_service
 from gauntler.core import browser as _browser_mod
-from gauntler.core.config import harden_permissions, load_company_list, load_config, load_profile
+from gauntler.core.config import (
+    harden_permissions,
+    load_company_list,
+    load_config,
+    load_profile,
+    validate_config,
+)
 from gauntler.core.db import Application, Job, init_db
-from gauntler.core.llm import make_caller
+from gauntler.core.llm import LLMCaller, make_caller
 from gauntler.core.log import get_logger as _get_logger
 from gauntler.core.log import setup as _setup_logging
 from gauntler.core.parsing import wrap_untrusted
 from gauntler.discovery import service as scan_service
-from gauntler.startup import validate_startup
+from gauntler.startup import StartupWarning, validate_startup
 from gauntler.tracking.email_monitor import (
     GmailAuthError,
     _run_gmail_oauth,
@@ -25,10 +33,52 @@ from gauntler.tracking.email_monitor import (
 from gauntler.views import render_jobs_table
 from mcp.server.fastmcp import FastMCP
 
+
+@dataclass(frozen=True)
+class AppContext:
+    config: dict[str, Any]
+    profile: dict[str, Any]
+    companies: dict[str, Any]
+    llm_caller: LLMCaller
+    startup_warnings: list[StartupWarning]
+    permission_warnings: list[str]
+
+
+@contextlib.asynccontextmanager
+async def lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
+    """FastMCP lifespan: loads+validates config, inits DB, hardens permissions,
+    runs startup checks, and yields the AppContext. Raises ConfigError before
+    yielding on an invalid config, refusing to boot."""
+    config = load_config()
+    validate_config(config)  # raises ConfigError -> server refuses to boot
+    try:
+        profile = load_profile()
+    except FileNotFoundError:
+        profile = {}
+    companies = load_company_list()
+    init_db()
+    permission_warnings = harden_permissions()
+    startup_warnings = validate_startup(config, profile)
+    for msg in permission_warnings:  # pragma: no cover - only hit on an OSError while chmod'ing
+        print(f"⚠️  {msg}", file=sys.stderr, flush=True)
+    for w in startup_warnings:
+        prefix = "🚫" if w.level == "error" else "⚠️ "
+        print(f"{prefix} {w.message}", file=sys.stderr, flush=True)
+    llm_caller = make_caller(config)
+    yield AppContext(
+        config=config,
+        profile=profile,
+        companies=companies,
+        llm_caller=llm_caller,
+        startup_warnings=startup_warnings,
+        permission_warnings=permission_warnings,
+    )
+
+
 _setup_logging()
 _log = _get_logger(__name__)
 
-mcp = FastMCP("gauntler")
+mcp = FastMCP("gauntler", lifespan=lifespan)
 _config = load_config()
 try:
     _profile = load_profile()
