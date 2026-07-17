@@ -48,6 +48,7 @@ async def lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     """FastMCP lifespan: loads+validates config, inits DB, hardens permissions,
     runs startup checks, and yields the AppContext. Raises ConfigError before
     yielding on an invalid config, refusing to boot."""
+    _setup_logging()
     config = load_config()
     validate_config(config)  # raises ConfigError -> server refuses to boot
     try:
@@ -74,26 +75,7 @@ async def lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     )
 
 
-_setup_logging()
-
 mcp = FastMCP("gauntler", lifespan=lifespan)
-_config = load_config()
-try:
-    _profile = load_profile()
-except FileNotFoundError:  # pragma: no cover - fallback de import sem profile.yaml
-    _profile = {}
-_companies = load_company_list()
-init_db()
-_llm_caller = make_caller(_config)
-_permission_warnings = harden_permissions()
-
-
-_startup_warnings = validate_startup(_config, _profile)
-for _msg in _permission_warnings:  # pragma: no cover - prints warnings at server import time
-    print(f"⚠️  {_msg}", file=sys.stderr, flush=True)
-for _w in _startup_warnings:  # pragma: no cover - print de avisos no import do servidor
-    _prefix = "🚫" if _w.level == "error" else "⚠️ "
-    print(f"{_prefix} {_w.message}", file=sys.stderr, flush=True)
 
 
 @mcp.tool()

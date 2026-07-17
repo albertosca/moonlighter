@@ -28,3 +28,21 @@ async def test_lifespan_prints_permission_warnings(tmp_db, monkeypatch, capsys):
     async with lifespan(mcp) as ctx:
         assert ctx.permission_warnings == ["could not chmod ~/.gauntler"]
     assert "could not chmod ~/.gauntler" in capsys.readouterr().err
+
+
+def test_importing_server_has_no_side_effects(monkeypatch):
+    import importlib
+    import sys
+
+    calls: list[str] = []
+    import gauntler.core.config as cfg
+    import gauntler.core.db as db
+    import gauntler.core.log as log_mod
+
+    monkeypatch.setattr(cfg, "load_config", lambda *a, **k: calls.append("load_config") or {})
+    monkeypatch.setattr(db, "init_db", lambda *a, **k: calls.append("init_db"))
+    monkeypatch.setattr(cfg, "harden_permissions", lambda *a, **k: calls.append("harden") or [])
+    monkeypatch.setattr(log_mod, "setup", lambda *a, **k: calls.append("setup_logging"))
+    sys.modules.pop("gauntler.server", None)
+    importlib.import_module("gauntler.server")
+    assert calls == []  # importing the server must not load config / init db / harden perms
