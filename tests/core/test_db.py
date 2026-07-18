@@ -409,3 +409,61 @@ def test_db_path_follows_gauntler_home(monkeypatch, tmp_path):
     monkeypatch.delenv("GAUNTLER_DB_PATH", raising=False)
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     assert _db_path() == str(tmp_path / "gauntler.db")
+
+
+# --- init_db delegates schema evolution to run_migrations (E7 T2) ─────────────
+
+
+def test_init_db_fresh_db_reaches_version_3_with_all_columns(tmp_db):
+    """A fresh temp DB, after init_db(), is at schema_version 3 and has every
+    column the migrations add (behavior-preserving vs. the old inline ALTERs)."""
+    from gauntler.core.db import db
+    from gauntler.core.migrations import current_version
+
+    init_db()
+
+    assert current_version(db) == 3
+    app_cols = {row[1] for row in db.execute_sql("PRAGMA table_info(application)").fetchall()}
+    assert "email_ref" in app_cols
+    assert "current_stage" in app_cols
+    job_cols = {row[1] for row in db.execute_sql("PRAGMA table_info(job)").fetchall()}
+    assert "closed_at" in job_cols
+
+
+def test_init_db_called_twice_stays_at_version_3(tmp_db):
+    """Calling init_db() a second time is a no-op: no error, version unchanged."""
+    from gauntler.core.db import db
+    from gauntler.core.migrations import current_version
+
+    init_db()
+    init_db()
+
+    assert current_version(db) == 3
+
+
+def test_init_db_converges_real_db_shape_without_schema_version(tmp_db):
+    """A DB that already has the migrated columns (the real ~/.gauntler shape,
+    pre-existing before this schema_version table existed) converges to version
+    3 with no error — run_migrations must not choke on already-applied columns."""
+    from gauntler.core.db import db
+    from gauntler.core.migrations import current_version
+
+    db.init(tmp_db)
+    db.connect(reuse_if_open=True)
+    db.execute_sql(
+        "CREATE TABLE application (id INTEGER PRIMARY KEY, status VARCHAR(50), "
+        "email_ref VARCHAR(8), current_stage VARCHAR(255))"
+    )
+    db.execute_sql(
+        "CREATE UNIQUE INDEX application_email_ref "
+        "ON application (email_ref) WHERE email_ref IS NOT NULL"
+    )
+    db.execute_sql(
+        "CREATE TABLE job (id INTEGER PRIMARY KEY, source VARCHAR(50), company VARCHAR(255), "
+        "title VARCHAR(255), url VARCHAR(255) UNIQUE, status VARCHAR(50), closed_at DATETIME)"
+    )
+    db.close()
+
+    init_db()
+
+    assert current_version(db) == 3

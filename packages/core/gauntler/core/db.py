@@ -95,18 +95,6 @@ def init_db() -> None:
     db.init(path)
     db.connect(reuse_if_open=True)
     db.create_tables([Job, Application, ScanLog, ProcessedEmail], safe=True)
-    # Migration segura: adiciona colunas novas se ainda não existem
-    cursor = db.execute_sql("PRAGMA table_info(application)")
-    existing = {row[1] for row in cursor.fetchall()}
-    if "email_ref" not in existing:
-        db.execute_sql("ALTER TABLE application ADD COLUMN email_ref VARCHAR(8) NULL")
-        db.execute_sql(
-            "CREATE UNIQUE INDEX IF NOT EXISTS application_email_ref "
-            "ON application (email_ref) WHERE email_ref IS NOT NULL"
-        )
-    if "current_stage" not in existing:
-        db.execute_sql("ALTER TABLE application ADD COLUMN current_stage VARCHAR(255) NULL")
-    cursor = db.execute_sql("PRAGMA table_info(job)")
-    existing_job_cols = {row[1] for row in cursor.fetchall()}
-    if "closed_at" not in existing_job_cols:
-        db.execute_sql("ALTER TABLE job ADD COLUMN closed_at DATETIME NULL")
+    from gauntler.core.migrations import run_migrations
+
+    run_migrations(db)
