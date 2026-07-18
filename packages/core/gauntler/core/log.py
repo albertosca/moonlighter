@@ -42,7 +42,7 @@ def setup(log_path: str | None = None) -> None:
         )
         root.addHandler(rh)
     except ImportError:
-        pass  # rich opcional
+        pass  # rich optional
 
 
 def get_logger(name: str) -> logging.Logger:

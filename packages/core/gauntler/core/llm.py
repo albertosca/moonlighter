@@ -13,7 +13,7 @@ from gauntler.core.metrics import record_call
 
 
 class LLMCaller(Protocol):
-    """Protocolo do caller LLM: aceita prompt, model e cache_prefix opcional."""
+    """LLM caller protocol: accepts prompt, model, and optional cache_prefix."""
 
     async def __call__(self, prompt: str, model: str, cache_prefix: str | None = None) -> str: ...
 

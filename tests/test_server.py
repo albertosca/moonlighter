@@ -1394,7 +1394,7 @@ async def test_apply_jobs_llm_error_still_creates_draft(tmp_db):
 
     app = Application.get(Application.job == job)
     assert app is not None
-    assert "erro" in result.lower() or "Erro" in result or "LLM" in result
+    assert "error" in result.lower() or "LLM" in result
 
 
 async def test_apply_jobs_updates_existing_draft(tmp_db):
