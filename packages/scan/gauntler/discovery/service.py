@@ -69,7 +69,7 @@ def _create_job(
     posted_at: datetime | None,
     **scoring: Any,
 ) -> Job | None:
-    """Cria um Job (core de _persist/_persist_manual). None se a URL já existe."""
+    """Create a Job (shared core of _persist/_persist_manual). None if the URL already exists."""
     try:
         job: Job = Job.create(
             source=source,
