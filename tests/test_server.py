@@ -1,6 +1,7 @@
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from gauntler.application.answers.cv import CVNotFoundError
 from gauntler.application.appliers.base import ApplicationDraft
 from gauntler.application.appliers.linkedin import LinkedInApplier
@@ -954,6 +955,123 @@ async def test_update_status_no_application(tmp_db):
     assert "application" in result or "not found" in result
 
 
+async def test_update_status_invalid_leaves_db_untouched(tmp_db):
+    """An invalid status must be rejected before any DB write — no partial mutation."""
+    init_db()
+    job = create_job(tmp_db, url="https://x.com/us6")
+    create_application(job, status="draft", notes="original notes")
+    from gauntler.server import update_status
+
+    result = await update_status(
+        job_id=job.id, status="banana", notes="should not stick", ctx=make_test_context()
+    )
+    app = Application.get(Application.job == job)
+    assert app.status == "draft"
+    assert app.notes == "original notes"
+    assert "Invalid" in result
+
+
+@pytest.mark.parametrize(
+    "status",
+    ["screening", "interviews", "offer", "rejected", "submitted", "draft"],
+)
+async def test_update_status_accepts_every_valid_status(tmp_db, status):
+    """Every documented status value in the `valid` set is actually accepted."""
+    init_db()
+    job = create_job(tmp_db, url=f"https://x.com/us-valid-{status}")
+    create_application(job)
+    from gauntler.server import update_status
+
+    result = await update_status(job_id=job.id, status=status, ctx=make_test_context())
+    app = Application.get(Application.job == job)
+    assert app.status == status
+    assert status in result
+
+
+async def test_update_status_invalid_lists_accepted_values_sorted(tmp_db):
+    """Error message enumerates the accepted statuses, alphabetically sorted."""
+    init_db()
+    from gauntler.server import update_status
+
+    result = await update_status(job_id=1, status="not-a-real-status", ctx=make_test_context())
+    expected_order = ", ".join(
+        sorted({"screening", "interviews", "offer", "rejected", "submitted", "draft"})
+    )
+    assert expected_order in result
+
+
+async def test_update_status_appends_multiple_notes_instead_of_overwriting(tmp_db):
+    """Calling update_status twice with notes appends, it does not clobber history."""
+    init_db()
+    job = create_job(tmp_db, url="https://x.com/us7")
+    create_application(job)
+    from gauntler.server import update_status
+
+    await update_status(
+        job_id=job.id, status="screening", notes="First note", ctx=make_test_context()
+    )
+    await update_status(
+        job_id=job.id, status="interviews", notes="Second note", ctx=make_test_context()
+    )
+    app = Application.get(Application.job == job)
+    assert "First note" in app.notes
+    assert "Second note" in app.notes
+    # Second note comes after the first in the accumulated history.
+    assert app.notes.index("First note") < app.notes.index("Second note")
+
+
+async def test_update_status_without_notes_preserves_existing_notes(tmp_db):
+    """Omitting `notes` on a later call must not erase previously stored notes."""
+    init_db()
+    job = create_job(tmp_db, url="https://x.com/us8")
+    create_application(job)
+    from gauntler.server import update_status
+
+    await update_status(job_id=job.id, status="screening", notes="Keep me", ctx=make_test_context())
+    await update_status(job_id=job.id, status="interviews", ctx=make_test_context())
+    app = Application.get(Application.job == job)
+    assert "Keep me" in app.notes
+
+
+async def test_update_status_without_next_action_preserves_existing_value(tmp_db):
+    """Omitting `next_action` must not clear a previously set one."""
+    init_db()
+    job = create_job(tmp_db, url="https://x.com/us9")
+    create_application(job, next_action="original follow-up")
+    from gauntler.server import update_status
+
+    result = await update_status(job_id=job.id, status="screening", ctx=make_test_context())
+    app = Application.get(Application.job == job)
+    assert app.next_action == "original follow-up"
+    assert "Next action" not in result
+
+
+async def test_update_status_job_not_found_does_not_leak_other_jobs(tmp_db):
+    """A missing job_id returns the not-found message without touching unrelated rows."""
+    init_db()
+    job = create_job(tmp_db, url="https://x.com/us10")
+    create_application(job, status="draft")
+    from gauntler.server import update_status
+
+    result = await update_status(job_id=999999, status="offer", ctx=make_test_context())
+    assert "not found" in result
+    app = Application.get(Application.job == job)
+    assert app.status == "draft"  # untouched
+
+
+async def test_update_status_updates_updated_at_timestamp(tmp_db):
+    """updated_at must move forward on a successful status change."""
+    init_db()
+    job = create_job(tmp_db, url="https://x.com/us11")
+    app = create_application(job)
+    original_updated_at = app.updated_at
+    from gauntler.server import update_status
+
+    await update_status(job_id=job.id, status="screening", ctx=make_test_context())
+    refreshed = Application.get(Application.job == job)
+    assert refreshed.updated_at >= original_updated_at
+
+
 # ── scan_and_evaluate: batch processing ───────────────────────────────────────
 
 
@@ -1608,6 +1726,82 @@ async def test_get_pipeline_total_count(tmp_db):
 
     result = await get_pipeline(ctx=make_test_context())
     assert "3" in result
+
+
+async def test_get_pipeline_every_status_bucket_appears(tmp_db):
+    """One application per status: every bucket header shows up, in the tool's declared order."""
+    init_db()
+    statuses = [
+        "draft",
+        "needs_review",
+        "submitted",
+        "screening",
+        "interviews",
+        "offer",
+        "rejected",
+    ]
+    for i, status in enumerate(statuses):
+        job = create_job(tmp_db, url=f"https://x.com/pl-all-{i}", company=f"Co{i}")
+        create_application(job, status=status)
+    from gauntler.server import get_pipeline
+
+    result = await get_pipeline(ctx=make_test_context())
+    headers = [f"## {status.capitalize()} (1)" for status in statuses]
+    positions = [result.index(header) for header in headers]
+    # Headers appear in the declared status order, not e.g. insertion order.
+    assert positions == sorted(positions)
+    assert "**Total applications:** 7" in result
+
+
+async def test_get_pipeline_multiple_applications_same_status_ordered_by_updated_at_desc(tmp_db):
+    """Within a bucket, applications are ordered most-recently-updated first."""
+    init_db()
+    job_old = create_job(tmp_db, url="https://x.com/pl-ord1", company="OldCo")
+    job_new = create_job(tmp_db, url="https://x.com/pl-ord2", company="NewCo")
+    create_application(job_old, status="submitted")
+    create_application(job_new, status="submitted")
+    # Force NewCo's application to have a strictly later updated_at.
+    from datetime import timedelta
+
+    app_new = Application.get(Application.job == job_new)
+    app_new.updated_at = app_new.updated_at + timedelta(days=1)
+    app_new.save()
+    from gauntler.server import get_pipeline
+
+    result = await get_pipeline(ctx=make_test_context())
+    assert result.index("NewCo") < result.index("OldCo")
+
+
+async def test_get_pipeline_no_applied_at_shows_dash(tmp_db):
+    """An application without applied_at renders '—' instead of a date/crashing."""
+    init_db()
+    job = create_job(tmp_db, url="https://x.com/pl-noapplied")
+    create_application(job, status="draft", applied_at=None)
+    from gauntler.server import get_pipeline
+
+    result = await get_pipeline(ctx=make_test_context())
+    assert "(—)" in result
+
+
+async def test_get_pipeline_shows_job_company_and_title(tmp_db):
+    """Each pipeline row includes the job's id, company and title."""
+    init_db()
+    job = create_job(tmp_db, url="https://x.com/pl-fmt", company="Acme Corp", title="Backend Dev")
+    create_application(job, status="submitted")
+    from gauntler.server import get_pipeline
+
+    result = await get_pipeline(ctx=make_test_context())
+    assert f"#{job.id} Acme Corp/Backend Dev" in result
+
+
+async def test_get_pipeline_empty_has_zero_total_and_no_bucket_headers(tmp_db):
+    """With zero applications, no '## Status' header appears anywhere, and total is 0."""
+    init_db()
+    from gauntler.server import get_pipeline
+
+    result = await get_pipeline(ctx=make_test_context())
+    assert "## " not in result
+    assert "**Total applications:** 0" in result
 
 
 # ── validate_startup integration ──────────────────────────────────────────────

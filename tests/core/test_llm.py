@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from anthropic.types import TextBlock
-from gauntler.core.llm import LLMCaller, _call_cli, make_api_caller, make_caller
+from gauntler.core.llm import LLMCaller, _call_cli, is_spend_limit, make_api_caller, make_caller
 
 
 @pytest.fixture(autouse=True)
@@ -470,3 +470,66 @@ async def test_api_no_cache_prefix_sends_plain_string():
     call_kwargs = mock_client.messages.create.call_args.kwargs
     content = call_kwargs["messages"][0]["content"]
     assert content == "PROMPT_ONLY"
+
+
+# ── is_spend_limit ────────────────────────────────────────────────────────────
+
+
+class _CustomAPIError(Exception):
+    """Stand-in for a real SDK exception type (e.g. anthropic.RateLimitError)."""
+
+
+IS_SPEND_LIMIT_CASES = [
+    # (exception, expected, case id)
+    (Exception("spend limit reached"), True, "spend-limit-plain"),
+    (Exception("Spend Limit Reached"), True, "spend-limit-mixed-case"),
+    (Exception("SPEND LIMIT EXCEEDED FOR ORG"), True, "spend-limit-upper"),
+    (Exception("your session limit has been hit"), True, "session-limit"),
+    (Exception("quota exceeded for this project"), True, "quota"),
+    (Exception("rate limit exceeded, please retry"), True, "rate-limit"),
+    (Exception("too many requests in a short period"), True, "too-many-requests"),
+    (Exception("the API is currently overloaded"), True, "overloaded"),
+    (Exception("HTTP 429 returned by upstream"), True, "429-in-http-status"),
+    (Exception("usage limit for this key was reached"), True, "usage-limit"),
+    # Marker embedded deep inside a longer, unrelated-looking message.
+    (
+        Exception("Traceback (most recent call last): anthropic.RateLimitError: rate limit"),
+        True,
+        "marker-embedded-in-traceback",
+    ),
+    # A real SDK-shaped exception type, not just builtin Exception.
+    (_CustomAPIError("429 Too Many Requests"), True, "custom-exception-type"),
+    # Wrapped exception: __str__ of the outer exception must still surface the marker.
+    (
+        RuntimeError(f"llm call failed: {ValueError('quota exceeded')}"),
+        True,
+        "wrapped-exception-str-propagates-marker",
+    ),
+    # ── should NOT be classified as spend-limit ──
+    (Exception("connection refused"), False, "unrelated-connection-error"),
+    (Exception("invalid api key"), False, "unrelated-auth-error"),
+    (Exception("file not found: /tmp/x.json"), False, "unrelated-file-error"),
+    (Exception(""), False, "empty-message"),
+    (Exception("timeout while waiting for response"), False, "timeout-not-a-marker"),
+    (ValueError("malformed JSON in response body"), False, "unrelated-value-error"),
+    (KeyError("missing_field"), False, "unrelated-key-error"),
+    # Partial/incomplete phrases: only a fragment of a two-word marker present.
+    (Exception("spend more time reviewing"), False, "partial-phrase-spend-without-limit"),
+    (Exception("limit your expectations"), False, "partial-phrase-limit-without-spend"),
+    (Exception("rate this job highly"), False, "partial-phrase-rate-without-limit"),
+]
+
+
+@pytest.mark.parametrize(
+    "exc,expected",
+    [(exc, expected) for exc, expected, _ in IS_SPEND_LIMIT_CASES],
+    ids=[case_id for _, _, case_id in IS_SPEND_LIMIT_CASES],
+)
+def test_is_spend_limit_table(exc: Exception, expected: bool) -> None:
+    assert is_spend_limit(exc) is expected
+
+
+def test_is_spend_limit_returns_bool_not_truthy_object() -> None:
+    """`is` comparisons above only work if the return type is a real bool."""
+    result = is_spend_limit(Exception("quota exceeded"))
+    assert isinstance(result, bool)
