@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from gauntler.core.llm import LLMCaller
-from gauntler.core.parsing import _extract_json, wrap_untrusted
+from gauntler.core.parsing import extract_json, wrap_untrusted
 
 logger = logging.getLogger(__name__)
 
@@ -262,7 +262,7 @@ Responda APENAS com o JSON, sem texto adicional."""
 
     try:
         raw = await llm_caller(prompt, model)
-        return _classification_from(json.loads(_extract_json(raw)))
+        return _classification_from(json.loads(extract_json(raw)))
     except Exception as e:
         logger.warning("classify_response: falha ao parsear LLM response: %s", e)
         return _classification_from({})

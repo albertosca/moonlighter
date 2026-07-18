@@ -2,7 +2,7 @@ import re
 import secrets
 
 
-def _extract_json(raw: str) -> str:
+def extract_json(raw: str) -> str:
     """
     Extrai JSON puro de uma resposta do LLM que pode conter markdown fences
     ou texto introdutório antes/depois do JSON.

@@ -32,7 +32,7 @@ from gauntler.core.config import gauntler_home, load_config, load_profile
 from gauntler.core.db import Job, init_db
 from gauntler.core.llm import make_caller
 from gauntler.core.log import setup as setup_logging
-from gauntler.core.parsing import _extract_json
+from gauntler.core.parsing import extract_json
 
 
 def _make_proposal_prompt(company: str, threshold: float, titles_block: str, profile: dict) -> str:
@@ -152,7 +152,7 @@ async def _propose_for_company(
     prompt = _make_proposal_prompt(company, threshold, titles_block, profile)
     try:
         raw = await caller(prompt, model)
-        extracted = _extract_json(raw)
+        extracted = extract_json(raw)
         proposals = json.loads(extracted)
         if not isinstance(proposals, list):
             return []

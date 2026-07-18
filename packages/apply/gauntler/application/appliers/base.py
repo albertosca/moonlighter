@@ -9,7 +9,7 @@ import yaml
 from gauntler.core.config import NEEDS_REVIEW_SENTINEL
 from gauntler.core.llm import LLMCaller, _make_api_caller
 from gauntler.core.log import get_logger
-from gauntler.core.parsing import _extract_json, wrap_untrusted
+from gauntler.core.parsing import extract_json, wrap_untrusted
 from playwright.async_api import Page
 
 logger = get_logger(__name__)
@@ -413,7 +413,7 @@ async def _ask_llm(
         wrapped_fields=wrap_untrusted("form_fields", numbered),
     )
     try:
-        raw: dict[str, Any] = json.loads(_extract_json(await caller(prompt, model)))
+        raw: dict[str, Any] = json.loads(extract_json(await caller(prompt, model)))
         answers = _resolve_answer_keys(raw, fields)
         if any(canary in v for v in answers.values()):
             logger.warning(
