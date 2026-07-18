@@ -1,75 +1,14 @@
-import asyncio
+from typing import ClassVar
 
-from gauntler.application.appliers.base import (
-    BaseApplier,
-    classify_submit_outcome,
-    fill_field,
-    is_skip,
-    query_labels_with_fallback,
-)
-from gauntler.core.log import get_logger
-from playwright.async_api import TimeoutError as PlaywrightTimeout
-
-logger = get_logger(__name__)
+from gauntler.application.appliers.simple_form import SimpleFormApplier
 
 
-class AshbyApplier(BaseApplier):
-    async def detect(self) -> bool:
-        return "ashbyhq.com" in self.page.url or "jobs.ashbyhq.com" in self.page.url
-
-    async def extract_fields(self) -> list[str]:
-        try:
-            await self.page.wait_for_selector("form", timeout=10000)
-        except PlaywrightTimeout:
-            return []
-        labels = []
-        label_els = await query_labels_with_fallback(
-            self.page,
-            [
-                "label",
-                ".ashby-application-form label",
-                "[class*='label']:not(legend)",
-            ],
-        )
-        for el in label_els:
-            text = (await el.inner_text()).strip()
-            if text and len(text) < 200:
-                labels.append(text)
-        return labels
-
-    async def fill_form(self, answers: dict[str, str], cv_path: str) -> None:
-        for label_text, answer in answers.items():
-            if is_skip(answer):
-                logger.debug("skipping sentinel answer for %r", label_text)
-                continue
-            try:
-                label = await self.page.query_selector(f"label:text-is('{label_text}')")
-                if not label:
-                    continue
-                for_id = await label.get_attribute("for")
-                if for_id:
-                    field = await self.page.query_selector(f"#{for_id}")
-                    if field:
-                        await fill_field(field, answer)
-                        await asyncio.sleep(0.3)
-            except Exception as e:
-                logger.debug("skipping field %r: %s", label_text, e)
-                continue
-        try:
-            file_input = await self.page.query_selector("input[type='file']")
-            if file_input and cv_path:
-                await file_input.set_input_files(cv_path)
-                await asyncio.sleep(1)
-        except Exception as e:
-            logger.debug("CV upload failed: %s", e)
-
-    async def submit(self) -> str:
-        try:
-            btn = await self.page.query_selector("button[type='submit']")
-            if not btn:
-                return "failed"
-            await btn.click()
-            await self.page.wait_for_load_state("networkidle", timeout=15000)
-            return await classify_submit_outcome(self.page)
-        except Exception:
-            return "failed"
+class AshbyApplier(SimpleFormApplier):
+    URL_HOSTS = ("ashbyhq.com", "jobs.ashbyhq.com")
+    FORM_SELECTOR = "form"
+    LABEL_SELECTORS: ClassVar[list[str]] = [
+        "label",
+        ".ashby-application-form label",
+        "[class*='label']:not(legend)",
+    ]
+    SUBMIT_SELECTOR = "button[type='submit']"

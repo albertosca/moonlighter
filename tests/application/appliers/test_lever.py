@@ -138,10 +138,11 @@ async def test_fill_form_skips_sentinel_answers():
 
 
 async def test_fill_form_skips_missing_label():
-    """No crash and no fill when label not found."""
+    """No crash, and the missing field is surfaced in the status dict (S-12)."""
     applier = make_applier()
     applier.page.query_selector = AsyncMock(return_value=None)
-    await applier.fill_form({"Q": "A"}, cv_path="")  # should not raise
+    status = await applier.fill_form({"Q": "A"}, cv_path="")
+    assert status["Q"] == "failed:not_found"
 
 
 # ── submit() ──────────────────────────────────────────────────────────────────
@@ -214,8 +215,9 @@ async def test_fill_form_skips_label_without_for_attr():
         return field
 
     applier.page.query_selector = qs
-    await applier.fill_form({"Q": "A"}, cv_path="")
+    status = await applier.fill_form({"Q": "A"}, cv_path="")
     field.fill.assert_not_called()
+    assert status["Q"] == "failed:not_found"
 
 
 async def test_submit_exception_returns_failed():
@@ -262,18 +264,22 @@ async def test_fill_form_skips_when_field_missing():
 
     applier.page.query_selector = qs
     with patch("asyncio.sleep", new=AsyncMock()):
-        await applier.fill_form({"Q": "A"}, cv_path="")
+        status = await applier.fill_form({"Q": "A"}, cv_path="")
+    assert status["Q"] == "failed:not_found"
 
 
 async def test_fill_form_swallows_exceptions(caplog):
     """query_selector raises throughout the flow -> both the field loop and the CV
-    upload swallow the exception, and both log it at debug level."""
+    upload swallow the exception, log it at debug level, and surface a failed:<reason>
+    status instead of silently dropping the field (S-12)."""
     applier = make_applier()
     applier.page.query_selector = AsyncMock(side_effect=Exception("boom"))
     with (
         patch("asyncio.sleep", new=AsyncMock()),
-        caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.lever"),
+        caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.simple_form"),
     ):
-        await applier.fill_form({"Q": "A"}, cv_path="/cv.pdf")
-    assert "skipping field 'Q'" in caplog.text
+        status = await applier.fill_form({"Q": "A"}, cv_path="/cv.pdf")
+    assert "fill failed for 'Q'" in caplog.text
     assert "CV upload failed" in caplog.text
+    assert status["Q"] == "failed:Exception"
+    assert status["__cv__"] == "failed:Exception"

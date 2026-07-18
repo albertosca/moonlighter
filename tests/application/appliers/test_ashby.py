@@ -189,8 +189,9 @@ async def test_fill_form_skips_label_without_for_attr():
 
     applier.page.query_selector = qs
     with patch("asyncio.sleep", new=AsyncMock()):
-        await applier.fill_form({"Q": "A"}, cv_path="")
+        status = await applier.fill_form({"Q": "A"}, cv_path="")
     field.fill.assert_not_called()
+    assert status["Q"] == "failed:not_found"
 
 
 async def test_submit_exception_returns_failed():
@@ -227,15 +228,16 @@ async def test_extract_fields_falls_back_when_primary_selector_empty():
 
 
 async def test_fill_form_skips_when_label_not_found():
-    """label:text-is(...) doesn't match → query_selector None → skips without error."""
+    """label:text-is(...) doesn't match → query_selector None → surfaced as failed:not_found (S-12)."""
     applier = make_applier()
     applier.page.query_selector = AsyncMock(return_value=None)
     with patch("asyncio.sleep", new=AsyncMock()):
-        await applier.fill_form({"Q": "A"}, cv_path="")
+        status = await applier.fill_form({"Q": "A"}, cv_path="")
+    assert status["Q"] == "failed:not_found"
 
 
 async def test_fill_form_skips_when_field_missing():
-    """label with for=fid but #fid doesn't exist → field not filled."""
+    """label with for=fid but #fid doesn't exist → field not filled, surfaced as failed:not_found."""
     applier = make_applier()
     label = MagicMock()
     label.get_attribute = AsyncMock(return_value="fid")
@@ -245,18 +247,22 @@ async def test_fill_form_skips_when_field_missing():
 
     applier.page.query_selector = qs
     with patch("asyncio.sleep", new=AsyncMock()):
-        await applier.fill_form({"Q": "A"}, cv_path="")
+        status = await applier.fill_form({"Q": "A"}, cv_path="")
+    assert status["Q"] == "failed:not_found"
 
 
 async def test_fill_form_swallows_exceptions(caplog):
     """query_selector raises throughout the flow -> both the field loop and the CV
-    upload swallow the exception, and both log it at debug level."""
+    upload swallow the exception, log it at debug level, and surface a failed:<reason>
+    status instead of silently dropping the field (S-12)."""
     applier = make_applier()
     applier.page.query_selector = AsyncMock(side_effect=Exception("boom"))
     with (
         patch("asyncio.sleep", new=AsyncMock()),
-        caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.ashby"),
+        caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.simple_form"),
     ):
-        await applier.fill_form({"Q": "A"}, cv_path="/cv.pdf")
-    assert "skipping field 'Q'" in caplog.text
+        status = await applier.fill_form({"Q": "A"}, cv_path="/cv.pdf")
+    assert "fill failed for 'Q'" in caplog.text
     assert "CV upload failed" in caplog.text
+    assert status["Q"] == "failed:Exception"
+    assert status["__cv__"] == "failed:Exception"
