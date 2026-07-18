@@ -212,9 +212,9 @@ async def login(platform: str = "linkedin", *, ctx: Context[ServerSession, AppCo
     page = await _browser_mod.new_page(app.config)
     await page.goto("https://www.linkedin.com/login")
     return (
-        "Browser aberto em linkedin.com/login. "
-        "Faça login manualmente. "
-        "A sessão será salva automaticamente em ~/.gauntler/browser-session/"
+        "Browser opened at linkedin.com/login. "
+        "Log in manually. "
+        "The session will be saved automatically to ~/.gauntler/browser-session/"
     )
 
 
