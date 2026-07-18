@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import yaml
-from gauntler.core.llm import LLMCaller, _make_api_caller, is_spend_limit
+from gauntler.core.llm import LLMCaller, is_spend_limit, make_api_caller
 from gauntler.core.log import get_logger
 from gauntler.core.parsing import extract_json, wrap_untrusted
 
@@ -103,7 +103,7 @@ async def evaluate_job(
     _caller: LLMCaller | None = None,
 ) -> EvaluationResult:
     if _caller is None:
-        _caller = _make_api_caller()
+        _caller = make_api_caller()
     logger.debug("evaluating %s/%s", company, title)
     # Prefixo estático (profile + instruções) → cacheável; sufixo dinâmico = só a vaga.
     prefix = EVAL_PREFIX.format(

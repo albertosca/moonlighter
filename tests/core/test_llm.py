@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from anthropic.types import TextBlock
-from gauntler.core.llm import LLMCaller, _call_cli, _make_api_caller, make_caller
+from gauntler.core.llm import LLMCaller, _call_cli, make_api_caller, make_caller
 
 
 @pytest.fixture(autouse=True)
@@ -236,7 +236,7 @@ async def test_call_cli_errors_clearly_when_claude_is_not_on_path():
         await _call_cli("the prompt", "model")
 
 
-# ── _make_api_caller ──────────────────────────────────────────────────────────
+# ── make_api_caller ──────────────────────────────────────────────────────────
 
 
 async def test_make_api_caller_calls_messages_create():
@@ -249,7 +249,7 @@ async def test_make_api_caller_calls_messages_create():
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
     with patch("gauntler.core.llm.anthropic", mock_anthropic):
-        caller = _make_api_caller()
+        caller = make_api_caller()
         result = await caller("my prompt", "claude-sonnet-4-6")
 
     assert result == "api response"
@@ -270,7 +270,7 @@ async def test_make_api_caller_custom_max_tokens():
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
     with patch("gauntler.core.llm.anthropic", mock_anthropic):
-        caller = _make_api_caller(max_tokens=512)
+        caller = make_api_caller(max_tokens=512)
         await caller("prompt", "model")
 
     call_kwargs = mock_client.messages.create.call_args.kwargs
@@ -287,7 +287,7 @@ async def test_make_api_caller_forwards_model():
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
     with patch("gauntler.core.llm.anthropic", mock_anthropic):
-        caller = _make_api_caller()
+        caller = make_api_caller()
         await caller("prompt", "claude-opus-4-7")
 
     call_kwargs = mock_client.messages.create.call_args.kwargs
@@ -308,7 +308,7 @@ async def test_make_api_caller_returns_first_content_text():
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
     with patch("gauntler.core.llm.anthropic", mock_anthropic):
-        caller = _make_api_caller()
+        caller = make_api_caller()
         result = await caller("prompt", "model")
 
     assert result == "first block"
@@ -323,13 +323,13 @@ async def test_make_api_caller_propagates_exception():
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
     with patch("gauntler.core.llm.anthropic", mock_anthropic):
-        caller = _make_api_caller()
+        caller = make_api_caller()
         with pytest.raises(Exception, match="rate limit"):
             await caller("prompt", "model")
 
 
 def test_make_api_caller_reuses_client_across_calls():
-    """_make_api_caller() creates ONE AsyncAnthropic instance, not one per call."""
+    """make_api_caller() creates ONE AsyncAnthropic instance, not one per call."""
     mock_client = MagicMock()
     mock_message = MagicMock()
     mock_message.content = [MagicMock(spec=TextBlock, text="ok")]
@@ -339,7 +339,7 @@ def test_make_api_caller_reuses_client_across_calls():
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
     with patch("gauntler.core.llm.anthropic", mock_anthropic):
-        _make_api_caller()
+        make_api_caller()
 
     assert mock_anthropic.AsyncAnthropic.call_count == 1
 
@@ -375,7 +375,7 @@ async def test_api_caller_satisfies_llm_caller_contract():
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
     with patch("gauntler.core.llm.anthropic", mock_anthropic):
-        caller = _make_api_caller()
+        caller = make_api_caller()
         result = await caller("hello", "any-model")
 
     assert isinstance(result, str)
@@ -390,7 +390,7 @@ async def test_make_api_caller_raises_on_non_text_block():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
     with patch("gauntler.core.llm.anthropic", mock_anthropic):
-        caller = _make_api_caller()
+        caller = make_api_caller()
         with pytest.raises(RuntimeError, match="bloco não-texto"):
             await caller("prompt", "model")
 
@@ -443,7 +443,7 @@ async def test_api_uses_cache_control_block():
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
     with patch("gauntler.core.llm.anthropic", mock_anthropic):
-        caller = _make_api_caller()
+        caller = make_api_caller()
         await caller("DYN", "m", cache_prefix="STATIC")
 
     call_kwargs = mock_client.messages.create.call_args.kwargs
@@ -464,7 +464,7 @@ async def test_api_no_cache_prefix_sends_plain_string():
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
     with patch("gauntler.core.llm.anthropic", mock_anthropic):
-        caller = _make_api_caller()
+        caller = make_api_caller()
         await caller("PROMPT_ONLY", "m")
 
     call_kwargs = mock_client.messages.create.call_args.kwargs

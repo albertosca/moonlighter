@@ -168,14 +168,14 @@ def test_application_draft_with_error():
 
 
 async def test_generate_answers_uses_injected_caller():
-    """When _caller is passed, _make_api_caller() is NOT called."""
+    """When _caller is passed, make_api_caller() is NOT called."""
     called = []
 
     async def tracking_caller(prompt, model):
         called.append((prompt, model))
         return json.dumps({"Q": "a"})
 
-    with patch("gauntler.application.appliers.base._make_api_caller") as mock_factory:
+    with patch("gauntler.application.appliers.base.make_api_caller") as mock_factory:
         await generate_answers(
             company="Co",
             title="Eng",
@@ -977,10 +977,10 @@ async def test_fill_field_unknown_tag_is_noop():
 
 
 async def test_generate_answers_builds_default_caller_when_none():
-    """_caller=None → usa _make_api_caller() como fallback (linha 225)."""
+    """_caller=None → usa make_api_caller() como fallback (linha 225)."""
     fake_caller = AsyncMock(return_value='{"Q": "A"}')
     with patch(
-        "gauntler.application.appliers.base._make_api_caller", return_value=fake_caller
+        "gauntler.application.appliers.base.make_api_caller", return_value=fake_caller
     ) as mock_factory:
         result = await generate_answers(
             company="Co", title="Eng", description="d", fields=["Q"], profile={}, _caller=None

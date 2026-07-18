@@ -307,7 +307,7 @@ async def test_evaluate_job_description_capped_at_8000():
 
 
 async def test_evaluate_job_uses_injected_caller():
-    """When _caller is passed, _make_api_caller() is NOT called."""
+    """When _caller is passed, make_api_caller() is NOT called."""
     response = json.dumps(
         {
             "score": 5.0,
@@ -325,7 +325,7 @@ async def test_evaluate_job_uses_injected_caller():
         called.append((prompt, model))
         return response
 
-    with patch("gauntler.discovery.evaluator._make_api_caller") as mock_factory:
+    with patch("gauntler.discovery.evaluator.make_api_caller") as mock_factory:
         await evaluate_job(
             company="Co",
             title="Eng",
@@ -704,9 +704,9 @@ async def test_evaluate_job_logs_score(caplog):
 
 
 async def test_evaluate_job_builds_default_caller_when_none():
-    """_caller=None → usa _make_api_caller() como fallback (evaluator.py:78)."""
+    """_caller=None → usa make_api_caller() como fallback (evaluator.py:78)."""
     fake = _make_caller(MOCK_LLM_RESPONSE)
-    with patch("gauntler.discovery.evaluator._make_api_caller", return_value=fake) as factory:
+    with patch("gauntler.discovery.evaluator.make_api_caller", return_value=fake) as factory:
         result = await evaluate_job(
             company="Co", title="Eng", description=JD, profile=PROFILE, _caller=None
         )

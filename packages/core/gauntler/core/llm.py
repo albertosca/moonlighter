@@ -45,7 +45,7 @@ def make_caller(config: dict[str, Any]) -> LLMCaller:
     backend = config.get("llm_backend", "api")
     if backend == "cli":
         return _call_cli
-    return _make_api_caller()
+    return make_api_caller()
 
 
 # Sandbox posture validated empirically (canary experiment, 2026-07-09 —
@@ -114,7 +114,7 @@ async def _call_cli(prompt: str, model: str, cache_prefix: str | None = None) ->
     return stdout.decode()
 
 
-def _make_api_caller(max_tokens: int = 2048) -> LLMCaller:
+def make_api_caller(max_tokens: int = 2048) -> LLMCaller:
     """Return an async caller that uses the Anthropic Python SDK.
 
     Requires ANTHROPIC_API_KEY in the environment.

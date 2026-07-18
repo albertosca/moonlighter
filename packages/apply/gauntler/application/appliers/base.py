@@ -7,7 +7,7 @@ from typing import Any
 
 import yaml
 from gauntler.core.config import NEEDS_REVIEW_SENTINEL
-from gauntler.core.llm import LLMCaller, _make_api_caller
+from gauntler.core.llm import LLMCaller, make_api_caller
 from gauntler.core.log import get_logger
 from gauntler.core.parsing import extract_json, wrap_untrusted
 from playwright.async_api import Page
@@ -285,7 +285,7 @@ async def generate_answers(
     from gauntler.application.answers.field_map import pre_populate_answers
 
     if _caller is None:
-        _caller = _make_api_caller(max_tokens=2048)
+        _caller = make_api_caller(max_tokens=2048)
     logger.info("generating answers: %s/%s (%d fields)", company, title, len(fields))
 
     # Pré-populamos campos de contato e respostas padronizadas diretamente do perfil.
