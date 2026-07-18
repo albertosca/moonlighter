@@ -2214,7 +2214,7 @@ async def test_add_job_tool_delegates_to_service(tmp_db):
 
 async def test_tool_archive_stale_jobs_delegates_and_formats(tmp_db):
     init_db()
-    from gauntler.discovery.service import ArchiveResult
+    from gauntler.discovery.archive import ArchiveResult
     from gauntler.server import archive_stale_jobs
 
     fake_result = ArchiveResult(
@@ -2233,7 +2233,7 @@ async def test_tool_archive_stale_jobs_delegates_and_formats(tmp_db):
 
 async def test_tool_archive_stale_jobs_passes_filters(tmp_db):
     init_db()
-    from gauntler.discovery.service import ArchiveResult
+    from gauntler.discovery.archive import ArchiveResult
     from gauntler.server import archive_stale_jobs
 
     mock_service = AsyncMock(return_value=ArchiveResult())
@@ -2248,7 +2248,7 @@ async def test_tool_archive_stale_jobs_passes_filters(tmp_db):
 
 async def test_tool_archive_stale_jobs_rejects_both_filters(tmp_db):
     init_db()
-    from gauntler.discovery.service import ArchiveStaleJobsError
+    from gauntler.discovery.archive import ArchiveStaleJobsError
     from gauntler.server import archive_stale_jobs
 
     with patch(

@@ -21,6 +21,7 @@ from gauntler.core.llm import LLMCaller, make_caller
 from gauntler.core.log import setup as _setup_logging
 from gauntler.core.parsing import wrap_untrusted
 from gauntler.discovery import service as scan_service
+from gauntler.discovery.archive import ArchiveStaleJobsError, _format_archive_result
 from gauntler.startup import StartupWarning, validate_startup
 from gauntler.tracking.email_monitor import (
     GmailAuthError,
@@ -150,9 +151,9 @@ async def archive_stale_jobs(
     app = ctx.request_context.lifespan_context
     try:
         result = await scan_service.archive_stale_jobs(job_id, company, app.config)
-    except scan_service.ArchiveStaleJobsError as e:
+    except ArchiveStaleJobsError as e:
         return str(e)
-    return scan_service._format_archive_result(result)
+    return _format_archive_result(result)
 
 
 @mcp.tool()

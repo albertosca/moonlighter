@@ -433,7 +433,7 @@ async def test_scan_batches_jobs_into_one_call(tmp_db):
 
 # ── archive_stale_jobs ──────────────────────────────────────────────────────
 
-from gauntler.discovery.service import ArchiveStaleJobsError, archive_stale_jobs  # noqa: E402
+from gauntler.discovery.archive import ArchiveStaleJobsError, archive_stale_jobs  # noqa: E402
 from gauntler.discovery.staleness import StalenessResult  # noqa: E402
 
 
@@ -469,7 +469,7 @@ async def test_archive_stale_jobs_marks_stale_job_closed(tmp_db, monkeypatch):
     async def fake_find(jobs_by_company, scanners, config):
         return StalenessResult(stale=[job], failed_companies=[])
 
-    monkeypatch.setattr("gauntler.discovery.service.find_stale_jobs", fake_find)
+    monkeypatch.setattr("gauntler.discovery.archive.find_stale_jobs", fake_find)
     result = await archive_stale_jobs(None, None, CONFIG)
 
     saved = Job.get_by_id(job.id)
@@ -487,7 +487,7 @@ async def test_archive_stale_jobs_reports_failed_companies(tmp_db, monkeypatch):
     async def fake_find(jobs_by_company, scanners, config):
         return StalenessResult(stale=[], failed_companies=["acme"])
 
-    monkeypatch.setattr("gauntler.discovery.service.find_stale_jobs", fake_find)
+    monkeypatch.setattr("gauntler.discovery.archive.find_stale_jobs", fake_find)
     result = await archive_stale_jobs(None, None, CONFIG)
 
     assert result.archived == []
@@ -509,7 +509,7 @@ async def test_archive_stale_jobs_filters_by_job_id(tmp_db, monkeypatch):
         seen_groups.append(jobs_by_company)
         return StalenessResult()
 
-    monkeypatch.setattr("gauntler.discovery.service.find_stale_jobs", fake_find)
+    monkeypatch.setattr("gauntler.discovery.archive.find_stale_jobs", fake_find)
     await archive_stale_jobs(target.id, None, CONFIG)
 
     jobs_checked = seen_groups[0][("greenhouse", "acme")]
@@ -528,7 +528,7 @@ async def test_archive_stale_jobs_filters_by_company_case_insensitive(tmp_db, mo
         seen_groups.append(jobs_by_company)
         return StalenessResult()
 
-    monkeypatch.setattr("gauntler.discovery.service.find_stale_jobs", fake_find)
+    monkeypatch.setattr("gauntler.discovery.archive.find_stale_jobs", fake_find)
     await archive_stale_jobs(None, "ACME", CONFIG)
 
     jobs_checked = seen_groups[0][("greenhouse", "acme")]
@@ -547,7 +547,7 @@ async def test_archive_stale_jobs_excludes_resolved_statuses(tmp_db, monkeypatch
         seen_groups.append(jobs_by_company)
         return StalenessResult()
 
-    monkeypatch.setattr("gauntler.discovery.service.find_stale_jobs", fake_find)
+    monkeypatch.setattr("gauntler.discovery.archive.find_stale_jobs", fake_find)
     await archive_stale_jobs(None, None, CONFIG)
 
     assert seen_groups[0] == {}
@@ -557,13 +557,13 @@ async def test_archive_stale_jobs_excludes_resolved_statuses(tmp_db, monkeypatch
 
 
 def test_format_archive_result_empty():
-    from gauntler.discovery.service import ArchiveResult, _format_archive_result
+    from gauntler.discovery.archive import ArchiveResult, _format_archive_result
 
     assert _format_archive_result(ArchiveResult()) == "Nenhuma vaga fechada encontrada."
 
 
 def test_format_archive_result_archived_only():
-    from gauntler.discovery.service import ArchiveResult, _format_archive_result
+    from gauntler.discovery.archive import ArchiveResult, _format_archive_result
 
     result = ArchiveResult(
         archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}]
@@ -574,7 +574,7 @@ def test_format_archive_result_archived_only():
 
 
 def test_format_archive_result_failed_only():
-    from gauntler.discovery.service import ArchiveResult, _format_archive_result
+    from gauntler.discovery.archive import ArchiveResult, _format_archive_result
 
     result = ArchiveResult(failed_companies=["acme"])
     formatted = _format_archive_result(result)
@@ -583,7 +583,7 @@ def test_format_archive_result_failed_only():
 
 
 def test_format_archive_result_archived_and_failed():
-    from gauntler.discovery.service import ArchiveResult, _format_archive_result
+    from gauntler.discovery.archive import ArchiveResult, _format_archive_result
 
     result = ArchiveResult(
         archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}],
