@@ -40,6 +40,25 @@ _US_MARKERS = (
 # Códigos de estado (", CA"/", NY"/...) precisam de word-boundary: como substring,
 # ", ca" casaria "Toronto, Ca-nada" e marcaria a vaga canadense como US (falso positivo).
 _US_STATE_RE = re.compile(r",\s*(ca|ny|wa|tx)\b")
+# "CA" é ambíguo: sigla de estado (California) OU de país (Canada, ISO 3166 alpha-2).
+# Uma vaga formatada como "Toronto, CA" bateria em _US_STATE_RE e seria classificada
+# como US — falso positivo real (não hipotético). Cidades/província/país canadenses
+# checados ANTES do regex de estado, pra não deixar o "CA" ambíguo decidir sozinho.
+_CANADA_MARKERS = (
+    "canada",
+    "toronto",
+    "vancouver",
+    "montreal",
+    "montréal",
+    "ottawa",
+    "calgary",
+    "edmonton",
+    "winnipeg",
+    "ontario",
+    "quebec",
+    "québec",
+    "british columbia",
+)
 
 
 def _canonical_country(value: str) -> str | None:
@@ -70,6 +89,8 @@ def infer_country(location: str | None, remote_type: str | None) -> str | None:
     text = (location or "").lower()
     if any(m in text for m in _BRAZIL_MARKERS):
         return "brazil"
+    if any(m in text for m in _CANADA_MARKERS):
+        return None
     if any(m in text for m in _US_MARKERS) or _US_STATE_RE.search(text):
         return "united states"
     return None

@@ -128,6 +128,77 @@ async def test_llm_not_called_when_no_options():
     assert called is False
 
 
+# ---- E8 T2: adversarial + exact 0.8 fuzzy-threshold boundary ----
+
+
+def test_whitespace_only_answer_returns_none():
+    assert match_option_locally("   ", ["Yes", "No"]) is None
+
+
+def test_punctuation_only_answer_returns_none():
+    # Sem overlap alfanumérico com nenhuma opção: nem exact, nem prefix, nem fuzzy >= 0.8.
+    assert match_option_locally("!!!", ["Yes", "No", "Maybe"]) is None
+
+
+def test_answer_substring_of_option_but_not_at_word_boundary():
+    # 'car' é substring de 'Scared' mas não é prefixo dela nem começa em fronteira
+    # de palavra em nenhum sentido -> não pode casar via startswith.
+    assert match_option_locally("car", ["Scared", "Not sure"]) is None
+
+
+def test_answer_much_longer_than_any_option():
+    long_answer = "I would very much like to relocate for this specific role" * 3
+    assert match_option_locally(long_answer, ["Yes", "No"]) is None
+
+
+def test_unicode_accented_answer_matches_accented_option_exactly():
+    assert match_option_locally("São Paulo", ["Rio de Janeiro", "São Paulo"]) == "São Paulo"
+
+
+def test_unicode_answer_fuzzy_matches_unaccented_option():
+    # 'Sao Paulo' (sem acento) vs 'São Paulo': ratio alto o bastante para fuzzy.
+    result = match_option_locally("Sao Paulo", ["Rio de Janeiro", "São Paulo"])
+    assert result == "São Paulo"
+
+
+def test_options_with_regex_special_characters_are_treated_as_literal_text():
+    # '.', '(', ')', '*', '+' não podem ser interpretados como regex — são comparados
+    # como texto puro via _norm/SequenceMatcher, nunca via re.match nas opções.
+    opts = ["C++ (systems)", "C# (.NET)", "Other"]
+    assert match_option_locally("C++ (systems)", opts) == "C++ (systems)"
+    assert match_option_locally("c#  (.net)", opts) == "C# (.NET)"
+
+
+def test_duplicate_options_returns_first_matching_occurrence():
+    opts = ["Yes", "Yes", "No"]
+    assert match_option_locally("yes", opts) == "Yes"
+
+
+def test_fuzzy_ratio_exactly_at_threshold_matches():
+    """SequenceMatcher('abcde', 'abcdf').ratio() == 0.8 (verificado via difflib direto):
+    match 'abcd' (4 chars) sobre 10 chars totais = 2*4/10 = 0.8 exato. threshold >= 0.8
+    deve casar."""
+    from difflib import SequenceMatcher
+
+    assert SequenceMatcher(None, "abcde", "abcdf").ratio() == 0.8
+    assert match_option_locally("abcde", ["xxxxx", "abcdf"]) == "abcdf"
+
+
+def test_fuzzy_ratio_just_below_threshold_returns_none():
+    """SequenceMatcher('aaaaaa', 'aaaaabb').ratio() == 0.7692... (5/6 * ... via difflib),
+    abaixo do threshold 0.8 por uma margem real (não seria arredondado pra cima) -> None."""
+    from difflib import SequenceMatcher
+
+    ratio = SequenceMatcher(None, "aaaaaa", "aaaaabb").ratio()
+    assert 0.75 < ratio < 0.8
+    assert match_option_locally("aaaaaa", ["xxxxxxx", "aaaaabb"]) is None
+
+
+def test_custom_threshold_below_default_allows_looser_fuzzy_match():
+    # Mesmo par 'just below 0.8' de cima, mas com threshold explícito mais baixo deve casar.
+    assert match_option_locally("aaaaaa", ["xxxxxxx", "aaaaabb"], threshold=0.7) == "aaaaabb"
+
+
 def test_starts_with_word_equal_strings_is_prefix():
     """prefix == string inteira é word-boundary válido (option_matcher.py:28)."""
     from gauntler.application.answers.option_matcher import _starts_with_word

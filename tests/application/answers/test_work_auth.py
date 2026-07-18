@@ -133,3 +133,51 @@ def test_resolve_unrecognized_citizenship_needs_review():
     cfg = {"work_authorization": {"citizenship_country": "Portugal"}}
     r = resolve_work_auth("Are you authorized to work here?", "united states", cfg)
     assert r == "__NEEDS_REVIEW__"
+
+
+# ── E8 T2: Canada false-positive (real bug found and fixed here) ─────────────
+#
+# 'CA' é ambíguo: sigla de estado americano (California) OU sigla de país
+# (Canada, ISO 3166 alpha-2). Antes do fix, uma vaga formatada como
+# "Toronto, CA" (país abreviado) batia em _US_STATE_RE (', ca' = California) e
+# era classificada como 'united states' — um falso positivo REAL, distinto do
+# caso hipotético 'Ca-nada' já coberto acima. Isso faria resolve_work_auth
+# responder autorização/sponsorship como se a vaga fosse nos EUA, quando na
+# verdade é uma vaga canadense sem país suportado -> deveria ser
+# __NEEDS_REVIEW__, nunca 'a vaga é US'.
+
+
+def test_infer_country_canadian_city_with_ambiguous_ca_country_code_is_not_us():
+    """'Toronto, CA' e 'Vancouver, CA' usam CA como sigla de país (Canada), não
+    de estado americano. Antes do fix isso retornava 'united states' — bug real."""
+    assert infer_country("Toronto, CA", None) is None
+    assert infer_country("Vancouver, CA", None) is None
+
+
+def test_infer_country_us_california_city_with_ca_still_resolves_to_us():
+    """Controle: cidades americanas reais com ', CA' (Sacramento, Los Angeles)
+    continuam corretamente inferidas como US mesmo após o fix — o fix só
+    desliga o match quando há um marcador canadense explícito na string."""
+    assert infer_country("Los Angeles, CA", None) == "united states"
+    assert infer_country("Sacramento, CA", None) == "united states"
+
+
+def test_resolve_work_auth_for_ambiguous_canada_string_needs_review_not_us():
+    """Fim a fim: campo de autorização com localização 'Toronto, CA' (o país
+    inferido deve ser None, não 'united states') não pode responder como se
+    fosse autorização/sponsorship nos EUA — precisa cair em review."""
+    country = infer_country("Toronto, CA", None)
+    assert country is None
+    r = resolve_work_auth("Are you authorized to work in the US?", country, WA_CONFIG)
+    assert r == "__NEEDS_REVIEW__"
+
+
+def test_infer_country_other_canadian_markers_not_misread_as_us():
+    assert infer_country("Montreal, Quebec", None) is None
+    assert infer_country("Ottawa, Ontario, Canada", None) is None
+    assert infer_country("Calgary, Alberta", None) is None
+
+
+def test_infer_country_remote_with_no_location_signal_is_none():
+    assert infer_country(None, None) is None
+    assert infer_country("Remote", "remote") is None
