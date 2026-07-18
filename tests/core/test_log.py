@@ -12,7 +12,7 @@ def test_get_logger_returns_logger_with_correct_name():
 def test_setup_creates_file_handler(tmp_path):
     from gauntler.core import log as log_mod
 
-    # reset estado do módulo para garantir setup limpo
+    # reset module state to guarantee a clean setup
     log_mod._initialized = False
     root = logging.getLogger("gauntler")
     for h in root.handlers[:]:
@@ -36,10 +36,10 @@ def test_setup_idempotent(tmp_path):
 
     log_path = str(tmp_path / "test.log")
     log_mod.setup(log_path=log_path)
-    log_mod.setup(log_path=log_path)  # segunda chamada
+    log_mod.setup(log_path=log_path)  # second call
 
     file_handlers = [h for h in root.handlers if isinstance(h, logging.FileHandler)]
-    assert len(file_handlers) == 1  # não duplicou
+    assert len(file_handlers) == 1  # did not duplicate
 
 
 def test_log_message_reaches_file(tmp_path):
@@ -54,18 +54,18 @@ def test_log_message_reaches_file(tmp_path):
     log_mod.setup(log_path=log_path)
 
     logger = log_mod.get_logger("gauntler.test_write")
-    logger.info("mensagem de teste xyz")
+    logger.info("test message xyz")
 
-    # flush e fecha handlers para garantir escrita
+    # flush and close handlers to guarantee the write
     for h in root.handlers:
         h.flush()
 
     content = Path(log_path).read_text()
-    assert "mensagem de teste xyz" in content
+    assert "test message xyz" in content
 
 
 def test_setup_without_rich_falls_back_silently(tmp_path, monkeypatch):
-    """rich ausente → ImportError engolido, só o FileHandler fica (log.py:35-36)."""
+    """rich absent → ImportError swallowed, only the FileHandler remains (log.py:35-36)."""
     import logging
     import sys
 

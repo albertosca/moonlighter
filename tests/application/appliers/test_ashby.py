@@ -12,7 +12,7 @@ def make_applier(url="https://jobs.ashbyhq.com/openai/123"):
     page.query_selector_all = AsyncMock(return_value=[])
     page.wait_for_selector = AsyncMock()
     page.wait_for_load_state = AsyncMock()
-    page.inner_text = AsyncMock(return_value="")  # sem confirmação por padrão
+    page.inner_text = AsyncMock(return_value="")  # no confirmation by default
     return AshbyApplier(page, {}, {})
 
 
@@ -145,14 +145,14 @@ async def test_submit_button_click_returns_submitted():
 
 
 async def test_submit_unverified_without_confirmation():
-    """RELIABILITY-01: clicou mas sem marcador de confirmação → 'unverified'."""
+    """RELIABILITY-01: clicked but with no confirmation marker → 'unverified'."""
     applier = make_applier()
     btn = MagicMock()
     btn.click = AsyncMock()
     applier.page.query_selector = AsyncMock(return_value=btn)
     applier.page.wait_for_load_state = AsyncMock()
     applier.page.inner_text = AsyncMock(return_value="Why this role? Full Name Apply")
-    applier.page.evaluate = AsyncMock(return_value=False)  # form não está mais visível
+    applier.page.evaluate = AsyncMock(return_value=False)  # form is no longer visible
     assert await applier.submit() == "unverified"
 
 
@@ -203,7 +203,7 @@ async def test_submit_exception_returns_failed():
 
 
 async def test_extract_fields_falls_back_when_primary_selector_empty():
-    """Seletor primário vazio → seletor alternativo tentado."""
+    """Empty primary selector → alternative selector tried."""
     applier = make_applier()
 
     fallback_label = MagicMock()
@@ -223,11 +223,11 @@ async def test_extract_fields_falls_back_when_primary_selector_empty():
     assert call_count[0] >= 2
 
 
-# ── fill_form: branches de borda ───────────────────────────────────────────
+# ── fill_form: edge branches ────────────────────────────────────────────────
 
 
 async def test_fill_form_skips_when_label_not_found():
-    """label:text-is(...) não casa → query_selector None → pula sem erro."""
+    """label:text-is(...) doesn't match → query_selector None → skips without error."""
     applier = make_applier()
     applier.page.query_selector = AsyncMock(return_value=None)
     with patch("asyncio.sleep", new=AsyncMock()):
@@ -235,7 +235,7 @@ async def test_fill_form_skips_when_label_not_found():
 
 
 async def test_fill_form_skips_when_field_missing():
-    """label com for=fid mas #fid não existe → campo não preenchido."""
+    """label with for=fid but #fid doesn't exist → field not filled."""
     applier = make_applier()
     label = MagicMock()
     label.get_attribute = AsyncMock(return_value="fid")

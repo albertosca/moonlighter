@@ -12,7 +12,7 @@ def make_applier(url="https://jobs.lever.co/gitlab/abc-123"):
     page.query_selector_all = AsyncMock(return_value=[])
     page.wait_for_selector = AsyncMock()
     page.wait_for_load_state = AsyncMock()
-    page.inner_text = AsyncMock(return_value="")  # sem confirmação por padrão
+    page.inner_text = AsyncMock(return_value="")  # no confirmation by default
     return LeverApplier(page, {}, {})
 
 
@@ -159,7 +159,7 @@ async def test_submit_clicks_submit_button():
 
 
 async def test_submit_template_btn():
-    """Template submit button also triggers True return (com confirmação)."""
+    """Template submit button also triggers True return (with confirmation)."""
     applier = make_applier()
     btn = MagicMock()
     btn.click = AsyncMock()
@@ -170,26 +170,26 @@ async def test_submit_template_btn():
 
 
 async def test_submit_unverified_without_confirmation():
-    """RELIABILITY-01: clicou, sem confirmação E sem form visível → 'unverified'."""
+    """RELIABILITY-01: clicked, with no confirmation AND no visible form → 'unverified'."""
     applier = make_applier()
     btn = MagicMock()
     btn.click = AsyncMock()
     applier.page.query_selector = AsyncMock(return_value=btn)
     applier.page.wait_for_load_state = AsyncMock()
     applier.page.inner_text = AsyncMock(return_value="Name Email Submit")
-    applier.page.evaluate = AsyncMock(return_value=False)  # form não está mais visível
+    applier.page.evaluate = AsyncMock(return_value=False)  # form is no longer visible
     assert await applier.submit() == "unverified"
 
 
 async def test_submit_validation_failure_when_form_visible():
-    """RELIABILITY: form ainda visível após click → failed:validation_errors (re-tentável)."""
+    """RELIABILITY: form still visible after click → failed:validation_errors (retryable)."""
     applier = make_applier()
     btn = MagicMock()
     btn.click = AsyncMock()
     applier.page.query_selector = AsyncMock(return_value=btn)
     applier.page.wait_for_load_state = AsyncMock()
-    applier.page.inner_text = AsyncMock(return_value="sem confirmação")
-    applier.page.evaluate = AsyncMock(side_effect=[True, ["Campo obrigatório"]])
+    applier.page.inner_text = AsyncMock(return_value="no confirmation")
+    applier.page.evaluate = AsyncMock(side_effect=[True, ["Required field"]])
     result = await applier.submit()
     assert result.startswith("failed:validation_errors")
 
@@ -228,7 +228,7 @@ async def test_submit_exception_returns_failed():
 
 
 async def test_extract_fields_falls_back_when_primary_selector_empty():
-    """Seletor primário vazio → seletor alternativo tentado."""
+    """Empty primary selector → alternative selector tried."""
     applier = make_applier()
 
     fallback_label = MagicMock()
@@ -248,11 +248,11 @@ async def test_extract_fields_falls_back_when_primary_selector_empty():
     assert call_count[0] >= 2
 
 
-# ── fill_form: branches de borda ───────────────────────────────────────────
+# ── fill_form: edge branches ────────────────────────────────────────────────
 
 
 async def test_fill_form_skips_when_field_missing():
-    """label com for=fid mas #fid não existe → campo não preenchido (43->loop)."""
+    """label with for=fid but #fid doesn't exist → field not filled (43->loop)."""
     applier = make_applier()
     label = MagicMock()
     label.get_attribute = AsyncMock(return_value="fid")

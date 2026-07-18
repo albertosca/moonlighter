@@ -1,6 +1,6 @@
-"""Testes de unidade do apply_service: detect_applier (loop real, sem mock),
-archive_screenshots (early-return e exceção engolida) e os branches de
-apply_jobs/confirm_apply que o caminho feliz do test_mcp_server não toca.
+"""Unit tests for apply_service: detect_applier (real loop, no mock),
+archive_screenshots (early-return and swallowed exception), and the
+apply_jobs/confirm_apply branches that test_mcp_server's happy path doesn't touch.
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -79,7 +79,7 @@ async def test_detect_applier_returns_none_for_unknown(tmp_db):
 
 
 def test_archive_screenshots_noop_when_missing(tmp_path):
-    # src não existe → retorna sem erro
+    # src doesn't exist → returns without error
     apply_service.archive_screenshots(123, {"screenshots_dir": str(tmp_path)})
 
 
@@ -87,11 +87,11 @@ def test_archive_screenshots_swallows_exception(tmp_path):
     src = tmp_path / "456"
     src.mkdir()
     with patch("gauntler.application.service.shutil.move", side_effect=OSError("disk")):
-        # exceção é logada como não-crítica, não propaga
+        # exception is logged as non-critical, does not propagate
         apply_service.archive_screenshots(456, {"screenshots_dir": str(tmp_path)})
 
 
-# ── apply_jobs: bloco needs_review ──────────────────────────────────────────
+# ── apply_jobs: needs_review block ───────────────────────────────────────────
 
 
 async def test_apply_jobs_shows_needs_review_fields(tmp_db):
@@ -118,7 +118,7 @@ async def test_apply_jobs_shows_needs_review_fields(tmp_db):
         result = await apply_service.apply_jobs([job.id], CONFIG, PROFILE, MagicMock())
     assert "NEED YOUR DECISION" in result
     assert "Work auth?" in result
-    # campo NEEDS_REVIEW não é renderizado como resposta normal, mas Name sim
+    # NEEDS_REVIEW field is not rendered as a normal answer, but Name is
     assert "Alberto" in result
 
 
@@ -190,13 +190,13 @@ def _confirm_mocks(job, *, fill_status, submit="submitted"):
 
 
 async def test_confirm_apply_without_email_config_skips_alias(tmp_db, tmp_path):
-    """config sem email.address → não injeta alias (branch falso de `if base_address`)."""
+    """config with no email.address → does not inject alias (false branch of `if base_address`)."""
     init_db()
     job = _job(url="https://boards.greenhouse.io/stripe/jobs/noemail")
     Application.create(job=job, status="draft", form_data='{"Name": "Alberto"}')
     cv = tmp_path / "cv.pdf"
     cv.write_text("x")
-    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x"}  # sem chave "email"
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x"}  # no "email" key
     applier = _confirm_mocks(job, fill_status={"Name": "filled"})
     with (
         patch("gauntler.application.service.browser") as mock_browser,
@@ -211,7 +211,7 @@ async def test_confirm_apply_without_email_config_skips_alias(tmp_db, tmp_path):
 
 
 async def test_confirm_apply_logs_failed_fields_but_submits(tmp_db, tmp_path):
-    """Campos com falha no preenchimento geram warning mas não impedem submit confirmado."""
+    """Fields that fail to fill generate a warning but don't prevent a confirmed submit."""
     init_db()
     job = _job(url="https://boards.greenhouse.io/stripe/jobs/partial")
     Application.create(job=job, status="draft", form_data='{"Name": "Alberto", "X": "y"}')
@@ -254,7 +254,7 @@ async def test_fill_open_page_fills_and_screenshots_without_submit(tmp_db, tmp_p
     assert returned_applier is applier
     assert fill_status == {"Name": "filled"}
     applier.submit.assert_not_called()
-    page.close.assert_not_called()  # o helper NÃO fecha a página
+    page.close.assert_not_called()  # the helper does NOT close the page
     mock_browser.save_screenshot.assert_awaited()  # screenshot 03 tirado
 
 
@@ -296,12 +296,12 @@ async def test_fill_application_fills_stops_persists(tmp_db, tmp_path):
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
     assert "FILLED" in result
     assert "submit_application" in result
-    assert str(tmp_path) in result  # path do screenshot deriva de screenshots_dir, não hardcode
-    applier.submit.assert_not_called()  # NÃO submete
+    assert str(tmp_path) in result  # screenshot path derives from screenshots_dir, not hardcoded
+    applier.submit.assert_not_called()  # does NOT submit
     saved = Application.get(Application.job == job)
     assert saved.status == "filled"
-    assert saved.email_ref is not None  # ref persistido
-    page.close.assert_awaited_once()  # sem falha => fecha normal
+    assert saved.email_ref is not None  # ref persisted
+    page.close.assert_awaited_once()  # no failure => closes normally
 
 
 async def test_fill_application_blocks_on_needs_review(tmp_db, tmp_path):
@@ -311,7 +311,7 @@ async def test_fill_application_blocks_on_needs_review(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
     assert "NOT submitted" in result or "awaiting your decision" in result
-    assert Application.get(Application.job == job).status == "draft"  # não virou filled
+    assert Application.get(Application.job == job).status == "draft"  # did not become filled
 
 
 async def test_fill_application_aborts_on_missing_cv(tmp_db, tmp_path):
@@ -321,7 +321,7 @@ async def test_fill_application_aborts_on_missing_cv(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     with patch(
         "gauntler.application.service.resolve_cv_path",
-        side_effect=CVNotFoundError("cv.pdf não existe"),
+        side_effect=CVNotFoundError("cv.pdf does not exist"),
     ):
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
     assert "Not filled" in result
@@ -377,11 +377,11 @@ async def test_fill_application_unknown_ats(tmp_db, tmp_path):
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
     assert "ATS not recognized" in result
-    page.close.assert_awaited_once()  # ATS desconhecido não precisa de ajuda humana
+    page.close.assert_awaited_once()  # unknown ATS doesn't need human help
 
 
 async def test_fill_application_handles_exception(tmp_db, tmp_path):
-    """Erro inesperado em _fill_open_page é capturado e devolvido como mensagem de aviso."""
+    """An unexpected error in _fill_open_page is captured and returned as a warning message."""
     init_db()
     job = _job(url="https://boards.greenhouse.io/stripe/jobs/exc")
     Application.create(job=job, status="draft", form_data='{"Name": "Alberto"}')
@@ -393,7 +393,7 @@ async def test_fill_application_handles_exception(tmp_db, tmp_path):
         patch("gauntler.application.service.browser") as mock_browser,
         patch(
             "gauntler.application.service._fill_open_page",
-            new=AsyncMock(side_effect=RuntimeError("falha inesperada")),
+            new=AsyncMock(side_effect=RuntimeError("unexpected failure")),
         ),
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
@@ -403,14 +403,14 @@ async def test_fill_application_handles_exception(tmp_db, tmp_path):
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
     assert "Error filling" in result
-    assert "falha inesperada" in result
+    assert "unexpected failure" in result
     page.close.assert_not_awaited()  # aba fica aberta pro humano mexer
     mock_browser.show_window.assert_awaited_once()
 
 
 async def test_confirm_apply_survives_hide_window_failure(tmp_db, tmp_path):
-    """hide_window (best-effort) lançando antes do try não deve derrubar o fluxo nem
-    impedir o submit — a page continua sendo usada e fechada normalmente."""
+    """hide_window (best-effort) raising before the try must not tear down the flow nor
+    prevent the submit — the page keeps being used and is closed normally."""
     init_db()
     job = _job(url="https://boards.greenhouse.io/stripe/jobs/hidefail")
     Application.create(job=job, status="draft", form_data='{"Name": "Alberto"}')
@@ -433,10 +433,9 @@ async def test_confirm_apply_survives_hide_window_failure(tmp_db, tmp_path):
 
 
 async def test_confirm_apply_survives_show_window_failure_on_exception(tmp_db, tmp_path):
-    """Se show_window (best-effort) lançar dentro do handler de exceção genérica de
-    _submit_on_page, o erro do CDP não deve mascarar o erro original nem pular o
-    revert de estado — confirm_apply continua devolvendo a mensagem amigável e
-    revertendo app/job."""
+    """If show_window (best-effort) raises inside _submit_on_page's generic exception
+    handler, the CDP error must not mask the original error nor skip the state
+    revert — confirm_apply still returns the friendly message and reverts app/job."""
     init_db()
     job = _job(url="https://boards.greenhouse.io/stripe/jobs/cdpdown")
     Application.create(job=job, status="draft", form_data='{"Name": "Alberto"}')
@@ -447,7 +446,7 @@ async def test_confirm_apply_survives_show_window_failure_on_exception(tmp_db, t
         patch("gauntler.application.service.browser") as mock_browser,
         patch(
             "gauntler.application.service._fill_open_page",
-            new=AsyncMock(side_effect=RuntimeError("falha inesperada")),
+            new=AsyncMock(side_effect=RuntimeError("unexpected failure")),
         ),
         patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
     ):
@@ -457,7 +456,7 @@ async def test_confirm_apply_survives_show_window_failure_on_exception(tmp_db, t
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.confirm_apply(job.id, None, cfg, PROFILE)
     assert "Error submitting" in result
-    assert "falha inesperada" in result
+    assert "unexpected failure" in result
     saved = Application.get(Application.job == job)
     assert saved.status == "draft"
     assert Job.get_by_id(job.id).status == "reviewed"
@@ -474,7 +473,7 @@ async def test_submit_application_requires_filled(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     result = await apply_service.submit_application(job.id, cfg, PROFILE)
     assert "fill_application" in result
-    assert Application.get(Application.job == job).status == "draft"  # não submeteu
+    assert Application.get(Application.job == job).status == "draft"  # did not submit
 
 
 async def test_submit_application_refills_and_submits(tmp_db, tmp_path):
@@ -515,7 +514,7 @@ async def test_submit_application_missing_cv(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     with patch(
         "gauntler.application.service.resolve_cv_path",
-        side_effect=CVNotFoundError("cv.pdf não existe"),
+        side_effect=CVNotFoundError("cv.pdf does not exist"),
     ):
         result = await apply_service.submit_application(job.id, cfg, PROFILE)
     assert "Not submitted" in result

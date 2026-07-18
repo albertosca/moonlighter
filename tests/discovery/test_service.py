@@ -1,8 +1,8 @@
-"""Testes do scan_service focados em add_job (vaga manual) e nos branches de
-borda do scan_and_evaluate que não passam pelo caminho feliz do test_mcp_server.
+"""Tests for scan_service focused on add_job (manual job) and the edge branches
+of scan_and_evaluate that test_mcp_server's happy path doesn't cover.
 
-add_job é chamado direto no service (não pela tool MCP) para isolar a lógica de
-config/profile/caller, sem depender da config global carregada no import.
+add_job is called directly on the service (not via the MCP tool) to isolate the
+config/profile/caller logic, without depending on the global config loaded on import.
 """
 
 import asyncio
@@ -34,7 +34,7 @@ def _eval(score=8.0, caveats=None):
 
 
 def _http_client(status_code=200, text="<p>Job description here</p>"):
-    """Monta um AsyncClient mockado que serve como context manager assíncrono."""
+    """Builds a mocked AsyncClient that works as an async context manager."""
     client = AsyncMock()
     client.get = AsyncMock(return_value=MagicMock(status_code=status_code, text=text))
     acm = MagicMock()
@@ -43,18 +43,18 @@ def _http_client(status_code=200, text="<p>Job description here</p>"):
     return acm, client
 
 
-# ── validação de entrada ────────────────────────────────────────────────────
+# ── input validation ────────────────────────────────────────────────────────
 
 
 async def test_add_job_missing_company_title(tmp_db):
     init_db()
     result = await scan_service.add_job(
-        "https://x.com/1", "", "", "desc fornecida", CONFIG, PROFILE, MagicMock()
+        "https://x.com/1", "", "", "provided desc", CONFIG, PROFILE, MagicMock()
     )
     assert "company" in result and "title" in result
 
 
-# ── busca automática de descrição via HTTP ──────────────────────────────────
+# ── automatic description lookup via HTTP ───────────────────────────────────
 
 
 async def test_add_job_fetches_description_when_empty(tmp_db):
@@ -97,7 +97,7 @@ async def test_add_job_http_exception_returns_error(tmp_db):
     assert "Error fetching URL" in result
 
 
-# ── deduplicação ────────────────────────────────────────────────────────────
+# ── deduplication ───────────────────────────────────────────────────────────
 
 
 async def test_add_job_dedup_existing_job(tmp_db):
@@ -119,9 +119,9 @@ async def test_add_job_dedup_existing_job(tmp_db):
 
 async def test_add_job_scanlog_without_job_proceeds_to_eval(tmp_db):
     init_db()
-    # ScanLog tem a URL mas não há Job (estado inconsistente raro) → o dedup deixa
-    # passar (Job.get levanta DoesNotExist), avalia, mas o ScanLog.create final
-    # colide com o registro existente → IntegrityError → mensagem de conflito.
+    # ScanLog has the URL but there's no Job (rare inconsistent state) → dedup lets
+    # it through (Job.get raises DoesNotExist), evaluates, but the final ScanLog.create
+    # collides with the existing record → IntegrityError → conflict message.
     ScanLog.create(job_url="https://x.com/6", source="manual")
     with patch(
         "gauntler.discovery.service.evaluate_job",
@@ -133,7 +133,7 @@ async def test_add_job_scanlog_without_job_proceeds_to_eval(tmp_db):
     assert "URL conflict" in result
 
 
-# ── filtro de título ────────────────────────────────────────────────────────
+# ── title filter ────────────────────────────────────────────────────────────
 
 
 async def test_add_job_title_blocklist_archives(tmp_db):
@@ -149,7 +149,7 @@ async def test_add_job_title_blocklist_archives(tmp_db):
 
 async def test_add_job_title_blocklist_integrity_swallowed(tmp_db):
     init_db()
-    # Pré-cria a URL para forçar IntegrityError no Job.create do branch de blocklist.
+    # Pre-creates the URL to force IntegrityError in Job.create on the blocklist branch.
     Job.create(source="manual", company="Acme", title="x", url="https://x.com/8", status="new")
     result = await scan_service.add_job(
         "https://x.com/8", "Acme", "Staff Accountant", "desc", CONFIG, PROFILE, MagicMock()
@@ -157,7 +157,7 @@ async def test_add_job_title_blocklist_integrity_swallowed(tmp_db):
     assert "discarded by the title filter" in result
 
 
-# ── avaliação e persistência ────────────────────────────────────────────────
+# ── evaluation and persistence ───────────────────────────────────────────────
 
 
 async def test_add_job_new_above_threshold_with_caveats(tmp_db):
@@ -202,7 +202,7 @@ async def test_add_job_integrity_conflict_on_create(tmp_db):
     assert "URL conflict" in result
 
 
-# ── branches de borda do scan_and_evaluate ──────────────────────────────────
+# ── scan_and_evaluate edge branches ──────────────────────────────────────────
 
 from gauntler.discovery.sources.base import RawJob  # noqa: E402
 
@@ -218,20 +218,20 @@ def _raw(i, title="Engineer", source="greenhouse"):
 
 
 async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=None, config=None):
-    """Roda scan_and_evaluate com scanners HTTP mockados servindo `raws`.
+    """Runs scan_and_evaluate with mocked HTTP scanners serving `raws`.
 
-    linkedin_exc: exceção que o LinkedInScanner.scan deve levantar.
-    linkedin_jobs: lista de RawJob que o LinkedInScanner.scan deve retornar.
-    Se ambos forem None, simula ausência de browser (new_page falha).
+    linkedin_exc: the exception LinkedInScanner.scan should raise.
+    linkedin_jobs: the list of RawJob LinkedInScanner.scan should return.
+    If both are None, simulates the absence of a browser (new_page fails).
 
-    eval_mock: AsyncMock aplicado por vaga dentro do lote. Pode ser
-    AsyncMock(return_value=EvaluationResult) ou AsyncMock(side_effect=exc).
+    eval_mock: an AsyncMock applied per job within the batch. Can be
+    AsyncMock(return_value=EvaluationResult) or AsyncMock(side_effect=exc).
     """
     cfg = config or {**CONFIG, "title_blocklist": ["staff accountant"]}
     _eval_per_job = eval_mock or AsyncMock(return_value=_eval(8.0))
 
     async def _batch(jobs, profile, model, caller):
-        # Aplica eval_mock a cada vaga do lote; erros propagam para evaluate_chunk.
+        # Applies eval_mock to each job in the batch; errors propagate to evaluate_chunk.
         return [await _eval_per_job(j.company, model) for j in jobs]
 
     with (
@@ -285,14 +285,14 @@ async def test_scan_linkedin_session_expired_adds_warning(tmp_db):
     init_db()
     from gauntler.discovery.sources.playwright import LinkedInSessionExpiredError
 
-    result = await _run_scan([_raw(2)], linkedin_exc=LinkedInSessionExpiredError("sessão expirada"))
+    result = await _run_scan([_raw(2)], linkedin_exc=LinkedInSessionExpiredError("session expired"))
     assert "LinkedIn" in result
 
 
 async def test_scan_linkedin_generic_error_is_swallowed(tmp_db):
     init_db()
     result = await _run_scan([_raw(3)], linkedin_exc=RuntimeError("boom"))
-    # erro genérico do LinkedIn não vira warning nem bloqueia os resultados HTTP
+    # a generic LinkedIn error doesn't become a warning nor block the HTTP results
     assert "LinkedIn" not in result
     assert Job.get(Job.url == "https://x.com/scan/3").status == "new"
 
@@ -300,18 +300,18 @@ async def test_scan_linkedin_generic_error_is_swallowed(tmp_db):
 async def test_scan_unexpected_eval_error_stops_conservatively(tmp_db):
     init_db()
     result = await _run_scan(
-        [_raw(4)], eval_mock=AsyncMock(side_effect=ValueError("erro inesperado"))
+        [_raw(4)], eval_mock=AsyncMock(side_effect=ValueError("unexpected error"))
     )
-    # erro não-spend é logado e propagado; o scan para conservadoramente e o
-    # claim do ScanLog é liberado (sem órfão) p/ retry futuro.
+    # a non-spend error is logged and propagated; the scan stops conservatively and
+    # the ScanLog claim is released (no orphan) for a future retry.
     assert ScanLog.select().count() == 0
     assert "processed" in result or "No new jobs found" in result
 
 
 async def test_scan_integrity_error_on_save_skips_silently(tmp_db):
     init_db()
-    # Pré-cria um Job com a mesma URL (sem entrada no ScanLog) → o claim sucede,
-    # avalia, mas Job.create colide → IntegrityError → vaga é pulada (return None).
+    # Pre-creates a Job with the same URL (no entry in ScanLog) → the claim succeeds,
+    # evaluates, but Job.create collides → IntegrityError → job is skipped (return None).
     Job.create(source="x", company="x", title="x", url="https://x.com/scan/5", status="new")
     result = await _run_scan([_raw(5)])
     assert "processed" in result or "No new jobs found" in result
@@ -319,18 +319,18 @@ async def test_scan_integrity_error_on_save_skips_silently(tmp_db):
 
 async def test_scan_title_filtered_integrity_error_skips_silently(tmp_db):
     init_db()
-    # Título na blocklist + Job pré-existente (sem ScanLog) → o branch de filtro
+    # Title in the blocklist + pre-existing Job (no ScanLog) → the filter branch
     # tenta Job.create archived, colide → IntegrityError → pulada (return None).
     Job.create(source="x", company="x", title="x", url="https://x.com/scan/6", status="new")
     result = await _run_scan([_raw(6, title="Staff Accountant")])
     assert "processed" in result or "No new jobs found" in result
 
 
-# ── concorrência com semaphore ───────────────────────────────────────────────
+# ── concurrency with semaphore ───────────────────────────────────────────────
 
 
 class _Tracker:
-    """Caller que rastreia pico de chamadas LLM simultâneas."""
+    """Caller that tracks the peak of concurrent LLM calls."""
 
     def __init__(self) -> None:
         self.current = 0
@@ -379,19 +379,19 @@ async def test_scan_stops_before_llm_after_spend_limit(tmp_db):
     jobs = [_raw(i) for i in range(5)]
     _saved, spend_hit = await scan_service._evaluate_and_store(jobs, config, {}, caller)
     assert spend_hit is True
-    # concurrency=1: a 1ª call detecta o spend-limit e seta stop; as demais veem
-    # stop=True logo após o semaphore e nem chamam o LLM.
+    # concurrency=1: the 1st call detects the spend-limit and sets stop; the rest see
+    # stop=True right after the semaphore and don't even call the LLM.
     assert calls["n"] == 1
-    assert ScanLog.select().count() == 0  # todos os claims liberados
+    assert ScanLog.select().count() == 0  # all claims released
 
 
 async def test_scan_chunk_skips_already_claimed_job(tmp_db):
     init_db()
-    # Pré-insere claim para a URL → _claim retorna False → vaga pulada sem chamar o LLM.
+    # Pre-inserts a claim for the URL → _claim returns False → job skipped without calling the LLM.
     ScanLog.create(job_url="https://x.com/scan/99", source="greenhouse")
 
     async def caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:
-        raise AssertionError("LLM não deve ser chamado para vaga já reservada")
+        raise AssertionError("LLM must not be called for an already-claimed job")
 
     config = {
         "score_threshold": 6.5,
@@ -403,7 +403,7 @@ async def test_scan_chunk_skips_already_claimed_job(tmp_db):
     saved, spend_hit = await scan_service._evaluate_and_store([_raw(99)], config, {}, caller)
     assert saved == []
     assert spend_hit is False
-    assert ScanLog.select().count() == 1  # apenas o claim pré-existente
+    assert ScanLog.select().count() == 1  # only the pre-existing claim
 
 
 async def test_scan_batches_jobs_into_one_call(tmp_db):
@@ -429,7 +429,7 @@ async def test_scan_batches_jobs_into_one_call(tmp_db):
     saved, spend_hit = await scan_service._evaluate_and_store(jobs, config, {}, caller)
     assert len(saved) == 4
     assert spend_hit is False
-    assert calls["n"] == 1  # 4 vagas, 1 lote, 1 chamada
+    assert calls["n"] == 1  # 4 jobs, 1 batch, 1 call
 
 
 # ── archive_stale_jobs ──────────────────────────────────────────────────────

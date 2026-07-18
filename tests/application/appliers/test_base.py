@@ -485,7 +485,7 @@ async def test_generate_answers_strips_markdown_fence():
 
 
 async def test_generate_answers_strips_leading_prose():
-    """LLM retorna texto seguido do JSON → JSON extraído."""
+    """LLM returns text followed by JSON → JSON extracted."""
     answers = {"Why here?": "Interesting work"}
     with_prose = f"Sure, here are the answers:\n{json.dumps(answers)}"
     result = await generate_answers(
@@ -638,7 +638,7 @@ async def test_ask_llm_truncates_giant_label_in_prompt_but_maps_full_label():
     assert answers == {giant: "answer-for-giant"}
 
 
-# ── generate_answers: pré-população via field_map ─────────────────────────────
+# ── generate_answers: pre-population via field_map ────────────────────────────
 
 PROFILE_WITH_CONTACT = {
     "name": "Maria de Souza",
@@ -650,7 +650,7 @@ PROFILE_WITH_CONTACT = {
 
 
 async def test_generate_answers_prepopulates_contact_fields():
-    """Campos de contato são pré-populados sem chamar o LLM."""
+    """Contact fields are pre-populated without calling the LLM."""
     llm_called_with = []
 
     async def capture_caller(prompt, model):
@@ -674,7 +674,7 @@ async def test_generate_answers_prepopulates_contact_fields():
 
 
 async def test_generate_answers_contact_fields_not_in_llm_prompt():
-    """Campos de contato pré-populados NÃO aparecem no prompt do LLM."""
+    """Pre-populated contact fields do NOT appear in the LLM prompt."""
     llm_prompts = []
 
     async def capture_caller(prompt, model):
@@ -697,7 +697,7 @@ async def test_generate_answers_contact_fields_not_in_llm_prompt():
 
 
 async def test_generate_answers_all_prepopulated_skips_llm():
-    """Quando todos os campos são pré-populados, o LLM não é chamado."""
+    """When all fields are pre-populated, the LLM is not called."""
     llm_calls = []
 
     async def capture_caller(prompt, model):
@@ -720,10 +720,10 @@ async def test_generate_answers_all_prepopulated_skips_llm():
 
 
 async def test_generate_answers_prepopulated_overrides_llm():
-    """Campo pré-populado tem prioridade sobre resposta do LLM para o mesmo campo."""
+    """A pre-populated field takes priority over the LLM's answer for the same field."""
 
     async def caller(prompt, model):
-        # LLM tenta responder Phone com valor errado
+        # LLM tries to answer Phone with the wrong value
         return json.dumps({"Phone": "+5511912345678", "Why here?": "ans"})
 
     result = await generate_answers(
@@ -736,7 +736,7 @@ async def test_generate_answers_prepopulated_overrides_llm():
         _caller=caller,
     )
 
-    # Pre-populated (sem +55) deve vencer o LLM
+    # Pre-populated (without +55) must win over the LLM
     assert result.answers["Phone"] == "11912345678"
 
 
@@ -855,14 +855,14 @@ async def test_generate_answers_logs_start_and_ok(caplog):
 
     from gauntler.application.appliers.base import generate_answers
 
-    mock_caller = AsyncMock(return_value=json.dumps({"Por que a Stripe?": "Porque é top"}))
+    mock_caller = AsyncMock(return_value=json.dumps({"Why Stripe?": "Because it's great"}))
 
     with caplog.at_level(logging.INFO, logger="gauntler.application.appliers.base"):
         await generate_answers(
             company="Stripe",
             title="SRE",
             description="infra stuff",
-            fields=["Por que a Stripe?"],
+            fields=["Why Stripe?"],
             profile={"name": "Maria"},
             _caller=mock_caller,
         )
@@ -911,9 +911,9 @@ async def test_classify_submit_outcome_validation_failed_when_form_visible():
     from gauntler.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
-    page.inner_text = AsyncMock(return_value="sem confirmação aqui")
+    page.inner_text = AsyncMock(return_value="no confirmation here")
     page.url = "https://jobs.lever.co/x/123"
-    # 1ª evaluate: form ainda visível = True; 2ª: mensagens de erro
+    # 1st evaluate: form still visible = True; 2nd: error messages
     page.evaluate = AsyncMock(side_effect=[True, ["Email is required"]])
     result = await classify_submit_outcome(page)
     assert result.startswith("failed:validation_errors")
@@ -924,44 +924,44 @@ async def test_classify_submit_outcome_unverified_when_ambiguous():
     from gauntler.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
-    page.inner_text = AsyncMock(return_value="página qualquer sem marcador")
+    page.inner_text = AsyncMock(return_value="some page with no marker")
     page.url = "https://jobs.lever.co/x/some-page"
-    page.evaluate = AsyncMock(return_value=False)  # form não está mais visível
+    page.evaluate = AsyncMock(return_value=False)  # form is no longer visible
     assert await classify_submit_outcome(page) == "unverified"
 
 
-# ── branches defensivos (cobertura) ────────────────────────────────────────
+# ── defensive branches (coverage) ───────────────────────────────────────────
 
 
 async def test_confirm_submitted_swallows_inner_text_exception():
-    """inner_text('body') lança → body vira '' e segue pela URL (53-54)."""
+    """inner_text('body') raises → body becomes '' and falls through to the URL (53-54)."""
     from gauntler.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
     page.inner_text = AsyncMock(side_effect=Exception("detached"))
-    page.url = "https://jobs.lever.co/x/thank-you"  # marcador de sucesso na URL
+    page.url = "https://jobs.lever.co/x/thank-you"  # success marker in the URL
     page.evaluate = AsyncMock(return_value=False)
-    # com body='' e URL de sucesso → submitted (confirma que não levantou)
+    # with body='' and a success URL → submitted (confirms it didn't raise)
     assert await classify_submit_outcome(page) == "submitted"
 
 
 async def test_classify_form_visible_evaluate_exception_is_false():
-    """page.evaluate(form_visible) lança → trata como não-visível → unverified (93-94)."""
+    """page.evaluate(form_visible) raises → treated as not visible → unverified (93-94)."""
     from gauntler.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
-    page.inner_text = AsyncMock(return_value="sem marcador")
+    page.inner_text = AsyncMock(return_value="no marker")
     page.url = "https://jobs.lever.co/x/123"
     page.evaluate = AsyncMock(side_effect=Exception("eval crash"))
     assert await classify_submit_outcome(page) == "unverified"
 
 
 async def test_classify_error_messages_evaluate_exception_is_empty():
-    """form visível mas o 2º evaluate (mensagens de erro) lança → errors=[] (98-99)."""
+    """form visible but the 2nd evaluate (error messages) raises → errors=[] (98-99)."""
     from gauntler.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
-    page.inner_text = AsyncMock(return_value="sem marcador")
+    page.inner_text = AsyncMock(return_value="no marker")
     page.url = "https://jobs.lever.co/x/123"
     page.evaluate = AsyncMock(side_effect=[True, Exception("eval crash")])
     result = await classify_submit_outcome(page)
@@ -969,7 +969,7 @@ async def test_classify_error_messages_evaluate_exception_is_empty():
 
 
 async def test_fill_field_unknown_tag_is_noop():
-    """tag fora de select/input/textarea (ex: div) → não faz nada (144->exit)."""
+    """tag outside select/input/textarea (e.g. div) → does nothing (144->exit)."""
     field = _make_field("div")
     await fill_field(field, "x")
     field.fill.assert_not_called()
@@ -977,7 +977,7 @@ async def test_fill_field_unknown_tag_is_noop():
 
 
 async def test_generate_answers_builds_default_caller_when_none():
-    """_caller=None → usa make_api_caller() como fallback (linha 225)."""
+    """_caller=None → uses make_api_caller() as a fallback (line 225)."""
     fake_caller = AsyncMock(return_value='{"Q": "A"}')
     with patch(
         "gauntler.application.appliers.base.make_api_caller", return_value=fake_caller

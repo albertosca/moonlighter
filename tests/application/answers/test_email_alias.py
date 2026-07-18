@@ -12,13 +12,13 @@ def test_build_email_alias_different_refs():
 
 
 def test_inject_email_alias_matches_ptbr_e_mail_label():
-    """Label 'E-mail' (PT, com hífen) deve receber o alias — sem o hífen quebrar o
-    match nem criar um campo fantasma 'Email'."""
+    """Label 'E-mail' (PT, with a hyphen) must receive the alias — without the hyphen
+    breaking the match or creating a phantom 'Email' field."""
     answers = {"E-mail*": "pessoal@gmail.com", "Nome*": "Alberto"}
     injected = inject_email_alias(answers, "candidaturas+abc123@gmail.com")
     assert injected is True
     assert answers["E-mail*"] == "candidaturas+abc123@gmail.com"
-    assert "Email" not in answers  # não cria campo fantasma
+    assert "Email" not in answers  # doesn't create a phantom field
 
 
 def test_inject_email_alias_matches_plain_email_label():

@@ -28,7 +28,7 @@ def make_eval_result(score=8.0):
 
 
 def _batch_of(result):
-    """Mock de evaluate_jobs_batch que devolve [result] para cada vaga do lote."""
+    """Mock of evaluate_jobs_batch that returns [result] for each job in the batch."""
 
     async def _batch(jobs, profile, model, caller):
         return [result for _ in jobs]
@@ -212,8 +212,8 @@ async def test_scan_dedup_against_scan_log(tmp_db):
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
         result = await scan_and_evaluate(ctx=make_test_context())
-    # evaluate_jobs_batch genuinamente não chamado: scanner retornou a vaga mas
-    # o dedup (ScanLog pré-existente) a filtrou antes de chegar em _evaluate_and_store.
+    # evaluate_jobs_batch is genuinely not called: the scanner returned the job but
+    # dedup (a pre-existing ScanLog) filtered it before it reached _evaluate_and_store.
     mock_batch.assert_not_called()
     assert "No new jobs found" in result
 
@@ -242,8 +242,8 @@ async def test_scan_linkedin_failure_doesnt_block(tmp_db):
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(side_effect=Exception("LinkedIn not available"))
         result = await scan_and_evaluate(ctx=make_test_context())
-    # Falha do LinkedIn não bloqueia os resultados HTTP; vaga com score=8.0 acima do threshold.
-    assert "co" in result or "Eng" in result or "vagas" in result.lower()
+    # LinkedIn failure doesn't block the HTTP results; job with score=8.0 above the threshold.
+    assert "co" in result or "Eng" in result or "jobs" in result.lower()
 
 
 async def test_scan_saves_salary_fields(tmp_db):
@@ -617,8 +617,8 @@ async def test_confirm_apply_success(tmp_db, tmp_path):
     assert app_fresh.status == "submitted"
     job_fresh = Job.get_by_id(job.id)
     assert job_fresh.status == "applied"
-    assert "✓" in result or "submetida" in result
-    page.close.assert_awaited_once()  # sucesso não precisa de ajuda humana
+    assert "✓" in result or "submitted" in result
+    page.close.assert_awaited_once()  # success doesn't need human help
 
 
 async def test_confirm_apply_no_application(tmp_db):
@@ -645,13 +645,13 @@ async def test_confirm_apply_cv_not_found(tmp_db):
     create_application(job)
     with patch(
         "gauntler.application.service.resolve_cv_path",
-        side_effect=CVNotFoundError("CV não encontrado"),
+        side_effect=CVNotFoundError("CV not found"),
     ):
         from gauntler.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id, ctx=make_test_context())
-    assert "CV" in result and "não encontrado" in result
-    # não submeteu — status não vira applied
+    assert "CV" in result and "not found" in result
+    # not submitted — status doesn't become applied
     assert Job.get_by_id(job.id).status != "applied"
 
 
@@ -689,9 +689,9 @@ async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
 
 
 async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
-    """BUG-01: confirm_apply deve injetar candidaturas+<ref>@... no campo de
-    email do formulário, para que respostas da empresa caiam na conta monitorada e
-    carreguem o ref de rastreamento."""
+    """BUG-01: confirm_apply must inject candidaturas+<ref>@... into the form's
+    email field, so company replies land in the monitored account and
+    carry the tracking ref."""
     init_db()
     job = create_job(
         tmp_db, url="https://boards.greenhouse.io/stripe/jobs/alias1", status="applying"
@@ -730,7 +730,7 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
         )
 
     app_fresh = Application.get_by_id(app.id)
-    assert app_fresh.email_ref  # ref foi gerado
+    assert app_fresh.email_ref  # ref was generated
     expected = build_email_alias(test_email, app_fresh.email_ref)
     assert fill_calls[0]["Email"] == expected
     assert "+" in fill_calls[0]["Email"]
@@ -764,10 +764,10 @@ async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
     assert app_fresh.status == "draft"
     job_fresh = Job.get_by_id(job.id)
     assert job_fresh.status == "reviewed"
-    assert "Erro" in result or "⚠️" in result
+    assert "Error" in result or "⚠️" in result
     mock_browser.hide_window.assert_awaited_once()
     mock_browser.show_window.assert_awaited_once()
-    page.close.assert_not_awaited()  # aba fica aberta pro humano mexer
+    page.close.assert_not_awaited()  # tab stays open for a human to work on
 
 
 # ── retry_apply ───────────────────────────────────────────────────────────────
@@ -779,7 +779,7 @@ async def test_retry_apply_no_draft(tmp_db):
     from gauntler.server import retry_apply
 
     result = await retry_apply(job_id=job.id, ctx=make_test_context())
-    assert "apply_jobs" in result or "primeiro" in result
+    assert "apply_jobs" in result or "first" in result
 
 
 async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
@@ -818,12 +818,12 @@ async def test_fill_application_tool_delegates_to_service(monkeypatch):
 
     async def fake_fill(job_id, answers, config, profile):
         called["args"] = (job_id, answers)
-        return "preenchida"
+        return "filled"
 
     monkeypatch.setattr(server.apply_service, "fill_application", fake_fill)
-    result = await server.fill_application(42, {"campo": "v"}, ctx=make_test_context())
-    assert result == "preenchida"
-    assert called["args"] == (42, {"campo": "v"})
+    result = await server.fill_application(42, {"field": "v"}, ctx=make_test_context())
+    assert result == "filled"
+    assert called["args"] == (42, {"field": "v"})
 
 
 async def test_submit_application_tool_delegates_to_service(monkeypatch):
@@ -1109,23 +1109,23 @@ async def test_scan_concurrent_batch_all_processed(tmp_db):
         await scan_and_evaluate(ctx=make_test_context())
     # chunking assertion: 15 jobs / batch_size=5 → exactly 3 calls to evaluate_jobs_batch
     assert mock_batch.call_count == 3, (
-        f"esperado 3 chunks, mas evaluate_jobs_batch foi chamado {mock_batch.call_count}× "
-        f"(loop de chunking quebrado?)"
+        f"expected 3 chunks, but evaluate_jobs_batch was called {mock_batch.call_count}x "
+        f"(chunking loop broken?)"
     )
     assert Job.select().count() == 15
 
 
 async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
-    """INVARIANTE: ao bater spend limit num chunk, nenhum ScanLog pode ficar
-    sem Job correspondente (senão a vaga some para sempre do pipeline).
+    """INVARIANT: when a spend limit is hit inside a chunk, no ScanLog may be left
+    without a matching Job (otherwise the job disappears from the pipeline forever).
 
-    Usa scan_batch_size=4 com 8 vagas (2 chunks de 4) e scan_concurrency=1
-    para serializar: o chunk 0 chama evaluate_jobs_batch (levanta spend-limit),
-    o loop `for raw in to_eval: _release(raw)` roda para as 4 vagas do chunk,
-    e o chunk 1 vê o stop event e não toca mais nada.
+    Uses scan_batch_size=4 with 8 jobs (2 chunks of 4) and scan_concurrency=1
+    to serialize: chunk 0 calls evaluate_jobs_batch (which raises spend-limit),
+    the `for raw in to_eval: _release(raw)` loop runs for the chunk's 4 jobs,
+    and chunk 1 sees the stop event and touches nothing else.
 
-    Este teste FALHA se o loop _release for removido do except de spend-limit:
-    sem release, as 4 vagas do chunk 0 ficam com ScanLog mas sem Job."""
+    This test FAILS if the _release loop is removed from the spend-limit except
+    clause: without release, chunk 0's 4 jobs end up with a ScanLog but no Job."""
     init_db()
     from gauntler.discovery.sources.base import RawJob
     from gauntler.server import scan_and_evaluate
@@ -1170,16 +1170,16 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
 
     job_urls = {j.url for j in Job.select()}
     orphans = [sl.job_url for sl in ScanLog.select() if sl.job_url not in job_urls]
-    assert orphans == [], f"claims órfãos (claim sem Job): {orphans}"
+    assert orphans == [], f"orphan claims (claim without Job): {orphans}"
 
 
 async def test_scan_spend_limit_stops_further_batches(tmp_db):
-    """Ao bater spend limit no batch 1, os batches seguintes não são tentados.
+    """When batch 1 hits the spend limit, the following batches are not attempted.
 
-    Com scan_concurrency=1 os chunks são serializados: o chunk 0 chama
-    evaluate_jobs_batch (que levanta spend-limit), seta o stop event e libera
-    o semáforo; os chunks 1 e 2 vêem o stop antes de chamar evaluate_jobs_batch.
-    Prova concreta de parada antecipada: call_count == 1, não 3."""
+    With scan_concurrency=1 the chunks are serialized: chunk 0 calls
+    evaluate_jobs_batch (which raises spend-limit), sets the stop event, and
+    releases the semaphore; chunks 1 and 2 see the stop before calling
+    evaluate_jobs_batch. Concrete proof of early stop: call_count == 1, not 3."""
     init_db()
     from gauntler.discovery.sources.base import RawJob
     from gauntler.server import scan_and_evaluate
@@ -1192,7 +1192,7 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
             url=f"https://x.com/stop/{i}",
             description="desc",
         )
-        for i in range(15)  # 3 batches de 5 com scan_batch_size=5
+        for i in range(15)  # 3 batches of 5 with scan_batch_size=5
     ]
 
     spend_limit_err = Exception("usage limit reached")
@@ -1222,13 +1222,13 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
             )
         )
 
-    # Com scan_concurrency=1 o stop impede que batches 2 e 3 chamem o LLM.
-    # call_count deve ser 1 (não 3 = total de batches).
+    # With scan_concurrency=1 the stop prevents batches 2 and 3 from calling the LLM.
+    # call_count should be 1 (not 3 = total batches).
     assert mock_batch.call_count == 1, (
-        f"esperado 1 chamada a evaluate_jobs_batch, mas foram {mock_batch.call_count} "
-        f"(batches 2 e 3 deveriam ter sido parados pelo stop event)"
+        f"expected 1 call to evaluate_jobs_batch, but there were {mock_batch.call_count} "
+        f"(batches 2 and 3 should have been stopped by the stop event)"
     )
-    # e nenhum claim órfão sobrou
+    # and no orphan claim remained
     job_urls = {j.url for j in Job.select()}
     assert all(sl.job_url in job_urls for sl in ScanLog.select())
 
@@ -1288,8 +1288,8 @@ async def test_scan_non_spend_error_keeps_title_filtered_in_report(tmp_db):
     assert filtered_job.status == "archived"
     # The bug: the report text undercounts it as 0 instead of 1.
     assert "1 filtered by title" in result, (
-        f"esperado a vaga filtrada por título contada no report mesmo com erro "
-        f"não-spend-limit no lote; report: {result!r}"
+        f"expected the title-filtered job to be counted in the report even with a "
+        f"non-spend-limit error in the batch; report: {result!r}"
     )
 
 
@@ -1494,9 +1494,9 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
 
         result = await confirm_apply(job_id=job.id, ctx=make_test_context())
 
-    assert "⚠️" in result or "falhou" in result.lower() or "Submissão" in result
+    assert "⚠️" in result or "not submitted" in result.lower()
     assert "screenshot" in result.lower() or "04-submitted" in result
-    # 'failed' é re-tentável → volta para rascunho
+    # 'failed' is retryable → reverts to draft
     assert Application.get_by_id(app.id).status == "draft"
     mock_browser.hide_window.assert_awaited_once()
     mock_browser.show_window.assert_awaited_once()
@@ -1504,9 +1504,9 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
 
 
 async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db, tmp_path):
-    """RELIABILITY: submit 'unverified' (clicou, sem confirmar nem detectar erro)
-    → NUNCA marca como enviada. Vira needs_review, salva screenshot e ref, e pede
-    conferência manual. Conservador: zero falso 'enviado'."""
+    """RELIABILITY: submit 'unverified' (clicked, without confirming or detecting an error)
+    → NEVER marks it as sent. Becomes needs_review, saves screenshot and ref, and asks
+    for manual review. Conservative: zero false 'sent'."""
     init_db()
     job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/uv1", status="applying")
     app = create_application(job)
@@ -1532,20 +1532,20 @@ async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db,
         result = await confirm_apply(job_id=job.id, ctx=make_test_context())
 
     app_fresh = Application.get_by_id(app.id)
-    assert app_fresh.status == "needs_review"  # NÃO submitted
-    assert app_fresh.applied_at is None  # não conta como enviada
-    assert app_fresh.email_ref  # ref salvo p/ rastrear se respondeu
+    assert app_fresh.status == "needs_review"  # NOT submitted
+    assert app_fresh.applied_at is None  # doesn't count as sent
+    assert app_fresh.email_ref  # ref saved to track if it got a reply
     assert Job.get_by_id(job.id).status == "needs_review"
-    assert "04-submitted" in result  # aponta o screenshot
-    assert "update_status" in result  # instrui o próximo passo humano
+    assert "04-submitted" in result  # points to the screenshot
+    assert "update_status" in result  # instructs the next human step
     mock_browser.hide_window.assert_awaited_once()
     mock_browser.show_window.assert_awaited_once()
-    page.close.assert_not_awaited()  # aba fica aberta pro humano mexer
+    page.close.assert_not_awaited()  # tab stays open for a human to work on
 
 
 async def test_retry_apply_refuses_needs_review(tmp_db):
-    """retry_apply NÃO re-submete uma candidatura em needs_review (pode ter ido →
-    duplicaria). Instrui o humano a decidir via update_status."""
+    """retry_apply must NOT re-submit an application in needs_review (it may have
+    gone through → would duplicate). Instructs the human to decide via update_status."""
     init_db()
     job = create_job(
         tmp_db, url="https://boards.greenhouse.io/stripe/jobs/nr1", status="needs_review"
@@ -1554,7 +1554,7 @@ async def test_retry_apply_refuses_needs_review(tmp_db):
     from gauntler.server import retry_apply
 
     result = await retry_apply(job_id=job.id, ctx=make_test_context())
-    assert "needs_review" in result or "revis" in result.lower()
+    assert "needs_review" in result
     assert "update_status" in result
 
 
@@ -1565,11 +1565,11 @@ async def test_get_pipeline_shows_needs_review(tmp_db):
     from gauntler.server import get_pipeline
 
     result = await get_pipeline(ctx=make_test_context())
-    assert "needs_review" in result.lower() or "revis" in result.lower()
+    assert "needs_review" in result.lower()
 
 
 async def test_confirm_apply_unknown_ats(tmp_db, tmp_path):
-    """_detect_applier returns None → ATS não reconhecido."""
+    """_detect_applier returns None → ATS not recognized."""
     init_db()
     job = create_job(tmp_db, url="https://unknownats.com/jobs/ca99", status="applying")
     create_application(job)
@@ -1810,12 +1810,12 @@ async def test_get_pipeline_empty_has_zero_total_and_no_bucket_headers(tmp_db):
 
 
 def test_validate_startup_called_at_import_with_real_config():
-    """validate_startup não lança exceção durante inicialização do mcp_server."""
-    # O mcp_server já foi importado nos testes anteriores.
-    # Este teste garante que o módulo importa sem crash mesmo sem API key.
-    import gauntler.server  # noqa: F401 — verifica que importa ok
+    """validate_startup does not raise an exception during mcp_server startup."""
+    # mcp_server was already imported in previous tests.
+    # This test ensures the module imports without crashing even without an API key.
+    import gauntler.server  # noqa: F401 — verifies it imports ok
 
-    assert True  # se chegou aqui, não crashou
+    assert True  # if we got here, it didn't crash
 
 
 def test_startup_warning_level_values():
@@ -1831,7 +1831,7 @@ def test_startup_warning_level_values():
 
 
 async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
-    """LinkedInSessionExpiredError → aviso explícito no resultado (não silêncio)."""
+    """LinkedInSessionExpiredError → explicit warning in the result (no silence)."""
     init_db()
     from gauntler.discovery.sources.playwright import LinkedInSessionExpiredError
     from gauntler.server import scan_and_evaluate
@@ -1848,16 +1848,16 @@ async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(return_value=make_mock_page())
         MockLI.return_value.scan = AsyncMock(
-            side_effect=LinkedInSessionExpiredError("Sessão expirada.")
+            side_effect=LinkedInSessionExpiredError("Session expired.")
         )
         result = await scan_and_evaluate(ctx=make_test_context())
 
     assert "LinkedIn" in result
-    assert "expirada" in result or "login" in result.lower()
+    assert "expired" in result or "login" in result.lower()
 
 
 async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db):
-    """LinkedInSessionExpiredError não impede que vagas HTTP sejam retornadas."""
+    """LinkedInSessionExpiredError does not prevent HTTP jobs from being returned."""
     init_db()
     from gauntler.discovery.sources.base import RawJob
     from gauntler.discovery.sources.playwright import LinkedInSessionExpiredError
@@ -1890,19 +1890,19 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(return_value=make_mock_page())
         MockLI.return_value.scan = AsyncMock(
-            side_effect=LinkedInSessionExpiredError("Sessão expirada.")
+            side_effect=LinkedInSessionExpiredError("Session expired.")
         )
         result = await scan_and_evaluate(ctx=make_test_context())
 
-    assert "Stripe" in result  # vaga HTTP aparece
-    assert "LinkedIn" in result  # aviso aparece também
+    assert "Stripe" in result  # HTTP job appears
+    assert "LinkedIn" in result  # warning appears too
 
 
-# ── email: confirm_apply gera ref e salva ─────────────────────────────────────
+# ── email: confirm_apply generates ref and saves ──────────────────────────────
 
 
 async def test_confirm_apply_generates_6_char_ref(tmp_db, tmp_path):
-    """confirm_apply deve gerar um email_ref com 6 caracteres e persistir."""
+    """confirm_apply must generate a 6-char email_ref and persist it."""
     init_db()
     job = create_job(
         tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca-ref-1", status="applying"
@@ -1934,7 +1934,7 @@ async def test_confirm_apply_generates_6_char_ref(tmp_db, tmp_path):
 
 
 async def test_confirm_apply_ref_is_url_safe(tmp_db, tmp_path):
-    """O ref gerado deve conter apenas chars url-safe (letras, dígitos, -, _)."""
+    """The generated ref must contain only url-safe chars (letters, digits, -, _)."""
     import re
 
     init_db()
@@ -1967,7 +1967,7 @@ async def test_confirm_apply_ref_is_url_safe(tmp_db, tmp_path):
 
 
 async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
-    """Dez chamadas a confirm_apply devem gerar refs distintos."""
+    """Ten calls to confirm_apply must generate distinct refs."""
     init_db()
     cv_path = tmp_path / "cv.pdf"
     cv_path.write_bytes(b"fake pdf")
@@ -1998,7 +1998,7 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
 
         refs.add(Application.get(Application.job == job).email_ref)
 
-    # Com 10 refs de 6 chars urlsafe (~62^6 possibilidades), colisão é virtualmente zero
+    # With 10 urlsafe 6-char refs (~62^6 possibilities), collision is virtually zero
     assert len(refs) == 10
 
 
@@ -2140,10 +2140,10 @@ async def test_sync_email_responses_flags_fuzzy_match_as_suggestion(tmp_db):
 
 
 def test_mcp_server_initializes_logging():
-    """Importar o mcp_server não deve explodir e deve ter setup de logging configurado."""
+    """Importing mcp_server must not blow up and must have logging set up."""
     import gauntler.core.log as log_mod
 
-    # se o módulo já foi importado, _initialized deve ser True
+    # if the module was already imported, _initialized should be True
     assert log_mod._initialized is True
 
 
@@ -2151,7 +2151,7 @@ def test_mcp_server_initializes_logging():
 
 
 def test_archive_screenshots_moves_dir(tmp_path):
-    """_archive_screenshots move o dir de screenshots para done/<job_id>/."""
+    """_archive_screenshots moves the screenshots dir to done/<job_id>/."""
     from gauntler.application.service import archive_screenshots
 
     job_dir = tmp_path / "42"
@@ -2169,15 +2169,15 @@ def test_archive_screenshots_moves_dir(tmp_path):
 
 
 def test_archive_screenshots_no_dir_is_noop(tmp_path):
-    """_archive_screenshots não falha quando o dir ainda não existe."""
+    """_archive_screenshots does not fail when the dir does not exist yet."""
     from gauntler.application.service import archive_screenshots
 
     config = {"screenshots_dir": str(tmp_path)}
-    archive_screenshots(999, config)  # não deve levantar
+    archive_screenshots(999, config)  # must not raise
 
 
 def test_archive_screenshots_overwrites_existing_done(tmp_path):
-    """_archive_screenshots substitui done/<job_id>/ se já existe."""
+    """_archive_screenshots replaces done/<job_id>/ if it already exists."""
     from gauntler.application.service import archive_screenshots
 
     job_dir = tmp_path / "7"
@@ -2196,7 +2196,7 @@ def test_archive_screenshots_overwrites_existing_done(tmp_path):
 
 
 async def test_confirm_apply_archives_on_success(tmp_db, tmp_path):
-    """confirm_apply chama _archive_screenshots quando outcome='submitted'."""
+    """confirm_apply calls _archive_screenshots when outcome='submitted'."""
     init_db()
     job = create_job(
         tmp_db, url="https://boards.greenhouse.io/stripe/jobs/arch1", status="applying"
@@ -2261,7 +2261,7 @@ def _scan_patches(raw_jobs, eval_mock):
     )
 
     async def _batch(jobs, profile, model, caller):
-        # Chama eval_mock por vaga; erros (spend limit) propagam para evaluate_chunk.
+        # Calls eval_mock per job; errors (spend limit) propagate to evaluate_chunk.
         return [
             await eval_mock(j.company, j.title, j.description, profile, model, caller) for j in jobs
         ]
@@ -2304,9 +2304,9 @@ async def test_scan_concurrent_calls_evaluate_same_url_only_once(tmp_db):
 
 
 async def test_scan_spend_limit_releases_scan_log_claim(tmp_db):
-    """Quando evaluate_job bate o spend limit, o scan PARA LIMPO (não crasha):
-    libera o claim no ScanLog (URL re-tentável no próximo scan), não cria Job, e
-    avisa no retorno. Contrato conservador — sem exceção propagando para o tool."""
+    """When evaluate_job hits the spend limit, the scan STOPS CLEANLY (does not crash):
+    it releases the claim in ScanLog (URL retryable on the next scan), does not create
+    a Job, and warns in the return. Conservative contract — no exception propagates to the tool."""
     init_db()
     from gauntler.discovery.sources.base import RawJob
     from gauntler.server import scan_and_evaluate
@@ -2321,9 +2321,9 @@ async def test_scan_spend_limit_releases_scan_log_claim(tmp_db):
     with _scan_patches([raw], failing_eval):
         result = await scan_and_evaluate(ctx=make_test_context())
 
-    # Não levanta — reporta o limite no texto de retorno.
+    # Does not raise — reports the limit in the return text.
     assert "spend limit" in result.lower() or "interrompido" in result.lower()
-    # Claim liberado — ScanLog vazio para o próximo scan re-tentar o URL.
+    # Claim released — empty ScanLog so the next scan can retry the URL.
     assert ScanLog.select().where(ScanLog.job_url == url).count() == 0
     # Nenhum Job criado.
     assert Job.select().where(Job.url == url).count() == 0
@@ -2346,7 +2346,7 @@ async def test_scan_already_in_scan_log_skips_llm(tmp_db):
 
 
 async def test_confirm_apply_aborts_when_cv_missing(tmp_db):
-    """Se o CV resolvido não existe, confirm_apply NÃO submete (não sobe CV errado)."""
+    """If the resolved CV does not exist, confirm_apply does NOT submit (won't upload the wrong CV)."""
     init_db()
     job = create_job(
         tmp_db,
@@ -2357,17 +2357,17 @@ async def test_confirm_apply_aborts_when_cv_missing(tmp_db):
     create_application(job)
     with patch(
         "gauntler.application.service.resolve_cv_path",
-        side_effect=CVNotFoundError("nao achei"),
+        side_effect=CVNotFoundError("not found"),
     ):
         from gauntler.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id, ctx=make_test_context())
-    assert "CV" in result and ("não" in result or "nao" in result)
+    assert "CV" in result and "not found" in result
     assert Job.get_by_id(job.id).status != "applied"
 
 
 async def test_confirm_apply_aborts_on_pending_needs_review(tmp_db, tmp_path):
-    """Se um campo __NEEDS_REVIEW__ continua sem resposta, confirm_apply NÃO submete."""
+    """If a __NEEDS_REVIEW__ field remains unanswered, confirm_apply does NOT submit."""
     init_db()
     job = create_job(
         tmp_db,

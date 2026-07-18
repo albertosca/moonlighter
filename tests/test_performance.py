@@ -87,7 +87,7 @@ async def test_ashby_scan_10_companies_concurrent():
     assert elapsed < 0.3, f"Expected < 0.3s (concurrent), got {elapsed:.3f}s"
 
 
-# ── Avaliação LLM em batch ────────────────────────────────────────────────────
+# ── Batch LLM evaluation ─────────────────────────────────────────────────────
 
 
 async def test_evaluate_10_jobs_concurrent_faster_than_sequential():

@@ -70,7 +70,7 @@ async def test_lever_scan():
     assert jobs[0].title == "Staff Engineer"
     assert jobs[0].remote_type == "remote"
     assert jobs[0].source == "lever"
-    assert "Elixir" in jobs[0].description  # QUALITY-01: descrição extraída
+    assert "Elixir" in jobs[0].description  # QUALITY-01: description extracted
 
 
 @pytest.mark.asyncio
@@ -338,7 +338,7 @@ async def test_ashby_scan_success():
     assert jobs[0].company == "openai"
     assert jobs[0].title == "ML Engineer"
     assert jobs[0].source == "ashby"
-    assert "language models" in jobs[0].description  # QUALITY-01: descrição extraída
+    assert "language models" in jobs[0].description  # QUALITY-01: description extracted
 
 
 async def test_ashby_is_remote_flag_true():
@@ -500,11 +500,11 @@ async def test_lever_multiple_companies_returns_all():
     assert jobs[1].company == "linear"
 
 
-# ── Greenhouse: validação de schema ───────────────────────────────────────────
+# ── Greenhouse: schema validation ────────────────────────────────────────────
 
 
 async def test_greenhouse_missing_title_skips_job():
-    """Item sem 'title' é ignorado — não gera KeyError."""
+    """Item with no 'title' is skipped — does not raise KeyError."""
     response = {
         "jobs": [
             {
@@ -522,7 +522,7 @@ async def test_greenhouse_missing_title_skips_job():
 
 
 async def test_greenhouse_missing_absolute_url_skips_job():
-    """Item sem 'absolute_url' é ignorado."""
+    """Item with no 'absolute_url' is skipped."""
     response = {
         "jobs": [
             {
@@ -555,7 +555,7 @@ async def test_greenhouse_jobs_key_missing_returns_empty():
     assert jobs == []
 
 
-# ── Lever: validação de schema ────────────────────────────────────────────────
+# ── Lever: schema validation ─────────────────────────────────────────────────
 
 
 async def test_lever_non_list_response_returns_empty():
@@ -566,11 +566,11 @@ async def test_lever_non_list_response_returns_empty():
     assert jobs == []
 
 
-# ── Ashby: validação de schema ────────────────────────────────────────────────
+# ── Ashby: schema validation ─────────────────────────────────────────────────
 
 
 async def test_ashby_missing_title_skips_job():
-    """Item sem 'title' é ignorado."""
+    """Item with no 'title' is skipped."""
     response = {
         "data": {
             "jobPostings": [
@@ -590,7 +590,7 @@ async def test_ashby_missing_title_skips_job():
 
 
 async def test_ashby_missing_url_skips_job():
-    """Item sem 'jobPostingAbsoluteUrl' é ignorado."""
+    """Item with no 'jobPostingAbsoluteUrl' is skipped."""
     response = {
         "data": {
             "jobPostings": [{"id": "1", "title": "Eng", "locationName": "Remote", "isRemote": True}]
@@ -603,7 +603,7 @@ async def test_ashby_missing_url_skips_job():
 
 
 async def test_ashby_null_job_postings_returns_empty():
-    """data.jobPostings é null → retorna [] sem crash."""
+    """data.jobPostings is null → returns [] without crashing."""
     response = {"data": {"jobPostings": None}}
     mock_client = _make_mock_client(response)
     with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
@@ -661,7 +661,7 @@ async def test_lever_logs_scan_fetched(caplog):
 
 
 async def test_ashby_jobpostings_not_a_list_returns_empty():
-    """jobPostings com shape inesperado (não-lista, mas truthy) → [] (http_sources.py:171)."""
+    """jobPostings with an unexpected shape (not a list, but truthy) → [] (http_sources.py:171)."""
     response = {"data": {"jobPostings": {"unexpected": "shape"}}}
     mock_client = _make_mock_client(response)
     with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
@@ -671,7 +671,7 @@ async def test_ashby_jobpostings_not_a_list_returns_empty():
 
 @pytest.mark.parametrize("Scanner", [GreenhouseScanner, LeverScanner, AshbyScanner])
 async def test_scan_skips_fetch_exceptions(Scanner):
-    """_fetch lança → gather(return_exceptions) devolve a exceção → ignorada (não-lista)."""
+    """_fetch raises → gather(return_exceptions) returns the exception → ignored (not a list)."""
     mock_client = _make_mock_client({})
     with (
         patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),

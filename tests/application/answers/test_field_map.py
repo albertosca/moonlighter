@@ -6,7 +6,7 @@ PROFILE = {
     "email": "maria.pereira@example.com",
     "linkedin": "https://www.linkedin.com/in/mariapereira/",
     "location": "São Paulo, SP, Brasil",
-    # campos genéricos de localização/idioma/disponibilidade
+    # generic location/language/availability fields
     "country_en": "Brazil",
     "country_pt": "Brasil",
     "english_level": "Fluent",
@@ -64,7 +64,7 @@ def test_country():
 
 def test_visa_field_unknown_country_needs_review():
     fields = ["Will you now or in the future require visa support to work in the role's location?"]
-    r = pre_populate_answers(fields, PROFILE)  # sem job_location → país desconhecido
+    r = pre_populate_answers(fields, PROFILE)  # no job_location → unknown country
     assert r[fields[0]] == "__NEEDS_REVIEW__"
 
 
@@ -114,7 +114,7 @@ def test_multiple_fields():
     assert "Why do you want to work here?" not in r
 
 
-# ── PT-BR labels (forms em português, ex: Nubank Investments) ──────────────────
+# ── PT-BR labels (Portuguese-language forms, e.g. Nubank Investments) ─────────
 
 
 def test_ptbr_nome_first_name():
@@ -160,14 +160,14 @@ def test_ptbr_strips_asterisk():
 
 
 def test_currently_based_question_fills_city():
-    """'Where are you currently based?' continua pré-populando a cidade."""
+    """'Where are you currently based?' keeps pre-populating the city."""
     r = pre_populate_answers(["Where are you currently based?"], PROFILE)
     assert r["Where are you currently based?"] == "São Paulo"
 
 
 def test_currently_based_midsentence_confirmation_not_prepopulated():
-    """Campo de confirmação que CONTÉM 'currently based' no meio NÃO é tratado como
-    cidade (deixa pro LLM responder 'Yes, I am aware')."""
+    """A confirmation field that CONTAINS 'currently based' mid-sentence is NOT treated
+    as the city (leaves it for the LLM to answer 'Yes, I am aware')."""
     label = (
         "You are aware that this is a hybrid position and we require you to be "
         'currently based in one of the job post locations. Type "Yes, I am aware" if you confirm.'
@@ -176,7 +176,7 @@ def test_currently_based_midsentence_confirmation_not_prepopulated():
     assert label not in r
 
 
-# ── Campos opcionais do profile (country_en, country_pt, english_level, office_available) ──
+# ── Optional profile fields (country_en, country_pt, english_level, office_available) ─────
 
 
 PROFILE_NO_LOCALE = {
@@ -189,19 +189,19 @@ PROFILE_NO_LOCALE = {
 
 
 def test_country_absent_from_profile_not_prepopulated():
-    """Sem country_en no perfil → campo 'Country' não entra no resultado (LLM decide)."""
+    """No country_en in the profile → 'Country' field doesn't enter the result (LLM decides)."""
     r = pre_populate_answers(["Country"], PROFILE_NO_LOCALE)
     assert "Country" not in r
 
 
 def test_pais_absent_from_profile_not_prepopulated():
-    """Sem country_pt no perfil → campo 'País' não entra no resultado."""
+    """No country_pt in the profile → 'País' field doesn't enter the result."""
     r = pre_populate_answers(["País"], PROFILE_NO_LOCALE)
     assert "País" not in r
 
 
 def test_english_level_absent_from_profile_not_prepopulated():
-    """Sem english_level no perfil → campo 'English level' não entra no resultado."""
+    """No english_level in the profile → 'English level' field doesn't enter the result."""
     r = pre_populate_answers(["English level"], PROFILE_NO_LOCALE)
     assert "English level" not in r
 
@@ -225,7 +225,7 @@ def test_office_available_false_returns_no():
 
 
 def test_office_absent_from_profile_not_prepopulated():
-    """Sem office_available no perfil → campo não entra no resultado."""
+    """No office_available in the profile → field doesn't enter the result."""
     r = pre_populate_answers(
         ["Are you able to work from the office at least two days per week?"], PROFILE_NO_LOCALE
     )
@@ -233,14 +233,14 @@ def test_office_absent_from_profile_not_prepopulated():
 
 
 def test_country_en_from_profile():
-    """country_en no perfil → usado como resposta para ^country$."""
+    """country_en in the profile → used as the answer for ^country$."""
     profile = {**PROFILE_NO_LOCALE, "country_en": "Germany"}
     r = pre_populate_answers(["Country"], profile)
     assert r["Country"] == "Germany"
 
 
 def test_english_level_from_profile():
-    """english_level no perfil → usado na regra de proficiência."""
+    """english_level in the profile → used in the proficiency rule."""
     profile = {**PROFILE_NO_LOCALE, "english_level": "Native"}
     r = pre_populate_answers(["English level"], profile)
     assert r["English level"] == "Native"

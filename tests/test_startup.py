@@ -29,8 +29,8 @@ def test_validate_startup_api_key_present_no_api_error(monkeypatch):
 
 
 def test_validate_startup_cli_backend_skips_api_key_error(monkeypatch):
-    """BUG-05: com llm_backend='cli' não se usa API key, então ausência dela
-    não deve gerar erro."""
+    """BUG-05: with llm_backend='cli' no API key is used, so its absence
+    must not raise an error."""
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     warnings = validate_startup(config={"llm_backend": "cli"}, profile={"skills": []})
     assert not any("ANTHROPIC_API_KEY" in w.message for w in warnings)
@@ -71,7 +71,7 @@ def test_validate_startup_missing_browser_produces_warn():
 
 
 def test_validate_startup_legacy_brave_path_still_works(tmp_path):
-    """Retrocompat: a chave legada brave_path ainda é reconhecida (via browser_executable)."""
+    """Backwards compat: the legacy brave_path key is still recognized (via browser_executable)."""
     brave = tmp_path / "brave"
     brave.touch()
     warnings = validate_startup(

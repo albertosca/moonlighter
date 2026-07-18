@@ -8,7 +8,7 @@ from peewee import IntegrityError
 
 
 def _make_job(**kwargs):
-    """Helper: cria um Job com defaults mínimos, sobrescrito por kwargs."""
+    """Helper: creates a Job with minimal defaults, overridden by kwargs."""
     defaults = {
         "source": "greenhouse",
         "company": "Stripe",
@@ -304,7 +304,7 @@ def test_application_email_ref_is_null_by_default(tmp_db):
 
 
 def test_application_email_ref_unique_constraint(tmp_db):
-    """email_ref é UNIQUE — dois apps com mesmo ref levantam IntegrityError."""
+    """email_ref is UNIQUE — two apps with the same ref raise IntegrityError."""
     from peewee import IntegrityError
 
     init_db()
@@ -315,7 +315,7 @@ def test_application_email_ref_unique_constraint(tmp_db):
 
 
 def test_application_email_ref_none_not_constrained(tmp_db):
-    """Múltiplos apps sem ref (null) devem coexistir sem violar unicidade."""
+    """Multiple apps with no ref (null) must coexist without violating uniqueness."""
     init_db()
     job1 = _make_job(url="https://x.com/1")
     job2 = _make_job(url="https://x.com/2")
@@ -340,7 +340,7 @@ def test_application_current_stage_is_null_by_default(tmp_db):
 
 
 def test_application_status_interviews_is_valid(tmp_db):
-    """'interviews' (plural) é o status correto para etapas de entrevista."""
+    """'interviews' (plural) is the correct status for interview stages."""
     init_db()
     job = _make_job()
     app = Application.create(job=job, status="interviews")
@@ -348,18 +348,18 @@ def test_application_status_interviews_is_valid(tmp_db):
 
 
 def test_init_db_idempotent_preserves_email_ref(tmp_db):
-    """Chamar init_db() duas vezes não apaga dados existentes."""
+    """Calling init_db() twice does not erase existing data."""
     init_db()
     job = _make_job()
     Application.create(job=job, email_ref="persist01", current_stage="live_coding")
-    init_db()  # segunda chamada — migration segura
+    init_db()  # second call — safe migration
     saved = Application.get_by_id(1)
     assert saved.email_ref == "persist01"
     assert saved.current_stage == "live_coding"
 
 
 def test_application_email_ref_lookup_by_ref(tmp_db):
-    """Deve ser possível recuperar uma Application pelo email_ref."""
+    """It must be possible to look up an Application by email_ref."""
     init_db()
     job = _make_job()
     Application.create(job=job, email_ref="lkp001")
@@ -368,8 +368,8 @@ def test_application_email_ref_lookup_by_ref(tmp_db):
 
 
 def test_init_db_migrates_old_application_table(tmp_db):
-    """Tabela 'application' antiga (sem email_ref/current_stage) → init_db adiciona
-    as colunas via ALTER TABLE (db.py:98-99, 104)."""
+    """Old 'application' table (with no email_ref/current_stage) → init_db adds
+    the columns via ALTER TABLE (db.py:98-99, 104)."""
     from gauntler.core.db import db
 
     db.init(tmp_db)
@@ -378,7 +378,7 @@ def test_init_db_migrates_old_application_table(tmp_db):
     db.execute_sql("CREATE TABLE application (id INTEGER PRIMARY KEY, status VARCHAR(50))")
     db.close()
 
-    init_db()  # roda a migração segura
+    init_db()  # runs the safe migration
 
     cursor = db.execute_sql("PRAGMA table_info(application)")
     cols = {row[1] for row in cursor.fetchall()}
@@ -387,7 +387,7 @@ def test_init_db_migrates_old_application_table(tmp_db):
 
 
 def test_db_path_default_when_env_unset(monkeypatch):
-    """Sem GAUNTLER_DB_PATH nem GAUNTLER_HOME → default ~/.gauntler/gauntler.db."""
+    """No GAUNTLER_DB_PATH nor GAUNTLER_HOME → default ~/.gauntler/gauntler.db."""
     from gauntler.core.db import _db_path
 
     monkeypatch.delenv("GAUNTLER_DB_PATH", raising=False)
@@ -403,7 +403,7 @@ def test_db_path_respects_env(monkeypatch):
 
 
 def test_db_path_follows_gauntler_home(monkeypatch, tmp_path):
-    """Sem GAUNTLER_DB_PATH, o banco segue GAUNTLER_HOME (fonte única)."""
+    """With no GAUNTLER_DB_PATH, the database follows GAUNTLER_HOME (single source)."""
     from gauntler.core.db import _db_path
 
     monkeypatch.delenv("GAUNTLER_DB_PATH", raising=False)

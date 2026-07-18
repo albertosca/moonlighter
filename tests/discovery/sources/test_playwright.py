@@ -19,7 +19,7 @@ def make_page(initial_url="https://www.linkedin.com/jobs/search/?keywords=engine
 
 
 async def test_linkedin_scanner_raises_on_login_redirect():
-    """Após goto(), se page.url contém '/login', levanta LinkedInSessionExpiredError."""
+    """After goto(), if page.url contains '/login', raises LinkedInSessionExpiredError."""
     page = make_page()
 
     async def goto_side_effect(url, **kwargs):
@@ -76,14 +76,14 @@ async def test_linkedin_scanner_raises_on_authwall():
 
 
 async def test_linkedin_scanner_valid_session_no_exception():
-    """URL válida de resultados de busca → sem exceção."""
+    """Valid search-results URL → no exception."""
     page = make_page(initial_url="https://www.linkedin.com/jobs/search/?keywords=engineer")
     page.wait_for_selector = AsyncMock(side_effect=Exception("no results"))  # timeout ok
 
     from gauntler.discovery.sources.playwright import LinkedInScanner
 
     scanner = LinkedInScanner(page)
-    # Não lança LinkedInSessionExpiredError, pode lançar outra coisa
+    # Does not raise LinkedInSessionExpiredError, may raise something else
     try:
         await scanner.scan(keywords="engineer")
     except Exception as e:
@@ -91,7 +91,7 @@ async def test_linkedin_scanner_valid_session_no_exception():
 
 
 async def test_linkedin_scanner_returns_jobs_on_success():
-    """Sessão válida + resultados encontrados → lista de RawJobs."""
+    """Valid session + results found → list of RawJobs."""
     page = make_page()
 
     title_el = MagicMock()
@@ -195,7 +195,7 @@ class TestFetchDescription:
         assert "description fetch failed" in caplog.text
 
     async def test_description_populated_in_scan_result(self):
-        """Quando _fetch_description retorna texto, RawJob.description é preenchido."""
+        """When _fetch_description returns text, RawJob.description is populated."""
         page = make_page()
 
         title_el = MagicMock()

@@ -12,7 +12,7 @@ def make_applier(url="https://www.linkedin.com/jobs/view/123"):
     page.query_selector_all = AsyncMock(return_value=[])
     page.wait_for_selector = AsyncMock()
     page.wait_for_load_state = AsyncMock()
-    page.inner_text = AsyncMock(return_value="")  # sem confirmação por padrão
+    page.inner_text = AsyncMock(return_value="")  # no confirmation by default
     return LinkedInApplier(page, {}, {})
 
 
@@ -291,7 +291,7 @@ async def test_fill_form_exception_continues_to_next_field(caplog):
 
 
 async def test_submit_clicks_submit_button_directly():
-    """Submit button present immediately + confirmação → True."""
+    """Submit button present immediately + confirmation → True."""
     applier = make_applier()
     submit_btn = MagicMock()
     submit_btn.click = AsyncMock()
@@ -312,7 +312,7 @@ async def test_submit_unverified_without_confirmation():
     submit_btn.click = AsyncMock()
     applier.page.query_selector = AsyncMock(return_value=submit_btn)
     applier.page.inner_text = AsyncMock(return_value="Phone Number Years of Experience")
-    applier.page.evaluate = AsyncMock(return_value=False)  # modal não está mais visível
+    applier.page.evaluate = AsyncMock(return_value=False)  # modal is no longer visible
 
     with patch("asyncio.sleep", new=AsyncMock()):
         result = await applier.submit()
@@ -405,7 +405,7 @@ async def test_submit_exception_returns_failed():
 
 
 async def test_extract_fields_falls_back_when_primary_modal_selector_empty():
-    """Seletor primário do modal vazio → seletor alternativo tentado."""
+    """Empty primary modal selector → alternative selector tried."""
     applier = make_applier()
     btn = MagicMock()
     btn.click = AsyncMock()
@@ -436,7 +436,7 @@ async def test_extract_fields_falls_back_when_primary_modal_selector_empty():
 
 
 async def test_extract_fields_apply_click_exception_returns_empty():
-    """Clique no botão Apply lança → extract_fields devolve [] (26-27)."""
+    """Click on the Apply button raises → extract_fields returns [] (26-27)."""
     applier = make_applier()
     btn = MagicMock()
     btn.click = AsyncMock(side_effect=Exception("detached"))
@@ -446,13 +446,13 @@ async def test_extract_fields_apply_click_exception_returns_empty():
 
 
 async def test_extract_fields_skips_empty_modal_label():
-    """Label com texto vazio no modal é ignorado (44->42)."""
+    """Label with empty text in the modal is ignored (44->42)."""
     applier = make_applier()
     empty = MagicMock()
     empty.inner_text = AsyncMock(return_value="   ")
     real = MagicMock()
     real.inner_text = AsyncMock(return_value="Phone")
-    applier.page.query_selector = AsyncMock(return_value=None)  # sem botão Apply
+    applier.page.query_selector = AsyncMock(return_value=None)  # no Apply button
     applier.page.query_selector_all = AsyncMock(return_value=[empty, real])
     with patch("asyncio.sleep", new=AsyncMock()):
         result = await applier.extract_fields()
@@ -460,7 +460,7 @@ async def test_extract_fields_skips_empty_modal_label():
 
 
 async def test_fill_form_skips_label_without_for():
-    """Label sem atributo for → campo não preenchido (59->51)."""
+    """Label with no for attribute → field not filled (59->51)."""
     applier = make_applier()
     label = MagicMock()
     label.get_attribute = AsyncMock(return_value=None)
@@ -470,7 +470,7 @@ async def test_fill_form_skips_label_without_for():
 
 
 async def test_fill_form_skips_when_field_missing():
-    """for=fid mas #fid não existe → campo não preenchido (61->51)."""
+    """for=fid but #fid doesn't exist → field not filled (61->51)."""
     applier = make_applier()
     label = MagicMock()
     label.get_attribute = AsyncMock(return_value="fid")
@@ -484,7 +484,7 @@ async def test_fill_form_skips_when_field_missing():
 
 
 async def test_fill_form_swallows_cv_upload_exception(caplog):
-    """Exceção ao subir o CV é engolida (74-75)."""
+    """Exception while uploading the CV is swallowed (74-75)."""
     applier = make_applier()
     file_input = MagicMock()
     file_input.set_input_files = AsyncMock(side_effect=Exception("io"))

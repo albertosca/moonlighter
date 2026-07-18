@@ -158,7 +158,7 @@ async def test_get_context_skips_launch_when_devtools_already_ready(tmp_path):
     ):
         ctx = await browser_mod.get_context(config)
     assert ctx is mock_context
-    popen.assert_not_called()  # browser já estava de pé, na porta que JÁ é nossa
+    popen.assert_not_called()  # browser was already up, on the port that's ALREADY ours
     mock_playwright.chromium.connect_over_cdp.assert_called_once()
     assert "9222" in mock_playwright.chromium.connect_over_cdp.call_args.args[0]
 
@@ -322,7 +322,7 @@ async def test_close_is_idempotent_when_already_closed():
 
 
 async def test_get_context_logs_cdp_connected(caplog, tmp_path):
-    """get_context() deve logar 'CDP connected' quando conecta com sucesso."""
+    """get_context() must log 'CDP connected' when it connects successfully."""
     import logging
 
     mock_pw, _mock_playwright, _mock_browser, _mock_context, mock_proc = _make_cdp_mocks()

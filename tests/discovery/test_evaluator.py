@@ -21,7 +21,7 @@ from gauntler.discovery.evaluator import (
 MOCK_LLM_RESPONSE = json.dumps(
     {
         "score": 8.5,
-        "score_notes": "Excelente match em Elixir/Phoenix. Stack alinhada. Remoto total.",
+        "score_notes": "Excellent match in Elixir/Phoenix. Stack aligned. Fully remote.",
         "caveats": ["Must overlap EST timezone by 4h"],
         "salary_min": 180000,
         "salary_max": 220000,
@@ -33,8 +33,8 @@ MOCK_LLM_RESPONSE = json.dumps(
 PROFILE = {
     "skills": [{"name": "Elixir/Phoenix", "years": 8, "level": "expert"}],
     "criteria": {
-        "hard_filters": ["descarta se exigir .NET"],
-        "soft_filters": ["preferência por série A–C"],
+        "hard_filters": ["discard if .NET is required"],
+        "soft_filters": ["preference for series A-C"],
     },
 }
 
@@ -400,7 +400,7 @@ async def test_evaluate_job_salary_source_preserved():
 
 
 async def test_evaluate_job_strips_markdown_fence():
-    """LLM retorna JSON dentro de ```json ... ``` → parsed corretamente, score válido."""
+    """LLM returns JSON inside ```json ... ``` → parsed correctly, valid score."""
     payload = {
         "score": 7.5,
         "score_notes": "Good.",
@@ -423,7 +423,7 @@ async def test_evaluate_job_strips_markdown_fence():
 
 
 async def test_evaluate_job_strips_markdown_fence_without_json_label():
-    """LLM retorna JSON dentro de ``` ... ``` (sem 'json') → parsed corretamente."""
+    """LLM returns JSON inside ``` ... ``` (with no 'json' label) → parsed correctly."""
     payload = {
         "score": 6.0,
         "score_notes": "Ok.",
@@ -446,7 +446,7 @@ async def test_evaluate_job_strips_markdown_fence_without_json_label():
 
 
 async def test_evaluate_job_strips_leading_prose():
-    """LLM retorna texto introdutório seguido do JSON → JSON extraído e parsed."""
+    """LLM returns introductory text followed by JSON → JSON extracted and parsed."""
     payload = {
         "score": 8.0,
         "score_notes": "Great.",
@@ -670,7 +670,7 @@ def test_skip_data_center_not_data_science():
 
 
 def test_skip_returns_first_matching_pattern():
-    # título contém dois padrões — retorna o primeiro que der match
+    # title contains two patterns — returns the first one that matches
     result = should_skip_by_title("Sales Customer Success Specialist", BLOCKLIST)
     assert result in BLOCKLIST
 
@@ -718,17 +718,17 @@ async def test_evaluate_job_builds_default_caller_when_none():
     assert result.score == 8.5
 
 
-# ── robustez: saída malformada do LLM (score/caveats) ───────────────────────
+# ── robustness: malformed output from the LLM (score/caveats) ──────────────
 
 
 async def test_evaluate_job_null_score_becomes_zero_keeps_notes():
-    """score null → 0.0 preservando as notas (não cai no 'evaluation error')."""
-    caller = _make_caller(json.dumps({"score": None, "score_notes": "sem score", "caveats": ["x"]}))
+    """score null → 0.0 while preserving the notes (doesn't fall into 'evaluation error')."""
+    caller = _make_caller(json.dumps({"score": None, "score_notes": "no score", "caveats": ["x"]}))
     result = await evaluate_job(
         company="C", title="T", description=JD, profile=PROFILE, _caller=caller
     )
     assert result.score == 0.0
-    assert result.score_notes == "sem score"
+    assert result.score_notes == "no score"
     assert result.caveats == ["x"]
 
 
@@ -741,7 +741,7 @@ async def test_evaluate_job_non_numeric_score_becomes_zero():
 
 
 async def test_evaluate_job_non_list_caveats_becomes_empty():
-    caller = _make_caller(json.dumps({"score": 7.0, "caveats": "não é lista"}))
+    caller = _make_caller(json.dumps({"score": 7.0, "caveats": "not a list"}))
     result = await evaluate_job(
         company="C", title="T", description=JD, profile=PROFILE, _caller=caller
     )
@@ -752,7 +752,7 @@ async def test_evaluate_job_non_list_caveats_becomes_empty():
 
 
 def test_eval_input_is_frozen():
-    """EvalInput é um frozen dataclass."""
+    """EvalInput is a frozen dataclass."""
     inp = EvalInput(company="Acme", title="Engineer", description="desc")
     with pytest.raises(FrozenInstanceError):
         inp.company = "other"
@@ -1021,7 +1021,7 @@ async def test_batch_happy_path_single_call():
 
     results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
     assert [r.score for r in results] == [8.0, 2.0]
-    assert calls["n"] == 1  # uma única chamada para o lote
+    assert calls["n"] == 1  # a single call for the batch
 
 
 async def test_batch_falls_back_per_job_on_bad_json():
@@ -1030,12 +1030,12 @@ async def test_batch_falls_back_per_job_on_bad_json():
     async def caller(prompt, model, cache_prefix=None):
         calls["n"] += 1
         if calls["n"] == 1:
-            return "garbage not json"  # lote falha o parse
+            return "garbage not json"  # batch fails to parse
         return '{"score": 5.0, "score_notes": "x", "caveats": []}'  # per-job
 
     results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
     assert [r.score for r in results] == [5.0, 5.0]
-    assert calls["n"] == 3  # 1 lote (falhou) + 2 per-job
+    assert calls["n"] == 3  # 1 batch (failed) + 2 per-job
 
 
 async def test_batch_spend_limit_propagates():
@@ -1059,23 +1059,23 @@ async def test_batch_single_job_uses_single_path():
 
 
 async def test_batch_falls_back_per_job_on_non_spend_error():
-    """Erro não-cota na chamada de lote → fallback per-job (score=0 por evaluate_job)."""
+    """Non-spend error in the batch call → per-job fallback (score=0 via evaluate_job)."""
     calls = {"n": 0}
 
     async def caller(prompt, model, cache_prefix=None):
         calls["n"] += 1
         if calls["n"] == 1:
-            raise ConnectionError("timeout")  # erro não-cota: fallback
+            raise ConnectionError("timeout")  # non-spend error: fallback
         return '{"score": 3.0, "score_notes": "y", "caveats": []}'
 
     results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
-    assert calls["n"] == 3  # 1 lote (erro) + 2 per-job
+    assert calls["n"] == 3  # 1 batch (error) + 2 per-job
     assert len(results) == 2
     assert [r.score for r in results] == [3.0, 3.0]
 
 
 async def test_evaluate_job_passes_cache_prefix():
-    """evaluate_job deve enviar o perfil/instruções como cache_prefix e a vaga como prompt."""
+    """evaluate_job must send the profile/instructions as cache_prefix and the job as the prompt."""
     captured = {}
 
     async def caller(prompt, model, cache_prefix=None):
@@ -1085,10 +1085,10 @@ async def test_evaluate_job_passes_cache_prefix():
 
     from gauntler.discovery.evaluator import evaluate_job
 
-    await evaluate_job("Co", "Eng", "JD aqui", {"skills": ["python"]}, "m", caller)
+    await evaluate_job("Co", "Eng", "JD here", {"skills": ["python"]}, "m", caller)
     assert captured["prefix"] is not None and "python" in captured["prefix"]
-    assert "JD aqui" in captured["dynamic"]
-    assert "JD aqui" not in captured["prefix"]  # vaga não está no prefixo cacheável
+    assert "JD here" in captured["dynamic"]
+    assert "JD here" not in captured["prefix"]  # job is not in the cacheable prefix
 
 
 # ── S-05: output validation (range/type clamping) ───────────────────────────

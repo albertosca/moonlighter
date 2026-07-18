@@ -7,7 +7,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 
 def make_label_locator(field_mock=None):
-    """Cria um mock de Locator do Playwright que retorna field_mock via element_handle()."""
+    """Creates a mock Playwright Locator that returns field_mock via element_handle()."""
     locator = MagicMock()
     locator.count = AsyncMock(return_value=1 if field_mock else 0)
     locator.first = MagicMock()
@@ -21,8 +21,8 @@ def make_applier(url="https://boards.greenhouse.io/stripe/jobs/123"):
     page.query_selector = AsyncMock(return_value=None)
     page.query_selector_all = AsyncMock(return_value=[])
     page.wait_for_load_state = AsyncMock()
-    page.inner_text = AsyncMock(return_value="")  # sem confirmação por padrão
-    page.get_by_label = MagicMock(return_value=make_label_locator(None))  # padrão: sem match
+    page.inner_text = AsyncMock(return_value="")  # no confirmation by default
+    page.get_by_label = MagicMock(return_value=make_label_locator(None))  # default: no match
     page.evaluate = AsyncMock(return_value=None)
     config = {}
     profile = {}
@@ -30,8 +30,8 @@ def make_applier(url="https://boards.greenhouse.io/stripe/jobs/123"):
 
 
 def make_evaluate(tag, combobox=False, selected=""):
-    """Stub de field.evaluate robusto à ordem/contagem de chamadas: devolve o valor
-    selecionado (single-value), o flag de combobox e o tag conforme o JS chamado."""
+    """Stub of field.evaluate robust to call order/count: returns the selected
+    value (single-value), the combobox flag, and the tag according to the JS called."""
 
     async def _ev(js, *args):
         if "single-value" in js:
@@ -164,7 +164,7 @@ async def test_extract_fields_timeout_on_load_state():
 
 
 async def test_fill_form_fills_text_inputs():
-    """fill() é chamado via get_by_label (estratégia 1)."""
+    """fill() is called via get_by_label (strategy 1)."""
     applier = make_applier()
 
     field = MagicMock()
@@ -181,7 +181,7 @@ async def test_fill_form_fills_text_inputs():
 
 
 async def test_fill_form_selects_dropdown_option():
-    """QUALITY-02: campo <select> é resolvido via select_option (por label), não fill."""
+    """QUALITY-02: a <select> field is resolved via select_option (by label), not fill."""
     applier = make_applier()
 
     field = MagicMock()
@@ -199,7 +199,7 @@ async def test_fill_form_selects_dropdown_option():
 
 
 async def test_fill_form_fills_textareas():
-    """fill() é chamado em campos textarea via get_by_label."""
+    """fill() is called on textarea fields via get_by_label."""
     applier = make_applier()
 
     field = MagicMock()
@@ -215,10 +215,10 @@ async def test_fill_form_fills_textareas():
 
 
 async def test_fill_form_skips_when_no_field_found():
-    """Se get_by_label e JS fallback não acham o campo, nenhum fill é chamado."""
+    """If get_by_label and the JS fallback don't find the field, no fill is called."""
     applier = make_applier()
-    # get_by_label retorna locator sem match (já é o default de make_applier)
-    # evaluate retorna None (sem for_id) — já é default
+    # get_by_label returns a locator with no match (already make_applier's default)
+    # evaluate returns None (no for_id) — already the default
 
     field = MagicMock()
     field.fill = AsyncMock()
@@ -228,7 +228,7 @@ async def test_fill_form_skips_when_no_field_found():
 
 
 async def test_fill_form_uploads_cv():
-    """set_input_files é chamado no locator de file input com o cv_path."""
+    """set_input_files is called on the file input locator with cv_path."""
     applier = make_applier()
 
     file_input = MagicMock()
@@ -259,7 +259,7 @@ async def test_fill_form_skips_cv_if_no_file_input():
 
 
 async def test_fill_form_exception_in_field_continues():
-    """Exception em um campo não impede os outros de serem preenchidos."""
+    """An exception on one field does not prevent the others from being filled."""
     applier = make_applier()
 
     fill_calls = []
@@ -297,7 +297,7 @@ async def test_fill_form_exception_in_field_continues():
 
 
 async def test_submit_returns_submitted_on_confirmation():
-    """submit() → 'submitted' quando a página confirma o envio."""
+    """submit() → 'submitted' when the page confirms the submission."""
     applier = make_applier()
 
     btn = MagicMock()
@@ -314,7 +314,7 @@ async def test_submit_returns_submitted_on_confirmation():
 
 
 async def test_submit_unverified_without_confirmation():
-    """RELIABILITY-01: clicou mas sem marcador de confirmação → 'unverified'."""
+    """RELIABILITY-01: clicked but with no confirmation marker → 'unverified'."""
     applier = make_applier("https://boards.greenhouse.io/stripe/jobs/123")
 
     btn = MagicMock()
@@ -328,7 +328,7 @@ async def test_submit_unverified_without_confirmation():
 
 
 async def test_submit_no_button_returns_failed():
-    """submit() → 'failed' quando não acha o botão de enviar."""
+    """submit() → 'failed' when it can't find the submit button."""
     applier = make_applier()
     applier.page.query_selector = AsyncMock(return_value=None)
 
@@ -337,7 +337,7 @@ async def test_submit_no_button_returns_failed():
 
 
 async def test_submit_exception_returns_failed():
-    """submit() → 'failed' quando o clique levanta exceção."""
+    """submit() → 'failed' when the click raises an exception."""
     applier = make_applier()
 
     btn = MagicMock()
@@ -349,7 +349,7 @@ async def test_submit_exception_returns_failed():
 
 
 async def test_extract_fields_falls_back_when_primary_selector_empty():
-    """Quando seletor primário retorna vazio, seletor alternativo é tentado."""
+    """When the primary selector returns empty, the alternative selector is tried."""
     applier = make_applier()
     applier.page.query_selector = AsyncMock(return_value=None)
 
@@ -361,7 +361,7 @@ async def test_extract_fields_falls_back_when_primary_selector_empty():
     async def qs_all(selector):
         call_count[0] += 1
         if call_count[0] == 1:
-            return []  # primeiro seletor vazio
+            return []  # first selector empty
         return [fallback_label]  # fallback retorna label
 
     applier.page.query_selector_all = qs_all
@@ -374,7 +374,7 @@ async def test_extract_fields_falls_back_when_primary_selector_empty():
 
 
 async def test_find_field_uses_get_by_label_exact_first():
-    """_find_field tenta get_by_label exact=True antes de exact=False."""
+    """_find_field tries get_by_label exact=True before exact=False."""
     applier = make_applier()
     field = MagicMock()
     field.evaluate = make_evaluate("input")
@@ -388,11 +388,11 @@ async def test_find_field_uses_get_by_label_exact_first():
     applier.page.get_by_label = get_by_label
     result = await applier._find_field("First Name")
     assert result is field
-    assert call_args[0] is True  # tentou exact primeiro
+    assert call_args[0] is True  # tried exact first
 
 
 async def test_find_field_falls_back_to_inexact():
-    """_find_field usa exact=False quando exact=True não encontra."""
+    """_find_field uses exact=False when exact=True finds nothing."""
     applier = make_applier()
     field = MagicMock()
     inexact_locator = make_label_locator(field)
@@ -407,11 +407,11 @@ async def test_find_field_falls_back_to_inexact():
 
 
 async def test_find_field_js_fallback_uses_for_attribute():
-    """_find_field usa JS para normalizar label e buscar por for-id quando get_by_label falha."""
+    """_find_field uses JS to normalize the label and look up by for-id when get_by_label fails."""
     applier = make_applier()
-    # get_by_label não encontra nada
+    # get_by_label finds nothing
     applier.page.get_by_label = MagicMock(return_value=make_label_locator(None))
-    # JS retorna um for_id
+    # JS returns a for_id
     applier.page.evaluate = AsyncMock(return_value="phone_field")
     field = MagicMock()
     applier.page.query_selector = AsyncMock(return_value=field)
@@ -422,10 +422,10 @@ async def test_find_field_js_fallback_uses_for_attribute():
 
 
 async def test_find_field_aria_label_strategy():
-    """_find_field usa [aria-label] como última estratégia."""
+    """_find_field uses [aria-label] as a last-resort strategy."""
     applier = make_applier()
     applier.page.get_by_label = MagicMock(return_value=make_label_locator(None))
-    applier.page.evaluate = AsyncMock(return_value=None)  # JS não acha for_id
+    applier.page.evaluate = AsyncMock(return_value=None)  # JS doesn't find a for_id
     field = MagicMock()
 
     call_count = [0]
@@ -443,7 +443,7 @@ async def test_find_field_aria_label_strategy():
 
 
 async def test_find_field_returns_none_when_all_fail():
-    """_find_field retorna None quando nenhuma estratégia encontra o campo."""
+    """_find_field returns None when no strategy finds the field."""
     applier = make_applier()
     applier.page.get_by_label = MagicMock(return_value=make_label_locator(None))
     applier.page.evaluate = AsyncMock(return_value=None)
@@ -457,7 +457,7 @@ async def test_find_field_returns_none_when_all_fail():
 
 
 async def test_fill_form_returns_status_dict():
-    """fill_form retorna dict com status por campo."""
+    """fill_form returns a dict with a status per field."""
     applier = make_applier()
     field = MagicMock()
     field.evaluate = make_evaluate("input")
@@ -469,22 +469,22 @@ async def test_fill_form_returns_status_dict():
     )
 
     with patch("asyncio.sleep", new=AsyncMock()):
-        result = await applier.fill_form({"Nome": "Alberto"}, cv_path="")
+        result = await applier.fill_form({"Name": "Alberto"}, cv_path="")
 
     assert isinstance(result, dict)
-    assert result.get("Nome") == "filled"
+    assert result.get("Name") == "filled"
 
 
 async def test_fill_form_skips_empty_answer():
-    """fill_form marca como 'skipped' campos com resposta vazia."""
+    """fill_form marks fields with an empty answer as 'skipped'."""
     applier = make_applier()
     with patch("asyncio.sleep", new=AsyncMock()):
-        result = await applier.fill_form({"Campo": ""}, cv_path="")
-    assert result.get("Campo") == "skipped"
+        result = await applier.fill_form({"Field": ""}, cv_path="")
+    assert result.get("Field") == "skipped"
 
 
 async def test_fill_form_skips_skip_sentinel():
-    """fill_form marca como 'skipped' campos com __SKIP__."""
+    """fill_form marks fields with __SKIP__ as 'skipped'."""
     applier = make_applier()
     with patch("asyncio.sleep", new=AsyncMock()):
         result = await applier.fill_form({"Attach": "__SKIP__"}, cv_path="")
@@ -492,9 +492,9 @@ async def test_fill_form_skips_skip_sentinel():
 
 
 async def test_fill_form_marks_failed_when_field_not_found():
-    """fill_form retorna 'failed:not_found' quando campo não é localizado."""
+    """fill_form returns 'failed:not_found' when the field is not located."""
     applier = make_applier()
-    # Todas estratégias retornam None
+    # All strategies return None
     applier.page.get_by_label = MagicMock(return_value=make_label_locator(None))
     applier.page.evaluate = AsyncMock(return_value=None)
     applier.page.query_selector = AsyncMock(return_value=None)
@@ -503,23 +503,23 @@ async def test_fill_form_marks_failed_when_field_not_found():
     )
 
     with patch("asyncio.sleep", new=AsyncMock()):
-        result = await applier.fill_form({"Campo Inexistente": "valor"}, cv_path="")
+        result = await applier.fill_form({"Nonexistent Field": "value"}, cv_path="")
 
-    assert result.get("Campo Inexistente") == "failed:not_found"
+    assert result.get("Nonexistent Field") == "failed:not_found"
 
 
 # ── _upload_cv() ──────────────────────────────────────────────────────────────
 
 
 async def test_upload_cv_skips_when_no_path():
-    """_upload_cv retorna 'skipped' quando cv_path está vazio."""
+    """_upload_cv returns 'skipped' when cv_path is empty."""
     applier = make_applier()
     result = await applier._upload_cv("")
     assert result == "skipped"
 
 
 async def test_upload_cv_falls_back_to_query_selector():
-    """_upload_cv usa query_selector quando locator.first.count retorna 0."""
+    """_upload_cv uses query_selector when locator.first.count returns 0."""
     applier = make_applier()
     file_input = MagicMock()
     file_input.set_input_files = AsyncMock()
@@ -537,7 +537,7 @@ async def test_upload_cv_falls_back_to_query_selector():
 
 
 async def test_upload_cv_returns_failed_when_no_input_found():
-    """_upload_cv retorna 'failed:no_file_input' quando não há input de arquivo."""
+    """_upload_cv returns 'failed:no_file_input' when there is no file input."""
     applier = make_applier()
     empty_first = MagicMock()
     empty_first.count = AsyncMock(return_value=0)
@@ -552,7 +552,7 @@ async def test_upload_cv_returns_failed_when_no_input_found():
 
 
 async def test_select_custom_option_clicks_and_selects():
-    """_select_custom_option: match local na opção estática, clica a exata e VERIFICA."""
+    """_select_custom_option: local match on a static option, clicks the exact one and VERIFIES."""
     applier = make_applier()
     element = MagicMock()
     element.click = AsyncMock()
@@ -569,13 +569,13 @@ async def test_select_custom_option_clicks_and_selects():
         result = await applier._select_custom_option(element, "Status", "Yes")
 
     assert result is True
-    applier._click_option_exact.assert_awaited_with("Yes", element, [])  # clicou a opção exata
+    applier._click_option_exact.assert_awaited_with("Yes", element, [])  # clicked the exact option
     applier.page.keyboard.press.assert_not_called()
 
 
 async def test_select_custom_option_uses_llm_for_descriptive_options():
-    """Quando o match local falha (opções em frase) o LLM escolhe entre as opções REAIS,
-    SEM digitar (regressão: digitar 'Fluent' filtraria p/ 'not able to speak fluently' e
+    """When the local match fails (phrase-style options) the LLM chooses among the REAL
+    options, WITHOUT typing (regression: typing 'Fluent' would filter to 'not able to speak fluently' and
     o Enter cego pegaria a negativa)."""
     applier = make_applier()
     element = MagicMock()
@@ -601,19 +601,19 @@ async def test_select_custom_option_uses_llm_for_descriptive_options():
     assert result is True
     applier._llm_pick.assert_awaited_once()
     applier._click_option_exact.assert_awaited_with("Native or bilingual proficiency", element, [])
-    element.type.assert_not_called()  # NÃO digitou (select estático) — sem Enter cego
-    element.press.assert_not_called()  # NÃO deu Enter cego
+    element.type.assert_not_called()  # did NOT type (static select) — no blind Enter
+    element.press.assert_not_called()  # did NOT press a blind Enter
 
 
 async def test_select_custom_option_async_typeahead_types_then_matches():
-    """Select async (sem opções estáticas, ex: cidade): digita p/ carregar, então
-    casa a opção e clica a exata."""
+    """Async select (no static options, e.g. city): types to load, then
+    matches the option and clicks the exact one."""
     applier = make_applier()
     element = MagicMock()
     element.click = AsyncMock()
     element.type = AsyncMock()
     element.scroll_into_view_if_needed = AsyncMock()
-    # 1ª leitura (estática) vazia → digita → 2ª leitura traz as cidades carregadas
+    # 1st (static) read is empty → types → 2nd read brings the loaded cities
     applier._visible_options = AsyncMock(
         side_effect=[[], ["Belo Horizonte, Brazil", "Recife, Brazil"]]
     )
@@ -629,9 +629,9 @@ async def test_select_custom_option_async_typeahead_types_then_matches():
         )
 
     assert result is True
-    element.type.assert_awaited()  # digitou para carregar (async)
+    element.type.assert_awaited()  # typed to load (async)
     applier._click_option_exact.assert_awaited_with("Belo Horizonte, Brazil", element, [])
-    applier._llm_pick.assert_not_called()  # match local resolveu, sem LLM
+    applier._llm_pick.assert_not_called()  # local match resolved it, no LLM
 
 
 async def test_type_and_reload_logs_when_typing_raises(caplog):
@@ -653,7 +653,7 @@ async def test_type_and_reload_logs_when_typing_raises(caplog):
 
 
 async def test_select_custom_option_presses_escape_when_no_match():
-    """_select_custom_option pressiona Escape e loga opções quando não acha match."""
+    """_select_custom_option presses Escape and logs options when no match is found."""
     applier = make_applier()
     element = MagicMock()
     element.click = AsyncMock()
@@ -671,7 +671,7 @@ async def test_select_custom_option_presses_escape_when_no_match():
 
 
 async def test_select_custom_option_handles_exception():
-    """_select_custom_option retorna False em vez de propagar exceção."""
+    """_select_custom_option returns False instead of propagating an exception."""
     applier = make_applier()
     element = MagicMock()
     element.click = AsyncMock(side_effect=Exception("element detached"))
@@ -684,9 +684,9 @@ async def test_select_custom_option_handles_exception():
 
 
 async def test_select_custom_option_snapshots_before_opening_menu():
-    """_select_custom_option tira o snapshot de opções ANTES de abrir o menu, e passa
-    esse snapshot pra _visible_options/_click_option_exact (usado no fallback da
-    Abordagem C — exclui widgets sempre-montados como poluição)."""
+    """_select_custom_option takes the options snapshot BEFORE opening the menu, and
+    passes that snapshot to _visible_options/_click_option_exact (used in Approach C's
+    fallback — excludes always-mounted widgets as pollution)."""
     applier = make_applier()
     element = MagicMock()
     element.click = AsyncMock()
@@ -711,7 +711,7 @@ async def test_select_custom_option_snapshots_before_opening_menu():
 
 
 async def test_fill_custom_element_combobox_delegates_to_select():
-    """_fill_custom_element com role=combobox delega para _select_custom_option."""
+    """_fill_custom_element with role=combobox delegates to _select_custom_option."""
     applier = make_applier()
     element = MagicMock()
     element.evaluate = AsyncMock(return_value="combobox")  # role
@@ -725,10 +725,10 @@ async def test_fill_custom_element_combobox_delegates_to_select():
 
 
 async def test_fill_custom_element_typeahead_types_and_clicks():
-    """_fill_custom_element sem role tenta typeahead: type + clica na sugestão."""
+    """_fill_custom_element with no role tries typeahead: type + click the suggestion."""
     applier = make_applier()
     element = MagicMock()
-    element.evaluate = AsyncMock(return_value="")  # sem role
+    element.evaluate = AsyncMock(return_value="")  # no role
     element.click = AsyncMock()
     element.type = AsyncMock()
     applier.page.evaluate = AsyncMock(return_value={"clicked": True, "options": ["Belo Horizonte"]})
@@ -741,12 +741,12 @@ async def test_fill_custom_element_typeahead_types_and_clicks():
 
 
 async def test_fill_custom_element_typeahead_logs_options_on_miss(caplog):
-    """_fill_custom_element loga as opções visíveis quando não encontra match."""
+    """_fill_custom_element logs the visible options when no match is found."""
     import logging
 
     applier = make_applier()
     element = MagicMock()
-    element.evaluate = AsyncMock(return_value="")  # sem role
+    element.evaluate = AsyncMock(return_value="")  # no role
     element.click = AsyncMock()
     element.type = AsyncMock()
     applier.page.evaluate = AsyncMock(
@@ -764,8 +764,8 @@ async def test_fill_custom_element_typeahead_logs_options_on_miss(caplog):
 
 
 async def test_select_custom_option_logs_options_on_miss(caplog):
-    """_select_custom_option loga as opções disponíveis quando não encontra match
-    (nem local nem LLM)."""
+    """_select_custom_option logs the available options when no match is found
+    (neither local nor LLM)."""
     import logging
 
     applier = make_applier()
@@ -789,11 +789,11 @@ async def test_select_custom_option_logs_options_on_miss(caplog):
     assert "Yes" in caplog.text or "No" in caplog.text
 
 
-# ── submit() novos comportamentos ─────────────────────────────────────────────
+# ── submit() new behaviors ────────────────────────────────────────────────────
 
 
 async def test_submit_detects_form_still_visible_after_click():
-    """submit() retorna 'failed:validation_errors:...' quando form ainda está visível."""
+    """submit() returns 'failed:validation_errors:...' when the form is still visible."""
     applier = make_applier()
     btn = MagicMock()
     btn.click = AsyncMock()
@@ -806,7 +806,7 @@ async def test_submit_detects_form_still_visible_after_click():
     async def qs_side(selector):
         call_n[0] += 1
         if "submit" in selector and call_n[0] == 1:
-            return btn  # primeiro call: encontra o botão
+            return btn  # first call: finds the button
         return None
 
     applier.page.query_selector = qs_side
@@ -827,7 +827,7 @@ async def test_submit_detects_form_still_visible_after_click():
 
 
 async def test_submit_logs_empty_required_fields(caplog):
-    """submit() loga aviso quando há campos obrigatórios vazios antes de submeter."""
+    """submit() logs a warning when required fields are empty before submitting."""
     import logging
 
     applier = make_applier()
@@ -866,7 +866,7 @@ async def test_greenhouse_submit_logs_outcome(caplog):
     submit_btn = AsyncMock()
     applier.page.query_selector = AsyncMock(return_value=submit_btn)
     applier.page.wait_for_load_state = AsyncMock()
-    # simula página de confirmação
+    # simulates confirmation page
     applier.page.inner_text = AsyncMock(return_value="application submitted successfully")
     applier.page.url = "https://boards.greenhouse.io/confirmation"
 
@@ -877,12 +877,15 @@ async def test_greenhouse_submit_logs_outcome(caplog):
     assert outcome in ("submitted", "unverified")
 
 
-# ── extract_fields: exclui campos de upload-alternativo ───────────────────────
+# ── extract_fields: excludes upload-alternative fields ────────────────────────
 
 
 async def test_extract_fields_excludes_upload_alternatives():
-    """Attach/Anexar/Enter manually/Informe manualmente são da área de upload de CV
-    (tratada por _upload_cv) — não devem ir pro LLM como campos de texto."""
+    """Attach/Anexar/Enter manually/Informe manualmente belong to the CV upload
+    area (handled by _upload_cv) — they must not go to the LLM as text fields.
+
+    "Anexar"/"Informe manualmente" are the real PT-BR labels _UPLOAD_LABELS
+    matches on Brazilian Greenhouse forms; kept verbatim as functional data."""
     applier = make_applier()
     applier.page.query_selector = AsyncMock(return_value=None)
     labels = []
@@ -892,7 +895,7 @@ async def test_extract_fields_excludes_upload_alternatives():
         "Enter manually",
         "Informe manualmente",
         "First Name",
-        "Telefone",
+        "Phone",
     ]:
         m = MagicMock()
         m.inner_text = AsyncMock(return_value=text)
@@ -903,15 +906,15 @@ async def test_extract_fields_excludes_upload_alternatives():
     for excluded in ("Attach", "Anexar", "Enter manually", "Informe manualmente"):
         assert excluded not in fields
     assert "First Name" in fields
-    assert "Telefone" in fields
+    assert "Phone" in fields
 
 
 # ── fill_form: react-select (input role=combobox) ─────────────────────────────
 
 
 async def test_fill_form_routes_combobox_input_to_custom_dropdown():
-    """react-select: <input role=combobox> deve ir pro handler de dropdown custom,
-    não ser tratado como text input (senão digita no busca e mente 'filled')."""
+    """react-select: <input role=combobox> must go to the custom dropdown handler,
+    not be treated as a text input (otherwise it types into the search and lies 'filled')."""
     applier = make_applier()
     field = MagicMock()
     field.evaluate = make_evaluate("input", combobox=True)  # tagName + combobox-check
@@ -920,7 +923,7 @@ async def test_fill_form_routes_combobox_input_to_custom_dropdown():
     applier.page.locator = MagicMock(
         return_value=MagicMock(first=MagicMock(count=AsyncMock(return_value=0)))
     )
-    applier._select_custom_option = AsyncMock(return_value=True)  # handler de dropdown
+    applier._select_custom_option = AsyncMock(return_value=True)  # dropdown handler
 
     with patch("asyncio.sleep", new=AsyncMock()):
         result = await applier.fill_form(
@@ -928,15 +931,15 @@ async def test_fill_form_routes_combobox_input_to_custom_dropdown():
         )
 
     assert result["Are you able to work from the office?"] == "filled"
-    applier._select_custom_option.assert_awaited_once()  # roteou pro handler de dropdown
-    field.fill.assert_not_called()  # NÃO tratou como text input
+    applier._select_custom_option.assert_awaited_once()  # routed to the dropdown handler
+    field.fill.assert_not_called()  # did NOT treat it as a text input
 
 
 async def test_fill_form_combobox_no_match_marks_failed_not_filled():
-    """Se a opção não é encontrada no react-select, status é failed — nunca 'filled'."""
+    """If the option is not found in the react-select, status is failed — never 'filled'."""
     applier = make_applier()
     field = MagicMock()
-    # combobox, mas single-value continua vazio → nada foi selecionado → failed
+    # combobox, but single-value stays empty → nothing was selected → failed
     field.evaluate = make_evaluate("input", combobox=True, selected="")
     field.click = AsyncMock()
     field.type = AsyncMock()
@@ -946,7 +949,7 @@ async def test_fill_form_combobox_no_match_marks_failed_not_filled():
     applier.page.locator = MagicMock(
         return_value=MagicMock(first=MagicMock(count=AsyncMock(return_value=0)))
     )
-    applier.page.evaluate = AsyncMock(return_value=False)  # nenhuma opção casou
+    applier.page.evaluate = AsyncMock(return_value=False)  # no option matched
     applier.page.keyboard = MagicMock()
     applier.page.keyboard.press = AsyncMock()
 
@@ -956,18 +959,18 @@ async def test_fill_form_combobox_no_match_marks_failed_not_filled():
     assert result["English level"].startswith("failed")
 
 
-# ── _find_field: for_id resolve mas elemento ausente (159->163) ─────────────
+# ── _find_field: for_id resolves but element is missing (159->163) ──────────
 
 
 async def test_find_field_for_id_missing_falls_to_aria():
     applier = make_applier()
     applier.page.get_by_label = MagicMock(return_value=make_label_locator(None))
-    applier.page.evaluate = AsyncMock(return_value="phone_field")  # JS acha for_id
+    applier.page.evaluate = AsyncMock(return_value="phone_field")  # JS finds for_id
     aria_field = MagicMock()
 
     async def qs(selector):
         if selector == "#phone_field":
-            return None  # mas #phone_field não existe → cai pro aria-label
+            return None  # but #phone_field doesn't exist → falls to aria-label
         if "aria-label" in selector:
             return aria_field
         return None
@@ -977,7 +980,7 @@ async def test_find_field_for_id_missing_falls_to_aria():
     assert result is aria_field
 
 
-# ── fill_form: elemento não-nativo vai pro _fill_custom_element (109-110) ────
+# ── fill_form: non-native element goes to _fill_custom_element (109-110) ────
 
 
 async def test_fill_form_routes_non_native_element_to_custom():
@@ -988,7 +991,7 @@ async def test_fill_form_routes_non_native_element_to_custom():
         if "combobox" in js or "aria-haspopup" in js or "select__input" in js:
             return False
         if "tagName" in js:
-            return "div"  # não-nativo
+            return "div"  # non-native
         return None
 
     field.evaluate = ev
@@ -1000,25 +1003,25 @@ async def test_fill_form_routes_non_native_element_to_custom():
     assert status["Q"] == "failed:custom_element_unsupported"
 
 
-# ── _fill_custom_element: typeahead com exceção (224-226) ───────────────────
+# ── _fill_custom_element: typeahead with exception (224-226) ────────────────
 
 
 async def test_fill_custom_element_typeahead_exception_returns_false():
     applier = make_applier()
     element = MagicMock()
-    element.evaluate = AsyncMock(return_value="")  # role vazio, sem classe select
+    element.evaluate = AsyncMock(return_value="")  # empty role, no select class
     element.click = AsyncMock(side_effect=Exception("boom"))
     with patch("asyncio.sleep", new=AsyncMock()):
         assert await applier._fill_custom_element(element, "City", "BH") is False
 
 
-# ── _choose_and_click: clica mas não verifica → False (294->296) ────────────
+# ── _choose_and_click: clicks but doesn't verify → False (294->296) ─────────
 
 
 async def test_choose_and_click_false_when_value_not_verified():
     applier = make_applier()
     applier._click_option_exact = AsyncMock(return_value=True)
-    applier._selected_value = AsyncMock(return_value="")  # não confirmou seleção
+    applier._selected_value = AsyncMock(return_value="")  # selection not confirmed
     applier._llm_pick = AsyncMock(return_value=None)
     with patch("asyncio.sleep", new=AsyncMock()):
         result = await applier._choose_and_click(MagicMock(), "Status", "Yes", ["Yes", "No"])
@@ -1146,8 +1149,8 @@ async def test_visible_options_empty_on_locator_exception():
 
 
 async def test_visible_options_uses_id_scoped_locator_when_available():
-    """Abordagem A: locator escopado pelo id do campo acha opções -> usa ele direto,
-    ignora poluição do seletor amplo (ex: lista de países do telefone)."""
+    """Approach A: locator scoped by the field's id finds options -> uses it directly,
+    ignoring pollution from the broad selector (e.g. the phone's country list)."""
     applier = make_applier()
     element = MagicMock()
     element.get_attribute = AsyncMock(return_value="question_123")
@@ -1159,16 +1162,17 @@ async def test_visible_options_uses_id_scoped_locator_when_available():
 
 
 async def test_visible_options_falls_back_to_diff_when_no_scoped_match():
-    """Abordagem C: sem locator escopado (id ausente), cai pro seletor amplo e exclui
-    textos já presentes ANTES de abrir o menu (poluição de widgets sempre-montados)."""
+    """Approach C: with no scoped locator (id absent), falls back to the broad selector
+    and excludes texts already present BEFORE the menu was opened (pollution from
+    always-mounted widgets)."""
     applier = make_applier()
     element = MagicMock()
-    element.get_attribute = AsyncMock(return_value=None)  # sem id -> sem Abordagem A
+    element.get_attribute = AsyncMock(return_value=None)  # no id -> no Approach A
     broad = MagicMock()
     broad.first.wait_for = AsyncMock()
     broad.all_inner_texts = AsyncMock(return_value=["Afghanistan+93", "Albania+355", "Yes", "No"])
     applier.page.locator = MagicMock(return_value=broad)
-    before_texts = ["Afghanistan+93", "Albania+355"]  # já existiam antes de abrir o menu
+    before_texts = ["Afghanistan+93", "Albania+355"]  # already existed before opening the menu
     assert await applier._visible_options(element, before_texts) == ["Yes", "No"]
 
 
@@ -1229,10 +1233,10 @@ async def test_click_option_exact_uses_id_scoped_locator_when_available():
 
 
 async def test_click_option_exact_falls_back_and_ignores_pollution():
-    """Abordagem C: sem locator escopado, usa o seletor amplo normalmente — a
-    exclusão de before_texts não impede o match real (só ignoraria se o TEXTO da
-    poluição fosse idêntico ao da resposta, o que não acontece na prática: países
-    vs Yes/No)."""
+    """Approach C: with no scoped locator, uses the broad selector normally — excluding
+    before_texts does not block the real match (it would only be ignored if the
+    pollution TEXT were identical to the answer, which doesn't happen in practice:
+    countries vs Yes/No)."""
     applier = make_applier()
     element = MagicMock()
     element.get_attribute = AsyncMock(return_value=None)
@@ -1298,7 +1302,7 @@ async def test_selected_value_empty_on_exception():
 
 
 async def test_select_custom_option_outer_exception_returns_false():
-    """Exceção não-suprimida dentro de _select_custom_option → False (278-280)."""
+    """Unsuppressed exception inside _select_custom_option → False (278-280)."""
     applier = make_applier()
     applier._visible_options = AsyncMock(side_effect=Exception("boom"))
     element = MagicMock()

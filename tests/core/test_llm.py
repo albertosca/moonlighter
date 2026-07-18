@@ -74,19 +74,19 @@ async def test_call_cli_uses_sandbox_argv_and_stdin():
     assert result == "hello from claude\n"
     args, kwargs = mock_exec.call_args
     assert args == ("/usr/local/bin/claude", *_CLI_SANDBOX_ARGS, "-p")
-    assert "my prompt" not in args  # o prompt NUNCA vai em argv
+    assert "my prompt" not in args  # the prompt NEVER goes into argv
     assert kwargs["stdin"] == asyncio.subprocess.PIPE
     assert kwargs["stdout"] == asyncio.subprocess.PIPE
     assert kwargs["stderr"] == asyncio.subprocess.PIPE
     assert "ANTHROPIC_API_KEY" not in kwargs["env"]
-    # communicate() recebe o prompt via stdin, não via argv
+    # communicate() receives the prompt via stdin, not via argv
     communicate_kwargs = mock_proc.communicate.call_args.kwargs
     assert communicate_kwargs["input"] == b"my prompt"
 
 
 async def test_call_cli_sandbox_args_contents():
-    """Cada flag do lockdown é load-bearing (validado empiricamente no canário) —
-    trava a lista exata para que uma edição futura não a afrouxe silenciosamente."""
+    """Each lockdown flag is load-bearing (validated empirically in the canary) —
+    locks the exact list so a future edit doesn't silently loosen it."""
     from gauntler.core.llm import _CLI_SANDBOX_ARGS
 
     assert "--safe-mode" in _CLI_SANDBOX_ARGS
@@ -96,11 +96,11 @@ async def test_call_cli_sandbox_args_contents():
     assert _CLI_SANDBOX_ARGS[tools_idx + 1] == ""
     mcp_idx = _CLI_SANDBOX_ARGS.index("--mcp-config")
     assert _CLI_SANDBOX_ARGS[mcp_idx + 1] == '{"mcpServers":{}}'
-    assert "--bare" not in _CLI_SANDBOX_ARGS  # --bare mata OAuth/keychain — proibido
+    assert "--bare" not in _CLI_SANDBOX_ARGS  # --bare kills OAuth/keychain — forbidden
 
 
 async def test_call_cli_cwd_is_neutral_workdir(tmp_path, monkeypatch):
-    """cwd nunca é o repositório — é um diretório dedicado dentro de GAUNTLER_HOME."""
+    """cwd is never the repository — it's a dedicated directory inside GAUNTLER_HOME."""
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     mock_proc = MagicMock()
     mock_proc.returncode = 0
@@ -125,7 +125,7 @@ def test_cli_workdir_created_with_0700(tmp_path, monkeypatch):
 
 
 def test_cli_workdir_is_idempotent(tmp_path, monkeypatch):
-    """Chamar duas vezes não falha nem recria o diretório."""
+    """Calling it twice does not fail nor recreate the directory."""
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     from gauntler.core.llm import _cli_workdir
 
@@ -382,9 +382,9 @@ async def test_api_caller_satisfies_llm_caller_contract():
 
 
 async def test_make_api_caller_raises_on_non_text_block():
-    """content[0] não é TextBlock → RuntimeError (llm.py:66)."""
+    """content[0] is not a TextBlock → RuntimeError (llm.py:66)."""
     mock_message = MagicMock()
-    mock_message.content = [MagicMock()]  # sem spec=TextBlock → isinstance False
+    mock_message.content = [MagicMock()]  # no spec=TextBlock → isinstance False
     mock_client = MagicMock()
     mock_client.messages.create = AsyncMock(return_value=mock_message)
     mock_anthropic = MagicMock()
@@ -399,7 +399,7 @@ async def test_make_api_caller_raises_on_non_text_block():
 
 
 async def test_cli_concatenates_cache_prefix():
-    """cache_prefix é concatenado ao prompt no backend cli."""
+    """cache_prefix is concatenated to the prompt in the cli backend."""
     captured: dict[str, bytes] = {}
 
     async def fake_communicate(*args: object, **kwargs: object) -> tuple[bytes, bytes]:
@@ -416,7 +416,7 @@ async def test_cli_concatenates_cache_prefix():
 
 
 async def test_cli_no_cache_prefix_keeps_prompt_unchanged():
-    """cache_prefix=None (default) mantém o comportamento original no cli."""
+    """cache_prefix=None (default) keeps the original behavior in the cli."""
     captured: dict[str, bytes] = {}
 
     async def fake_communicate(*args: object, **kwargs: object) -> tuple[bytes, bytes]:
@@ -433,7 +433,7 @@ async def test_cli_no_cache_prefix_keeps_prompt_unchanged():
 
 
 async def test_api_uses_cache_control_block():
-    """cache_prefix vira um content block com cache_control ephemeral no api."""
+    """cache_prefix becomes a content block with cache_control ephemeral in the api."""
     mock_message = MagicMock()
     mock_message.content = [MagicMock(spec=TextBlock, text="ok")]
     mock_client = MagicMock()
@@ -454,7 +454,7 @@ async def test_api_uses_cache_control_block():
 
 
 async def test_api_no_cache_prefix_sends_plain_string():
-    """cache_prefix=None (default) mantém envio de string simples no api."""
+    """cache_prefix=None (default) keeps sending a plain string in the api."""
     mock_message = MagicMock()
     mock_message.content = [MagicMock(spec=TextBlock, text="ok")]
     mock_client = MagicMock()

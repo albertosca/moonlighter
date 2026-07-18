@@ -202,14 +202,14 @@ def test_load_config_default_path_uses_gauntler_home(monkeypatch, tmp_path):
 
 
 def test_load_config_no_learned_blocklist(tmp_path, monkeypatch):
-    """Sem blocklist_learned.yaml → config segue sem merge."""
+    """No blocklist_learned.yaml → config proceeds without merging."""
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
     assert "title_blocklist" in config
 
 
 def test_load_config_learned_blocklist_empty(tmp_path, monkeypatch):
-    """blocklist_learned.yaml existe mas sem patterns → não altera."""
+    """blocklist_learned.yaml exists but has no patterns → does not change anything."""
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     learned = tmp_path / "blocklist_learned.yaml"
     learned.write_text("title_blocklist: []\n")
@@ -218,7 +218,7 @@ def test_load_config_learned_blocklist_empty(tmp_path, monkeypatch):
 
 
 def test_load_config_learned_blocklist_merges(tmp_path, monkeypatch):
-    """patterns aprendidos são mesclados após os manuais, sem duplicar."""
+    """Learned patterns are merged after the manual ones, without duplicating."""
     monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
     learned = tmp_path / "blocklist_learned.yaml"
     learned.write_text("title_blocklist:\n  - recruiter\n  - intern\n")
@@ -227,11 +227,11 @@ def test_load_config_learned_blocklist_merges(tmp_path, monkeypatch):
     assert "intern" in config["title_blocklist"]
 
 
-# --- load_company_list: formatos de valor ---
+# --- load_company_list: value formats ---
 
 
 def test_load_company_list_mixed_value_shapes(tmp_path):
-    """Fase-dict com valor não-lista é ignorado; valor escalar vira [] (125->124, 129)."""
+    """A phase-dict with a non-list value is ignored; a scalar value becomes [] (125->124, 129)."""
     company_file = tmp_path / "company_list.yaml"
     company_file.write_text(
         "greenhouse:\n"
@@ -246,7 +246,7 @@ def test_load_company_list_mixed_value_shapes(tmp_path):
 
 
 def test_load_company_list_with_phase_filter(tmp_path):
-    """Quando phase é especificado, retorna apenas os slugs daquela fase."""
+    """When phase is specified, returns only that phase's slugs."""
     company_file = tmp_path / "company_list.yaml"
     company_file.write_text("greenhouse:\n  phase1:\n    - stripe\n  phase2:\n    - linear\n")
     result = load_company_list(path=str(company_file), phase="phase1")
