@@ -3,7 +3,14 @@ import contextlib
 import re
 from typing import Any
 
-from gauntler.application.appliers.base import BaseApplier, _is_skip
+from gauntler.application.appliers.base import (
+    BaseApplier,
+    classify_submit_outcome,
+    fill_field,
+    is_skip,
+    query_labels_with_fallback,
+)
+from gauntler.core.llm import make_caller
 from gauntler.core.log import get_logger
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
@@ -41,9 +48,7 @@ class GreenhouseApplier(BaseApplier):
 
     async def extract_fields(self) -> list[str]:
         await self._open_application()
-        from gauntler.application.appliers.base import _query_labels_with_fallback
-
-        label_els = await _query_labels_with_fallback(
+        label_els = await query_labels_with_fallback(
             self.page,
             ["label, .field-label", ".application-question label", "[data-field-label]"],
         )
@@ -78,7 +83,7 @@ class GreenhouseApplier(BaseApplier):
         return status
 
     async def _fill_one(self, label_text: str, answer: str) -> str:
-        if _is_skip(answer):
+        if is_skip(answer):
             return "skipped"
         try:
             field = await self._find_field(label_text)
@@ -92,9 +97,7 @@ class GreenhouseApplier(BaseApplier):
 
             tag = await field.evaluate("el => el.tagName.toLowerCase()")
             if tag in ("input", "textarea", "select"):
-                from gauntler.application.appliers.base import _fill_field
-
-                await _fill_field(field, answer)
+                await fill_field(field, answer)
                 await asyncio.sleep(0.2)
                 return "filled"
 
@@ -105,10 +108,10 @@ class GreenhouseApplier(BaseApplier):
             return f"failed:{type(e).__name__}"
 
     async def _is_custom_combobox(self, field: Any) -> bool:
-        """react-select expõe um <input role=combobox aria-haspopup class=select__input>.
-        Tratá-lo como text input só DIGITA no campo de busca sem selecionar a opção — e
-        ainda reportaria 'filled' (falso positivo). Por isso roteamos para o handler
-        de dropdown custom em vez do _fill_field nativo."""
+        """A react-select exposes an <input role=combobox aria-haspopup class=select__input>.
+        Treating it as a text input only TYPES into the search box without selecting the
+        option — and would still report 'filled' (false positive). That's why we route to
+        the custom dropdown handler instead of the native fill_field."""
         return bool(
             await field.evaluate(
                 "el => el.getAttribute('role') === 'combobox'"
@@ -376,7 +379,6 @@ class GreenhouseApplier(BaseApplier):
             return None
         try:
             from gauntler.application.answers.option_matcher import pick_option_with_llm
-            from gauntler.core.llm import make_caller
 
             caller = make_caller(self.config)
             model = (
@@ -473,8 +475,6 @@ class GreenhouseApplier(BaseApplier):
                 return "failed"
             await submit_btn.click()
             await self.page.wait_for_load_state("networkidle", timeout=15000)
-
-            from gauntler.application.appliers.base import classify_submit_outcome
 
             outcome = await classify_submit_outcome(self.page)
             if outcome.startswith("failed:validation_errors"):

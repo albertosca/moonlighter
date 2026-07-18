@@ -10,10 +10,10 @@ from gauntler.application.appliers.base import (
     ApplicationDraft,
     _ask_llm,
     _cap_label,
-    _fill_field,
-    _is_skip,
     _resolve_answer_keys,
+    fill_field,
     generate_answers,
+    is_skip,
     profile_for_answers,
 )
 from gauntler.core.config import NEEDS_REVIEW_SENTINEL
@@ -501,7 +501,7 @@ async def test_generate_answers_strips_leading_prose():
     assert result.answers.get("Why here?") == "Interesting work"
 
 
-# ── _fill_field ───────────────────────────────────────────────────────────────
+# ── fill_field ───────────────────────────────────────────────────────────────
 
 
 def _make_field(tag: str, input_type: str = "text") -> MagicMock:
@@ -519,34 +519,34 @@ def _make_field(tag: str, input_type: str = "text") -> MagicMock:
 class TestFillField:
     async def test_text_input_calls_fill(self):
         field = _make_field("input", "text")
-        await _fill_field(field, "hello")
+        await fill_field(field, "hello")
         field.fill.assert_called_once_with("hello")
 
     async def test_textarea_calls_fill(self):
         field = _make_field("textarea")
-        await _fill_field(field, "long answer")
+        await fill_field(field, "long answer")
         field.fill.assert_called_once_with("long answer")
 
     async def test_select_uses_label(self):
         field = _make_field("select")
-        await _fill_field(field, "Option A")
+        await fill_field(field, "Option A")
         field.select_option.assert_called_once_with(label="Option A")
 
     async def test_select_falls_back_to_value(self):
         field = _make_field("select")
         field.select_option = AsyncMock(side_effect=[Exception("no label"), None])
-        await _fill_field(field, "val_a")
+        await fill_field(field, "val_a")
         assert field.select_option.call_count == 2
         field.select_option.assert_called_with(value="val_a")
 
     async def test_select_both_fail_no_exception(self):
         field = _make_field("select")
         field.select_option = AsyncMock(side_effect=Exception("no match"))
-        await _fill_field(field, "unknown")  # must not raise
+        await fill_field(field, "unknown")  # must not raise
 
     async def test_radio_calls_evaluate_with_answer(self):
         field = _make_field("input", "radio")
-        await _fill_field(field, "Yes")
+        await fill_field(field, "Yes")
         calls = field.evaluate.call_args_list
         # First call: tag name; second call: radio JS with answer
         assert len(calls) == 2
@@ -554,44 +554,44 @@ class TestFillField:
 
     async def test_radio_js_contains_type_radio_selector(self):
         field = _make_field("input", "radio")
-        await _fill_field(field, "No")
+        await fill_field(field, "No")
         js_code = field.evaluate.call_args_list[1].args[0]
         assert "type=radio" in js_code
 
     async def test_checkbox_clicked_when_truthy_and_unchecked(self):
         field = _make_field("input", "checkbox")
         field.is_checked = AsyncMock(return_value=False)
-        await _fill_field(field, "yes")
+        await fill_field(field, "yes")
         field.click.assert_called_once()
 
     async def test_checkbox_not_clicked_when_truthy_and_already_checked(self):
         field = _make_field("input", "checkbox")
         field.is_checked = AsyncMock(return_value=True)
-        await _fill_field(field, "yes")
+        await fill_field(field, "yes")
         field.click.assert_not_called()
 
     async def test_checkbox_clicked_when_falsy_and_checked(self):
         field = _make_field("input", "checkbox")
         field.is_checked = AsyncMock(return_value=True)
-        await _fill_field(field, "no")
+        await fill_field(field, "no")
         field.click.assert_called_once()
 
     async def test_checkbox_not_clicked_when_falsy_and_already_unchecked(self):
         field = _make_field("input", "checkbox")
         field.is_checked = AsyncMock(return_value=False)
-        await _fill_field(field, "no")
+        await fill_field(field, "no")
         field.click.assert_not_called()
 
     async def test_checkbox_recognizes_sim_as_truthy(self):
         field = _make_field("input", "checkbox")
         field.is_checked = AsyncMock(return_value=False)
-        await _fill_field(field, "sim")
+        await fill_field(field, "sim")
         field.click.assert_called_once()
 
     async def test_checkbox_recognizes_true_string(self):
         field = _make_field("input", "checkbox")
         field.is_checked = AsyncMock(return_value=False)
-        await _fill_field(field, "true")
+        await fill_field(field, "true")
         field.click.assert_called_once()
 
 
@@ -971,7 +971,7 @@ async def test_classify_error_messages_evaluate_exception_is_empty():
 async def test_fill_field_unknown_tag_is_noop():
     """tag fora de select/input/textarea (ex: div) → não faz nada (144->exit)."""
     field = _make_field("div")
-    await _fill_field(field, "x")
+    await fill_field(field, "x")
     field.fill.assert_not_called()
     field.select_option.assert_not_called()
 
@@ -1096,15 +1096,15 @@ async def test_ask_llm_canary_is_unique_per_call():
     assert tokens[0] != tokens[1]
 
 
-# ── _is_skip / _SKIP_SENTINELS: shared predicate for every applier ────────────
+# ── is_skip / _SKIP_SENTINELS: shared predicate for every applier ────────────
 
 
 def test_is_skip_covers_all_sentinels():
-    assert _is_skip("")
-    assert _is_skip("__SKIP__")
-    assert _is_skip("__MANUAL_UPLOAD_REQUIRED__")
-    assert _is_skip(NEEDS_REVIEW_SENTINEL)
-    assert not _is_skip("real answer")
+    assert is_skip("")
+    assert is_skip("__SKIP__")
+    assert is_skip("__MANUAL_UPLOAD_REQUIRED__")
+    assert is_skip(NEEDS_REVIEW_SENTINEL)
+    assert not is_skip("real answer")
 
 
 def test_skip_sentinels_membership():

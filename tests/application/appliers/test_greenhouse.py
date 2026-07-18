@@ -1261,7 +1261,7 @@ async def test_llm_pick_returns_choice():
             "gauntler.application.answers.option_matcher.pick_option_with_llm",
             new=AsyncMock(return_value="Native"),
         ),
-        patch("gauntler.core.llm.make_caller", return_value=AsyncMock()),
+        patch("gauntler.application.appliers.greenhouse.make_caller", return_value=AsyncMock()),
     ):
         result = await applier._llm_pick("English", "Fluent", ["Native", "Basic"])
     assert result == "Native"
@@ -1274,7 +1274,9 @@ async def test_llm_pick_returns_none_without_options():
 
 async def test_llm_pick_returns_none_on_exception():
     applier = make_applier()
-    with patch("gauntler.core.llm.make_caller", side_effect=Exception("boom")):
+    with patch(
+        "gauntler.application.appliers.greenhouse.make_caller", side_effect=Exception("boom")
+    ):
         assert await applier._llm_pick("English", "Fluent", ["Native"]) is None
 
 

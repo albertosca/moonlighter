@@ -1,6 +1,12 @@
 import asyncio
 
-from gauntler.application.appliers.base import BaseApplier, _is_skip
+from gauntler.application.appliers.base import (
+    BaseApplier,
+    classify_submit_outcome,
+    fill_field,
+    is_skip,
+    query_labels_with_fallback,
+)
 from gauntler.core.log import get_logger
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
@@ -31,9 +37,7 @@ class LinkedInApplier(BaseApplier):
         fields = []
         try:
             await self.page.wait_for_selector(".jobs-easy-apply-modal", timeout=10000)
-            from gauntler.application.appliers.base import _query_labels_with_fallback
-
-            label_els = await _query_labels_with_fallback(
+            label_els = await query_labels_with_fallback(
                 self.page,
                 [
                     ".jobs-easy-apply-modal label, .jobs-easy-apply-modal .fb-dash-form-element__label",
@@ -51,7 +55,7 @@ class LinkedInApplier(BaseApplier):
 
     async def fill_form(self, answers: dict[str, str], cv_path: str) -> None:
         for label_text, answer in answers.items():
-            if _is_skip(answer):
+            if is_skip(answer):
                 logger.debug("skipping sentinel answer for %r", label_text)
                 continue
             try:
@@ -64,9 +68,7 @@ class LinkedInApplier(BaseApplier):
                 if for_id:
                     field = await self.page.query_selector(f"#{for_id}")
                     if field:
-                        from gauntler.application.appliers.base import _fill_field
-
-                        await _fill_field(field, answer)
+                        await fill_field(field, answer)
                         await asyncio.sleep(0.4)
             except Exception as e:
                 logger.debug("skipping field %r: %s", label_text, e)
@@ -90,8 +92,6 @@ class LinkedInApplier(BaseApplier):
                 if submit_btn:
                     await submit_btn.click()
                     await asyncio.sleep(2)
-                    from gauntler.application.appliers.base import classify_submit_outcome
-
                     # Para o LinkedIn, "form ainda visível" = modal Easy Apply aberto.
                     return await classify_submit_outcome(
                         self.page,

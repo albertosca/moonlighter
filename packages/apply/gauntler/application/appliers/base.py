@@ -19,11 +19,11 @@ logger = get_logger(__name__)
 _SKIP_SENTINELS = {"__SKIP__", "__MANUAL_UPLOAD_REQUIRED__", NEEDS_REVIEW_SENTINEL}
 
 
-def _is_skip(answer: str) -> bool:
+def is_skip(answer: str) -> bool:
     return not answer or answer in _SKIP_SENTINELS
 
 
-async def _query_labels_with_fallback(page: Page, selectors: list[str]) -> list[Any]:
+async def query_labels_with_fallback(page: Page, selectors: list[str]) -> list[Any]:
     """
     Tenta cada seletor CSS em ordem até encontrar um que retorne elementos.
     Retorna a primeira lista não-vazia, ou [] se todos forem vazios.
@@ -128,7 +128,7 @@ async def classify_submit_outcome(
     return "unverified"
 
 
-async def _fill_field(field: Any, answer: str) -> None:
+async def fill_field(field: Any, answer: str) -> None:
     """Preenche o campo conforme o tipo do elemento (select, input, textarea)."""
     tag = await field.evaluate("el => el.tagName.toLowerCase()")
     if tag == "select":

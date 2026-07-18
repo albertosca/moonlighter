@@ -109,7 +109,7 @@ async def test_fill_form_skips_sentinel_answers():
     """A sentinel answer (e.g. __NEEDS_REVIEW__) must never be typed into the form.
 
     field.evaluate/get_attribute are configured (mirroring test_fill_form_fills_inputs) so
-    that, absent the skip guard, _fill_field would actually run and call field.fill —
+    that, absent the skip guard, fill_field would actually run and call field.fill —
     without this, an unconfigured MagicMock.evaluate() raises TypeError on await, which the
     surrounding try/except swallows, making the assertion pass for the wrong reason.
     """
