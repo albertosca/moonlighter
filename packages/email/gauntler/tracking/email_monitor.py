@@ -7,14 +7,13 @@ e atualiza o pipeline de candidaturas automaticamente.
 
 import base64
 import datetime
-import json
 import logging
 import re
 from pathlib import Path
 from typing import Any
 
 from gauntler.core.llm import LLMCaller
-from gauntler.core.parsing import extract_json, wrap_untrusted
+from gauntler.core.parsing import parse_llm_json, wrap_untrusted
 
 logger = logging.getLogger(__name__)
 
@@ -262,7 +261,7 @@ Responda APENAS com o JSON, sem texto adicional."""
 
     try:
         raw = await llm_caller(prompt, model)
-        return _classification_from(json.loads(extract_json(raw)))
+        return _classification_from(parse_llm_json(raw))
     except Exception as e:
         logger.warning("classify_response: falha ao parsear LLM response: %s", e)
         return _classification_from({})

@@ -6,7 +6,7 @@ from typing import Any
 import yaml
 from gauntler.core.llm import LLMCaller, is_spend_limit, make_api_caller
 from gauntler.core.log import get_logger
-from gauntler.core.parsing import extract_json, wrap_untrusted
+from gauntler.core.parsing import parse_llm_json, wrap_untrusted
 
 logger = get_logger(__name__)
 
@@ -111,7 +111,7 @@ async def evaluate_job(
     )
     suffix = _eval_suffix(company, title, description)
     try:
-        data = json.loads(extract_json(await _caller(suffix, model, cache_prefix=prefix)))
+        data = parse_llm_json(await _caller(suffix, model, cache_prefix=prefix))
         result = _result_from(data)
         logger.debug("→ score %.1f (%s)", result.score, company)
         return result
@@ -191,7 +191,7 @@ def _parse_batch(raw: str, n: int) -> list[EvaluationResult] | None:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
-            data = json.loads(extract_json(raw))
+            data = parse_llm_json(raw)
     except json.JSONDecodeError:
         return None
     if not isinstance(data, list) or len(data) != n:

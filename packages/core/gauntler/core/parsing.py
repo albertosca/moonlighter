@@ -1,5 +1,7 @@
+import json
 import re
 import secrets
+from typing import Any
 
 
 def extract_json(raw: str) -> str:
@@ -16,6 +18,12 @@ def extract_json(raw: str) -> str:
     if m:
         return m.group(1)
     return raw
+
+
+def parse_llm_json(raw: str) -> Any:
+    """Extract a JSON payload from a raw LLM response (stripping prose/fences via
+    extract_json) and parse it. Raises json.JSONDecodeError (a ValueError) on malformed input."""
+    return json.loads(extract_json(raw))
 
 
 def wrap_untrusted(label: str, text: str, *, cap: int | None = None) -> str:

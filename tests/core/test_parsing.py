@@ -1,6 +1,7 @@
 import json
 
-from gauntler.core.parsing import extract_json
+import pytest
+from gauntler.core.parsing import extract_json, parse_llm_json
 
 
 def test_extract_json_plain_json_passthrough():
@@ -62,6 +63,22 @@ def test_extract_json_nested_object_extracted():
     raw = f"Result: {json.dumps(payload)} end"
     result = extract_json(raw)
     assert json.loads(result) == payload
+
+
+# ── parse_llm_json ───────────────────────────────────────────────────────────
+
+
+def test_parse_llm_json_plain():
+    assert parse_llm_json('{"a": 1}') == {"a": 1}
+
+
+def test_parse_llm_json_fenced():
+    assert parse_llm_json('```json\n{"a": 1}\n```') == {"a": 1}
+
+
+def test_parse_llm_json_malformed_raises():
+    with pytest.raises(ValueError):  # json.JSONDecodeError is a ValueError subclass
+        parse_llm_json("not json")
 
 
 # ── wrap_untrusted ────────────────────────────────────────────────────────────
