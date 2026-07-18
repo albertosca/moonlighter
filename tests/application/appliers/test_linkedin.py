@@ -154,8 +154,9 @@ async def test_fill_form_uses_modal_selector():
 
     applier.page.query_selector = qs
 
-    await applier.fill_form({"Phone": "555-1234"}, cv_path="")
+    status = await applier.fill_form({"Phone": "555-1234"}, cv_path="")
     assert any(".jobs-easy-apply-modal" in s for s in selectors_used)
+    assert status["Phone"] == "failed:not_found"
 
 
 async def test_fill_form_fills_input_fields():
@@ -175,9 +176,10 @@ async def test_fill_form_fills_input_fields():
     applier.page.query_selector = qs
 
     with patch("asyncio.sleep", new=AsyncMock()):
-        await applier.fill_form({"Phone": "555-1234"}, cv_path="")
+        status = await applier.fill_form({"Phone": "555-1234"}, cv_path="")
 
     field.fill.assert_called_once_with("555-1234")
+    assert status["Phone"] == "filled"
 
 
 async def test_fill_form_fills_textarea_fields():
@@ -196,9 +198,10 @@ async def test_fill_form_fills_textarea_fields():
     applier.page.query_selector = qs
 
     with patch("asyncio.sleep", new=AsyncMock()):
-        await applier.fill_form({"Summary": "Experienced engineer"}, cv_path="")
+        status = await applier.fill_form({"Summary": "Experienced engineer"}, cv_path="")
 
     field.fill.assert_called_once_with("Experienced engineer")
+    assert status["Summary"] == "filled"
 
 
 async def test_fill_form_skips_sentinel_answers():
@@ -224,8 +227,9 @@ async def test_fill_form_skips_sentinel_answers():
 
     applier.page.query_selector = qs
     with patch("asyncio.sleep", new=AsyncMock()):
-        await applier.fill_form({"Q1": "__NEEDS_REVIEW__"}, cv_path="")
+        status = await applier.fill_form({"Q1": "__NEEDS_REVIEW__"}, cv_path="")
     field.fill.assert_not_called()
+    assert status["Q1"] == "skipped"
 
 
 async def test_fill_form_uploads_cv_via_modal_selector():
@@ -245,10 +249,11 @@ async def test_fill_form_uploads_cv_via_modal_selector():
     applier.page.query_selector = qs
 
     with patch("asyncio.sleep", new=AsyncMock()):
-        await applier.fill_form({}, cv_path="/cv.pdf")
+        status = await applier.fill_form({}, cv_path="/cv.pdf")
 
     file_input.set_input_files.assert_called_once_with("/cv.pdf")
     assert any(".jobs-easy-apply-modal" in s and "file" in s for s in selectors_used)
+    assert status["__cv__"] == "filled"
 
 
 async def test_fill_form_exception_continues_to_next_field(caplog):
@@ -281,10 +286,12 @@ async def test_fill_form_exception_continues_to_next_field(caplog):
         patch("asyncio.sleep", new=AsyncMock()),
         caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.linkedin"),
     ):
-        await applier.fill_form({"Field1": "v1", "Field2": "v2"}, cv_path="")
+        status = await applier.fill_form({"Field1": "v1", "Field2": "v2"}, cv_path="")
 
     assert "v2" in filled
-    assert "skipping field 'Field1'" in caplog.text
+    assert "fill failed for 'Field1'" in caplog.text
+    assert status["Field1"] == "failed:Exception"
+    assert status["Field2"] == "filled"
 
 
 # ── submit() — multi-step ─────────────────────────────────────────────────────
@@ -466,7 +473,8 @@ async def test_fill_form_skips_label_without_for():
     label.get_attribute = AsyncMock(return_value=None)
     applier.page.query_selector = AsyncMock(return_value=label)
     with patch("asyncio.sleep", new=AsyncMock()):
-        await applier.fill_form({"Q": "A"}, cv_path="")
+        status = await applier.fill_form({"Q": "A"}, cv_path="")
+    assert status["Q"] == "failed:not_found"
 
 
 async def test_fill_form_skips_when_field_missing():
@@ -480,7 +488,17 @@ async def test_fill_form_skips_when_field_missing():
 
     applier.page.query_selector = qs
     with patch("asyncio.sleep", new=AsyncMock()):
-        await applier.fill_form({"Q": "A"}, cv_path="")
+        status = await applier.fill_form({"Q": "A"}, cv_path="")
+    assert status["Q"] == "failed:not_found"
+
+
+async def test_fill_form_cv_upload_not_found():
+    """No file input found in the modal → status surfaces failed:not_found, not silently dropped."""
+    applier = make_applier()
+    applier.page.query_selector = AsyncMock(return_value=None)
+    with patch("asyncio.sleep", new=AsyncMock()):
+        status = await applier.fill_form({}, cv_path="/cv.pdf")
+    assert status["__cv__"] == "failed:not_found"
 
 
 async def test_fill_form_swallows_cv_upload_exception(caplog):
@@ -497,5 +515,6 @@ async def test_fill_form_swallows_cv_upload_exception(caplog):
         patch("asyncio.sleep", new=AsyncMock()),
         caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.linkedin"),
     ):
-        await applier.fill_form({}, cv_path="/cv.pdf")
+        status = await applier.fill_form({}, cv_path="/cv.pdf")
     assert "CV upload failed" in caplog.text
+    assert status["__cv__"] == "failed:Exception"
