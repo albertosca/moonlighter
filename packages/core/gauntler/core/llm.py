@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import Any, Protocol
@@ -15,8 +16,8 @@ class LLMCaller(Protocol):
     async def __call__(self, prompt: str, model: str, cache_prefix: str | None = None) -> str: ...
 
 
-# Sinais de que o LLM esgotou cota/limite de gasto — vale parar o scan e re-tentar
-# depois, em vez de tratar como erro da vaga.
+# Signals that the LLM exhausted its quota/spend limit — worth aborting the
+# scan and retrying later, instead of treating it as a per-job error.
 SPEND_LIMIT_MARKERS = (
     "spend limit",
     "session limit",
@@ -28,11 +29,18 @@ SPEND_LIMIT_MARKERS = (
     "usage limit",
 )
 
+# Word-boundary match so markers only fire on real tokens: bare substring
+# matching let "quota" match inside "quotation" and "429" match inside "4290",
+# false-positive-aborting the whole scan on unrelated JSON/network errors.
+_SPEND_LIMIT_PATTERN = re.compile(
+    r"\b(?:" + "|".join(re.escape(marker) for marker in SPEND_LIMIT_MARKERS) + r")\b"
+)
+
 
 def is_spend_limit(exc: Exception) -> bool:
-    """True se a exceção indica esgotamento de cota/limite de gasto do LLM."""
+    """True if the exception indicates the LLM's quota/spend limit was exhausted."""
     msg = str(exc).lower()
-    return any(marker in msg for marker in SPEND_LIMIT_MARKERS)
+    return bool(_SPEND_LIMIT_PATTERN.search(msg))
 
 
 def make_caller(config: dict[str, Any]) -> LLMCaller:

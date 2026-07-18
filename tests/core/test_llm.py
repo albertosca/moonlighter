@@ -517,6 +517,16 @@ IS_SPEND_LIMIT_CASES = [
     (Exception("spend more time reviewing"), False, "partial-phrase-spend-without-limit"),
     (Exception("limit your expectations"), False, "partial-phrase-limit-without-spend"),
     (Exception("rate this job highly"), False, "partial-phrase-rate-without-limit"),
+    # Regression: bare substring matching let "quota" match inside "quotation"
+    # and "429" match inside "4290" — a false positive here ABORTS THE WHOLE
+    # SCAN, so these must stay False under word-boundary matching.
+    (Exception("malformed quotation marks in JSON"), False, "quota-substring-of-quotation"),
+    (Exception("connection refused on port 4290"), False, "429-substring-of-4290"),
+    (Exception("error 14293 occurred"), False, "429-substring-of-14293"),
+    # Real spend-limit phrasings that must keep matching after the word-boundary fix.
+    (Exception("quota exceeded"), True, "quota-exceeded-word-boundary"),
+    (Exception("429 Too Many Requests"), True, "429-leading-word-boundary"),
+    (Exception("error 429"), True, "429-trailing-word-boundary"),
 ]
 
 
@@ -527,9 +537,3 @@ IS_SPEND_LIMIT_CASES = [
 )
 def test_is_spend_limit_table(exc: Exception, expected: bool) -> None:
     assert is_spend_limit(exc) is expected
-
-
-def test_is_spend_limit_returns_bool_not_truthy_object() -> None:
-    """`is` comparisons above only work if the return type is a real bool."""
-    result = is_spend_limit(Exception("quota exceeded"))
-    assert isinstance(result, bool)
