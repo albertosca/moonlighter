@@ -150,6 +150,107 @@ class TestExtractRef:
         to = "candidaturas+Ab-_12@gmail.com"
         assert extract_ref(to, BASE_EMAIL) == "Ab-_12"
 
+    def test_multiple_plus_signs_ref_includes_everything_after_first_plus(self):
+        """Documents the actual partition behavior: only the FIRST '+' splits
+        local-part from ref, so a second '+' becomes part of the ref value
+        itself rather than being treated as a delimiter."""
+        from gauntler.tracking.email_monitor import extract_ref
+
+        to = "candidaturas+ref+extra@gmail.com"
+        assert extract_ref(to, BASE_EMAIL) == "ref+extra"
+
+    def test_uppercase_local_and_domain_still_matches(self):
+        from gauntler.tracking.email_monitor import extract_ref
+
+        to = "CANDIDATURAS+REF123@GMAIL.COM"
+        assert extract_ref(to, BASE_EMAIL) == "REF123"
+
+    def test_leading_trailing_whitespace_around_address_is_tolerated(self):
+        from gauntler.tracking.email_monitor import extract_ref
+
+        to = "   candidaturas+ws001@gmail.com   "
+        assert extract_ref(to, BASE_EMAIL) == "ws001"
+
+    def test_whitespace_inside_angle_brackets_is_tolerated(self):
+        from gauntler.tracking.email_monitor import extract_ref
+
+        to = "Alberto < candidaturas+ab001@gmail.com >"
+        assert extract_ref(to, BASE_EMAIL) == "ab001"
+
+    def test_injection_like_ref_is_extracted_verbatim(self):
+        """The ref is a bare local-part token: anything an attacker puts after
+        the '+' (short of '@' or ',') comes back verbatim. This is safe because
+        callers only ever use it for an EXACT equality lookup against
+        Application.email_ref (see _match_by_ref) — never interpolated into a
+        query or command, so there is no injection surface here."""
+        from gauntler.tracking.email_monitor import extract_ref
+
+        to = "candidaturas+'; DROP TABLE apps;--@gmail.com"
+        assert extract_ref(to, BASE_EMAIL) == "'; DROP TABLE apps;--"
+
+    def test_subdomain_suffix_does_not_match_base_domain(self):
+        """'gmail.com.evil.com' must never be treated as 'gmail.com' — the
+        security property extract_ref exists for (S-06: unspoofable +ref
+        signal) requires the domain comparison to be an exact match, not a
+        suffix/substring check."""
+        from gauntler.tracking.email_monitor import extract_ref
+
+        to = "candidaturas+ref@gmail.com.evil.com"
+        assert extract_ref(to, BASE_EMAIL) is None
+
+    def test_base_domain_as_suffix_of_attacker_local_part_does_not_match(self):
+        """An attacker-chosen local part that merely CONTAINS the real local
+        part is not a match — comparison is on the full local part before '+',
+        not a substring/suffix check."""
+        from gauntler.tracking.email_monitor import extract_ref
+
+        to = "evilcandidaturas+ref@gmail.com"
+        assert extract_ref(to, BASE_EMAIL) is None
+
+    def test_none_to_field_returns_none(self):
+        from gauntler.tracking.email_monitor import extract_ref
+
+        assert extract_ref(None, BASE_EMAIL) is None  # type: ignore[arg-type]
+
+    def test_first_matching_recipient_wins_when_several_match(self):
+        """Multiple recipients could, in principle, both match the base
+        address with different refs (e.g. forwarded/CC'd copies) — the first
+        one found in iteration order is returned, deterministically."""
+        from gauntler.tracking.email_monitor import extract_ref
+
+        to = "candidaturas+first@gmail.com, candidaturas+second@gmail.com"
+        assert extract_ref(to, BASE_EMAIL) == "first"
+
+    @pytest.mark.parametrize(
+        "to",
+        [
+            "recruiter@acme.com",
+            "candidaturas@othermail.com",
+            "candidaturas+ref@yahoo.com",
+            "notcandidaturas+ref@gmail.com",
+            "candidaturas.x+ref@gmail.com",
+            "random text with no email at all",
+            ", , ,",
+        ],
+    )
+    def test_no_false_extraction_for_non_matching_input(self, to):
+        """Property: for any To-field that does not contain a genuine alias of
+        base_address, extract_ref must return None — never fabricate a ref
+        from an unrelated address. This is the core anti-spoofing guarantee."""
+        from gauntler.tracking.email_monitor import extract_ref
+
+        assert extract_ref(to, BASE_EMAIL) is None
+
+    @pytest.mark.parametrize("ref", ["a", "x7k2mp", "AB-cd_12", "123456", "r" * 64])
+    def test_round_trips_ref_for_well_formed_alias(self, ref):
+        """Property: for a well-formed alias of base_address, extract_ref
+        recovers exactly the ref that was embedded — no truncation, no
+        mangling, for a range of ref shapes."""
+        from gauntler.tracking.email_monitor import extract_ref
+
+        to = f"candidaturas+{ref}@gmail.com"
+        assert extract_ref(to, BASE_EMAIL) == ref
+
 
 # ── classify_response ─────────────────────────────────────────────────────────
 
@@ -1917,6 +2018,145 @@ def test_status_rank_unknown_returns_minus_one():
     from gauntler.tracking.email_monitor import _status_rank
 
     assert _status_rank("status_inexistente") == -1
+
+
+# ── _match_by_company_title ─────────────────────────────────────────────────
+
+
+class TestMatchByCompanyTitle:
+    """Direct unit tests for the fuzzy company+title matcher. It only ever
+    feeds a 'fuzzy' suggestion (never an auto-mutation — see S-06 tests in
+    TestSyncResponses), so the safety property under test here is: ambiguity
+    must yield None, never a silently-picked wrong Application."""
+
+    def test_exact_single_match_returns_application(self, tmp_db):
+        init_db()
+        from gauntler.tracking.email_monitor import _match_by_company_title
+
+        job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
+        app = _make_application(job, status="submitted")
+
+        result = _match_by_company_title("Anthropic", "Senior Engineer")
+        assert result is not None
+        assert result.id == app.id
+
+    def test_no_match_returns_none(self, tmp_db):
+        init_db()
+        from gauntler.tracking.email_monitor import _match_by_company_title
+
+        job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
+        _make_application(job, status="submitted")
+
+        assert _match_by_company_title("Totally Unrelated Co", "Some Other Role") is None
+
+    def test_ambiguous_match_returns_none_not_a_silent_pick(self, tmp_db):
+        """Two active applications with the same company+title: the matcher
+        must refuse to guess — returning None is the safe behavior, since
+        picking either one at random would risk mutating the WRONG
+        application's status/notes."""
+        init_db()
+        from gauntler.tracking.email_monitor import _match_by_company_title
+
+        job1 = _make_job(tmp_db, company="Stripe", title="Engineer", url="https://x.com/a")
+        job2 = _make_job(tmp_db, company="Stripe", title="Engineer", url="https://x.com/b")
+        _make_application(job1, status="submitted")
+        _make_application(job2, status="screening")
+
+        assert _match_by_company_title("Stripe", "Engineer") is None
+
+    def test_both_none_returns_none_without_querying(self, tmp_db):
+        init_db()
+        from gauntler.tracking.email_monitor import _match_by_company_title
+
+        job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
+        _make_application(job, status="submitted")
+
+        assert _match_by_company_title(None, None) is None
+
+    def test_case_insensitive_company_match(self, tmp_db):
+        init_db()
+        from gauntler.tracking.email_monitor import _match_by_company_title
+
+        job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
+        app = _make_application(job, status="submitted")
+
+        result = _match_by_company_title("ANTHROPIC", "senior engineer")
+        assert result is not None
+        assert result.id == app.id
+
+    def test_partial_substring_match(self, tmp_db):
+        """Matching uses LIKE %term% — a partial title still matches."""
+        init_db()
+        from gauntler.tracking.email_monitor import _match_by_company_title
+
+        job = _make_job(tmp_db, company="Anthropic", title="Senior Backend Engineer")
+        app = _make_application(job, status="submitted")
+
+        result = _match_by_company_title("Anthropic", "Backend")
+        assert result is not None
+        assert result.id == app.id
+
+    def test_only_company_given_filters_by_company_alone(self, tmp_db):
+        init_db()
+        from gauntler.tracking.email_monitor import _match_by_company_title
+
+        job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
+        app = _make_application(job, status="submitted")
+
+        result = _match_by_company_title("Anthropic", None)
+        assert result is not None
+        assert result.id == app.id
+
+    def test_only_title_given_filters_by_title_alone(self, tmp_db):
+        init_db()
+        from gauntler.tracking.email_monitor import _match_by_company_title
+
+        job = _make_job(tmp_db, company="Anthropic", title="Staff Platform Engineer")
+        app = _make_application(job, status="submitted")
+
+        result = _match_by_company_title(None, "Platform Engineer")
+        assert result is not None
+        assert result.id == app.id
+
+    def test_inactive_status_applications_are_excluded(self, tmp_db):
+        """A 'rejected' or 'draft' Application must never surface as a fuzzy
+        match target — only _ACTIVE_STATUSES are eligible, so a stale/closed
+        application can't get reopened by a coincidental company+title hit."""
+        init_db()
+        from gauntler.tracking.email_monitor import _match_by_company_title
+
+        job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
+        _make_application(job, status="rejected")
+        _make_application(job, status="draft")
+
+        assert _match_by_company_title("Anthropic", "Senior Engineer") is None
+
+    def test_active_match_found_even_with_an_inactive_duplicate(self, tmp_db):
+        """A rejected duplicate for the same company+title must not make an
+        otherwise-unique active match look ambiguous."""
+        init_db()
+        from gauntler.tracking.email_monitor import _match_by_company_title
+
+        job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
+        _make_application(job, status="rejected")
+        active_app = _make_application(job, status="submitted")
+
+        result = _match_by_company_title("Anthropic", "Senior Engineer")
+        assert result is not None
+        assert result.id == active_app.id
+
+    def test_company_filter_alone_is_ambiguous_across_two_titles(self, tmp_db):
+        """Same company, two different active roles, no job_title given to
+        disambiguate → None, not an arbitrary pick."""
+        init_db()
+        from gauntler.tracking.email_monitor import _match_by_company_title
+
+        job1 = _make_job(tmp_db, company="Anthropic", title="Backend Engineer", url="https://x/1")
+        job2 = _make_job(tmp_db, company="Anthropic", title="Frontend Engineer", url="https://x/2")
+        _make_application(job1, status="submitted")
+        _make_application(job2, status="submitted")
+
+        assert _match_by_company_title("Anthropic", None) is None
 
 
 # ── _resolve_application ────────────────────────────────────────────────────
