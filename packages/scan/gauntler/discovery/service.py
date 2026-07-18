@@ -16,7 +16,8 @@ from gauntler.core.config import load_company_list
 from gauntler.core.db import Job, ScanLog
 from gauntler.core.llm import LLMCaller, is_spend_limit
 from gauntler.core.log import get_logger
-from gauntler.discovery.archive import _format_archive_result, archive_stale_jobs
+from gauntler.discovery.archive import _format_archive_result
+from gauntler.discovery.archive import archive_stale_jobs as archive_stale_jobs
 from gauntler.discovery.evaluator import (
     EvalInput,
     evaluate_job,
