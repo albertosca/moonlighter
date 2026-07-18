@@ -7,6 +7,10 @@ import pytest
 from gauntler.discovery.evaluator import (
     EvalInput,
     EvaluationResult,
+    _as_float,
+    _as_salary,
+    _as_salary_currency,
+    _as_salary_source,
     _parse_batch,
     evaluate_job,
     evaluate_jobs_batch,
@@ -762,6 +766,150 @@ def test_eval_input_fields():
     assert inp.description == "Build stuff."
 
 
+# ── _as_float (S-05: never let untrusted text decide its own rank) ──────────
+
+
+def test_as_float_none_becomes_zero():
+    assert _as_float(None) == 0.0
+
+
+def test_as_float_non_numeric_string_becomes_zero():
+    assert _as_float("high") == 0.0
+
+
+def test_as_float_numeric_string_with_trailing_junk_becomes_zero():
+    assert _as_float("5abc") == 0.0
+
+
+def test_as_float_dict_becomes_zero():
+    """float(dict) raises TypeError, not ValueError — both must be caught."""
+    assert _as_float({"score": 9}) == 0.0
+
+
+def test_as_float_list_becomes_zero():
+    assert _as_float([1, 2]) == 0.0
+
+
+def test_as_float_nan_string_becomes_zero():
+    """float() accepts "NaN" as a string; math.isfinite rejects it (S-05)."""
+    assert _as_float("NaN") == 0.0
+
+
+def test_as_float_nan_object_becomes_zero():
+    assert _as_float(float("nan")) == 0.0
+
+
+def test_as_float_infinity_string_becomes_zero():
+    assert _as_float("Infinity") == 0.0
+
+
+def test_as_float_negative_infinity_becomes_zero():
+    assert _as_float(float("-inf")) == 0.0
+
+
+def test_as_float_negative_value_clamps_to_zero():
+    assert _as_float(-5.0) == 0.0
+
+
+def test_as_float_very_large_value_clamps_to_ten():
+    assert _as_float(1e300) == 10.0
+
+
+def test_as_float_valid_numeric_string_is_coerced():
+    assert _as_float("7.5") == 7.5
+
+
+def test_as_float_bool_true_is_coerced_like_int():
+    """bool is an int subclass; _as_float doesn't special-case it (unlike
+    _as_salary, which explicitly rejects bools) — documents actual behavior."""
+    assert _as_float(True) == 1.0
+
+
+# ── _as_salary / _as_salary_currency / _as_salary_source (S-05) ─────────────
+
+
+def test_as_salary_none_becomes_none():
+    assert _as_salary(None) is None
+
+
+def test_as_salary_bool_true_becomes_none():
+    """bool is a subclass of int in Python — must be rejected explicitly."""
+    assert _as_salary(True) is None
+
+
+def test_as_salary_bool_false_becomes_none():
+    assert _as_salary(False) is None
+
+
+def test_as_salary_negative_int_becomes_none():
+    assert _as_salary(-1000) is None
+
+
+def test_as_salary_negative_float_becomes_none():
+    assert _as_salary(-1000.0) is None
+
+
+def test_as_salary_non_integer_float_becomes_none():
+    assert _as_salary(50000.5) is None
+
+
+def test_as_salary_string_becomes_none():
+    assert _as_salary("50000") is None
+
+
+def test_as_salary_zero_is_valid():
+    assert _as_salary(0) == 0
+
+
+def test_as_salary_integer_valued_float_is_coerced():
+    assert _as_salary(180000.0) == 180000
+
+
+def test_as_salary_currency_none_becomes_none():
+    assert _as_salary_currency(None) is None
+
+
+def test_as_salary_currency_empty_string_becomes_none():
+    assert _as_salary_currency("") is None
+
+
+def test_as_salary_currency_whitespace_only_becomes_none():
+    assert _as_salary_currency("   ") is None
+
+
+def test_as_salary_currency_non_string_becomes_none():
+    assert _as_salary_currency(42) is None
+
+
+def test_as_salary_currency_is_stripped_and_capped_at_ten_chars():
+    assert _as_salary_currency("  ABCDEFGHIJKLMNOP  ") == "ABCDEFGHIJ"
+
+
+def test_as_salary_source_valid_stated():
+    assert _as_salary_source("stated") == "stated"
+
+
+def test_as_salary_source_valid_llm_estimate():
+    assert _as_salary_source("llm_estimate") == "llm_estimate"
+
+
+def test_as_salary_source_outside_closed_set_becomes_none():
+    assert _as_salary_source("confirmed") is None
+
+
+def test_as_salary_source_wrong_case_becomes_none():
+    """Whitelist matching is case-sensitive — documents actual behavior."""
+    assert _as_salary_source("Stated") is None
+
+
+def test_as_salary_source_non_string_becomes_none():
+    assert _as_salary_source(1) is None
+
+
+def test_as_salary_source_none_becomes_none():
+    assert _as_salary_source(None) is None
+
+
 # ── _parse_batch ─────────────────────────────────────────────────────────────
 
 
@@ -777,18 +925,84 @@ def test_parse_batch_wrong_length_returns_none():
     assert _parse_batch('[{"score": 8.0}]', 2) is None
 
 
+def test_parse_batch_more_items_than_requested_returns_none():
+    """LLM returns MORE items than n (e.g. hallucinated extras) — also structurally invalid."""
+    raw = '[{"score": 1.0}, {"score": 2.0}, {"score": 3.0}]'
+    assert _parse_batch(raw, 2) is None
+
+
 def test_parse_batch_non_array_returns_none():
     assert _parse_batch('{"score": 8.0}', 1) is None
+
+
+def test_parse_batch_bare_scalar_top_level_returns_none():
+    assert _parse_batch("42", 1) is None
 
 
 def test_parse_batch_invalid_json_returns_none():
     assert _parse_batch("not json", 2) is None
 
 
+def test_parse_batch_empty_string_returns_none():
+    assert _parse_batch("", 1) is None
+
+
+def test_parse_batch_empty_array_matches_zero_n():
+    assert _parse_batch("[]", 0) == []
+
+
 def test_parse_batch_item_with_missing_keys_uses_defaults():
     results = _parse_batch('[{"foo": 1}]', 1)
     assert results is not None
     assert results[0].score == 0.0 and results[0].caveats == []
+
+
+def test_parse_batch_item_wrong_type_string_tolerated_as_default():
+    """A non-dict item (LLM returned a bare string/number instead of an
+    object) is coerced to {} by _parse_batch and gets default field values —
+    the malformed item is tolerated, never crashes the batch."""
+    results = _parse_batch('["oops", 5, null]', 3)
+    assert results is not None
+    assert all(r.score == 0.0 and r.caveats == [] for r in results)
+
+
+def test_parse_batch_item_is_nested_list_tolerated_as_default():
+    results = _parse_batch("[[1, 2, 3]]", 1)
+    assert results is not None
+    assert results[0].score == 0.0
+
+
+def test_parse_batch_extracts_json_from_markdown_fence_with_prose():
+    """Fallback path: raw isn't valid JSON on its own (has surrounding
+    prose + fence) — parse_llm_json must extract it before json.loads."""
+    raw = 'Here are the results:\n```json\n[{"score": 6.5, "score_notes": "ok"}]\n```'
+    results = _parse_batch(raw, 1)
+    assert results is not None
+    assert results[0].score == 6.5
+
+
+def test_parse_batch_item_with_malformed_salary_fields_sanitized():
+    """A dict item with hostile/wrong-typed salary sub-fields still parses —
+    _result_from's per-field coercion sanitizes them instead of raising."""
+    raw = json.dumps(
+        [
+            {
+                "score": "not a number",
+                "salary_min": -500,
+                "salary_max": True,
+                "salary_currency": 123,
+                "salary_source": "made_up",
+            }
+        ]
+    )
+    results = _parse_batch(raw, 1)
+    assert results is not None
+    r = results[0]
+    assert r.score == 0.0
+    assert r.salary_min is None
+    assert r.salary_max is None
+    assert r.salary_currency is None
+    assert r.salary_source is None
 
 
 # ── evaluate_jobs_batch ───────────────────────────────────────────────────────
