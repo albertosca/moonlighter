@@ -17,9 +17,9 @@ def validate_startup(
     profile: dict[str, Any],
     cv_path: str | None = None,
 ) -> list[StartupWarning]:
-    """Inspeciona o ambiente e devolve os avisos/erros de configuração. Lista vazia =
-    tudo ok. 'error' = funcionalidade crítica indisponível.
-    cv_path: se None, procura em <project_root>/profile/cv.pdf."""
+    """Inspects the environment and returns configuration warnings/errors. Empty list =
+    everything ok. 'error' = critical functionality unavailable.
+    cv_path: if None, looks in <project_root>/profile/cv.pdf."""
     cv = cv_path or str(Path(__file__).parent.parent / "profile" / "cv.pdf")
     checks = [
         _check_profile(profile),
@@ -31,47 +31,46 @@ def validate_startup(
 
 
 def _check_profile(profile: dict[str, Any]) -> StartupWarning | None:
-    """Profile vazio → avaliações LLM inúteis."""
+    """Empty profile → useless LLM evaluations."""
     if profile:
         return None
     return StartupWarning(
         "warn",
-        "profile/profile.yaml está vazio. "
-        "Preencha skills, experiências e critérios para avaliações LLM úteis.",
+        "profile/profile.yaml is empty. "
+        "Fill in skills, experience, and criteria for useful LLM evaluations.",
     )
 
 
 def _check_api_key(config: dict[str, Any]) -> StartupWarning | None:
-    """API key ausente → toda avaliação LLM retorna score=0.0. Só é necessária no
-    backend 'api'; com llm_backend='cli' usa-se o `claude` CLI."""
+    """Missing API key → every LLM evaluation returns score=0.0. Only needed for the
+    'api' backend; with llm_backend='cli' the `claude` CLI is used instead."""
     if config.get("llm_backend") == "cli" or os.environ.get("ANTHROPIC_API_KEY"):
         return None
     return StartupWarning(
         "error",
-        "ANTHROPIC_API_KEY não encontrada no ambiente. "
-        "scan_and_evaluate e apply_jobs não funcionarão.",
+        "ANTHROPIC_API_KEY not found in the environment. "
+        "scan_and_evaluate and apply_jobs will not work.",
     )
 
 
 def _check_cv(cv_path: str) -> StartupWarning | None:
-    """CV ausente → confirm_apply vai falhar."""
+    """Missing CV → confirm_apply will fail."""
     if Path(cv_path).exists():
         return None
     return StartupWarning(
         "warn",
-        "Arquivo cv.pdf não encontrado. "
-        "confirm_apply vai falhar. Adicione seu currículo ao diretório correto.",
+        "cv.pdf file not found. confirm_apply will fail. Add your resume to the correct directory.",
     )
 
 
 def _check_browser(config: dict[str, Any]) -> StartupWarning | None:
-    """Browser ausente → LinkedIn scan e candidaturas via browser não funcionam."""
+    """Missing browser → LinkedIn scan and browser-based applications don't work."""
     browser_path = browser_executable(config)
     if not browser_path or Path(browser_path).exists():
         return None
     return StartupWarning(
         "warn",
-        f"Browser não encontrado em {browser_path}. "
-        "Scan LinkedIn e candidaturas via browser não funcionarão. "
-        "Instale o browser (Chrome/Chromium/Brave) ou ajuste browser_path em config.yaml.",
+        f"Browser not found at {browser_path}. "
+        "LinkedIn scan and browser-based applications will not work. "
+        "Install the browser (Chrome/Chromium/Brave) or set browser_path in config.yaml.",
     )

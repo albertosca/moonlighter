@@ -6,9 +6,9 @@ from typing import Any
 
 def extract_json(raw: str) -> str:
     """
-    Extrai JSON puro de uma resposta do LLM que pode conter markdown fences
-    ou texto introdutório antes/depois do JSON.
-    Tentativas em ordem: fence com label, fence sem label, objeto JSON nu.
+    Extracts raw JSON from an LLM response that may contain markdown fences
+    or introductory text before/after the JSON.
+    Attempts in order: labeled fence, unlabeled fence, bare JSON object.
     """
     raw = raw.strip()
     m = re.search(r"```(?:json)?\s*\n?([\s\S]*?)\n?```", raw)

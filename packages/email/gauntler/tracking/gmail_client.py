@@ -9,19 +9,19 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ── Importações opcionais Google (só necessárias em runtime real) ─────────────
+# ── Optional Google imports (only needed at real runtime) ───────────────────
 try:
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
-except ImportError:  # pragma: no cover - fallback de import opcional (libs google)
+except ImportError:  # pragma: no cover - optional import fallback (google libs)
     Credentials = None  # type: ignore[assignment, misc]
     Request = None  # type: ignore[assignment, misc]
     build = None
 
 try:
     from google_auth_oauthlib.flow import InstalledAppFlow
-except ImportError:  # pragma: no cover - fallback de import opcional (oauthlib)
+except ImportError:  # pragma: no cover - optional import fallback (oauthlib)
     InstalledAppFlow = None
 
 SCOPE_READONLY = "https://www.googleapis.com/auth/gmail.readonly"
@@ -32,7 +32,7 @@ class GmailAuthError(Exception):
     pass
 
 
-# ── Gmail API: autenticação e leitura ───────────────────────────────────────
+# ── Gmail API: authentication and reading ───────────────────────────────────
 
 
 def _required_scope(config: dict[str, Any]) -> str:
@@ -54,29 +54,27 @@ def _warn_if_scope_mismatch(creds: Any, required_scope: str) -> None:
     granted_set = set(granted)
     if required_scope not in granted_set and SCOPE_MODIFY in granted_set:
         logger.warning(
-            "Gmail token tem escopo mais amplo (%s) do que o necessário (%s). "
-            "Rode setup_email() para re-consentir com o escopo mínimo.",
+            "Gmail token has a broader scope (%s) than required (%s). "
+            "Run setup_email() to re-consent with the minimal scope.",
             ", ".join(sorted(granted_set)),
             required_scope,
         )
 
 
 def setup_gmail_service(config: dict[str, Any]) -> Any:
-    """Carrega credentials + token OAuth2 e devolve o resource do Gmail API.
-    Levanta GmailAuthError com mensagem clara se o token não existe; faz refresh
-    automático se expirado."""
+    """Loads credentials + OAuth2 token and returns the Gmail API resource.
+    Raises GmailAuthError with a clear message if the token doesn't exist; refreshes
+    automatically if expired."""
     if Credentials is None or build is None:
         raise GmailAuthError(
-            "google-api-python-client não instalado. "
-            "Rode: pip install google-api-python-client google-auth-oauthlib"
-            " e depois setup_email() para autorizar o acesso."
+            "google-api-python-client not installed. "
+            "Run: pip install google-api-python-client google-auth-oauthlib"
+            " and then setup_email() to authorize access."
         )
 
     token_path = Path(config["email"]["token_path"]).expanduser()
     if not token_path.exists():
-        raise GmailAuthError(
-            "Token Gmail não encontrado. Rode setup_email() primeiro para autorizar o acesso."
-        )
+        raise GmailAuthError("Gmail token not found. Run setup_email() first to authorize access.")
 
     required_scope = _required_scope(config)
     creds = Credentials.from_authorized_user_file(str(token_path), [required_scope])  # type: ignore[no-untyped-call]
@@ -89,7 +87,7 @@ def setup_gmail_service(config: dict[str, Any]) -> Any:
 
 
 def fetch_unread_messages(service: Any, max_results: int = 50) -> list[dict[str, Any]]:
-    """Busca emails não lidos na inbox. Devolve lista de {id, threadId}."""
+    """Fetches unread emails in the inbox. Returns a list of {id, threadId}."""
     response = (
         service.users()
         .messages()
@@ -101,7 +99,7 @@ def fetch_unread_messages(service: Any, max_results: int = 50) -> list[dict[str,
 
 
 def parse_message(service: Any, message_id: str) -> dict[str, Any]:
-    """Extrai to, from_, subject, body de uma mensagem Gmail."""
+    """Extracts to, from_, subject, body from a Gmail message."""
     raw = service.users().messages().get(userId="me", id=message_id, format="full").execute()
     payload = raw.get("payload", {})
     headers = {h["name"].lower(): h["value"] for h in payload.get("headers", [])}
@@ -114,7 +112,7 @@ def parse_message(service: Any, message_id: str) -> dict[str, Any]:
 
 
 def _extract_body(payload: dict[str, Any]) -> str:
-    """Extrai o corpo da mensagem, preferindo text/plain a text/html."""
+    """Extracts the message body, preferring text/plain over text/html."""
     mime = payload.get("mimeType", "")
     if mime in ("text/plain", "text/html"):
         return _decode_data(payload.get("body", {}).get("data", ""))
@@ -124,8 +122,8 @@ def _extract_body(payload: dict[str, Any]) -> str:
 
 
 def _extract_multipart(parts: list[dict[str, Any]]) -> str:
-    """Procura o corpo num multipart: text/plain primeiro, text/html depois, e por
-    fim desce recursivamente em parts aninhados (multipart dentro de multipart)."""
+    """Looks for the body in a multipart message: text/plain first, then text/html,
+    and finally recurses into nested parts (multipart within multipart)."""
     for preferred in ("text/plain", "text/html"):
         for part in parts:
             if part.get("mimeType") == preferred:
@@ -149,7 +147,7 @@ def _decode_data(data: str) -> str:
 
 
 def mark_processed(service: Any, message_id: str, label_id: str) -> None:
-    """Marca como lido e aplica o label 'gauntler/processed'."""
+    """Marks as read and applies the 'gauntler/processed' label."""
     service.users().messages().modify(
         userId="me",
         id=message_id,
@@ -158,7 +156,7 @@ def mark_processed(service: Any, message_id: str, label_id: str) -> None:
 
 
 def _get_or_create_label(service: Any, label_name: str) -> str:
-    """Devolve o ID do label, criando-o se ainda não existir."""
+    """Returns the label's ID, creating it if it doesn't exist yet."""
     labels = service.users().labels().list(userId="me").execute()
     for label in labels.get("labels", []):
         if label["name"] == label_name:
@@ -182,10 +180,10 @@ def _get_or_create_label(service: Any, label_name: str) -> str:
 def _run_gmail_oauth(
     credentials_path: str, token_path: str, config: dict[str, Any] | None = None
 ) -> None:
-    """Executa o fluxo OAuth2 interativo e salva o token."""
+    """Runs the interactive OAuth2 flow and saves the token."""
     if InstalledAppFlow is None:
         raise GmailAuthError(
-            "google-auth-oauthlib não instalado. Rode: pip install google-auth-oauthlib"
+            "google-auth-oauthlib not installed. Run: pip install google-auth-oauthlib"
         )
     scope = _required_scope(config or {})
     flow = InstalledAppFlow.from_client_secrets_file(credentials_path, [scope])

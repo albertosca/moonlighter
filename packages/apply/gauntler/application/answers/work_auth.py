@@ -1,8 +1,8 @@
 """
-Resolução país-dependente de campos de autorização de trabalho / visto /
-sponsorship. Conservador por design: o país da vaga só é usado quando inferível
-com confiança; do contrário, o campo vira o sentinel de revisão manual — nunca
-um chute (responder errado sobre autorização é mentir).
+Country-dependent resolution of work-authorization / visa / sponsorship
+fields. Conservative by design: the job's country is only used when it can
+be confidently inferred; otherwise the field becomes the manual-review
+sentinel — never a guess (answering wrong about authorization is lying).
 """
 
 import re
@@ -10,8 +10,8 @@ from typing import Any
 
 from gauntler.core.config import NEEDS_REVIEW_SENTINEL
 
-# Países/cidades que permitem inferência confiante. Lista curta de propósito:
-# preferimos __NEEDS_REVIEW__ a um falso positivo.
+# Countries/cities that allow confident inference. Deliberately short list:
+# we prefer __NEEDS_REVIEW__ over a false positive.
 _BRAZIL_MARKERS = (
     "brazil",
     "brasil",
@@ -51,8 +51,8 @@ _US_STATE_RE = re.compile(r",\s*(ca|ny|wa|tx)\b")
 
 
 def _canonical_country(value: str) -> str | None:
-    """Normaliza um nome de país (livre, qualquer locale) para a forma canônica
-    usada na comparação. Desconhecido (nem BR nem US) → None (vira review)."""
+    """Normalizes a country name (free-form, any locale) to the canonical form
+    used for comparison. Unknown (neither BR nor US) → None (becomes review)."""
     text = value.strip().lower()
     if text in ("brazil", "brasil", "br"):
         return "brazil"
@@ -61,8 +61,8 @@ def _canonical_country(value: str) -> str | None:
     return None
 
 
-# Detecta o tipo de campo. authorization e sponsorship são respondidos de forma
-# OPOSTA conforme o país.
+# Detects the field type. authorization and sponsorship are answered in
+# OPPOSITE ways depending on the country.
 _AUTHORIZED_RE = re.compile(
     r"authorized.*work|work.*authoriz|legally.*work|work\s+permit|eligible.*work",
     re.IGNORECASE,
@@ -74,7 +74,7 @@ _SPONSORSHIP_RE = re.compile(
 
 
 def infer_country(location: str | None, remote_type: str | None) -> str | None:
-    """Retorna 'brazil', 'united states' ou None (quando não dá para afirmar)."""
+    """Returns 'brazil', 'united states', or None (when it can't be asserted)."""
     text = (location or "").lower()
     if any(m in text for m in _BRAZIL_MARKERS):
         return "brazil"
@@ -89,13 +89,13 @@ def infer_country(location: str | None, remote_type: str | None) -> str | None:
 
 def resolve_work_auth(field_label: str, country: str | None, config: dict[str, Any]) -> str | None:
     """
-    Para campos de autorização/sponsorship retorna a resposta correta para o país,
-    ou o sentinel de revisão quando o país é desconhecido. Retorna None se o campo
-    não for de autorização (aí o LLM cuida).
+    For authorization/sponsorship fields returns the correct answer for the country,
+    or the review sentinel when the country is unknown. Returns None if the field
+    is not authorization-related (then the LLM handles it).
     """
     wa = config.get("work_authorization", {}) or {}
-    # Normaliza pra forma canônica: aceita "Brasil"/"Brazil"/"BR" etc. sem depender
-    # de locale exato. Vazio/ausente/desconhecido → None → review (conservador).
+    # Normalizes to the canonical form: accepts "Brasil"/"Brazil"/"BR" etc. without
+    # depending on the exact locale. Empty/missing/unknown → None → review (conservative).
     citizenship = _canonical_country(wa.get("citizenship_country") or "")
     yes: str = wa.get("authorized_answer", "Yes")
     no: str = wa.get("not_authorized_answer", "No")
@@ -112,5 +112,5 @@ def resolve_work_auth(field_label: str, country: str | None, config: dict[str, A
     authorized_here = country == citizenship
     if is_auth:
         return yes if authorized_here else no
-    # sponsorship: precisa de patrocínio exatamente quando NÃO é autorizado lá.
+    # sponsorship: needs sponsorship exactly when NOT authorized there.
     return no if authorized_here else yes

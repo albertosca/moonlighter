@@ -15,8 +15,8 @@ _Fetch = Callable[[httpx.AsyncClient, str], Awaitable[list[RawJob]]]
 
 
 async def _gather_jobs(source: str, slugs: list[str], fetch: _Fetch) -> list[RawJob]:
-    """Busca todas as empresas em paralelo e achata o resultado. Uma empresa que
-    falha (exceção no fetch) é ignorada, não derruba as outras."""
+    """Fetches all companies in parallel and flattens the result. A company that
+    fails (exception in fetch) is ignored, it doesn't take down the others."""
     logger.info("[%s] scanning %d companies", source, len(slugs))
     jobs: list[RawJob] = []
     async with httpx.AsyncClient(timeout=15) as client:

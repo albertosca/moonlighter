@@ -11,9 +11,9 @@ from gauntler.core.parsing import parse_llm_json, wrap_untrusted
 
 logger = get_logger(__name__)
 
-# Campos do profile que importam para PONTUAR uma vaga. Contato/credenciais
-# (name/phone/email/linkedin) e education/publications não influenciam o score e
-# só inflam o prompt — ficam de fora.
+# Profile fields that matter for SCORING a job. Contact/credentials
+# (name/phone/email/linkedin) and education/publications don't influence the score
+# and only bloat the prompt — left out.
 _EVAL_PROFILE_KEYS = (
     "criteria",
     "skills",
@@ -26,15 +26,15 @@ _EVAL_PROFILE_KEYS = (
 
 
 def profile_for_eval(profile: dict[str, Any]) -> dict[str, Any]:
-    """Subconjunto do profile relevante para avaliação. Reduz tokens por chamada
-    sem perder os dealbreakers (criteria) nem o contexto de match (skills/experience)."""
+    """Subset of the profile relevant to evaluation. Reduces tokens per call
+    without losing the dealbreakers (criteria) or the match context (skills/experience)."""
     return {k: profile[k] for k in _EVAL_PROFILE_KEYS if k in profile}
 
 
 def should_skip_by_title(title: str, blocklist: list[str]) -> str | None:
-    """Retorna o padrão que deu match se o título deve ser descartado, ou None.
+    """Returns the pattern that matched if the title should be discarded, or None.
 
-    Matching case-insensitive por substring. Custo zero — sem LLM.
+    Case-insensitive substring matching. Zero cost — no LLM.
     """
     lower = title.lower()
     for pattern in blocklist:
@@ -43,8 +43,8 @@ def should_skip_by_title(title: str, blocklist: list[str]) -> str | None:
     return None
 
 
-# Prefixo estático do prompt de avaliação individual: profile + filtros + instruções.
-# Enviado como cache_prefix para que o backend API possa cachear entre chamadas.
+# Static prefix of the individual evaluation prompt: profile + filters + instructions.
+# Sent as cache_prefix so the API backend can cache it across calls.
 EVAL_PREFIX = """You are evaluating a job posting for a senior software engineer.
 
 ## Candidate Profile
@@ -77,7 +77,7 @@ def _eval_suffix(company: str, title: str, description: str) -> str:
 
 @dataclass(frozen=True)
 class EvalInput:
-    """Entrada para avaliação em lote: company, title, description."""
+    """Input for batch evaluation: company, title, description."""
 
     company: str
     title: str
@@ -106,7 +106,7 @@ async def evaluate_job(
     if _caller is None:
         _caller = make_api_caller()
     logger.debug("evaluating %s/%s", company, title)
-    # Prefixo estático (profile + instruções) → cacheável; sufixo dinâmico = só a vaga.
+    # Static prefix (profile + instructions) → cacheable; dynamic suffix = just the job.
     prefix = EVAL_PREFIX.format(
         profile_yaml=yaml.dump(profile_for_eval(profile), allow_unicode=True)
     )
@@ -117,13 +117,13 @@ async def evaluate_job(
         logger.debug("→ score %.1f (%s)", result.score, company)
         return result
     except json.JSONDecodeError:
-        logger.warning("evaluator: parse error para %s/%s", company, title)
+        logger.warning("evaluator: parse error for %s/%s", company, title)
         return EvaluationResult(score=0.0, score_notes="parse error: LLM returned non-JSON")
     except Exception as e:
         if is_spend_limit(e):
             record_spend_limit_hit()
-            raise  # esgotou cota — quem chama decide parar; não é erro da vaga
-        logger.warning("evaluator: erro para %s/%s — %s", company, title, e)
+            raise  # quota exhausted — the caller decides to stop; not the job's fault
+        logger.warning("evaluator: error for %s/%s — %s", company, title, e)
         return EvaluationResult(score=0.0, score_notes=f"evaluation error: {e}")
 
 
@@ -185,11 +185,11 @@ def _as_salary_source(value: Any) -> str | None:
 
 
 def _parse_batch(raw: str, n: int) -> list[EvaluationResult] | None:
-    """Faz parse da resposta de lote num array de n EvaluationResult. Devolve None
-    quando a ESTRUTURA é inválida (não é lista ou tamanho ≠ n) — o chamador então cai
-    no fallback per-job. Item individual malformado é tolerado via _result_from."""
+    """Parses the batch response into an array of n EvaluationResult. Returns None
+    when the STRUCTURE is invalid (not a list or size ≠ n) — the caller then falls
+    back to the per-job path. A malformed individual item is tolerated via _result_from."""
     try:
-        # Tenta parse direto (arrays puras); se falhar, tenta extrair JSON de markdown/prose
+        # Tries direct parsing (bare arrays); if that fails, tries extracting JSON from markdown/prose
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
@@ -201,7 +201,7 @@ def _parse_batch(raw: str, n: int) -> list[EvaluationResult] | None:
     return [_result_from(item if isinstance(item, dict) else {}) for item in data]
 
 
-# Prefixo estático do prompt de lote: profile + filtros + instruções.
+# Static prefix of the batch prompt: profile + filters + instructions.
 # Doesn't include the job blocks — those go in the dynamic suffix, outside the cache.
 EVAL_BATCH_PREFIX = """You are evaluating job postings for a senior software engineer.
 
@@ -245,7 +245,7 @@ def _jobs_block(jobs: list[EvalInput]) -> str:
 async def _eval_each(
     jobs: list[EvalInput], profile: dict[str, Any], model: str, caller: LLMCaller
 ) -> list[EvaluationResult]:
-    """Fallback: avalia vaga a vaga (sequencial). Spend-limit em qualquer uma propaga."""
+    """Fallback: evaluates job by job (sequentially). A spend-limit in any of them propagates."""
     return [
         await evaluate_job(j.company, j.title, j.description, profile, model, caller) for j in jobs
     ]
@@ -254,14 +254,14 @@ async def _eval_each(
 async def evaluate_jobs_batch(
     jobs: list[EvalInput], profile: dict[str, Any], model: str, caller: LLMCaller
 ) -> list[EvaluationResult]:
-    """Avalia K vagas numa única chamada LLM (profile enviado uma vez). Em caso de
-    parse inválido ou erro não-cota, cai no fallback per-job — nunca piora a robustez.
-    Spend-limit propaga para o chamador parar o scan."""
+    """Evaluates K jobs in a single LLM call (profile sent once). On invalid parse
+    or a non-quota error, falls back to the per-job path — never worsens robustness.
+    A spend-limit propagates to the caller so it can stop the scan."""
     if len(jobs) == 1:
         return await _eval_each(jobs, profile, model, caller)
 
-    # Prefixo estático (profile + instruções, sem as vagas) → cacheável.
-    # Sufixo dinâmico = bloco das vagas (muda a cada lote).
+    # Static prefix (profile + instructions, without the jobs) → cacheable.
+    # Dynamic suffix = the jobs block (changes every batch).
     prefix = EVAL_BATCH_PREFIX.format(
         profile_yaml=yaml.dump(profile_for_eval(profile), allow_unicode=True),
         n=len(jobs),
@@ -273,11 +273,11 @@ async def evaluate_jobs_batch(
         if is_spend_limit(e):
             record_spend_limit_hit()
             raise
-        logger.warning("batch eval: erro na chamada — fallback per-job: %s", e)
+        logger.warning("batch eval: call error — fallback per-job: %s", e)
         return await _eval_each(jobs, profile, model, caller)
 
     parsed = _parse_batch(raw, len(jobs))
     if parsed is None:
-        logger.warning("batch eval: parse inválido — fallback per-job (%d vagas)", len(jobs))
+        logger.warning("batch eval: invalid parse — fallback per-job (%d jobs)", len(jobs))
         return await _eval_each(jobs, profile, model, caller)
     return parsed

@@ -13,7 +13,7 @@ _LOGIN_REDIRECTS = ("/login", "/checkpoint", "/authwall")
 
 
 class LinkedInSessionExpiredError(Exception):
-    """Levantada quando o LinkedIn redireciona para login após goto()."""
+    """Raised when LinkedIn redirects to login after goto()."""
 
     pass
 
@@ -52,7 +52,7 @@ class LinkedInScanner(BaseScanner):
 
         listings = await self.page.query_selector_all(".jobs-search__results-list > li")
         jobs = []
-        for item in listings[:30]:  # cap em 30 por busca
+        for item in listings[:30]:  # cap at 30 per search
             job = await self._parse_listing(item)
             if job:
                 jobs.append(job)
@@ -60,29 +60,29 @@ class LinkedInScanner(BaseScanner):
         return jobs
 
     async def _load_results(self, url: str) -> bool:
-        """Abre a busca, detecta sessão expirada e espera a lista carregar (com scroll
-        para o lazy-load). False se a lista não apareceu (timeout)."""
+        """Opens the search, detects an expired session, and waits for the list to load
+        (with scrolling for lazy-load). False if the list never appeared (timeout)."""
         try:
             await self.page.goto(url, timeout=30000)
             if any(marker in self.page.url for marker in _LOGIN_REDIRECTS):
                 raise LinkedInSessionExpiredError(
-                    "Sessão LinkedIn expirada. Execute login(platform='linkedin') para re-autenticar."
+                    "LinkedIn session expired. Run login(platform='linkedin') to re-authenticate."
                 )
             await self.page.wait_for_selector(".jobs-search__results-list", timeout=15000)
         except LinkedInSessionExpiredError:
-            raise  # propaga sem engolir
+            raise  # propagate without swallowing
         except PlaywrightTimeout:
-            logger.warning("LinkedIn scan: timeout aguardando resultados")
+            logger.warning("LinkedIn scan: timeout waiting for results")
             return False
 
-        for _ in range(3):  # LinkedIn faz lazy-load — rola para carregar mais
+        for _ in range(3):  # LinkedIn does lazy-load — scroll to load more
             await self.page.keyboard.press("End")
             await asyncio.sleep(1.5)
         return True
 
     async def _parse_listing(self, item: Any) -> RawJob | None:
-        """Extrai um RawJob de um card da lista. None se o card estiver incompleto
-        ou der erro."""
+        """Extracts a RawJob from a listing card. None if the card is incomplete
+        or an error occurs."""
         try:
             title = await _text(await item.query_selector(".base-search-card__title"))
             company = await _text(await item.query_selector(".base-search-card__subtitle"))
@@ -105,7 +105,7 @@ class LinkedInScanner(BaseScanner):
             return None
 
     async def _fetch_description(self, card_item: Any) -> str | None:
-        """Clica no card e extrai a descrição do painel lateral. Retorna None se falhar."""
+        """Clicks the card and extracts the description from the side panel. Returns None on failure."""
         try:
             await card_item.click()
             desc_el = await self.page.wait_for_selector(_DESCRIPTION_SELECTORS, timeout=5000)

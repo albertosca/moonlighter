@@ -89,8 +89,8 @@ async def _call_cli(prompt: str, model: str, cache_prefix: str | None = None) ->
 
     Uses the active Claude Code session — no API key needed.
     The `model` parameter is ignored (CLI uses whichever model the session provides).
-    O cache_prefix é concatenado antes do prompt (o CLI não expõe cache_control);
-    o efeito de cache real só existe no backend api.
+    The cache_prefix is concatenated before the prompt (the CLI doesn't expose cache_control);
+    the actual caching effect only exists in the api backend.
 
     The prompt goes over STDIN, never argv (S-01): this removes the exposure in
     `ps` and makes argument injection structurally impossible (there's no prompt
@@ -136,9 +136,9 @@ def make_api_caller(max_tokens: int = 2048) -> LLMCaller:
     client = anthropic.AsyncAnthropic()
 
     async def _call(prompt: str, model: str, cache_prefix: str | None = None) -> str:
-        # Quando cache_prefix fornecido, envia dois blocos: o prefixo estático
-        # com cache_control ephemeral (marcado para cache no lado do Anthropic)
-        # seguido do prompt dinâmico. Sem prefix, envia string simples (retrocompat).
+        # When cache_prefix is provided, sends two blocks: the static prefix
+        # with ephemeral cache_control (marked for caching on Anthropic's side)
+        # followed by the dynamic prompt. Without a prefix, sends a plain string (backcompat).
         if cache_prefix is not None:
             content: Any = [
                 {"type": "text", "text": cache_prefix, "cache_control": {"type": "ephemeral"}},

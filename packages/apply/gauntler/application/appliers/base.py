@@ -24,8 +24,8 @@ def is_skip(answer: str) -> bool:
 
 async def query_labels_with_fallback(page: Page, selectors: list[str]) -> list[Any]:
     """
-    Tenta cada seletor CSS em ordem até encontrar um que retorne elementos.
-    Retorna a primeira lista não-vazia, ou [] se todos forem vazios.
+    Tries each CSS selector in order until one returns elements.
+    Returns the first non-empty list, or [] if all are empty.
     """
     for selector in selectors:
         results = await page.query_selector_all(selector)
@@ -34,9 +34,9 @@ async def query_labels_with_fallback(page: Page, selectors: list[str]) -> list[A
     return []
 
 
-# Marcadores de confirmação de submissão. Conservador de propósito: na dúvida
-# retornamos False — um falso "enviado" é pior (candidatura perdida sem acompanhamento)
-# do que um falso "falhou" (screenshot revisável, re-tentável).
+# Submission-confirmation markers. Conservative by design: when in doubt we
+# return False — a false "sent" is worse (application lost with no follow-up)
+# than a false "failed" (reviewable screenshot, retriable).
 SUCCESS_TEXT_MARKERS = (
     "thank you for applying",
     "thanks for applying",
@@ -71,8 +71,8 @@ def _cap_label(label: str) -> str:
 
 async def _confirm_submitted(page: Page, extra_text_markers: tuple[str, ...] = ()) -> bool:
     """
-    Verifica se a submissão foi de fato confirmada, lendo o texto da página
-    (marcador de sucesso) ou a URL (página de confirmação). Não levanta exceção.
+    Checks whether the submission was actually confirmed, by reading the page's
+    text (success marker) or the URL (confirmation page). Never raises.
     """
     try:
         body = (await page.inner_text("body")).lower()
@@ -85,7 +85,7 @@ async def _confirm_submitted(page: Page, extra_text_markers: tuple[str, ...] = (
     return any(u in url for u in SUCCESS_URL_MARKERS)
 
 
-# JS reaproveitado entre ATS para classificar o pós-submit de forma conservadora.
+# JS shared across ATS implementations to classify the post-submit state conservatively.
 _SUBMIT_VISIBLE_JS = (
     '() => !!document.querySelector(\'form input[type="submit"], form button[type="submit"]\')'
 )
@@ -104,13 +104,13 @@ async def classify_submit_outcome(
     page: Page, form_visible_js: str = _SUBMIT_VISIBLE_JS, extra_text_markers: tuple[str, ...] = ()
 ) -> str:
     """
-    Classifica o resultado de um clique de submit de forma CONSERVADORA:
-      - "submitted": página/URL contém marcador de confirmação.
-      - "failed:validation_errors:[...]": o form ainda está visível (a validação
-        client-side barrou o envio) — é re-tentável.
-      - "unverified": clicou, a página mudou, mas não há nem confirmação nem form
-        visível. Caso ambíguo — quem chama decide (NÃO presumir enviado).
-    Nunca levanta exceção.
+    Classifies the outcome of a submit click CONSERVATIVELY:
+      - "submitted": page/URL contains a confirmation marker.
+      - "failed:validation_errors:[...]": the form is still visible (client-side
+        validation blocked the submission) — retriable.
+      - "unverified": clicked, the page changed, but there's neither confirmation
+        nor a visible form. Ambiguous case — the caller decides (do NOT assume sent).
+    Never raises.
     """
     if await _confirm_submitted(page, extra_text_markers):
         return "submitted"
@@ -128,7 +128,7 @@ async def classify_submit_outcome(
 
 
 async def fill_field(field: Any, answer: str) -> None:
-    """Preenche o campo conforme o tipo do elemento (select, input, textarea)."""
+    """Fills the field according to the element type (select, input, textarea)."""
     tag = await field.evaluate("el => el.tagName.toLowerCase()")
     if tag == "select":
         await _fill_select(field, answer)
@@ -139,7 +139,7 @@ async def fill_field(field: Any, answer: str) -> None:
 
 
 async def _fill_select(field: Any, answer: str) -> None:
-    """Escolhe a opção pelo label visível; cai para o value se o label não bater."""
+    """Chooses the option by its visible label; falls back to the value if the label doesn't match."""
     try:
         await field.select_option(label=answer)
     except Exception:
@@ -162,7 +162,7 @@ async def _fill_input(field: Any, answer: str) -> None:
 
 
 async def _click_radio(field: Any, answer: str) -> None:
-    """Clica o radio do grupo cujo value (ou label associado) bate com a resposta."""
+    """Clicks the radio in the group whose value (or associated label) matches the answer."""
     await field.evaluate(
         """(el, answer) => {
             const root = el.form || document;
@@ -287,8 +287,8 @@ async def generate_answers(
         _caller = make_api_caller(max_tokens=2048)
     logger.info("generating answers: %s/%s (%d fields)", company, title, len(fields))
 
-    # Pré-populamos campos de contato e respostas padronizadas diretamente do perfil.
-    # O LLM só recebe os campos que ele realmente precisa responder.
+    # We pre-populate contact fields and standardized answers directly from the profile.
+    # The LLM only receives the fields it actually needs to answer.
     pre_populated = pre_populate_answers(
         fields,
         profile,
@@ -306,7 +306,7 @@ async def generate_answers(
             _MAX_LLM_FIELDS,
             len(overflow),
         )
-    logger.info("→ pre-populated %d campos, LLM responde %d", len(pre_populated), len(to_ask))
+    logger.info("→ pre-populated %d fields, LLM answers %d", len(pre_populated), len(to_ask))
 
     llm_answers: dict[str, str] = {}
     llm_error: str | None = None
@@ -319,7 +319,7 @@ async def generate_answers(
     # front of the operator instead of going into the form blank.
     unanswered = {f: NEEDS_REVIEW_SENTINEL for f in remaining_fields if f not in llm_answers}
 
-    # Pre-populated tem prioridade sobre o LLM para campos de contato.
+    # Pre-populated takes priority over the LLM for contact fields.
     answers = {**unanswered, **llm_answers, **pre_populated}
     return ApplicationDraft(
         job_id=job_id,
@@ -389,7 +389,7 @@ async def _ask_llm(
     model: str,
     caller: LLMCaller,
 ) -> tuple[dict[str, str], str | None]:
-    """Pede ao LLM as respostas dos campos restantes. Devolve (respostas, erro).
+    """Asks the LLM for the remaining fields' answers. Returns (answers, error).
 
     The fields are scraped from the employer's page (untrusted), so they are wrapped
     before entering the prompt. They are also the output keys — so to break that coupling
@@ -420,7 +420,7 @@ async def _ask_llm(
                 "(profile-exfiltration signature)"
             )
             return {}, "canary detected in LLM output; answers discarded"
-        logger.info("→ LLM answers ok (%d respostas)", len(answers))
+        logger.info("→ LLM answers ok (%d answers)", len(answers))
         return answers, None
     except Exception as e:
         logger.warning("→ LLM answers error: %s", e)

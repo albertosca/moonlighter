@@ -18,15 +18,15 @@ from peewee import (
 
 
 def _db_path() -> str:
-    # Fonte única do caminho do banco: override explícito via GAUNTLER_DB_PATH,
-    # senão segue gauntler_home() (respeita GAUNTLER_HOME).
+    # Single source of truth for the DB path: explicit override via GAUNTLER_DB_PATH,
+    # otherwise falls back to gauntler_home() (respects GAUNTLER_HOME).
     return os.environ.get("GAUNTLER_DB_PATH") or str(gauntler_home() / "gauntler.db")
 
 
 db = SqliteDatabase(None)  # initialized in init_db()
 
 
-class BaseModel(Model):  # type: ignore[misc]  # peewee.Model é untyped (Any)
+class BaseModel(Model):  # type: ignore[misc]  # peewee.Model is untyped (Any)
     class Meta:
         database = db
 
@@ -82,8 +82,8 @@ class ScanLog(BaseModel):
 
 
 class ProcessedEmail(BaseModel):
-    """Dedup local de emails já processados pelo sync, para que o monitor não
-    precise marcar o email no Gmail (mantém o sync autônomo 100% leitura)."""
+    """Local dedup of emails already processed by the sync, so the monitor doesn't
+    need to mark the email in Gmail (keeps the autonomous sync 100% read-only)."""
 
     message_id = CharField(unique=True)
     processed_at = DateTimeField(default=datetime.datetime.now)

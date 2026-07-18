@@ -1,7 +1,7 @@
-"""Alias de rastreamento +ref no campo de email do formulário ATS.
+"""+ref tracking alias for the email field on the ATS form.
 
-A empresa responde em candidaturas+<ref>@gmail.com (conta monitorada),
-o que permite ao email_monitor casar a resposta com a candidatura pelo ref.
+The company replies to candidaturas+<ref>@gmail.com (monitored account),
+which lets email_monitor match the reply to the application by the ref.
 """
 
 
@@ -13,11 +13,11 @@ def build_email_alias(address: str, ref: str) -> str:
 
 def inject_email_alias(answers: dict[str, str], alias: str) -> bool:
     """
-    Sobrescreve o campo de email do formulário com o alias +ref de rastreamento.
-    Procura qualquer label que contenha 'email' ignorando hífen/espaço — assim
-    casa tanto 'Email' quanto 'E-mail' (PT). Se não houver, adiciona uma chave
-    'Email' como fallback (label mais comum nos ATS).
-    Retorna True se algum campo existente foi sobrescrito.
+    Overwrites the form's email field with the +ref tracking alias.
+    Looks for any label containing 'email' ignoring hyphen/space — this
+    matches both 'Email' and 'E-mail' (PT). If none exists, adds an
+    'Email' key as a fallback (the most common label across ATS).
+    Returns True if some existing field was overwritten.
     """
     injected = False
     for key in list(answers.keys()):

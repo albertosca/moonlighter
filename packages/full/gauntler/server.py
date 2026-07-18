@@ -83,13 +83,13 @@ async def scan_and_evaluate(
 ) -> str:
     """Scan job boards, evaluate with LLM, return new jobs above threshold.
 
-    Por padrão escaneia só a fase 1 (empresas BR prioritárias) para economizar tokens.
-    Use phase='phase2', 'phase3', ou 'all' para escanear mais empresas explicitamente.
+    By default scans only phase 1 (priority BR companies) to save tokens.
+    Use phase='phase2', 'phase3', or 'all' to explicitly scan more companies.
 
     Args:
-        keywords: palavras-chave para o scanner LinkedIn (opcional)
-        phase: "phase1" (padrão/BR), "phase2" (remote-first global),
-               "phase3" (big techs), ou "all" (tudo)
+        keywords: keywords for the LinkedIn scanner (optional)
+        phase: "phase1" (default/BR), "phase2" (remote-first global),
+               "phase3" (big techs), or "all" (everything)
     """
     app = ctx.request_context.lifespan_context
     with operation_metrics("scan_and_evaluate"):
@@ -108,17 +108,17 @@ async def add_job(
     *,
     ctx: Context[ServerSession, AppContext, Any],
 ) -> str:
-    """Avalia uma vaga fornecida manualmente e salva no banco.
+    """Evaluates a manually provided job and saves it to the database.
 
-    Útil para vagas do LinkedIn, posts de emprego, ou qualquer fonte não suportada
-    pelo scanner automático. Se 'description' não for fornecida, tenta buscar a
-    URL via HTTP (não funciona para páginas que requerem autenticação, como LinkedIn).
+    Useful for LinkedIn postings, job posts, or any source not supported by
+    the automatic scanner. If 'description' is not provided, tries to fetch
+    the URL via HTTP (doesn't work for pages requiring authentication, like LinkedIn).
 
     Args:
-        url: URL da vaga (obrigatório, usado como identificador único)
-        company: Nome da empresa (ex: "ifood")
-        title: Título da vaga (ex: "Senior Software Engineer")
-        description: Texto da descrição da vaga. Se vazio, tenta buscar automaticamente.
+        url: job URL (required, used as unique identifier)
+        company: company name (e.g. "ifood")
+        title: job title (e.g. "Senior Software Engineer")
+        description: job description text. If empty, tries to fetch it automatically.
     """
     app = ctx.request_context.lifespan_context
     return await scan_service.add_job(

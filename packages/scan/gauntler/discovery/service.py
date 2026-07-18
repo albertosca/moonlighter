@@ -1,7 +1,7 @@
-"""Serviço de scan: descobre vagas (HTTP + LinkedIn), avalia com LLM e salva.
+"""Scan service: discovers jobs (HTTP + LinkedIn), evaluates with the LLM, and saves.
 
-As tools MCP em server.py são wrappers finos que chamam estas funções passando
-config/profile/caller. A lógica fica aqui, testável isolada.
+The MCP tools in server.py are thin wrappers that call these functions passing
+config/profile/caller. The logic lives here, testable in isolation.
 """
 
 import asyncio
@@ -34,7 +34,7 @@ logger = get_logger(__name__)
 
 
 class _StopScan:
-    """Sentinela devolvida por uma coroutine que detectou spend limit e parou."""
+    """Sentinel returned by a coroutine that detected a spend limit and stopped."""
 
 
 def _model_for(config: dict[str, Any]) -> str:
@@ -43,10 +43,10 @@ def _model_for(config: dict[str, Any]) -> str:
 
 
 def _claim(raw: RawJob) -> bool:
-    """Reserva a URL no ScanLog antes de qualquer trabalho. ScanLog.create é
-    síncrono, então o asyncio não troca de contexto entre o insert e o retorno — a
-    UNIQUE em job_url é o guard atômico contra duas chamadas concorrentes avaliarem
-    a mesma URL. Devolve False quando a URL já foi reservada."""
+    """Reserves the URL in ScanLog before any work. ScanLog.create is synchronous,
+    so asyncio doesn't switch context between the insert and the return — the
+    UNIQUE constraint on job_url is the atomic guard against two concurrent calls
+    evaluating the same URL. Returns False when the URL was already reserved."""
     try:
         ScanLog.create(job_url=raw.url, source=raw.source)
         return True
@@ -55,7 +55,7 @@ def _claim(raw: RawJob) -> bool:
 
 
 def _release(raw: RawJob) -> None:
-    """Libera o claim para retry num scan futuro (nunca deixa claim órfão)."""
+    """Releases the claim for a retry in a future scan (never leaves an orphaned claim)."""
     ScanLog.delete().where(ScanLog.job_url == raw.url).execute()
 
 
@@ -89,7 +89,7 @@ def _create_job(
 
 
 def _persist(raw: RawJob, **scoring: Any) -> Job | None:
-    """Salva o RawJob como Job com os campos de scoring. None se a URL já existe."""
+    """Saves the RawJob as a Job with the scoring fields. None if the URL already exists."""
     return _create_job(
         raw.source,
         raw.company,
@@ -104,9 +104,9 @@ def _persist(raw: RawJob, **scoring: Any) -> Job | None:
 
 
 async def _scan_linkedin(keywords: str, config: dict[str, Any]) -> tuple[list[RawJob], str | None]:
-    """Scan do LinkedIn via Playwright (exige login prévio). Sessão expirada vira
-    aviso; qualquer outra falha — inclusive não haver browser — é silenciosa para
-    não bloquear os resultados HTTP."""
+    """LinkedIn scan via Playwright (requires prior login). An expired session becomes
+    a warning; any other failure — including no browser being available — is silent
+    so it doesn't block the HTTP results."""
     from gauntler.discovery.sources.playwright import (
         LinkedInScanner,
         LinkedInSessionExpiredError,
@@ -130,8 +130,8 @@ async def _scan_linkedin(keywords: str, config: dict[str, Any]) -> tuple[list[Ra
 async def _collect_raw_jobs(
     keywords: str, config: dict[str, Any], companies: dict[str, list[str]]
 ) -> tuple[list[RawJob], str | None]:
-    """Coleta vagas das fontes HTTP e do LinkedIn. Devolve as vagas brutas e um
-    aviso opcional do LinkedIn."""
+    """Collects jobs from the HTTP sources and LinkedIn. Returns the raw jobs and
+    an optional LinkedIn warning."""
     scanners = build_http_scanners()
     raw_jobs: list[RawJob] = []
     for source, scanner in scanners.items():
@@ -152,9 +152,9 @@ def _drop_already_seen(raw_jobs: list[RawJob]) -> list[RawJob]:
 async def _evaluate_and_store(
     new_jobs: list[RawJob], config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
 ) -> tuple[list[Job], bool]:
-    """Avalia e salva as vagas em LOTES concorrentes (até scan_concurrency lotes em
-    paralelo, scan_batch_size vagas por lote), parando no primeiro spend limit ou erro
-    inesperado. Devolve as vagas salvas e se parou."""
+    """Evaluates and saves jobs in concurrent BATCHES (up to scan_concurrency batches
+    in parallel, scan_batch_size jobs per batch), stopping at the first spend limit
+    or unexpected error. Returns the saved jobs and whether it stopped."""
     threshold = config["score_threshold"]
     model = _model_for(config)
     blocklist: list[str] = config.get("title_blocklist", [])
@@ -165,7 +165,7 @@ async def _evaluate_and_store(
 
     async def evaluate_chunk(chunk: list[RawJob]) -> list[Job | _StopScan]:
         async with semaphore:
-            # Já parou enquanto esperava o permit: não reserva nem chama o LLM.
+            # Already stopped while waiting for the permit: don't reserve or call the LLM.
             if stop.is_set():
                 return [_StopScan()]
 
@@ -173,7 +173,7 @@ async def _evaluate_and_store(
             to_eval: list[RawJob] = []
             for raw in chunk:
                 if not _claim(raw):
-                    continue  # já reservada (corrida/scan anterior)
+                    continue  # already reserved (race/previous scan)
                 matched = should_skip_by_title(raw.title, blocklist)
                 if matched:
                     job = _persist(
@@ -209,10 +209,10 @@ async def _evaluate_and_store(
                     stop.set()
                     results.append(_StopScan())
                     return results
-                logger.error("scan: erro inesperado no lote — %s", e)
-                # Devolve results (title-filtered jobs já persistidos neste chunk) em
-                # vez de propagar — a exceção crua faria o gather() descartar o chunk
-                # inteiro do relatório, sub-contando vagas que já estão salvas no banco.
+                logger.error("scan: unexpected error in batch — %s", e)
+                # Returns results (title-filtered jobs already persisted in this chunk)
+                # instead of propagating — the raw exception would make gather() discard
+                # the whole chunk from the report, undercounting jobs already saved in the DB.
                 results.append(_StopScan())
                 return results
 
@@ -239,7 +239,7 @@ async def _evaluate_and_store(
     spend_hit = False
     for outcome in chunk_outcomes:
         if isinstance(outcome, BaseException):
-            logger.error("scan: lote falhou — %s", outcome)
+            logger.error("scan: batch failed — %s", outcome)
             spend_hit = True
             continue
         for item in outcome:
@@ -249,7 +249,7 @@ async def _evaluate_and_store(
                 saved.append(item)
 
     if spend_hit:
-        logger.warning("scan_and_evaluate: interrompido por spend limit após %d vagas", len(saved))
+        logger.warning("scan_and_evaluate: stopped by spend limit after %d jobs", len(saved))
     return saved, spend_hit
 
 
@@ -320,7 +320,7 @@ async def add_job(
             return error
         description = fetched or ""
     if not company or not title:
-        return "Forneça pelo menos 'company' e 'title' junto com a URL."
+        return "Provide at least 'company' and 'title' along with the URL."
 
     already = _existing_job_message(url)
     if already:
@@ -370,15 +370,14 @@ async def add_job(
 
 
 async def _fetch_description(url: str) -> tuple[str | None, str | None]:
-    """Busca e limpa (sem HTML) a descrição da vaga. Devolve (descrição, erro) — só
-    um dos dois é não-nulo. Não funciona em páginas que exigem login."""
+    """Fetches and cleans (strips HTML from) the job description. Returns (description,
+    error) — only one of the two is non-null. Doesn't work on pages that require login."""
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             r = await client.get(url, headers={"User-Agent": "gauntler/0.1"})
         if r.status_code != 200:
             return None, (
-                f"Não consegui buscar a URL (HTTP {r.status_code}). "
-                f"Forneça 'description' manualmente."
+                f"Could not fetch the URL (HTTP {r.status_code}). Provide 'description' manually."
             )
         text = re.sub(r"<[^>]+>", " ", r.text).strip()
         return re.sub(r"\s+", " ", text)[:8000], None
@@ -391,7 +390,7 @@ async def _fetch_description(url: str) -> tuple[str | None, str | None]:
 
 
 def _existing_job_message(url: str) -> str | None:
-    """Mensagem de 'já existe' se a URL já está no banco; None caso contrário."""
+    """'Already exists' message if the URL is already in the DB; None otherwise."""
     if not ScanLog.select().where(ScanLog.job_url == url).exists():
         return None
     try:
@@ -404,8 +403,8 @@ def _existing_job_message(url: str) -> str | None:
 def _persist_manual(
     company: str, title: str, url: str, description: str, **scoring: Any
 ) -> Job | None:
-    """Salva uma vaga manual (source='manual') + o claim no ScanLog. None se a URL
-    já existe (corrida/conflito)."""
+    """Saves a manual job (source='manual') + the claim in ScanLog. None if the URL
+    already exists (race/conflict)."""
     job = _create_job("manual", company, title, url, None, None, description, None, **scoring)
     if job is not None:
         try:

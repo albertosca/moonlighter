@@ -76,7 +76,7 @@ async def _launch_browser(config: dict[str, Any], session_dir: Path) -> int:
         await asyncio.sleep(0.5)
     _browser_process.kill()
     _browser_process = None
-    raise RuntimeError("Browser não ficou disponível (DevToolsActivePort) em 30s")
+    raise RuntimeError("Browser did not become available (DevToolsActivePort) within 30s")
 
 
 async def get_context(config: dict[str, Any]) -> BrowserContext:

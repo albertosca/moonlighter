@@ -1,8 +1,8 @@
 """
-Monitor de email para candidaturas.
+Email monitor for job applications.
 
-Monitora candidaturas@gmail.com, classifica respostas com LLM
-e atualiza o pipeline de candidaturas automaticamente.
+Monitors candidaturas@gmail.com, classifies replies with the LLM,
+and automatically updates the applications pipeline.
 """
 
 import datetime
@@ -22,7 +22,7 @@ from gauntler.tracking.gmail_client import (
 
 logger = logging.getLogger(__name__)
 
-# Ordem canônica de avanço no funil — o status só anda para frente, nunca regride.
+# Canonical funnel progression order — the status only ever moves forward, never back.
 _STATUS_ORDER = ["draft", "submitted", "screening", "interviews", "offer", "rejected"]
 _ACTIVE_STATUSES = ["submitted", "screening", "interviews", "offer"]
 
@@ -31,21 +31,21 @@ _TYPE_TO_STATUS = {
     "interview": "interviews",
     "offer": "offer",
     "rejection": "rejected",
-    # info_request e unrelated → mantém status atual
+    # info_request and unrelated → keeps the current status
 }
 
 
 def extract_ref(to_field: str, base_address: str) -> str | None:
-    """Extrai o ref de um alias Gmail (+ref) no campo To.
+    """Extracts the ref from a Gmail (+ref) alias in the To field.
 
     "candidaturas+x7k2mp@gmail.com" → "x7k2mp"
-    None se não houver alias ou se não bater com base_address."""
+    None if there's no alias or it doesn't match base_address."""
     if not to_field:
         return None
 
     local, _, domain = base_address.partition("@")
-    for part in re.split(r",\s*", to_field):  # o campo To pode ter vários endereços
-        match = re.search(r"<([^>]+)>", part)  # "Nome <email>" → "email"
+    for part in re.split(r",\s*", to_field):  # the To field can have multiple addresses
+        match = re.search(r"<([^>]+)>", part)  # "Name <email>" → "email"
         addr = match.group(1).strip() if match else part.strip()
 
         addr_local, _, addr_domain = addr.partition("@")
@@ -58,12 +58,12 @@ def extract_ref(to_field: str, base_address: str) -> str | None:
     return None
 
 
-# ── Sync: lê, classifica e atualiza o pipeline ──────────────────────────────
+# ── Sync: reads, classifies, and updates the pipeline ───────────────────────
 
 
 async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[dict[str, Any]]:
-    """Orquestra o fluxo completo: lê emails não lidos, classifica e atualiza o
-    banco. Devolve a lista de updates feitos."""
+    """Orchestrates the full flow: reads unread emails, classifies them, and updates
+    the database. Returns the list of updates made."""
     from gauntler.core.db import ProcessedEmail
 
     service = setup_gmail_service(config)
@@ -72,8 +72,8 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
     stages = list(email_cfg.get("interview_stages", []))
     model = config.get("llm_model", "claude-sonnet-4-6")
 
-    # O sync é 100% LEITURA no Gmail por padrão: o dedup vive numa tabela local
-    # (ProcessedEmail). Só escreve no Gmail (lido + label) se mark_processed=True.
+    # The sync is 100% READ-ONLY on Gmail by default: dedup lives in a local table
+    # (ProcessedEmail). Only writes to Gmail (read + label) if mark_processed=True.
     mutate_gmail = bool(email_cfg.get("mark_processed", False))
     label_name = email_cfg.get("processed_label", "gauntler/processed")
     label_id = _get_or_create_label(service, label_name) if mutate_gmail else None
@@ -87,7 +87,7 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
     for msg_ref in fetch_unread_messages(service):
         msg_id = msg_ref["id"]
         if ProcessedEmail.select().where(ProcessedEmail.message_id == msg_id).exists():
-            continue  # já processado numa rodada anterior — não re-chama o LLM
+            continue  # already processed in a previous run — don't re-call the LLM
 
         message = parse_message(service, msg_id)
         classification = await classify_response(message, stages, llm_caller, model)
@@ -204,8 +204,8 @@ def _status_rank(status: str) -> int:
 
 
 def _resolve_application(ref: str | None, classification: dict[str, Any]) -> tuple[Any, str]:
-    """Encontra a Application correspondente, por ref (exato) ou empresa+cargo
-    (fuzzy). Devolve (Application | None, 'ref' | 'fuzzy' | 'uncertain')."""
+    """Finds the matching Application, by ref (exact) or company+title
+    (fuzzy). Returns (Application | None, 'ref' | 'fuzzy' | 'uncertain')."""
     if ref:
         app = _match_by_ref(ref)
         if app is not None:
@@ -227,8 +227,8 @@ def _match_by_ref(ref: str) -> Any:
 
 
 def _match_by_company_title(company: str | None, job_title: str | None) -> Any:
-    """Match fuzzy entre candidaturas ativas. Devolve a Application única, ou None
-    quando não há candidato ou quando é ambíguo (>1 — não dá para decidir)."""
+    """Fuzzy match among active applications. Returns the single Application, or None
+    when there's no candidate or it's ambiguous (>1 — can't decide)."""
     if not (company or job_title):
         return None
 
@@ -248,15 +248,15 @@ def _match_by_company_title(company: str | None, job_title: str | None) -> Any:
     return results[0] if len(results) == 1 else None
 
 
-# ── Entry point standalone ────────────────────────────────────────────────────
+# ── Standalone entry point ───────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import asyncio
     import logging
     import sys
 
-    # Loga só para stdout. No cron, a saída é redirecionada para o arquivo de log
-    # (>> email-sync.log), então um FileHandler aqui duplicaria cada linha.
+    # Logs to stdout only. In cron, the output is redirected to the log file
+    # (>> email-sync.log), so a FileHandler here would duplicate every line.
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
@@ -267,12 +267,12 @@ if __name__ == "__main__":
     from gauntler.core.db import init_db
     from gauntler.core.llm import make_caller
 
-    init_db()  # garante conexão + tabelas (inclui ProcessedEmail) no path standalone/cron
+    init_db()  # ensures connection + tables (including ProcessedEmail) on the standalone/cron path
     cfg = load_config()
     llm_caller = make_caller(cfg)
 
     updates = asyncio.run(sync_responses(cfg, llm_caller))
-    logger.info("sync_responses: %d atualizações", len(updates))
+    logger.info("sync_responses: %d updates", len(updates))
     for u in updates:
         logger.info(
             "  %s @ %s → %s (match: %s)",

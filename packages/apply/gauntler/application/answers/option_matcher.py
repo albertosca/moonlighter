@@ -1,11 +1,12 @@
 """
-Escolha da opção certa num dropdown a partir da resposta pretendida.
+Selects the right dropdown option from the intended answer.
 
-Híbrido conservador: primeiro tenta casar localmente (exact > startswith com
-word-boundary > fuzzy >= threshold) — custo zero. Só quando o local falha E há
-opções reais é que o LLM desambigua (ex: "English level" com opções em frase
-descritiva CEFR onde "Fluent" não casa textualmente). Incerteza vira None — o
-chamador trata como failed e o humano vê no screenshot. Nunca chuta.
+Conservative hybrid: first tries to match locally (exact > startswith with
+word-boundary > fuzzy >= threshold) — zero cost. Only when the local match
+fails AND there are real options does the LLM disambiguate (e.g. "English
+level" with options in descriptive CEFR phrasing where "Fluent" does not
+match textually). Uncertainty becomes None — the caller treats it as failed
+and the human sees it in the screenshot. Never guesses.
 """
 
 import re
@@ -23,8 +24,8 @@ def _norm(s: str) -> str:
 
 
 def _starts_with_word(longer: str, prefix: str) -> bool:
-    """True se `longer` começa com `prefix` numa fronteira de palavra (o caractere
-    seguinte ao prefixo, se houver, não é alfanumérico). Evita 'No' casar 'Not sure'."""
+    """True if `longer` starts with `prefix` at a word boundary (the character
+    following the prefix, if any, is not alphanumeric). Avoids 'No' matching 'Not sure'."""
     if not prefix or not longer.startswith(prefix):
         return False
     if len(longer) == len(prefix):
@@ -34,9 +35,9 @@ def _starts_with_word(longer: str, prefix: str) -> bool:
 
 def match_option_locally(answer: str, options: list[str], threshold: float = 0.8) -> str | None:
     """
-    Retorna o TEXTO EXATO da opção que melhor casa com `answer`, ou None.
-    Ordem: exact (normalizado) > startswith com word-boundary (nas duas direções)
-    > fuzzy (difflib ratio >= threshold). Custo zero, sem LLM.
+    Returns the EXACT TEXT of the option that best matches `answer`, or None.
+    Order: exact (normalized) > startswith with word-boundary (in both directions)
+    > fuzzy (difflib ratio >= threshold). Zero cost, no LLM.
     """
     a = _norm(answer)
     if not a or not options:
@@ -48,7 +49,7 @@ def match_option_locally(answer: str, options: list[str], threshold: float = 0.8
         if no == a:
             return orig
 
-    # 2) startswith com word-boundary (opção começa com answer, ou vice-versa)
+    # 2) startswith with word-boundary (option starts with answer, or vice versa)
     for no, orig in norm_opts:
         if _starts_with_word(no, a) or _starts_with_word(a, no):
             return orig
@@ -95,10 +96,10 @@ async def pick_option_with_llm(
     model: str,
 ) -> str | None:
     """
-    Usa o LLM para escolher entre as opções REAIS do dropdown quando o match local
-    falhou. Retorna o texto exato da opção escolhida, ou None (sem opções, LLM
-    indeciso/__NONE__, índice fora de faixa, ou erro). Não chama o caller se não
-    houver opções.
+    Uses the LLM to choose among the dropdown's REAL options when the local match
+    failed. Returns the exact text of the chosen option, or None (no options, LLM
+    undecided/__NONE__, index out of range, or error). Does not call the caller if
+    there are no options.
     """
     if not options:
         return None

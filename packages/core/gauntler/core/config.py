@@ -40,23 +40,23 @@ DEFAULTS = {
     "eval_model": "claude-haiku-4-5-20251001",
     "slow_mo_ms": 300,
     "title_blocklist": [],
-    # Máximo de avaliações LLM em paralelo no scan. Limita o burst de tokens e o
-    # desperdício após o spend-limit (irmãs em voo). Com batching (scan_batch_size),
-    # é o nº de LOTES em paralelo. Concorrência efetiva = scan_concurrency × scan_batch_size.
+    # Max parallel LLM evaluations in the scan. Bounds the token burst and the
+    # waste after the spend-limit (in-flight siblings). With batching (scan_batch_size),
+    # this is the number of BATCHES in parallel. Effective concurrency = scan_concurrency × scan_batch_size.
     "scan_concurrency": 5,
-    # Vagas avaliadas por chamada LLM. O profile vai uma única vez por lote, cortando
-    # re-transmissão por fator K. 1 desliga o batching (1 vaga por chamada).
+    # Jobs evaluated per LLM call. The profile is sent once per batch, cutting
+    # re-transmission by a factor of K. 1 disables batching (1 job per call).
     "scan_batch_size": 5,
-    # CV por empresa. Caminhos relativos a GAUNTLER_HOME; match case-insensitive.
-    # 'default' usado quando a empresa não tem entrada. Pode ser sobrescrito no
-    # config.yaml local. Se o arquivo escolhido não existir, confirm_apply aborta.
+    # CV per company. Paths relative to GAUNTLER_HOME; case-insensitive match.
+    # 'default' used when the company has no entry. Can be overridden in the
+    # local config.yaml. If the chosen file doesn't exist, confirm_apply aborts.
     "cv": {
         "default": "",
         "by_company": {},
     },
-    # Autorização de trabalho país-dependente. O candidato é autorizado a trabalhar
-    # apenas no país de cidadania. Quando o país da vaga não é inferível com
-    # confiança, o campo vira __NEEDS_REVIEW__ (decisão manual — nunca um chute).
+    # Country-dependent work authorization. The candidate is authorized to work
+    # only in their citizenship country. When the job's country cannot be
+    # confidently inferred, the field becomes __NEEDS_REVIEW__ (manual decision — never a guess).
     "work_authorization": {
         "citizenship_country": "",
         "authorized_answer": "Yes",
@@ -221,7 +221,7 @@ def load_company_list(path: str | Path | None = None, phase: str | None = None) 
     result = {}
     for source, value in raw.items():
         if isinstance(value, list):
-            # Formato legado: lista plana sem fases
+            # Legacy format: flat list without phases
             result[source] = value
         elif isinstance(value, dict):
             if phase:

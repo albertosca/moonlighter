@@ -1,8 +1,8 @@
-"""Serviço de candidatura: detecta o ATS, gera rascunho (apply_jobs), submete
-(confirm_apply) e re-tenta (retry_apply).
+"""Application service: detects the ATS, generates a draft (apply_jobs), submits
+(confirm_apply), and retries (retry_apply).
 
-As tools MCP em server.py são wrappers finos que chamam estas funções passando
-config/profile/caller. A lógica fica aqui, testável isolada.
+The MCP tools in server.py are thin wrappers that call these functions passing
+config/profile/caller. The logic lives here, testable in isolation.
 """
 
 import json
@@ -99,12 +99,12 @@ async def detect_applier(
 
 
 def _screenshot_path(job_id: int, name: str, config: dict[str, Any]) -> str:
-    """Caminho do screenshot exibido ao humano, derivado de screenshots_dir (não hardcode)."""
+    """Path to the screenshot shown to the human, derived from screenshots_dir (not hardcoded)."""
     return f"{config['screenshots_dir']}/{job_id}/{name}.png"
 
 
 def archive_screenshots(job_id: int, config: dict[str, Any]) -> None:
-    """Move screenshots de candidatura concluída para subdir 'done/', liberando espaço."""
+    """Moves screenshots from a completed application into the 'done/' subdir, freeing space."""
     try:
         src = Path(config["screenshots_dir"]) / str(job_id)
         if not src.exists():
@@ -116,10 +116,10 @@ def archive_screenshots(job_id: int, config: dict[str, Any]) -> None:
         shutil.move(str(src), str(dst))
         logger.info("archive_screenshots: #%d → done/", job_id)
     except Exception as e:
-        logger.debug("archive_screenshots: falha (não crítico) — %s", e)
+        logger.debug("archive_screenshots: failed (non-critical) — %s", e)
 
 
-# ── apply_jobs: gera rascunhos ──────────────────────────────────────────────
+# ── apply_jobs: generates drafts ────────────────────────────────────────────
 
 
 async def apply_jobs(
@@ -132,8 +132,8 @@ async def apply_jobs(
 async def _draft_one(
     job_id: int, config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
 ) -> str:
-    """Abre a vaga, extrai o formulário, gera as respostas e salva o rascunho.
-    Devolve o texto do rascunho (ou um aviso) — nunca levanta."""
+    """Opens the job, extracts the form, generates the answers, and saves the draft.
+    Returns the draft text (or a warning) — never raises."""
     try:
         job = Job.get_by_id(job_id)
     except Job.DoesNotExist:
@@ -173,7 +173,7 @@ async def _draft_one(
             Job.update(status="applying").where(Job.id == job_id).execute()
             return _render_draft(job_id, job, draft)
     except Exception as e:
-        return f"⚠️  Vaga #{job_id}: erro — {e}"
+        return f"⚠️  Job #{job_id}: error — {e}"
 
 
 def _save_draft(job: Job, answers: dict[str, str]) -> None:
@@ -188,22 +188,22 @@ def _save_draft(job: Job, answers: dict[str, str]) -> None:
 
 
 def _render_draft(job_id: int, job: Job, draft: Any) -> str:
-    lines = [f"\n## Rascunho — Vaga #{job_id}: {job.company} / {job.title}"]
+    lines = [f"\n## Draft — Job #{job_id}: {job.company} / {job.title}"]
     if draft.error:
-        lines.append(f"⚠️ Erro ao gerar respostas: {draft.error}")
+        lines.append(f"⚠️ Error generating answers: {draft.error}")
 
     needs_review = [
         field for field, answer in draft.answers.items() if answer == NEEDS_REVIEW_SENTINEL
     ]
     if needs_review:
         lines.append(
-            "\n🚫 PRECISAM DA SUA DECISÃO (não preenchidos — autorização de "
-            "trabalho/visto, país da vaga indefinido):"
+            "\n🚫 PRECISAM DA SUA DECISÃO (not filled — work authorization/visa, "
+            "job's country undefined):"
         )
         lines += [f"  - {field}" for field in needs_review]
         lines.append(
-            f"Responda no confirm_apply: "
-            f'`confirm_apply(job_id={job_id}, answers={{"<campo>": "Yes/No"}})`'
+            f"Answer in confirm_apply: "
+            f'`confirm_apply(job_id={job_id}, answers={{"<field>": "Yes/No"}})`'
         )
 
     scannable = {
@@ -219,20 +219,20 @@ def _render_draft(job_id: int, job: Job, draft: Any) -> str:
             flagged.append(f"  - **{field}**: {', '.join(reasons)}")
     if flagged:
         lines.append(
-            "\n⚠️ REVISE COM ATENÇÃO — respostas com sinais de exfiltração "
-            "(pode ser conteúdo injetado pela vaga):"
+            "\n⚠️ REVIEW CAREFULLY — answers with signs of exfiltration "
+            "(could be content injected by the job):"
         )
         lines += flagged
 
     for field, answer in draft.answers.items():
         if answer != NEEDS_REVIEW_SENTINEL:
             lines.append(f"\n**{field}**\n{answer}")
-    lines.append(f"\nPara aprovar e candidatar: `confirm_apply(job_id={job_id})`")
-    lines.append('Para editar: passe `answers={"campo": "nova resposta"}` no confirm_apply')
+    lines.append(f"\nTo approve and apply: `confirm_apply(job_id={job_id})`")
+    lines.append('To edit: pass `answers={"field": "new answer"}` to confirm_apply')
     return "\n".join(lines)
 
 
-# ── confirm_apply: submete ──────────────────────────────────────────────────
+# ── confirm_apply: submits ──────────────────────────────────────────────────
 
 
 async def confirm_apply(
@@ -268,7 +268,7 @@ def _load_draft(job_id: int) -> tuple[Job, Application] | None:
 
 
 def _pending_review_message(job_id: int, answers: dict[str, str]) -> str | None:
-    """Bloqueia o envio enquanto houver campos de autorização aguardando decisão."""
+    """Blocks submission while there are work-authorization fields awaiting a decision."""
     pending = [k for k, v in answers.items() if v == NEEDS_REVIEW_SENTINEL]
     if not pending:
         return None
@@ -282,8 +282,8 @@ def _pending_review_message(job_id: int, answers: dict[str, str]) -> str | None:
 
 
 def _inject_reply_alias(answers: dict[str, str], ref: str, config: dict[str, Any]) -> None:
-    """Injeta candidaturas+<ref>@gmail.com no campo de email ANTES de preencher,
-    para a empresa responder na conta monitorada (sync autônomo por ref)."""
+    """Injects candidaturas+<ref>@gmail.com into the email field BEFORE filling,
+    so the company replies to the monitored account (autonomous sync by ref)."""
     base_address = config.get("email", {}).get("address")
     if base_address:
         inject_email_alias(answers, build_email_alias(base_address, ref))
@@ -297,16 +297,16 @@ async def _fill_open_page(
     config: dict[str, Any],
     profile: dict[str, Any],
 ) -> tuple[BaseApplier, dict[str, str]] | None:
-    """Navega, detecta o ATS, preenche e tira o screenshot 03-filled numa página JÁ
-    ABERTA. Devolve (applier, fill_status) ou None se o ATS não for reconhecido. NÃO
-    fecha a página — quem abriu é dono do ciclo de vida."""
+    """Navigates, detects the ATS, fills, and takes the 03-filled screenshot on an
+    ALREADY OPEN page. Returns (applier, fill_status) or None if the ATS is not
+    recognized. Does NOT close the page — whoever opened it owns its lifecycle."""
     await page.goto(job.url, timeout=30000)
     await page.wait_for_load_state("networkidle", timeout=15000)
     applier = await detect_applier(page, config, profile)
     if applier is None:
         return None
     if isinstance(applier, LinkedInApplier):
-        await applier.extract_fields()  # abre o modal
+        await applier.extract_fields()  # opens the modal
     fill_status = await _fill_form(applier, answers, cv_path, job.id)
     await browser.save_screenshot(page, job.id, "03-filled", config)
     return applier, fill_status
@@ -372,7 +372,7 @@ async def _fill_form(
 def _record_failed(
     app: Application, job_id: int, outcome: str, fill_status: dict[str, str], shot: str
 ) -> str:
-    """Submit falhou (botão não encontrado, erro, ou validação) — volta a rascunho."""
+    """Submit failed (button not found, error, or validation) — reverts to draft."""
     app.status = "draft"
     app.save()
     Job.update(status="reviewed").where(Job.id == job_id).execute()
@@ -390,8 +390,8 @@ def _record_failed(
 def _record_unverified(
     app: Application, job: Job, answers: dict[str, str], ref: str, shot: str
 ) -> str:
-    """Clicou mas não deu para confirmar envio nem detectar erro. CONSERVADOR: não
-    marca como enviada (evita falso positivo) nem libera retry cego (evita duplicar)."""
+    """Clicked but could not confirm submission or detect an error. CONSERVATIVE: does
+    not mark as sent (avoids a false positive) nor unlock a blind retry (avoids duplicating)."""
     now = datetime.now()
     app.status = "needs_review"
     app.applied_at = None
@@ -431,14 +431,14 @@ def _record_submitted(
     return f"✓ Candidatura #{job.id} submetida e confirmada: {job.company} / {job.title}"
 
 
-# ── fill_application: preenche e PARA (não submete) ─────────────────────────
+# ── fill_application: fills and STOPS (does not submit) ─────────────────────
 
 
 async def fill_application(
     job_id: int, answers: dict[str, str] | None, config: dict[str, Any], profile: dict[str, Any]
 ) -> str:
-    """Preenche o formulário e PARA antes do submit, para o humano revisar o
-    screenshot 03-filled. Persiste status='filled' + respostas (com alias) + ref."""
+    """Fills the form and STOPS before submit, for the human to review the
+    03-filled screenshot. Persists status='filled' + answers (with alias) + ref."""
     loaded = _load_draft(job_id)
     if loaded is None:
         return f"⚠️  Vaga #{job_id} não encontrada ou sem rascunho. Rode apply_jobs primeiro."
@@ -504,12 +504,12 @@ def _render_filled(job: Job, fill_status: dict[str, str], config: dict[str, Any]
     return "\n".join(lines)
 
 
-# ── submit_application: submete um form já preenchido ───────────────────────
+# ── submit_application: submits an already-filled form ──────────────────────
 
 
 async def submit_application(job_id: int, config: dict[str, Any], profile: dict[str, Any]) -> str:
-    """Submete uma candidatura já preenchida (status 'filled'). Re-preenche das
-    respostas salvas (determinístico) e submete. Estrito: nunca submete às cegas."""
+    """Submits an already-filled application (status 'filled'). Re-fills from the
+    saved answers (deterministic) and submits. Strict: never submits blindly."""
     loaded = _load_draft(job_id)
     if loaded is None:
         return f"⚠️  Vaga #{job_id} não encontrada ou sem rascunho. Rode apply_jobs primeiro."
