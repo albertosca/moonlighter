@@ -172,6 +172,7 @@ async def test_add_job_new_above_threshold_with_caveats(tmp_db):
     assert "NEW" in result
     assert "visa" in result and "relocation" in result
     assert Job.get(Job.url == "https://x.com/9").status == "new"
+    assert ScanLog.get(ScanLog.job_url == "https://x.com/9").source == "manual"
 
 
 async def test_add_job_below_threshold_archived(tmp_db):

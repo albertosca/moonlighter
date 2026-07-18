@@ -7,6 +7,7 @@ config/profile/caller. A lógica fica aqui, testável isolada.
 import asyncio
 import json
 import re
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -56,23 +57,48 @@ def _release(raw: RawJob) -> None:
     ScanLog.delete().where(ScanLog.job_url == raw.url).execute()
 
 
-def _persist(raw: RawJob, **scoring: Any) -> Job | None:
-    """Salva o RawJob como Job com os campos de scoring. None se a URL já existe."""
+def _create_job(
+    source: str,
+    company: str,
+    title: str,
+    url: str,
+    location: str | None,
+    remote_type: str | None,
+    description: str | None,
+    posted_at: datetime | None,
+    **scoring: Any,
+) -> Job | None:
+    """Cria um Job (core de _persist/_persist_manual). None se a URL já existe."""
     try:
         job: Job = Job.create(
-            source=raw.source,
-            company=raw.company,
-            title=raw.title,
-            url=raw.url,
-            location=raw.location,
-            remote_type=raw.remote_type,
-            description=raw.description,
-            posted_at=raw.posted_at,
+            source=source,
+            company=company,
+            title=title,
+            url=url,
+            location=location,
+            remote_type=remote_type,
+            description=description,
+            posted_at=posted_at,
             **scoring,
         )
         return job
     except IntegrityError:
         return None
+
+
+def _persist(raw: RawJob, **scoring: Any) -> Job | None:
+    """Salva o RawJob como Job com os campos de scoring. None se a URL já existe."""
+    return _create_job(
+        raw.source,
+        raw.company,
+        raw.title,
+        raw.url,
+        raw.location,
+        raw.remote_type,
+        raw.description,
+        raw.posted_at,
+        **scoring,
+    )
 
 
 async def _scan_linkedin(keywords: str, config: dict[str, Any]) -> tuple[list[RawJob], str | None]:
@@ -377,22 +403,13 @@ def _persist_manual(
 ) -> Job | None:
     """Salva uma vaga manual (source='manual') + o claim no ScanLog. None se a URL
     já existe (corrida/conflito)."""
-    try:
-        job: Job = Job.create(
-            source="manual",
-            company=company,
-            title=title,
-            url=url,
-            location=None,
-            remote_type=None,
-            description=description,
-            posted_at=None,
-            **scoring,
-        )
-        ScanLog.create(job_url=url, source="manual")
-        return job
-    except IntegrityError:
-        return None
+    job = _create_job("manual", company, title, url, None, None, description, None, **scoring)
+    if job is not None:
+        try:
+            ScanLog.create(job_url=url, source="manual")
+        except IntegrityError:
+            return None
+    return job
 
 
 def _format_add_result(
