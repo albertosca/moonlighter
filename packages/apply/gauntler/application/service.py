@@ -137,7 +137,7 @@ async def _draft_one(
     try:
         job = Job.get_by_id(job_id)
     except Job.DoesNotExist:
-        return f"⚠️  Vaga #{job_id} não encontrada."
+        return f"⚠️  Job #{job_id} not found."
 
     try:
         async with page_session(config) as page:
@@ -147,11 +147,11 @@ async def _draft_one(
 
             applier = await detect_applier(page, config, profile)
             if not applier:
-                return f"⚠️  Vaga #{job_id}: ATS não reconhecido. URL: {job.url}"
+                return f"⚠️  Job #{job_id}: ATS not recognized. URL: {job.url}"
             if isinstance(applier, LinkedInApplier) and not await applier.is_easy_apply():
                 return (
-                    f"⚠️  Vaga #{job_id} ({job.company}/{job.title}): não tem Easy Apply. "
-                    f"Candidatura manual necessária: {job.url}"
+                    f"⚠️  Job #{job_id} ({job.company}/{job.title}): does not have Easy Apply. "
+                    f"Manual application required: {job.url}"
                 )
 
             fields = await applier.extract_fields()
@@ -197,7 +197,7 @@ def _render_draft(job_id: int, job: Job, draft: Any) -> str:
     ]
     if needs_review:
         lines.append(
-            "\n🚫 PRECISAM DA SUA DECISÃO (not filled — work authorization/visa, "
+            "\n🚫 NEED YOUR DECISION (not filled — work authorization/visa, "
             "job's country undefined):"
         )
         lines += [f"  - {field}" for field in needs_review]
@@ -240,7 +240,7 @@ async def confirm_apply(
 ) -> str:
     loaded = _load_draft(job_id)
     if loaded is None:
-        return f"⚠️  Vaga #{job_id} não encontrada ou sem rascunho. Rode apply_jobs primeiro."
+        return f"⚠️  Job #{job_id} not found or has no draft. Run apply_jobs first."
     job, app = loaded
 
     final_answers = {**app.get_form_data(), **(answers or {})}
@@ -254,7 +254,7 @@ async def confirm_apply(
     try:
         cv_path = resolve_cv_path(job.company, config)
     except CVNotFoundError as e:
-        return f"⚠️  {e}\n🚫 Não submeti — não vou subir um CV errado."
+        return f"⚠️  {e}\n🚫 Not submitted — I won't upload the wrong CV."
 
     return await _submit_on_page(job, app, final_answers, ref, cv_path, config, profile)
 
@@ -274,9 +274,9 @@ def _pending_review_message(job_id: int, answers: dict[str, str]) -> str | None:
         return None
     bullets = "\n".join(f"  - {k}" for k in pending)
     return (
-        f"🚫 Candidatura #{job_id} NÃO submetida — campos de autorização de "
-        f"trabalho aguardando sua decisão (país da vaga indefinido):\n{bullets}"
-        f"\nResponda e re-rode: "
+        f"🚫 Application #{job_id} NOT submitted — work authorization "
+        f"fields awaiting your decision (job's country undefined):\n{bullets}"
+        f"\nAnswer and re-run: "
         f'`confirm_apply(job_id={job_id}, answers={{"{pending[0]}": "Yes"}})`'
     )
 
@@ -328,7 +328,7 @@ async def _submit_on_page(
         try:
             result = await _fill_open_page(page, job, answers, cv_path, config, profile)
             if result is None:
-                return f"⚠️  ATS não reconhecido para vaga #{job.id}."
+                return f"⚠️  ATS not recognized for job #{job.id}."
             applier, fill_status = result
             outcome = await applier.submit()
             await browser.save_screenshot(page, job.id, "04-submitted", config)
@@ -348,7 +348,7 @@ async def _submit_on_page(
             app.status = "draft"
             app.save()
             Job.update(status="reviewed").where(Job.id == job.id).execute()
-            return f"⚠️  Erro ao submeter vaga #{job.id}: {e}"
+            return f"⚠️  Error submitting job #{job.id}: {e}"
         finally:
             # needs_review keeps the browser tab open for a human to fix — detach it
             # from the exit stack so leaving this block does not close it.
@@ -365,7 +365,7 @@ async def _fill_form(
         return {}
     failed = [field for field, s in status.items() if s.startswith("failed")]
     if failed:
-        logger.warning("confirm_apply #%d: campos com falha no preenchimento: %s", job_id, failed)
+        logger.warning("confirm_apply #%d: fields failed to fill: %s", job_id, failed)
     return status
 
 
@@ -377,13 +377,12 @@ def _record_failed(
     app.save()
     Job.update(status="reviewed").where(Job.id == job_id).execute()
     problems = (
-        ", ".join(f"{k}={s}" for k, s in fill_status.items() if s != "filled")
-        or "todos preenchidos"
+        ", ".join(f"{k}={s}" for k, s in fill_status.items() if s != "filled") or "all filled"
     )
     return (
-        f"⚠️  Candidatura #{job_id} NÃO foi submetida ({outcome}).\n"
-        f"Campos problemáticos: {problems}\n"
-        f"Confira {shot} e rode retry_apply({job_id}) após corrigir."
+        f"⚠️  Application #{job_id} was NOT submitted ({outcome}).\n"
+        f"Problem fields: {problems}\n"
+        f"Check {shot} and run retry_apply({job_id}) after fixing."
     )
 
 
@@ -399,20 +398,20 @@ def _record_unverified(
     app.email_ref = ref
     app.updated_at = now
     note = (
-        f"[{now.strftime('%Y-%m-%d')}] submit NÃO confirmado — conferir {shot}. "
-        f"Se foi enviada: update_status({job.id}, 'submitted'). "
-        f"Se NÃO foi: update_status({job.id}, 'draft') e retry_apply({job.id})."
+        f"[{now.strftime('%Y-%m-%d')}] submit NOT confirmed — check {shot}. "
+        f"If it was sent: update_status({job.id}, 'submitted'). "
+        f"If NOT: update_status({job.id}, 'draft') and retry_apply({job.id})."
     )
     app.notes = f"{app.notes}\n{note}" if app.notes else note
     app.save()
     Job.update(status="needs_review").where(Job.id == job.id).execute()
     return (
-        f"⚠️  Candidatura #{job.id} ({job.company} / {job.title}): NÃO consegui "
-        f"confirmar o envio.\n"
-        f"🚫 NÃO marquei como enviada e NÃO vou re-submeter sozinho (evita duplicar).\n"
-        f"Confira o screenshot: {shot}\n"
-        f"→ Se foi enviada: `update_status({job.id}, 'submitted')`\n"
-        f"→ Se não foi: `update_status({job.id}, 'draft')` e `retry_apply({job.id})`"
+        f"⚠️  Application #{job.id} ({job.company} / {job.title}): could NOT "
+        f"confirm submission.\n"
+        f"🚫 Did NOT mark as sent and will NOT re-submit on my own (avoids duplicating).\n"
+        f"Check the screenshot: {shot}\n"
+        f"→ If it was sent: `update_status({job.id}, 'submitted')`\n"
+        f"→ If not: `update_status({job.id}, 'draft')` and `retry_apply({job.id})`"
     )
 
 
@@ -428,7 +427,7 @@ def _record_submitted(
     app.save()
     Job.update(status="applied").where(Job.id == job.id).execute()
     archive_screenshots(job.id, config)
-    return f"✓ Candidatura #{job.id} submetida e confirmada: {job.company} / {job.title}"
+    return f"✓ Application #{job.id} submitted and confirmed: {job.company} / {job.title}"
 
 
 # ── fill_application: fills and STOPS (does not submit) ─────────────────────
@@ -441,7 +440,7 @@ async def fill_application(
     03-filled screenshot. Persists status='filled' + answers (with alias) + ref."""
     loaded = _load_draft(job_id)
     if loaded is None:
-        return f"⚠️  Vaga #{job_id} não encontrada ou sem rascunho. Rode apply_jobs primeiro."
+        return f"⚠️  Job #{job_id} not found or has no draft. Run apply_jobs first."
     job, app = loaded
 
     final_answers = {**app.get_form_data(), **(answers or {})}
@@ -454,7 +453,7 @@ async def fill_application(
     try:
         cv_path = resolve_cv_path(job.company, config)
     except CVNotFoundError as e:
-        return f"⚠️  {e}\n🚫 Não preenchi — não vou subir um CV errado."
+        return f"⚠️  {e}\n🚫 Not filled — I won't upload the wrong CV."
 
     async with AsyncExitStack() as stack:
         page = await stack.enter_async_context(page_session(config))
@@ -463,7 +462,7 @@ async def fill_application(
         try:
             result = await _fill_open_page(page, job, final_answers, cv_path, config, profile)
             if result is None:
-                return f"⚠️  ATS não reconhecido para vaga #{job.id}."
+                return f"⚠️  ATS not recognized for job #{job.id}."
             _applier, fill_status = result
             app.status = "filled"
             app.form_data = json.dumps(final_answers)
@@ -474,12 +473,12 @@ async def fill_application(
             if any(s.startswith("failed") for s in fill_status.values()):
                 await _show_window_safe(page)
                 needs_review = True
-                message += "\n🖥️  Abri o browser — dá uma olhada e ajusta manualmente se precisar."
+                message += "\n🖥️  Opened the browser — take a look and adjust manually if needed."
             return message
         except Exception as e:
             await _show_window_safe(page)
             needs_review = True
-            return f"⚠️  Erro ao preencher vaga #{job.id}: {e}\n🖥️  Abri o browser — dá uma olhada."
+            return f"⚠️  Error filling job #{job.id}: {e}\n🖥️  Opened the browser — take a look."
         finally:
             # needs_review keeps the browser tab open for a human to fix — detach it
             # from the exit stack so leaving this block does not close it.
@@ -491,15 +490,15 @@ async def fill_application(
 def _render_filled(job: Job, fill_status: dict[str, str], config: dict[str, Any]) -> str:
     shot = _screenshot_path(job.id, "03-filled", config)
     lines = [
-        f"📝 Vaga #{job.id} ({job.company} / {job.title}) PREENCHIDA — não submetida.",
-        f"Revise o formulário real no screenshot: {shot}",
+        f"📝 Job #{job.id} ({job.company} / {job.title}) FILLED — not submitted.",
+        f"Review the actual form in the screenshot: {shot}",
     ]
     failed = [field for field, s in fill_status.items() if s.startswith("failed")]
     if failed:
-        lines.append(f"⚠️  Campos com falha de preenchimento: {', '.join(failed)}")
-    lines.append(f"→ Para submeter: `submit_application({job.id})`")
+        lines.append(f"⚠️  Fields that failed to fill: {', '.join(failed)}")
+    lines.append(f"→ To submit: `submit_application({job.id})`")
     lines.append(
-        f'→ Para editar e re-preencher: `fill_application({job.id}, answers={{"campo": "valor"}})`'
+        f'→ To edit and re-fill: `fill_application({job.id}, answers={{"field": "value"}})`'
     )
     return "\n".join(lines)
 
@@ -512,18 +511,18 @@ async def submit_application(job_id: int, config: dict[str, Any], profile: dict[
     saved answers (deterministic) and submits. Strict: never submits blindly."""
     loaded = _load_draft(job_id)
     if loaded is None:
-        return f"⚠️  Vaga #{job_id} não encontrada ou sem rascunho. Rode apply_jobs primeiro."
+        return f"⚠️  Job #{job_id} not found or has no draft. Run apply_jobs first."
     job, app = loaded
     if app.status != "filled":
         return (
-            f"🚫 Vaga #{job_id} não está preenchida (status={app.status}). Rode "
-            f"`fill_application({job_id})` primeiro — ou `confirm_apply({job_id})` para "
-            f"preencher e submeter num passo só."
+            f"🚫 Job #{job_id} is not filled (status={app.status}). Run "
+            f"`fill_application({job_id})` first — or `confirm_apply({job_id})` to "
+            f"fill and submit in a single step."
         )
     try:
         cv_path = resolve_cv_path(job.company, config)
     except CVNotFoundError as e:
-        return f"⚠️  {e}\n🚫 Não submeti — não vou subir um CV errado."
+        return f"⚠️  {e}\n🚫 Not submitted — I won't upload the wrong CV."
     return await _submit_on_page(
         job, app, app.get_form_data(), app.email_ref or "", cv_path, config, profile
     )
@@ -533,12 +532,12 @@ async def retry_apply(job_id: int, config: dict[str, Any], profile: dict[str, An
     try:
         app = Application.get(Application.job == Job.get_by_id(job_id))
     except Job.DoesNotExist, Application.DoesNotExist:
-        return f"Vaga #{job_id} não tem rascunho salvo. Rode apply_jobs(ids=[{job_id}]) primeiro."
+        return f"Job #{job_id} has no saved draft. Run apply_jobs(ids=[{job_id}]) first."
     if app.status == "needs_review":
         return (
-            f"🚫 Vaga #{job_id} está em needs_review — pode ter sido enviada. "
-            f"NÃO vou re-submeter cegamente (evita candidatura duplicada).\n"
-            f"→ Se foi enviada: `update_status({job_id}, 'submitted')`\n"
-            f"→ Se não foi: `update_status({job_id}, 'draft')` e então `retry_apply({job_id})`"
+            f"🚫 Job #{job_id} is in needs_review — may have already been sent. "
+            f"Will NOT blindly re-submit (avoids a duplicate application).\n"
+            f"→ If it was sent: `update_status({job_id}, 'submitted')`\n"
+            f"→ If not: `update_status({job_id}, 'draft')` and then `retry_apply({job_id})`"
         )
     return await confirm_apply(job_id, None, config, profile)

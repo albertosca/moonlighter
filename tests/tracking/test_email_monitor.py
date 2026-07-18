@@ -476,13 +476,13 @@ class TestPromptInjectionHardening:
 
     async def test_prompt_includes_anti_injection_instruction(self):
         prompt, _ = await self._capture_prompt(self._msg())
-        assert "dados externos" in prompt
+        assert "external data" in prompt
 
     async def test_anti_injection_instruction_is_outside_email_block(self):
         """The mitigation instruction must come AFTER the block closes, never inside."""
         prompt, _ = await self._capture_prompt(self._msg())
         close_match = re.search(r"</email_[0-9a-f]{8}>", prompt)
-        instruction_pos = prompt.index("dados externos")
+        instruction_pos = prompt.index("external data")
         assert instruction_pos > close_match.end()
 
     async def test_injection_in_body_stays_inside_xml_block(self):

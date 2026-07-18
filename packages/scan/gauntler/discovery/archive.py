@@ -68,14 +68,14 @@ async def archive_stale_jobs(
 
 def _format_archive_result(result: ArchiveResult) -> str:
     if not result.archived and not result.failed_companies:
-        return "Nenhuma vaga fechada encontrada."
+        return "No closed jobs found."
     lines: list[str] = []
     if result.archived:
-        lines.append(f"{len(result.archived)} vaga(s) arquivada(s) (fechada na fonte):")
+        lines.append(f"{len(result.archived)} job(s) archived (closed at source):")
         lines.extend(f"  - {j['company']} / {j['title']} — {j['url']}" for j in result.archived)
     else:
-        lines.append("Nenhuma vaga fechada encontrada.")
+        lines.append("No closed jobs found.")
     if result.failed_companies:
         lines.append("")
-        lines.append(f"⚠️  Não foi possível checar: {', '.join(result.failed_companies)}")
+        lines.append(f"⚠️  Could not check: {', '.join(result.failed_companies)}")
     return "\n".join(lines)

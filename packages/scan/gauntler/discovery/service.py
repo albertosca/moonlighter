@@ -264,25 +264,24 @@ def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
     )
     below = len(saved) - len(above) - title_filtered
     spend_note = (
-        "\n\n⚠️  Spend limit atingido — scan interrompido (vagas restantes ficam para o próximo scan)."
+        "\n\n⚠️  Spend limit reached — scan stopped (remaining jobs are left for the next scan)."
         if spend_hit
         else ""
     )
 
     if not above:
         return (
-            f"{len(saved)} vagas processadas. Nenhuma passou o threshold de {threshold}. "
-            f"({title_filtered} descartadas por título, {below} abaixo do score){spend_note}"
+            f"{len(saved)} jobs processed. None passed the threshold of {threshold}. "
+            f"({title_filtered} filtered by title, {below} below score){spend_note}"
         )
 
     table = render_jobs_table(above)
     footer = (
-        f"\n∗ = salário estimado pelo LLM  |  "
-        f"{below} abaixo do threshold  |  {title_filtered} descartadas por título"
+        f"\n∗ = salary estimated by the LLM  |  "
+        f"{below} below threshold  |  {title_filtered} filtered by title"
     )
     return (
-        f"{len(saved)} vagas processadas. {len(above)} acima do threshold:"
-        f"\n\n{table}{footer}{spend_note}"
+        f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}{spend_note}"
     )
 
 
@@ -297,7 +296,7 @@ async def scan_and_evaluate(
         saved, spend_hit = await _evaluate_and_store(new_jobs, config, profile, caller)
         report = _format_report(saved, spend_hit, config["score_threshold"])
     else:
-        report = "Nenhuma vaga nova encontrada."
+        report = "No new jobs found."
 
     archive_result = await archive_stale_jobs(None, None, config)
     report = f"{report}\n\n{_format_archive_result(archive_result)}"
@@ -338,7 +337,7 @@ async def add_job(
             caveats="[]",
             status="archived",
         )
-        return f"Vaga descartada pelo filtro de título (padrão: {matched!r})."
+        return f"Job discarded by the title filter (pattern: {matched!r})."
 
     threshold = config["score_threshold"]
     result = await evaluate_job(
@@ -365,7 +364,7 @@ async def add_job(
         status=status,
     )
     if job is None:
-        return "Vaga já existe no banco (conflito de URL)."
+        return "Job already in the database (URL conflict)."
     return _format_add_result(job, company, title, result, threshold, status)
 
 
@@ -383,9 +382,9 @@ async def _fetch_description(url: str) -> tuple[str | None, str | None]:
         return re.sub(r"\s+", " ", text)[:8000], None
     except Exception as e:
         return None, (
-            f"Erro ao buscar URL: {e}\n"
-            f"Para páginas que requerem login (LinkedIn, etc.), forneça "
-            f"'company', 'title' e 'description' manualmente."
+            f"Error fetching URL: {e}\n"
+            f"For pages that require login (LinkedIn, etc.), provide "
+            f"'company', 'title', and 'description' manually."
         )
 
 
@@ -397,7 +396,7 @@ def _existing_job_message(url: str) -> str | None:
         job = Job.get(Job.url == url)
     except Job.DoesNotExist:
         return None
-    return f"Vaga já existe no banco (id={job.id}, score={job.score:.1f}, status={job.status})."
+    return f"Job already in the database (id={job.id}, score={job.score:.1f}, status={job.status})."
 
 
 def _persist_manual(
@@ -417,12 +416,12 @@ def _persist_manual(
 def _format_add_result(
     job: Job, company: str, title: str, result: Any, threshold: float, status: str
 ) -> str:
-    icon = "✓ NEW" if status == "new" else "arquivada"
-    caveats_str = "\n".join(f"  ⚠ {c}" for c in result.caveats) if result.caveats else "  nenhum"
+    icon = "✓ NEW" if status == "new" else "archived"
+    caveats_str = "\n".join(f"  ⚠ {c}" for c in result.caveats) if result.caveats else "  none"
     return (
         f"{icon} — {company} / {title}\n"
         f"Score: {result.score:.1f}/10  (threshold: {threshold})\n"
-        f"Notas: {result.score_notes}\n"
+        f"Notes: {result.score_notes}\n"
         f"Caveats:\n{caveats_str}\n"
         f"id={job.id}"
     )

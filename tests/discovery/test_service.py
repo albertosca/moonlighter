@@ -94,7 +94,7 @@ async def test_add_job_http_exception_returns_error(tmp_db):
         result = await scan_service.add_job(
             "https://x.com/4", "Stripe", "Engineer", "", CONFIG, PROFILE, MagicMock()
         )
-    assert "Erro ao buscar URL" in result
+    assert "Error fetching URL" in result
 
 
 # ── deduplicação ────────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ async def test_add_job_dedup_existing_job(tmp_db):
     result = await scan_service.add_job(
         "https://x.com/5", "Stripe", "Eng", "desc", CONFIG, PROFILE, MagicMock()
     )
-    assert "já existe" in result
+    assert "already in the database" in result
 
 
 async def test_add_job_scanlog_without_job_proceeds_to_eval(tmp_db):
@@ -130,7 +130,7 @@ async def test_add_job_scanlog_without_job_proceeds_to_eval(tmp_db):
         result = await scan_service.add_job(
             "https://x.com/6", "Stripe", "Eng", "desc", CONFIG, PROFILE, MagicMock()
         )
-    assert "conflito de URL" in result
+    assert "URL conflict" in result
 
 
 # ── filtro de título ────────────────────────────────────────────────────────
@@ -141,7 +141,7 @@ async def test_add_job_title_blocklist_archives(tmp_db):
     result = await scan_service.add_job(
         "https://x.com/7", "Acme", "Staff Accountant", "desc", CONFIG, PROFILE, MagicMock()
     )
-    assert "descartada pelo filtro" in result
+    assert "discarded by the title filter" in result
     job = Job.get(Job.url == "https://x.com/7")
     assert job.status == "archived"
     assert job.score == 0.0
@@ -154,7 +154,7 @@ async def test_add_job_title_blocklist_integrity_swallowed(tmp_db):
     result = await scan_service.add_job(
         "https://x.com/8", "Acme", "Staff Accountant", "desc", CONFIG, PROFILE, MagicMock()
     )
-    assert "descartada pelo filtro" in result
+    assert "discarded by the title filter" in result
 
 
 # ── avaliação e persistência ────────────────────────────────────────────────
@@ -184,8 +184,8 @@ async def test_add_job_below_threshold_archived(tmp_db):
         result = await scan_service.add_job(
             "https://x.com/10", "Acme", "Eng", "desc", CONFIG, PROFILE, MagicMock()
         )
-    assert "arquivada" in result
-    assert "nenhum" in result  # sem caveats
+    assert "archived" in result
+    assert "none" in result  # no caveats
     assert Job.get(Job.url == "https://x.com/10").status == "archived"
 
 
@@ -199,7 +199,7 @@ async def test_add_job_integrity_conflict_on_create(tmp_db):
         result = await scan_service.add_job(
             "https://x.com/11", "Stripe", "Eng", "desc", CONFIG, PROFILE, MagicMock()
         )
-    assert "conflito de URL" in result
+    assert "URL conflict" in result
 
 
 # ── branches de borda do scan_and_evaluate ──────────────────────────────────
@@ -278,7 +278,7 @@ async def test_scan_title_filtered_archives_with_score_zero(tmp_db):
     assert job.status == "archived"
     assert job.score == 0.0
     assert "title filtered" in job.score_notes
-    assert "descartada" in result.lower() or "descartadas" in result.lower()
+    assert "filtered by title" in result.lower()
 
 
 async def test_scan_linkedin_session_expired_adds_warning(tmp_db):
@@ -305,7 +305,7 @@ async def test_scan_unexpected_eval_error_stops_conservatively(tmp_db):
     # erro não-spend é logado e propagado; o scan para conservadoramente e o
     # claim do ScanLog é liberado (sem órfão) p/ retry futuro.
     assert ScanLog.select().count() == 0
-    assert "processadas" in result or "Nenhuma" in result
+    assert "processed" in result or "No new jobs found" in result
 
 
 async def test_scan_integrity_error_on_save_skips_silently(tmp_db):
@@ -314,7 +314,7 @@ async def test_scan_integrity_error_on_save_skips_silently(tmp_db):
     # avalia, mas Job.create colide → IntegrityError → vaga é pulada (return None).
     Job.create(source="x", company="x", title="x", url="https://x.com/scan/5", status="new")
     result = await _run_scan([_raw(5)])
-    assert "processadas" in result or "Nenhuma" in result
+    assert "processed" in result or "No new jobs found" in result
 
 
 async def test_scan_title_filtered_integrity_error_skips_silently(tmp_db):
@@ -323,7 +323,7 @@ async def test_scan_title_filtered_integrity_error_skips_silently(tmp_db):
     # tenta Job.create archived, colide → IntegrityError → pulada (return None).
     Job.create(source="x", company="x", title="x", url="https://x.com/scan/6", status="new")
     result = await _run_scan([_raw(6, title="Staff Accountant")])
-    assert "processadas" in result or "Nenhuma" in result
+    assert "processed" in result or "No new jobs found" in result
 
 
 # ── concorrência com semaphore ───────────────────────────────────────────────
@@ -560,7 +560,7 @@ async def test_archive_stale_jobs_excludes_resolved_statuses(tmp_db, monkeypatch
 def test_format_archive_result_empty():
     from gauntler.discovery.archive import ArchiveResult, _format_archive_result
 
-    assert _format_archive_result(ArchiveResult()) == "Nenhuma vaga fechada encontrada."
+    assert _format_archive_result(ArchiveResult()) == "No closed jobs found."
 
 
 def test_format_archive_result_archived_only():
@@ -570,7 +570,7 @@ def test_format_archive_result_archived_only():
         archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}]
     )
     formatted = _format_archive_result(result)
-    assert "1 vaga(s) arquivada(s)" in formatted
+    assert "1 job(s) archived" in formatted
     assert "acme / Engineer — https://x.com/1" in formatted
 
 
@@ -579,8 +579,8 @@ def test_format_archive_result_failed_only():
 
     result = ArchiveResult(failed_companies=["acme"])
     formatted = _format_archive_result(result)
-    assert "Nenhuma vaga fechada encontrada." in formatted
-    assert "Não foi possível checar: acme" in formatted
+    assert "No closed jobs found." in formatted
+    assert "Could not check: acme" in formatted
 
 
 def test_format_archive_result_archived_and_failed():
@@ -591,5 +591,5 @@ def test_format_archive_result_archived_and_failed():
         failed_companies=["beta"],
     )
     formatted = _format_archive_result(result)
-    assert "1 vaga(s) arquivada(s)" in formatted
-    assert "Não foi possível checar: beta" in formatted
+    assert "1 job(s) archived" in formatted
+    assert "Could not check: beta" in formatted

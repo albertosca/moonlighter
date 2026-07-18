@@ -116,7 +116,7 @@ async def test_apply_jobs_shows_needs_review_fields(tmp_db):
         applier.extract_fields = AsyncMock(return_value=["Work auth?", "Name"])
         mock_detect.return_value = applier
         result = await apply_service.apply_jobs([job.id], CONFIG, PROFILE, MagicMock())
-    assert "PRECISAM DA SUA DECISÃO" in result
+    assert "NEED YOUR DECISION" in result
     assert "Work auth?" in result
     # campo NEEDS_REVIEW não é renderizado como resposta normal, mas Name sim
     assert "Alberto" in result
@@ -207,7 +207,7 @@ async def test_confirm_apply_without_email_config_skips_alias(tmp_db, tmp_path):
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.confirm_apply(job.id, None, cfg, PROFILE)
-    assert "submetida e confirmada" in result
+    assert "submitted and confirmed" in result
 
 
 async def test_confirm_apply_logs_failed_fields_but_submits(tmp_db, tmp_path):
@@ -228,7 +228,7 @@ async def test_confirm_apply_logs_failed_fields_but_submits(tmp_db, tmp_path):
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.confirm_apply(job.id, None, cfg, PROFILE)
-    assert "submetida e confirmada" in result
+    assert "submitted and confirmed" in result
     assert Application.get(Application.job == job).status == "submitted"
 
 
@@ -294,7 +294,7 @@ async def test_fill_application_fills_stops_persists(tmp_db, tmp_path):
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
-    assert "PREENCHIDA" in result
+    assert "FILLED" in result
     assert "submit_application" in result
     assert str(tmp_path) in result  # path do screenshot deriva de screenshots_dir, não hardcode
     applier.submit.assert_not_called()  # NÃO submete
@@ -310,7 +310,7 @@ async def test_fill_application_blocks_on_needs_review(tmp_db, tmp_path):
     Application.create(job=job, status="draft", form_data='{"Work auth?": "__NEEDS_REVIEW__"}')
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
-    assert "NÃO submetida" in result or "aguardando sua decisão" in result
+    assert "NOT submitted" in result or "awaiting your decision" in result
     assert Application.get(Application.job == job).status == "draft"  # não virou filled
 
 
@@ -324,7 +324,7 @@ async def test_fill_application_aborts_on_missing_cv(tmp_db, tmp_path):
         side_effect=CVNotFoundError("cv.pdf não existe"),
     ):
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
-    assert "Não preenchi" in result
+    assert "Not filled" in result
 
 
 async def test_fill_application_reports_failed_fields(tmp_db, tmp_path):
@@ -346,7 +346,7 @@ async def test_fill_application_reports_failed_fields(tmp_db, tmp_path):
         mock_browser.show_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
-    assert "falha" in result.lower() and "X" in result
+    assert "failed" in result.lower() and "X" in result
     mock_browser.hide_window.assert_awaited_once()
     mock_browser.show_window.assert_awaited_once()
     page.close.assert_not_awaited()  # aba fica aberta pro humano mexer
@@ -356,7 +356,7 @@ async def test_fill_application_no_draft(tmp_db, tmp_path):
     init_db()
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     result = await apply_service.fill_application(99999, None, cfg, PROFILE)
-    assert "não encontrada" in result
+    assert "not found" in result
 
 
 async def test_fill_application_unknown_ats(tmp_db, tmp_path):
@@ -376,7 +376,7 @@ async def test_fill_application_unknown_ats(tmp_db, tmp_path):
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
-    assert "ATS não reconhecido" in result
+    assert "ATS not recognized" in result
     page.close.assert_awaited_once()  # ATS desconhecido não precisa de ajuda humana
 
 
@@ -402,7 +402,7 @@ async def test_fill_application_handles_exception(tmp_db, tmp_path):
         mock_browser.show_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
-    assert "Erro ao preencher" in result
+    assert "Error filling" in result
     assert "falha inesperada" in result
     page.close.assert_not_awaited()  # aba fica aberta pro humano mexer
     mock_browser.show_window.assert_awaited_once()
@@ -428,7 +428,7 @@ async def test_confirm_apply_survives_hide_window_failure(tmp_db, tmp_path):
         mock_browser.hide_window = AsyncMock(side_effect=RuntimeError("cdp down"))
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.confirm_apply(job.id, None, cfg, PROFILE)
-    assert "submetida e confirmada" in result
+    assert "submitted and confirmed" in result
     page.close.assert_awaited_once()
 
 
@@ -456,7 +456,7 @@ async def test_confirm_apply_survives_show_window_failure_on_exception(tmp_db, t
         mock_browser.show_window = AsyncMock(side_effect=RuntimeError("cdp down"))
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.confirm_apply(job.id, None, cfg, PROFILE)
-    assert "Erro ao submeter" in result
+    assert "Error submitting" in result
     assert "falha inesperada" in result
     saved = Application.get(Application.job == job)
     assert saved.status == "draft"
@@ -496,7 +496,7 @@ async def test_submit_application_refills_and_submits(tmp_db, tmp_path):
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service.submit_application(job.id, cfg, PROFILE)
-    assert "submetida e confirmada" in result
+    assert "submitted and confirmed" in result
     applier.submit.assert_awaited()
     assert Application.get(Application.job == job).status == "submitted"
 
@@ -505,7 +505,7 @@ async def test_submit_application_no_draft(tmp_db, tmp_path):
     init_db()
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     result = await apply_service.submit_application(99999, cfg, PROFILE)
-    assert "não encontrada" in result
+    assert "not found" in result
 
 
 async def test_submit_application_missing_cv(tmp_db, tmp_path):
@@ -518,4 +518,4 @@ async def test_submit_application_missing_cv(tmp_db, tmp_path):
         side_effect=CVNotFoundError("cv.pdf não existe"),
     ):
         result = await apply_service.submit_application(job.id, cfg, PROFILE)
-    assert "Não submeti" in result
+    assert "Not submitted" in result

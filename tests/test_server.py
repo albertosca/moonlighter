@@ -75,7 +75,7 @@ async def test_scan_no_new_jobs(tmp_db):
             M.return_value = instance
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
         result = await scan_and_evaluate(ctx=make_test_context())
-    assert "Nenhuma vaga nova" in result
+    assert "No new jobs found" in result
 
 
 async def test_scan_and_evaluate_reports_archived_stale_jobs(tmp_db):
@@ -100,7 +100,7 @@ async def test_scan_and_evaluate_reports_archived_stale_jobs(tmp_db):
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
         result = await scan_and_evaluate(ctx=make_test_context())
 
-    assert "arquivada" in result.lower()
+    assert "archived" in result.lower()
     job = Job.get(Job.url == "https://boards.greenhouse.io/stale-co/jobs/1")
     assert job.status == "closed"
     assert job.closed_at is not None
@@ -124,8 +124,8 @@ async def test_scan_and_evaluate_no_new_jobs_still_runs_archive_check(tmp_db):
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
         result = await scan_and_evaluate(ctx=make_test_context())
 
-    assert "Nenhuma vaga nova" in result
-    assert "Nenhuma vaga fechada encontrada." in result
+    assert "No new jobs found" in result
+    assert "No closed jobs found." in result
 
 
 async def test_scan_all_below_threshold(tmp_db):
@@ -215,7 +215,7 @@ async def test_scan_dedup_against_scan_log(tmp_db):
     # evaluate_jobs_batch genuinamente não chamado: scanner retornou a vaga mas
     # o dedup (ScanLog pré-existente) a filtrou antes de chegar em _evaluate_and_store.
     mock_batch.assert_not_called()
-    assert "Nenhuma vaga nova" in result
+    assert "No new jobs found" in result
 
 
 async def test_scan_linkedin_failure_doesnt_block(tmp_db):
@@ -541,7 +541,7 @@ async def test_apply_jobs_job_not_found(tmp_db):
     from gauntler.server import apply_jobs
 
     result = await apply_jobs(ids=[99999], ctx=make_test_context())
-    assert "não encontrada" in result
+    assert "not found" in result
 
 
 async def test_apply_jobs_unknown_ats(tmp_db):
@@ -557,7 +557,7 @@ async def test_apply_jobs_unknown_ats(tmp_db):
         from gauntler.server import apply_jobs
 
         result = await apply_jobs(ids=[job.id], ctx=make_test_context())
-    assert "ATS não reconhecido" in result
+    assert "ATS not recognized" in result
 
 
 async def test_apply_jobs_updates_job_status(tmp_db):
@@ -628,7 +628,7 @@ async def test_confirm_apply_no_application(tmp_db):
     from gauntler.server import confirm_apply
 
     result = await confirm_apply(job_id=job.id, ctx=make_test_context())
-    assert "sem rascunho" in result or "não encontrada" in result
+    assert "no draft" in result or "not found" in result
 
 
 async def test_confirm_apply_job_not_found(tmp_db):
@@ -636,7 +636,7 @@ async def test_confirm_apply_job_not_found(tmp_db):
     from gauntler.server import confirm_apply
 
     result = await confirm_apply(job_id=88888, ctx=make_test_context())
-    assert "não encontrada" in result or "sem rascunho" in result
+    assert "not found" in result or "no draft" in result
 
 
 async def test_confirm_apply_cv_not_found(tmp_db):
@@ -1287,7 +1287,7 @@ async def test_scan_non_spend_error_keeps_title_filtered_in_report(tmp_db):
     filtered_job = Job.get(Job.url == "https://x.com/nonspend/1")
     assert filtered_job.status == "archived"
     # The bug: the report text undercounts it as 0 instead of 1.
-    assert "1 descartadas por título" in result, (
+    assert "1 filtered by title" in result, (
         f"esperado a vaga filtrada por título contada no report mesmo com erro "
         f"não-spend-limit no lote; report: {result!r}"
     )
@@ -1337,7 +1337,7 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tmp
         )  # must not raise
 
     assert Job.select().count() == 0
-    assert "0 vagas processadas" in result
+    assert "0 jobs processed" in result
 
 
 # ── apply_jobs: missing scenarios ─────────────────────────────────────────────
@@ -1589,7 +1589,7 @@ async def test_confirm_apply_unknown_ats(tmp_db, tmp_path):
 
         result = await confirm_apply(job_id=job.id, ctx=make_test_context())
 
-    assert "ATS" in result and "reconhecido" in result
+    assert "ATS" in result and "recognized" in result
 
 
 async def test_confirm_apply_linkedin_calls_extract_fields(tmp_db, tmp_path):
@@ -2379,7 +2379,7 @@ async def test_confirm_apply_aborts_on_pending_needs_review(tmp_db, tmp_path):
     from gauntler.server import confirm_apply
 
     result = await confirm_apply(job_id=job.id, ctx=make_test_context())
-    assert "NÃO submetida" in result or "decisão" in result.lower()
+    assert "NOT submitted" in result or "decision" in result.lower()
     assert Job.get_by_id(job.id).status != "applied"
 
 
