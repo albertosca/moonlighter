@@ -24,7 +24,7 @@ from gauntler.discovery.evaluator import (
     should_skip_by_title,
 )
 from gauntler.discovery.sources.base import RawJob
-from gauntler.discovery.sources.http import AshbyScanner, GreenhouseScanner, LeverScanner
+from gauntler.discovery.sources.registry import build_http_scanners
 from gauntler.discovery.staleness import find_stale_jobs
 from gauntler.views import render_jobs_table
 from peewee import IntegrityError, fn
@@ -106,11 +106,7 @@ async def _collect_raw_jobs(
 ) -> tuple[list[RawJob], str | None]:
     """Coleta vagas das fontes HTTP e do LinkedIn. Devolve as vagas brutas e um
     aviso opcional do LinkedIn."""
-    scanners = {
-        "greenhouse": GreenhouseScanner(),
-        "lever": LeverScanner(),
-        "ashby": AshbyScanner(),
-    }
+    scanners = build_http_scanners()
     raw_jobs: list[RawJob] = []
     for source, scanner in scanners.items():
         slugs = companies.get(source, [])
@@ -458,11 +454,7 @@ async def archive_stale_jobs(
 
     jobs = list(_eligible_jobs_query(job_id, company))
     jobs_by_company = _group_by_source_company(jobs)
-    scanners: dict[str, Any] = {
-        "greenhouse": GreenhouseScanner(),
-        "lever": LeverScanner(),
-        "ashby": AshbyScanner(),
-    }
+    scanners = build_http_scanners()
     staleness = await find_stale_jobs(jobs_by_company, scanners, config)
 
     now = datetime.datetime.now()

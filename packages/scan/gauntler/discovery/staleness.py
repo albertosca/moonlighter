@@ -13,11 +13,11 @@ from gauntler.core import browser
 from gauntler.core.db import Job
 from gauntler.core.log import get_logger
 from gauntler.discovery.sources.base import BaseScanner
+from gauntler.discovery.sources.registry import LISTING_SOURCES as _LISTING_SOURCES
 from playwright.async_api import Error as PlaywrightError
 
 logger = get_logger(__name__)
 
-_LISTING_SOURCES = {"greenhouse", "lever", "ashby"}
 _CLOSED_MARKERS = (
     "no longer accepting applications",
     "this job is no longer available",

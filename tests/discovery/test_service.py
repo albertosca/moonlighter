@@ -234,9 +234,9 @@ async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=No
         return [await _eval_per_job(j.company, model) for j in jobs]
 
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service.evaluate_jobs_batch", new=_batch),
         patch("gauntler.discovery.sources.playwright.LinkedInScanner") as MockLI,

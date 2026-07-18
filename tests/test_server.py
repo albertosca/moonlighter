@@ -61,9 +61,9 @@ async def test_scan_no_new_jobs(tmp_db):
     from gauntler.server import scan_and_evaluate
 
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
     ):
         for M in (MockGH, MockLV, MockAB):
@@ -85,9 +85,9 @@ async def test_scan_and_evaluate_reports_archived_stale_jobs(tmp_db):
     )
 
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
     ):
         for M in (MockGH, MockLV, MockAB):
@@ -109,9 +109,9 @@ async def test_scan_and_evaluate_no_new_jobs_still_runs_archive_check(tmp_db):
     from gauntler.server import scan_and_evaluate
 
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
     ):
         for M in (MockGH, MockLV, MockAB):
@@ -134,9 +134,9 @@ async def test_scan_all_below_threshold(tmp_db):
         source="greenhouse", company="co", title="Eng", url="https://x.com/1", description="desc"
     )
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch(
             "gauntler.discovery.service.evaluate_jobs_batch",
@@ -168,9 +168,9 @@ async def test_scan_above_threshold_shows_table(tmp_db):
         description="desc",
     )
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch(
             "gauntler.discovery.service.evaluate_jobs_batch",
@@ -197,9 +197,9 @@ async def test_scan_dedup_against_scan_log(tmp_db):
 
     raw = RawJob(source="greenhouse", company="co", title="Eng", url="https://x.com/3")
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service.evaluate_jobs_batch") as mock_batch,
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
@@ -224,9 +224,9 @@ async def test_scan_linkedin_failure_doesnt_block(tmp_db):
         source="greenhouse", company="co", title="Eng", url="https://x.com/4", description="desc"
     )
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch(
             "gauntler.discovery.service.evaluate_jobs_batch",
@@ -265,9 +265,9 @@ async def test_scan_saves_salary_fields(tmp_db):
         salary_source="stated",
     )
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch(
             "gauntler.discovery.service.evaluate_jobs_batch",
@@ -300,9 +300,9 @@ async def test_scan_saves_caveats_as_json(tmp_db):
         score=7.0, score_notes="ok", caveats=["US only", "requires visa"]
     )
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch(
             "gauntler.discovery.service.evaluate_jobs_batch",
@@ -330,9 +330,9 @@ async def test_scan_status_archived_if_below_threshold(tmp_db):
         source="greenhouse", company="co", title="Eng", url="https://x.com/7", description="desc"
     )
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch(
             "gauntler.discovery.service.evaluate_jobs_batch",
@@ -975,9 +975,9 @@ async def test_scan_concurrent_batch_all_processed(tmp_db):
     ]
     mock_batch = AsyncMock(side_effect=_batch_of(make_eval_result(score=7.0)))
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
@@ -1025,9 +1025,9 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
     mock_batch = AsyncMock(side_effect=spend_limit_err)
 
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
@@ -1079,9 +1079,9 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
     mock_batch = AsyncMock(side_effect=spend_limit_err)
 
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
@@ -1140,9 +1140,9 @@ async def test_scan_non_spend_error_keeps_title_filtered_in_report(tmp_db):
     mock_batch = AsyncMock(side_effect=Exception("unexpected LLM error"))
 
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
@@ -1193,9 +1193,9 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tmp
     ]
 
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.service._claim", side_effect=Exception("db corrupted")),
         patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
@@ -1641,9 +1641,9 @@ async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
     from gauntler.server import scan_and_evaluate
 
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.sources.playwright.LinkedInScanner") as MockLI,
     ):
@@ -1676,9 +1676,9 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
     )
 
     with (
-        patch("gauntler.discovery.service.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.service.LeverScanner") as MockLV,
-        patch("gauntler.discovery.service.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
         patch("gauntler.discovery.service.browser") as mock_browser,
         patch("gauntler.discovery.sources.playwright.LinkedInScanner") as MockLI,
         patch(
@@ -2041,19 +2041,19 @@ def _scan_patches(raw_jobs, eval_mock):
     stack = ExitStack()
     stack.enter_context(
         patch(
-            "gauntler.discovery.service.GreenhouseScanner",
+            "gauntler.discovery.sources.http.GreenhouseScanner",
             **{"return_value.scan": AsyncMock(return_value=raw_jobs)},
         )
     )
     stack.enter_context(
         patch(
-            "gauntler.discovery.service.LeverScanner",
+            "gauntler.discovery.sources.http.LeverScanner",
             **{"return_value.scan": AsyncMock(return_value=[])},
         )
     )
     stack.enter_context(
         patch(
-            "gauntler.discovery.service.AshbyScanner",
+            "gauntler.discovery.sources.http.AshbyScanner",
             **{"return_value.scan": AsyncMock(return_value=[])},
         )
     )
