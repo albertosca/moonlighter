@@ -23,12 +23,8 @@ from gauntler.core.parsing import wrap_untrusted
 from gauntler.discovery import service as scan_service
 from gauntler.discovery.archive import ArchiveStaleJobsError, _format_archive_result
 from gauntler.startup import StartupWarning, validate_startup
-from gauntler.tracking.email_monitor import (
-    GmailAuthError,
-    _run_gmail_oauth,
-    setup_gmail_service,
-    sync_responses,
-)
+from gauntler.tracking.email_monitor import sync_responses
+from gauntler.tracking.gmail_client import GmailAuthError, _run_gmail_oauth, setup_gmail_service
 from gauntler.views import render_jobs_table
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.session import ServerSession

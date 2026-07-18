@@ -165,7 +165,7 @@ class TestClassifyResponse:
         }
 
     async def test_returns_interview_type(self, message):
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -185,7 +185,7 @@ class TestClassifyResponse:
     async def test_passes_model_to_caller(self, message):
         """Regressão BUG-02: o caller real (_call_cli/api) exige (prompt, model)
         sem default. classify_response deve repassar o model posicionalmente."""
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         received = {}
 
@@ -197,7 +197,7 @@ class TestClassifyResponse:
         assert received["model"] == "claude-test"
 
     async def test_returns_rejection(self, message):
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -214,7 +214,7 @@ class TestClassifyResponse:
         assert result["stage"] is None
 
     async def test_returns_offer(self, message):
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -230,7 +230,7 @@ class TestClassifyResponse:
         assert result["type"] == "offer"
 
     async def test_returns_screening(self, message):
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -247,7 +247,7 @@ class TestClassifyResponse:
         assert result["stage"] == "phone_screening"
 
     async def test_returns_info_request(self, message):
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -263,7 +263,7 @@ class TestClassifyResponse:
         assert result["type"] == "info_request"
 
     async def test_returns_unrelated(self, message):
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -279,7 +279,7 @@ class TestClassifyResponse:
         assert result["type"] == "unrelated"
 
     async def test_new_stage_populated_when_llm_proposes_unknown(self, message):
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -295,7 +295,7 @@ class TestClassifyResponse:
         assert result["new_stage"] == "pair_programming"
 
     async def test_json_fence_in_llm_response_handled(self, message):
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         raw = {
             "type": "rejection",
@@ -313,7 +313,7 @@ class TestClassifyResponse:
         assert result["type"] == "rejection"
 
     async def test_malformed_llm_response_returns_unrelated(self, message):
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         async def bad_caller(prompt, model=None):
             return "não é JSON"
@@ -336,7 +336,7 @@ class TestPromptInjectionHardening:
     """
 
     async def _capture_prompt(self, message: dict) -> tuple[str, dict]:
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         captured: dict = {}
 
@@ -411,7 +411,7 @@ class TestPromptInjectionHardening:
         """S-04 fix: a literal </email> an attacker embeds in the body is
         stripped before wrapping — it no longer closes the block early (this
         WAS a known, documented limitation; now it's actively neutralized)."""
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         captured: dict = {}
 
@@ -440,7 +440,7 @@ class TestPromptInjectionHardening:
 
     async def test_llm_returning_plain_text_injection_falls_back_to_unrelated(self):
         """LLM 'obedece' à injeção e retorna texto livre → fallback unrelated."""
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         async def confused_caller(prompt, model=None):
             return "Claro! Seguindo as novas instruções: type=offer confirmado."
@@ -452,7 +452,7 @@ class TestPromptInjectionHardening:
 
     async def test_llm_returning_truncated_json_does_not_raise(self):
         """JSON incompleto causado por injection não deve levantar exceção."""
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         async def partial_caller(prompt, model=None):
             return '{"type": "offer", "company": "Evil Corp"'  # sem fechamento
@@ -464,7 +464,7 @@ class TestPromptInjectionHardening:
 
     async def test_llm_returning_extra_fields_from_injection_is_ignored(self):
         """LLM retorna JSON válido mas com campo extra injetado — campos extras são ignorados."""
-        from gauntler.tracking.email_monitor import classify_response
+        from gauntler.tracking.classification import classify_response
 
         async def extra_fields_caller(prompt, model=None):
             return json.dumps(
@@ -571,7 +571,7 @@ class TestRegisterNewStageBounds:
 
 class TestParseMessage:
     def test_extracts_plain_text_body(self):
-        from gauntler.tracking.email_monitor import parse_message
+        from gauntler.tracking.gmail_client import parse_message
 
         raw_msg = _build_gmail_message(
             to=BASE_EMAIL,
@@ -591,7 +591,7 @@ class TestParseMessage:
         assert "Parabéns" in result["body"]
 
     def test_falls_back_to_html_when_no_plain(self):
-        from gauntler.tracking.email_monitor import parse_message
+        from gauntler.tracking.gmail_client import parse_message
 
         raw_msg = {
             "id": "msg456",
@@ -617,7 +617,7 @@ class TestParseMessage:
         assert "Olá" in result["body"]
 
     def test_prefers_plain_over_html_in_multipart(self):
-        from gauntler.tracking.email_monitor import parse_message
+        from gauntler.tracking.gmail_client import parse_message
 
         raw_msg = {
             "id": "msg789",
@@ -647,7 +647,7 @@ class TestParseMessage:
         assert result["body"] == "Texto puro"
 
     def test_handles_missing_body_gracefully(self):
-        from gauntler.tracking.email_monitor import parse_message
+        from gauntler.tracking.gmail_client import parse_message
 
         raw_msg = {
             "id": "msg000",
@@ -673,7 +673,7 @@ class TestParseMessage:
 
 class TestFetchUnreadMessages:
     def test_returns_list_of_id_and_thread_id(self):
-        from gauntler.tracking.email_monitor import fetch_unread_messages
+        from gauntler.tracking.gmail_client import fetch_unread_messages
 
         service = MagicMock()
         msgs = [{"id": "a1", "threadId": "t1"}, {"id": "a2", "threadId": "t2"}]
@@ -686,7 +686,7 @@ class TestFetchUnreadMessages:
         assert result[1]["threadId"] == "t2"
 
     def test_returns_empty_list_when_no_messages(self):
-        from gauntler.tracking.email_monitor import fetch_unread_messages
+        from gauntler.tracking.gmail_client import fetch_unread_messages
 
         service = MagicMock()
         service.users().messages().list().execute.return_value = {}
@@ -695,7 +695,7 @@ class TestFetchUnreadMessages:
         assert result == []
 
     def test_respects_max_results(self):
-        from gauntler.tracking.email_monitor import fetch_unread_messages
+        from gauntler.tracking.gmail_client import fetch_unread_messages
 
         service = MagicMock()
         service.users().messages().list().execute.return_value = {}
@@ -711,7 +711,7 @@ class TestFetchUnreadMessages:
 
 class TestMarkProcessed:
     def test_removes_unread_label_and_adds_processed_label(self):
-        from gauntler.tracking.email_monitor import mark_processed
+        from gauntler.tracking.gmail_client import mark_processed
 
         service = MagicMock()
         service.users().messages().modify().execute.return_value = {}
@@ -727,7 +727,7 @@ class TestMarkProcessed:
         assert "Label_123" in body.get("addLabelIds", [])
 
     def test_calls_execute(self):
-        from gauntler.tracking.email_monitor import mark_processed
+        from gauntler.tracking.gmail_client import mark_processed
 
         service = MagicMock()
         service.users().messages().modify().execute.return_value = {}
@@ -742,7 +742,7 @@ class TestMarkProcessed:
 
 class TestSetupGmailService:
     def test_returns_service_when_token_exists(self, tmp_path):
-        from gauntler.tracking.email_monitor import setup_gmail_service
+        from gauntler.tracking.gmail_client import setup_gmail_service
 
         token_path = str(tmp_path / "gmail-token.json")
         creds_path = str(tmp_path / "gmail-client.json")
@@ -759,8 +759,8 @@ class TestSetupGmailService:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.Credentials") as MockCreds,
-            patch("gauntler.tracking.email_monitor.build") as mock_build,
+            patch("gauntler.tracking.gmail_client.Credentials") as MockCreds,
+            patch("gauntler.tracking.gmail_client.build") as mock_build,
             patch("os.path.exists", return_value=True),
         ):
             MockCreds.from_authorized_user_file.return_value = mock_creds
@@ -772,7 +772,7 @@ class TestSetupGmailService:
         mock_build.assert_called_once_with("gmail", "v1", credentials=mock_creds)
 
     def test_raises_gmail_auth_error_when_token_missing(self, tmp_path):
-        from gauntler.tracking.email_monitor import GmailAuthError, setup_gmail_service
+        from gauntler.tracking.gmail_client import GmailAuthError, setup_gmail_service
 
         config = {
             "email": {
@@ -785,7 +785,7 @@ class TestSetupGmailService:
             setup_gmail_service(config)
 
     def test_gmail_oauth_sets_chmod_600_on_token(self, tmp_path):
-        from gauntler.tracking.email_monitor import _run_gmail_oauth
+        from gauntler.tracking.gmail_client import _run_gmail_oauth
 
         token_path = str(tmp_path / "subdir" / "gmail-token.json")
         creds_path = str(tmp_path / "creds.json")
@@ -796,7 +796,7 @@ class TestSetupGmailService:
         mock_flow = MagicMock()
         mock_flow.run_local_server.return_value = mock_creds
 
-        with patch("gauntler.tracking.email_monitor.InstalledAppFlow") as MockFlow:
+        with patch("gauntler.tracking.gmail_client.InstalledAppFlow") as MockFlow:
             MockFlow.from_client_secrets_file.return_value = mock_flow
             _run_gmail_oauth(creds_path, token_path)
 
@@ -805,7 +805,7 @@ class TestSetupGmailService:
         assert written.stat().st_mode & 0o777 == 0o600
 
     def test_refreshes_expired_token(self, tmp_path):
-        from gauntler.tracking.email_monitor import setup_gmail_service
+        from gauntler.tracking.gmail_client import setup_gmail_service
 
         token_path = str(tmp_path / "gmail-token.json")
         config = {
@@ -824,9 +824,9 @@ class TestSetupGmailService:
         mock_creds.to_json.return_value = '{"token": "refreshed"}'
 
         with (
-            patch("gauntler.tracking.email_monitor.Credentials") as MockCreds,
-            patch("gauntler.tracking.email_monitor.Request"),
-            patch("gauntler.tracking.email_monitor.build") as mock_build,
+            patch("gauntler.tracking.gmail_client.Credentials") as MockCreds,
+            patch("gauntler.tracking.gmail_client.Request"),
+            patch("gauntler.tracking.gmail_client.build") as mock_build,
         ):
             MockCreds.from_authorized_user_file.return_value = mock_creds
             mock_build.return_value = MagicMock()
@@ -837,13 +837,13 @@ class TestSetupGmailService:
         assert Path(token_path).read_text() == '{"token": "refreshed"}'
 
     def test_required_scope_defaults_to_readonly(self):
-        from gauntler.tracking.email_monitor import SCOPE_READONLY, _required_scope
+        from gauntler.tracking.gmail_client import SCOPE_READONLY, _required_scope
 
         assert _required_scope({}) == SCOPE_READONLY
         assert _required_scope({"email": {"mark_processed": False}}) == SCOPE_READONLY
 
     def test_required_scope_is_modify_when_opted_in(self):
-        from gauntler.tracking.email_monitor import SCOPE_MODIFY, _required_scope
+        from gauntler.tracking.gmail_client import SCOPE_MODIFY, _required_scope
 
         assert _required_scope({"email": {"mark_processed": True}}) == SCOPE_MODIFY
 
@@ -853,7 +853,7 @@ class TestSetupGmailService:
         auto-revoke, just say so plainly."""
         import logging
 
-        from gauntler.tracking.email_monitor import setup_gmail_service
+        from gauntler.tracking.gmail_client import setup_gmail_service
 
         token_path = str(tmp_path / "gmail-token.json")
         config = {
@@ -870,10 +870,10 @@ class TestSetupGmailService:
         mock_creds.scopes = ["https://www.googleapis.com/auth/gmail.modify"]
 
         with (
-            patch("gauntler.tracking.email_monitor.Credentials") as MockCreds,
-            patch("gauntler.tracking.email_monitor.build") as mock_build,
+            patch("gauntler.tracking.gmail_client.Credentials") as MockCreds,
+            patch("gauntler.tracking.gmail_client.build") as mock_build,
             patch("os.path.exists", return_value=True),
-            caplog.at_level(logging.WARNING, logger="gauntler.tracking.email_monitor"),
+            caplog.at_level(logging.WARNING, logger="gauntler.tracking.gmail_client"),
         ):
             MockCreds.from_authorized_user_file.return_value = mock_creds
             mock_build.return_value = MagicMock()
@@ -884,7 +884,7 @@ class TestSetupGmailService:
     def test_setup_gmail_service_no_warning_when_scope_already_matches(self, tmp_path, caplog):
         import logging
 
-        from gauntler.tracking.email_monitor import setup_gmail_service
+        from gauntler.tracking.gmail_client import setup_gmail_service
 
         token_path = str(tmp_path / "gmail-token.json")
         config = {
@@ -901,10 +901,10 @@ class TestSetupGmailService:
         mock_creds.scopes = ["https://www.googleapis.com/auth/gmail.readonly"]
 
         with (
-            patch("gauntler.tracking.email_monitor.Credentials") as MockCreds,
-            patch("gauntler.tracking.email_monitor.build") as mock_build,
+            patch("gauntler.tracking.gmail_client.Credentials") as MockCreds,
+            patch("gauntler.tracking.gmail_client.build") as mock_build,
             patch("os.path.exists", return_value=True),
-            caplog.at_level(logging.WARNING, logger="gauntler.tracking.email_monitor"),
+            caplog.at_level(logging.WARNING, logger="gauntler.tracking.gmail_client"),
         ):
             MockCreds.from_authorized_user_file.return_value = mock_creds
             mock_build.return_value = MagicMock()
@@ -917,7 +917,7 @@ class TestSetupGmailService:
         never be iterated — the mismatch check is a no-op in that case."""
         import logging
 
-        from gauntler.tracking.email_monitor import setup_gmail_service
+        from gauntler.tracking.gmail_client import setup_gmail_service
 
         token_path = str(tmp_path / "gmail-token.json")
         config = {
@@ -933,10 +933,10 @@ class TestSetupGmailService:
         # .scopes NOT explicitly configured — it's a MagicMock, not a real list
 
         with (
-            patch("gauntler.tracking.email_monitor.Credentials") as MockCreds,
-            patch("gauntler.tracking.email_monitor.build") as mock_build,
+            patch("gauntler.tracking.gmail_client.Credentials") as MockCreds,
+            patch("gauntler.tracking.gmail_client.build") as mock_build,
             patch("os.path.exists", return_value=True),
-            caplog.at_level(logging.WARNING, logger="gauntler.tracking.email_monitor"),
+            caplog.at_level(logging.WARNING, logger="gauntler.tracking.gmail_client"),
         ):
             MockCreds.from_authorized_user_file.return_value = mock_creds
             mock_build.return_value = MagicMock()
@@ -1821,10 +1821,10 @@ def test_extract_ref_skips_wrong_base_with_plus():
 
 def test_setup_gmail_service_raises_without_google_libs():
     """Credentials None (libs ausentes) → GmailAuthError (email_monitor.py:98)."""
-    from gauntler.tracking.email_monitor import GmailAuthError, setup_gmail_service
+    from gauntler.tracking.gmail_client import GmailAuthError, setup_gmail_service
 
     with (
-        patch("gauntler.tracking.email_monitor.Credentials", None),
+        patch("gauntler.tracking.gmail_client.Credentials", None),
         pytest.raises(GmailAuthError, match="google-api-python-client"),
     ):
         setup_gmail_service({"email": {}})
@@ -1835,7 +1835,7 @@ def test_setup_gmail_service_raises_without_google_libs():
 
 def test_extract_body_html_top_level():
     """Payload text/html no nível superior é decodificado (169)."""
-    from gauntler.tracking.email_monitor import _extract_body
+    from gauntler.tracking.gmail_client import _extract_body
 
     payload = {"mimeType": "text/html", "body": {"data": _b64("<p>Hi</p>")}}
     assert "Hi" in _extract_body(payload)
@@ -1844,7 +1844,7 @@ def test_extract_body_html_top_level():
 def test_extract_body_multipart_skips_empty_parts_then_finds_html():
     """Parts text/plain e text/html com data vazia são puladas (177->174, 181->180);
     o html com data é aceito (183)."""
-    from gauntler.tracking.email_monitor import _extract_body
+    from gauntler.tracking.gmail_client import _extract_body
 
     payload = {
         "mimeType": "multipart/alternative",
@@ -1859,7 +1859,7 @@ def test_extract_body_multipart_skips_empty_parts_then_finds_html():
 
 def test_extract_body_recurses_into_nested_multipart():
     """multipart aninhado é resolvido por recursão (186-189)."""
-    from gauntler.tracking.email_monitor import _extract_body
+    from gauntler.tracking.gmail_client import _extract_body
 
     payload = {
         "mimeType": "multipart/mixed",
@@ -1874,14 +1874,14 @@ def test_extract_body_recurses_into_nested_multipart():
 
 
 def test_extract_body_unknown_mime_returns_empty():
-    from gauntler.tracking.email_monitor import _extract_body
+    from gauntler.tracking.gmail_client import _extract_body
 
     assert _extract_body({"mimeType": "application/pdf", "body": {}}) == ""
 
 
 def test_decode_data_invalid_base64_returns_empty():
     """Base64 inválido → '' sem levantar (199-200)."""
-    from gauntler.tracking.email_monitor import _decode_data
+    from gauntler.tracking.gmail_client import _decode_data
 
     assert _decode_data("!!!nãoébase64@@@") == ""
 
@@ -1891,7 +1891,7 @@ def test_decode_data_invalid_base64_returns_empty():
 
 def test_get_or_create_label_returns_existing():
     """Label já existe → devolve o id existente (280-282)."""
-    from gauntler.tracking.email_monitor import _get_or_create_label
+    from gauntler.tracking.gmail_client import _get_or_create_label
 
     service = MagicMock()
     service.users().labels().list().execute.return_value = {
@@ -1902,7 +1902,7 @@ def test_get_or_create_label_returns_existing():
 
 def test_get_or_create_label_creates_when_missing():
     """Label não existe → cria e devolve o novo id (283-296)."""
-    from gauntler.tracking.email_monitor import _get_or_create_label
+    from gauntler.tracking.gmail_client import _get_or_create_label
 
     service = MagicMock()
     service.users().labels().list().execute.return_value = {"labels": []}
@@ -1968,10 +1968,10 @@ def test_resolve_application_no_company_no_title_is_uncertain(tmp_db):
 
 def test_run_gmail_oauth_raises_without_oauthlib():
     """InstalledAppFlow None → GmailAuthError (454)."""
-    from gauntler.tracking.email_monitor import GmailAuthError, _run_gmail_oauth
+    from gauntler.tracking.gmail_client import GmailAuthError, _run_gmail_oauth
 
     with (
-        patch("gauntler.tracking.email_monitor.InstalledAppFlow", None),
+        patch("gauntler.tracking.gmail_client.InstalledAppFlow", None),
         pytest.raises(GmailAuthError, match="google-auth-oauthlib"),
     ):
         _run_gmail_oauth("creds.json", "token.json")
@@ -1979,7 +1979,7 @@ def test_run_gmail_oauth_raises_without_oauthlib():
 
 def test_extract_body_multipart_unresolvable_returns_empty():
     """Parts que não resolvem em texto → recursão termina sem achar (186->191, 188->186)."""
-    from gauntler.tracking.email_monitor import _extract_body
+    from gauntler.tracking.gmail_client import _extract_body
 
     payload = {
         "mimeType": "multipart/mixed",
@@ -1990,7 +1990,7 @@ def test_extract_body_multipart_unresolvable_returns_empty():
 
 def test_get_or_create_label_skips_non_matching_then_creates():
     """Label existente que não casa é pulado (281->280) e o alvo é criado."""
-    from gauntler.tracking.email_monitor import _get_or_create_label
+    from gauntler.tracking.gmail_client import _get_or_create_label
 
     service = MagicMock()
     service.users().labels().list().execute.return_value = {

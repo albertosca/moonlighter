@@ -2263,7 +2263,7 @@ async def test_tool_archive_stale_jobs_rejects_both_filters(tmp_db):
 async def test_setup_email_handles_auth_error(tmp_path):
     """GmailAuthError during OAuth → friendly message (server.py setup_email)."""
     from gauntler.server import setup_email
-    from gauntler.tracking.email_monitor import GmailAuthError
+    from gauntler.tracking.gmail_client import GmailAuthError
 
     creds = tmp_path / "gmail-client.json"
     creds.write_text("{}")
