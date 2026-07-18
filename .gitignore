@@ -3,13 +3,10 @@ __pycache__/
 .DS_Store
 .venv/
 *.egg-info/
-~/.candidatador/
 .superpowers/
-pytest_output.txt
-.venv314/
 
-# Dados pessoais — fora do repo (mantidos em disco localmente). Templates
-# genéricos (.example) entram quando for preparar o release público.
+# Personal data — kept on disk locally, out of the repo. Generic templates
+# (.example) get added when preparing the public release.
 config.yaml
 profile/
 docs/
@@ -18,7 +15,7 @@ company_list.yaml
 blocklist_learned.yaml
 .mcp.json
 TODO.md
-candidatador.db
+*.db
 
 # Coverage
 .coverage
