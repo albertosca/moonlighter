@@ -1230,7 +1230,7 @@ class TestSyncResponses:
         )  # NEVER turns rejected without ref
         assert updates[0]["needs_confirmation"] is True
 
-    async def test_ambiguous_match_marks_incerto_in_notes(self, tmp_db):
+    async def test_ambiguous_match_marks_uncertain_in_notes(self, tmp_db):
         init_db()
         job1 = _make_job(tmp_db, company="Stripe", title="Engineer", url="https://x.com/1")
         job2 = _make_job(tmp_db, company="Stripe", title="Engineer", url="https://x.com/2")
@@ -1272,8 +1272,8 @@ class TestSyncResponses:
 
             updates = await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
-        # Nenhuma application pode ter sido atualizada definitivamente — incerto
-        assert any("incerto" in (u.get("match_type", "")) for u in updates)
+        # Nenhuma application pode ter sido atualizada definitivamente — uncertain
+        assert any("uncertain" in (u.get("match_type", "")) for u in updates)
 
     async def test_rejection_sets_status_rejected(self, tmp_db):
         init_db()
@@ -2169,7 +2169,7 @@ def test_resolve_application_ref_no_match_falls_through(tmp_db):
 
     app, match = _resolve_application("ref_inexistente", {"company": None, "job_title": None})
     assert app is None
-    assert match == "incerto"
+    assert match == "uncertain"
 
 
 def test_resolve_application_fuzzy_by_title_only(tmp_db):
@@ -2197,13 +2197,13 @@ def test_resolve_application_fuzzy_by_company_only(tmp_db):
 
 
 def test_resolve_application_no_company_no_title_is_uncertain(tmp_db):
-    """Sem ref, sem company e sem job_title → incerto (448)."""
+    """Sem ref, sem company e sem job_title → uncertain (448)."""
     init_db()
     from gauntler.tracking.email_monitor import _resolve_application
 
     app, match = _resolve_application(None, {"company": None, "job_title": None})
     assert app is None
-    assert match == "incerto"
+    assert match == "uncertain"
 
 
 def test_run_gmail_oauth_raises_without_oauthlib():
@@ -2241,10 +2241,10 @@ def test_get_or_create_label_skips_non_matching_then_creates():
 
 
 def test_resolve_application_fuzzy_zero_matches_is_uncertain(tmp_db):
-    """company sem nenhuma Application correspondente → 0 resultados → incerto (444->448)."""
+    """company sem nenhuma Application correspondente → 0 resultados → uncertain (444->448)."""
     init_db()
     from gauntler.tracking.email_monitor import _resolve_application
 
     app, match = _resolve_application(None, {"company": "EmpresaInexistente", "job_title": None})
     assert app is None
-    assert match == "incerto"
+    assert match == "uncertain"

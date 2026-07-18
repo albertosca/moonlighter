@@ -104,7 +104,7 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
         elif app is not None:  # match_type == "fuzzy" — suggestion only (S-06)
             updates.append(_make_suggestion(app, classification, match_type))
         else:
-            updates.append(_make_update(classification, "incerto"))
+            updates.append(_make_update(classification, "uncertain"))
         mark_done(msg_id)
 
     return updates
@@ -205,7 +205,7 @@ def _status_rank(status: str) -> int:
 
 def _resolve_application(ref: str | None, classification: dict[str, Any]) -> tuple[Any, str]:
     """Encontra a Application correspondente, por ref (exato) ou empresa+cargo
-    (fuzzy). Devolve (Application | None, 'ref' | 'fuzzy' | 'incerto')."""
+    (fuzzy). Devolve (Application | None, 'ref' | 'fuzzy' | 'uncertain')."""
     if ref:
         app = _match_by_ref(ref)
         if app is not None:
@@ -214,7 +214,7 @@ def _resolve_application(ref: str | None, classification: dict[str, Any]) -> tup
     app = _match_by_company_title(classification.get("company"), classification.get("job_title"))
     if app is not None:
         return app, "fuzzy"
-    return None, "incerto"
+    return None, "uncertain"
 
 
 def _match_by_ref(ref: str) -> Any:

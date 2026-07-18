@@ -12,6 +12,7 @@ import re
 from difflib import SequenceMatcher
 from typing import Any
 
+import yaml
 from gauntler.application.appliers.base import profile_for_answers
 from gauntler.core.llm import LLMCaller
 from gauntler.core.parsing import wrap_untrusted
@@ -102,8 +103,6 @@ async def pick_option_with_llm(
     if not options:
         return None
     try:
-        import yaml
-
         options_text = "\n".join(f"{i}: {o}" for i, o in enumerate(options))
         prompt = _PICK_PROMPT.format(
             label=wrap_untrusted("field_label", label),

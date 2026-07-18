@@ -14,8 +14,8 @@ def _learned_blocklist_path() -> Path:
 
 
 def browser_executable(config: dict[str, Any]) -> str:
-    """Caminho do executável do browser. Lê 'browser_path'; cai para 'brave_path'
-    (chave legada) se browser_path estiver vazio."""
+    """Browser executable path. Reads 'browser_path'; falls back to the legacy
+    'brave_path' key when browser_path is empty."""
     path: str = config.get("browser_path") or config.get("brave_path", "")
     return path
 
@@ -32,8 +32,8 @@ NEEDS_REVIEW_SENTINEL = "__NEEDS_REVIEW__"
 
 
 DEFAULTS = {
-    # Caminho do executável do browser (Chrome/Chromium/Brave). Vazio por padrão:
-    # configure browser_path no config.yaml. Aceita brave_path (legado) como fallback.
+    # Browser executable path (Chrome/Chromium/Brave). Empty by default:
+    # set browser_path in config.yaml. Accepts brave_path (legacy) as a fallback.
     "browser_path": "",
     "score_threshold": 6.5,
     "llm_model": "claude-sonnet-4-6",
