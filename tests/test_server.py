@@ -1,4 +1,5 @@
 import json
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -6,6 +7,7 @@ from gauntler.application.answers.cv import CVNotFoundError
 from gauntler.application.appliers.base import ApplicationDraft
 from gauntler.application.appliers.linkedin import LinkedInApplier
 from gauntler.core.db import Application, Job, ScanLog, init_db
+from gauntler.core.metrics import record_call
 from gauntler.discovery.evaluator import EvaluationResult
 
 from tests._context import make_test_context
@@ -2481,3 +2483,102 @@ async def test_setup_email_handles_unexpected_error(tmp_path):
     with patch("gauntler.server._run_gmail_oauth", side_effect=RuntimeError("boom")):
         result = await setup_email(ctx=make_test_context(config=test_config))
     assert "unexpected" in result.lower()
+
+
+# ── observability (Task 4): scan_and_evaluate opens one operation_metrics scope ─
+
+
+async def test_scan_and_evaluate_logs_one_metrics_summary(tmp_db, caplog):
+    """With a stubbed evaluate_jobs_batch that records one LLM call per job (as the
+    real evaluator/caller would), scan_and_evaluate must emit exactly one
+    `op=scan_and_evaluate` summary line naming the right call count — proof the
+    tool wraps its whole body in a single operation_metrics scope, not one
+    scope per job/batch (which would split the counts across many lines)."""
+    init_db()
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
+
+    raws = [
+        RawJob(
+            source="greenhouse",
+            company=f"Co{i}",
+            title="Eng",
+            url=f"https://x.com/metrics/{i}",
+            description="desc",
+        )
+        for i in range(3)
+    ]
+
+    async def _batch_records_calls(jobs, profile, model, caller):
+        result = make_eval_result(score=8.0)
+        out = []
+        for _ in jobs:
+            record_call(0.01, input_tokens=1, output_tokens=2)
+            out.append(result)
+        return out
+
+    with (
+        caplog.at_level(logging.INFO),
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.evaluate_jobs_batch", new=_batch_records_calls),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+    ):
+        MockGH.return_value.scan = AsyncMock(return_value=raws)
+        MockLV.return_value.scan = AsyncMock(return_value=[])
+        MockAB.return_value.scan = AsyncMock(return_value=[])
+        mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
+        await scan_and_evaluate(ctx=make_test_context())
+
+    summary_lines = [r for r in caplog.records if "op=scan_and_evaluate" in r.getMessage()]
+    assert len(summary_lines) == 1
+    msg = summary_lines[0].getMessage()
+    assert "calls=3" in msg
+    assert "spend_limit_hits=0" in msg
+
+
+async def test_scan_and_evaluate_spend_limit_abort_increments_hits(tmp_db, caplog):
+    """A spend-limit abort mid-scan increments spend_limit_hits in the single
+    scan_and_evaluate summary (evaluator/service call record_spend_limit_hit()
+    before propagating, inside the tool's one operation_metrics scope)."""
+    init_db()
+    from gauntler.discovery.sources.base import RawJob
+    from gauntler.server import scan_and_evaluate
+
+    raws = [
+        RawJob(
+            source="greenhouse",
+            company="co",
+            title="Eng",
+            url="https://x.com/quota/1",
+            description="desc",
+        )
+    ]
+
+    async def _batch_raises_spend_limit(jobs, profile, model, caller):
+        # Deliberately does NOT call record_spend_limit_hit() itself — the
+        # production `except is_spend_limit(e)` catch site in
+        # gauntler.discovery.service is what must record the hit, exactly
+        # once, before propagating.
+        raise RuntimeError("spend limit reached")
+
+    with (
+        caplog.at_level(logging.INFO),
+        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
+        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("gauntler.discovery.service.evaluate_jobs_batch", new=_batch_raises_spend_limit),
+        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+    ):
+        MockGH.return_value.scan = AsyncMock(return_value=raws)
+        MockLV.return_value.scan = AsyncMock(return_value=[])
+        MockAB.return_value.scan = AsyncMock(return_value=[])
+        mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
+        await scan_and_evaluate(ctx=make_test_context())
+
+    summary_lines = [r for r in caplog.records if "op=scan_and_evaluate" in r.getMessage()]
+    assert len(summary_lines) == 1
+    assert "spend_limit_hits=1" in summary_lines[0].getMessage()

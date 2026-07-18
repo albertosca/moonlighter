@@ -32,6 +32,7 @@ from gauntler.core.config import gauntler_home, load_config, load_profile
 from gauntler.core.db import Job, init_db
 from gauntler.core.llm import make_caller
 from gauntler.core.log import setup as setup_logging
+from gauntler.core.metrics import operation_metrics
 from gauntler.core.parsing import extract_json
 
 
@@ -178,61 +179,62 @@ async def _run(
     profile: dict,
     assume_yes: bool,
 ) -> None:
-    caller = make_caller(config)
-    grouped = _fetch_low_scorers(threshold, company_filter)
+    with operation_metrics("build_blocklist"):
+        caller = make_caller(config)
+        grouped = _fetch_low_scorers(threshold, company_filter)
 
-    if not grouped:
-        print("Nenhuma vaga encontrada com os critérios.")
-        return
+        if not grouped:
+            print("Nenhuma vaga encontrada com os critérios.")
+            return
 
-    total_titles = sum(len(v) for v in grouped.values())
-    print(
-        f"Vagas para análise: {total_titles} em {len(grouped)} empresa(s)  [threshold={threshold}]"
-    )
-    print()
-
-    existing = set(_load_learned())
-    all_new: list[str] = []
-
-    for company, titles in sorted(grouped.items(), key=lambda x: -len(x[1])):
-        print(f"▶ {company} ({len(titles)} vagas)...")
-        try:
-            proposals = await _propose_for_company(
-                company, titles, threshold, caller, model, profile
-            )
-        except Exception as e:
-            if any(m in str(e).lower() for m in QUOTA_MARKERS):
-                print(f"🚫 COTA ATINGIDA — parando. Erro: {e}")
-                break
-            print(f"  ✗ Erro: {e}")
-            continue
-
-        if not proposals:
-            print("  (nenhum padrão seguro identificado)")
-            continue
-
-        for p in proposals:
-            pattern = p["pattern"].lower().strip()
-            status = (
-                "JÁ EXISTE" if pattern in existing else ("DRY RUN" if dry_run else "ADICIONADO")
-            )
-            print(f"  + {pattern!r:40s} [{status}]")
-            print(f"    → {p.get('reasoning', '')}")
-            if pattern not in existing and not dry_run:
-                all_new.append(pattern)
-                existing.add(pattern)
+        total_titles = sum(len(v) for v in grouped.values())
+        print(
+            f"Vagas para análise: {total_titles} em {len(grouped)} empresa(s)  [threshold={threshold}]"
+        )
         print()
 
-    if all_new and not dry_run:
-        if not assume_yes and not _confirm_write(all_new):
-            print("Cancelado — nada foi gravado.")
-            return
-        _save_learned(all_new)
-        print(f"✓ {len(all_new)} padrão(ões) gravado(s) em blocklist_learned.yaml")
-    elif dry_run and all_new:
-        print(f"[DRY RUN] {len(all_new)} padrão(ões) seriam adicionados.")
-    else:
-        print("Nenhum padrão novo.")
+        existing = set(_load_learned())
+        all_new: list[str] = []
+
+        for company, titles in sorted(grouped.items(), key=lambda x: -len(x[1])):
+            print(f"▶ {company} ({len(titles)} vagas)...")
+            try:
+                proposals = await _propose_for_company(
+                    company, titles, threshold, caller, model, profile
+                )
+            except Exception as e:
+                if any(m in str(e).lower() for m in QUOTA_MARKERS):
+                    print(f"🚫 COTA ATINGIDA — parando. Erro: {e}")
+                    break
+                print(f"  ✗ Erro: {e}")
+                continue
+
+            if not proposals:
+                print("  (nenhum padrão seguro identificado)")
+                continue
+
+            for p in proposals:
+                pattern = p["pattern"].lower().strip()
+                status = (
+                    "JÁ EXISTE" if pattern in existing else ("DRY RUN" if dry_run else "ADICIONADO")
+                )
+                print(f"  + {pattern!r:40s} [{status}]")
+                print(f"    → {p.get('reasoning', '')}")
+                if pattern not in existing and not dry_run:
+                    all_new.append(pattern)
+                    existing.add(pattern)
+            print()
+
+        if all_new and not dry_run:
+            if not assume_yes and not _confirm_write(all_new):
+                print("Cancelado — nada foi gravado.")
+                return
+            _save_learned(all_new)
+            print(f"✓ {len(all_new)} padrão(ões) gravado(s) em blocklist_learned.yaml")
+        elif dry_run and all_new:
+            print(f"[DRY RUN] {len(all_new)} padrão(ões) seriam adicionados.")
+        else:
+            print("Nenhum padrão novo.")
 
 
 def main() -> None:

@@ -19,6 +19,7 @@ from gauntler.core.config import (
 from gauntler.core.db import Application, Job, init_db
 from gauntler.core.llm import LLMCaller, make_caller
 from gauntler.core.log import setup as _setup_logging
+from gauntler.core.metrics import operation_metrics
 from gauntler.core.parsing import wrap_untrusted
 from gauntler.discovery import service as scan_service
 from gauntler.discovery.archive import ArchiveStaleJobsError, _format_archive_result
@@ -91,9 +92,10 @@ async def scan_and_evaluate(
                "phase3" (big techs), ou "all" (tudo)
     """
     app = ctx.request_context.lifespan_context
-    return await scan_service.scan_and_evaluate(
-        keywords, phase, app.config, app.profile, app.llm_caller
-    )
+    with operation_metrics("scan_and_evaluate"):
+        return await scan_service.scan_and_evaluate(
+            keywords, phase, app.config, app.profile, app.llm_caller
+        )
 
 
 @mcp.tool()
@@ -224,7 +226,8 @@ async def apply_jobs(ids: list[int], *, ctx: Context[ServerSession, AppContext, 
     Returns draft answers for review before submission.
     """
     app = ctx.request_context.lifespan_context
-    return await apply_service.apply_jobs(ids, app.config, app.profile, app.llm_caller)
+    with operation_metrics("apply_jobs"):
+        return await apply_service.apply_jobs(ids, app.config, app.profile, app.llm_caller)
 
 
 @mcp.tool()
@@ -259,7 +262,8 @@ async def fill_application(
     answers: optional {field: answer} overrides merged into the saved draft
     """
     app = ctx.request_context.lifespan_context
-    return await apply_service.fill_application(job_id, answers, app.config, app.profile)
+    with operation_metrics("fill_application"):
+        return await apply_service.fill_application(job_id, answers, app.config, app.profile)
 
 
 @mcp.tool()
@@ -396,28 +400,29 @@ async def sync_email_responses(*, ctx: Context[ServerSession, AppContext, Any]) 
     Returns a summary of the updates made.
     """
     app = ctx.request_context.lifespan_context
-    updates = await sync_responses(app.config, app.llm_caller)
+    with operation_metrics("sync_email_responses"):
+        updates = await sync_responses(app.config, app.llm_caller)
 
-    if not updates:
-        return "No new emails found."
+        if not updates:
+            return "No new emails found."
 
-    lines = [f"# Email sync — {len(updates)} update(s)\n"]
-    for u in updates:
-        company = u.get("company") or "?"
-        title = u.get("title") or "?"
-        msg_type = u.get("type", "?")
-        stage = u.get("stage") or ""
-        match_type = u.get("match_type", "")
-        stage_str = f" → {stage}" if stage else ""
-        line = f"- **{company}** / {title}: `{msg_type}`{stage_str} (match: {match_type})"
-        if u.get("needs_confirmation"):
-            line += (
-                f" — ⚠️ suggestion not applied; confirm with "
-                f"update_status(job_id={u['suggested_job_id']}, status=...)"
-            )
-        lines.append(line)
+        lines = [f"# Email sync — {len(updates)} update(s)\n"]
+        for u in updates:
+            company = u.get("company") or "?"
+            title = u.get("title") or "?"
+            msg_type = u.get("type", "?")
+            stage = u.get("stage") or ""
+            match_type = u.get("match_type", "")
+            stage_str = f" → {stage}" if stage else ""
+            line = f"- **{company}** / {title}: `{msg_type}`{stage_str} (match: {match_type})"
+            if u.get("needs_confirmation"):
+                line += (
+                    f" — ⚠️ suggestion not applied; confirm with "
+                    f"update_status(job_id={u['suggested_job_id']}, status=...)"
+                )
+            lines.append(line)
 
-    return "\n".join(lines)
+        return "\n".join(lines)
 
 
 def main() -> None:  # pragma: no cover - entry-point do servidor MCP (boundary)

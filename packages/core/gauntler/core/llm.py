@@ -3,11 +3,13 @@ import os
 import re
 import shutil
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Protocol
 
 import anthropic
 from anthropic.types import TextBlock
 from gauntler.core.config import gauntler_home
+from gauntler.core.metrics import record_call
 
 
 class LLMCaller(Protocol):
@@ -105,21 +107,25 @@ async def _call_cli(prompt: str, model: str, cache_prefix: str | None = None) ->
             "the `claude` CLI was not found on PATH. Install it, or put it on PATH — "
             "this project uses the CLI backend (the claude.ai subscription), not an API key."
         )
-    proc = await asyncio.create_subprocess_exec(
-        exe,
-        *_CLI_SANDBOX_ARGS,
-        "-p",
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=env,
-        cwd=str(_cli_workdir()),
-    )
-    stdout, stderr = await proc.communicate(input=full.encode())
-    if proc.returncode != 0:
-        detail = stderr.decode().strip() or stdout.decode().strip()
-        raise RuntimeError(f"claude CLI exited with code {proc.returncode}: {detail[:300]}")
-    return stdout.decode()
+    start = perf_counter()
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            exe,
+            *_CLI_SANDBOX_ARGS,
+            "-p",
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+            cwd=str(_cli_workdir()),
+        )
+        stdout, stderr = await proc.communicate(input=full.encode())
+        if proc.returncode != 0:
+            detail = stderr.decode().strip() or stdout.decode().strip()
+            raise RuntimeError(f"claude CLI exited with code {proc.returncode}: {detail[:300]}")
+        return stdout.decode()
+    finally:
+        record_call(perf_counter() - start)
 
 
 def make_api_caller(max_tokens: int = 2048) -> LLMCaller:
@@ -140,14 +146,23 @@ def make_api_caller(max_tokens: int = 2048) -> LLMCaller:
             ]
         else:
             content = prompt
-        message = await client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            messages=[{"role": "user", "content": content}],
-        )
-        block = message.content[0]
-        if not isinstance(block, TextBlock):
-            raise RuntimeError("resposta inesperada do modelo (bloco não-texto)")
-        return block.text
+        start = perf_counter()
+        input_tokens = output_tokens = 0
+        try:
+            message = await client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                messages=[{"role": "user", "content": content}],
+            )
+            input_tokens = message.usage.input_tokens
+            output_tokens = message.usage.output_tokens
+            block = message.content[0]
+            if not isinstance(block, TextBlock):
+                raise RuntimeError("unexpected model response (non-text block)")
+            return block.text
+        finally:
+            record_call(
+                perf_counter() - start, input_tokens=input_tokens, output_tokens=output_tokens
+            )
 
     return _call

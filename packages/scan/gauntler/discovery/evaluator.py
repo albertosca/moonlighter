@@ -6,6 +6,7 @@ from typing import Any
 import yaml
 from gauntler.core.llm import LLMCaller, is_spend_limit, make_api_caller
 from gauntler.core.log import get_logger
+from gauntler.core.metrics import record_spend_limit_hit
 from gauntler.core.parsing import parse_llm_json, wrap_untrusted
 
 logger = get_logger(__name__)
@@ -120,6 +121,7 @@ async def evaluate_job(
         return EvaluationResult(score=0.0, score_notes="parse error: LLM returned non-JSON")
     except Exception as e:
         if is_spend_limit(e):
+            record_spend_limit_hit()
             raise  # esgotou cota — quem chama decide parar; não é erro da vaga
         logger.warning("evaluator: erro para %s/%s — %s", company, title, e)
         return EvaluationResult(score=0.0, score_notes=f"evaluation error: {e}")
@@ -269,6 +271,7 @@ async def evaluate_jobs_batch(
         raw = await caller(suffix, model, cache_prefix=prefix)
     except Exception as e:
         if is_spend_limit(e):
+            record_spend_limit_hit()
             raise
         logger.warning("batch eval: erro na chamada — fallback per-job: %s", e)
         return await _eval_each(jobs, profile, model, caller)

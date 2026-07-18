@@ -391,7 +391,7 @@ async def test_make_api_caller_raises_on_non_text_block():
     mock_anthropic.AsyncAnthropic.return_value = mock_client
     with patch("gauntler.core.llm.anthropic", mock_anthropic):
         caller = make_api_caller()
-        with pytest.raises(RuntimeError, match="bloco não-texto"):
+        with pytest.raises(RuntimeError, match="non-text block"):
             await caller("prompt", "model")
 
 
