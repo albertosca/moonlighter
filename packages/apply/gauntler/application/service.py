@@ -10,6 +10,8 @@ import re
 import secrets
 import shutil
 import statistics
+from collections.abc import AsyncIterator
+from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -56,6 +58,18 @@ def _anomaly_reasons(answer: str, other_answers: list[str]) -> list[str]:
 
 
 _APPLIER_CLASSES = [LinkedInApplier, GreenhouseApplier, LeverApplier, AshbyApplier]
+
+
+@asynccontextmanager
+async def page_session(config: dict[str, Any]) -> AsyncIterator[Page]:
+    """Opens a fresh browser page for the duration of the block, closing it on
+    exit (success or error) — DRYs the acquire/close boilerplate shared by
+    `_draft_one` and `_submit_on_page`."""
+    page = await browser.new_page(config)
+    try:
+        yield page
+    finally:
+        await page.close()
 
 
 async def _hide_window_safe(page: Page) -> None:
@@ -125,43 +139,41 @@ async def _draft_one(
     except Job.DoesNotExist:
         return f"⚠️  Vaga #{job_id} não encontrada."
 
-    page = await browser.new_page(config)
     try:
-        await page.goto(job.url, timeout=30000)
-        await page.wait_for_load_state("networkidle", timeout=15000)
-        await browser.save_screenshot(page, job_id, "01-job-page", config)
+        async with page_session(config) as page:
+            await page.goto(job.url, timeout=30000)
+            await page.wait_for_load_state("networkidle", timeout=15000)
+            await browser.save_screenshot(page, job_id, "01-job-page", config)
 
-        applier = await detect_applier(page, config, profile)
-        if not applier:
-            return f"⚠️  Vaga #{job_id}: ATS não reconhecido. URL: {job.url}"
-        if isinstance(applier, LinkedInApplier) and not await applier.is_easy_apply():
-            return (
-                f"⚠️  Vaga #{job_id} ({job.company}/{job.title}): não tem Easy Apply. "
-                f"Candidatura manual necessária: {job.url}"
+            applier = await detect_applier(page, config, profile)
+            if not applier:
+                return f"⚠️  Vaga #{job_id}: ATS não reconhecido. URL: {job.url}"
+            if isinstance(applier, LinkedInApplier) and not await applier.is_easy_apply():
+                return (
+                    f"⚠️  Vaga #{job_id} ({job.company}/{job.title}): não tem Easy Apply. "
+                    f"Candidatura manual necessária: {job.url}"
+                )
+
+            fields = await applier.extract_fields()
+            await browser.save_screenshot(page, job_id, "02-form", config)
+            draft = await generate_answers(
+                company=job.company,
+                title=job.title,
+                description=job.description or "",
+                fields=fields,
+                profile=profile,
+                model=config["llm_model"],
+                job_id=job_id,
+                _caller=caller,
+                config=config,
+                job_location=job.location,
+                job_remote_type=job.remote_type,
             )
-
-        fields = await applier.extract_fields()
-        await browser.save_screenshot(page, job_id, "02-form", config)
-        draft = await generate_answers(
-            company=job.company,
-            title=job.title,
-            description=job.description or "",
-            fields=fields,
-            profile=profile,
-            model=config["llm_model"],
-            job_id=job_id,
-            _caller=caller,
-            config=config,
-            job_location=job.location,
-            job_remote_type=job.remote_type,
-        )
-        _save_draft(job, draft.answers)
-        Job.update(status="applying").where(Job.id == job_id).execute()
-        return _render_draft(job_id, job, draft)
+            _save_draft(job, draft.answers)
+            Job.update(status="applying").where(Job.id == job_id).execute()
+            return _render_draft(job_id, job, draft)
     except Exception as e:
         return f"⚠️  Vaga #{job_id}: erro — {e}"
-    finally:
-        await page.close()
 
 
 def _save_draft(job: Job, answers: dict[str, str]) -> None:
@@ -309,36 +321,40 @@ async def _submit_on_page(
     config: dict[str, Any],
     profile: dict[str, Any],
 ) -> str:
-    page = await browser.new_page(config)
-    await _hide_window_safe(page)
-    needs_review = False
-    try:
-        result = await _fill_open_page(page, job, answers, cv_path, config, profile)
-        if result is None:
-            return f"⚠️  ATS não reconhecido para vaga #{job.id}."
-        applier, fill_status = result
-        outcome = await applier.submit()
-        await browser.save_screenshot(page, job.id, "04-submitted", config)
-        shot = _screenshot_path(job.id, "04-submitted", config)
-        if isinstance(outcome, str) and outcome.startswith("failed"):
+    async with AsyncExitStack() as stack:
+        page = await stack.enter_async_context(page_session(config))
+        await _hide_window_safe(page)
+        needs_review = False
+        try:
+            result = await _fill_open_page(page, job, answers, cv_path, config, profile)
+            if result is None:
+                return f"⚠️  ATS não reconhecido para vaga #{job.id}."
+            applier, fill_status = result
+            outcome = await applier.submit()
+            await browser.save_screenshot(page, job.id, "04-submitted", config)
+            shot = _screenshot_path(job.id, "04-submitted", config)
+            if isinstance(outcome, str) and outcome.startswith("failed"):
+                await _show_window_safe(page)
+                needs_review = True
+                return _record_failed(app, job.id, outcome, fill_status, shot)
+            if outcome == "unverified":
+                await _show_window_safe(page)
+                needs_review = True
+                return _record_unverified(app, job, answers, ref, shot)
+            return _record_submitted(app, job, answers, ref, config)
+        except Exception as e:
             await _show_window_safe(page)
             needs_review = True
-            return _record_failed(app, job.id, outcome, fill_status, shot)
-        if outcome == "unverified":
-            await _show_window_safe(page)
-            needs_review = True
-            return _record_unverified(app, job, answers, ref, shot)
-        return _record_submitted(app, job, answers, ref, config)
-    except Exception as e:
-        await _show_window_safe(page)
-        needs_review = True
-        app.status = "draft"
-        app.save()
-        Job.update(status="reviewed").where(Job.id == job.id).execute()
-        return f"⚠️  Erro ao submeter vaga #{job.id}: {e}"
-    finally:
-        if not needs_review:
-            await page.close()
+            app.status = "draft"
+            app.save()
+            Job.update(status="reviewed").where(Job.id == job.id).execute()
+            return f"⚠️  Erro ao submeter vaga #{job.id}: {e}"
+        finally:
+            # needs_review keeps the browser tab open for a human to fix — detach it
+            # from the exit stack so leaving this block does not close it.
+            if needs_review:
+                stack.pop_all()
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 async def _fill_form(

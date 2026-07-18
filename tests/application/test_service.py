@@ -5,6 +5,7 @@ apply_jobs/confirm_apply que o caminho feliz do test_mcp_server não toca.
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from gauntler.application import service as apply_service
 from gauntler.application.answers.cv import CVNotFoundError
 from gauntler.application.appliers.base import ApplicationDraft
@@ -36,6 +37,23 @@ def _job(**kw):
     }
     defaults.update(kw)
     return Job.create(**defaults)
+
+
+# ── page_session ─────────────────────────────────────────────────────────────
+
+
+async def test_page_session_closes_on_error():
+    from gauntler.application.service import page_session
+
+    fake_page = AsyncMock()
+    with (
+        patch("gauntler.application.service.browser.new_page", AsyncMock(return_value=fake_page)),
+        pytest.raises(RuntimeError),
+    ):
+        async with page_session({}) as p:
+            assert p is fake_page
+            raise RuntimeError("boom")
+    fake_page.close.assert_awaited_once()
 
 
 # ── detect_applier (loop real) ──────────────────────────────────────────────
