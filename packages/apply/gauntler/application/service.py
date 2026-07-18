@@ -456,32 +456,36 @@ async def fill_application(
     except CVNotFoundError as e:
         return f"⚠️  {e}\n🚫 Não preenchi — não vou subir um CV errado."
 
-    page = await browser.new_page(config)
-    await _hide_window_safe(page)
-    needs_review = False
-    try:
-        result = await _fill_open_page(page, job, final_answers, cv_path, config, profile)
-        if result is None:
-            return f"⚠️  ATS não reconhecido para vaga #{job.id}."
-        _applier, fill_status = result
-        app.status = "filled"
-        app.form_data = json.dumps(final_answers)
-        app.email_ref = ref
-        app.updated_at = datetime.now()
-        app.save()
-        message = _render_filled(job, fill_status, config)
-        if any(s.startswith("failed") for s in fill_status.values()):
+    async with AsyncExitStack() as stack:
+        page = await stack.enter_async_context(page_session(config))
+        await _hide_window_safe(page)
+        needs_review = False
+        try:
+            result = await _fill_open_page(page, job, final_answers, cv_path, config, profile)
+            if result is None:
+                return f"⚠️  ATS não reconhecido para vaga #{job.id}."
+            _applier, fill_status = result
+            app.status = "filled"
+            app.form_data = json.dumps(final_answers)
+            app.email_ref = ref
+            app.updated_at = datetime.now()
+            app.save()
+            message = _render_filled(job, fill_status, config)
+            if any(s.startswith("failed") for s in fill_status.values()):
+                await _show_window_safe(page)
+                needs_review = True
+                message += "\n🖥️  Abri o browser — dá uma olhada e ajusta manualmente se precisar."
+            return message
+        except Exception as e:
             await _show_window_safe(page)
             needs_review = True
-            message += "\n🖥️  Abri o browser — dá uma olhada e ajusta manualmente se precisar."
-        return message
-    except Exception as e:
-        await _show_window_safe(page)
-        needs_review = True
-        return f"⚠️  Erro ao preencher vaga #{job.id}: {e}\n🖥️  Abri o browser — dá uma olhada."
-    finally:
-        if not needs_review:
-            await page.close()
+            return f"⚠️  Erro ao preencher vaga #{job.id}: {e}\n🖥️  Abri o browser — dá uma olhada."
+        finally:
+            # needs_review keeps the browser tab open for a human to fix — detach it
+            # from the exit stack so leaving this block does not close it.
+            if needs_review:
+                stack.pop_all()
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 def _render_filled(job: Job, fill_status: dict[str, str], config: dict[str, Any]) -> str:
