@@ -258,8 +258,14 @@ class BaseApplier(ABC):
         ...
 
     @abstractmethod
-    async def fill_form(self, answers: dict[str, str], cv_path: str) -> dict[str, str] | None:
-        """Fill the form with the given answers and upload CV."""
+    async def fill_form(self, answers: dict[str, str], cv_path: str) -> dict[str, str]:
+        """Fill the form with the given answers and upload the CV.
+
+        Returns a status dict keyed by field label, where each value is one of
+        "filled", "skipped", or "failed:<reason>" — plus a "__cv__" key for the
+        CV upload outcome. Never returns None: every implementation must report a
+        status for each field it attempted, even on partial failure.
+        """
         ...
 
     @abstractmethod

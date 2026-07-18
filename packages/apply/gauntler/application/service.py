@@ -361,8 +361,6 @@ async def _fill_form(
     applier: BaseApplier, answers: dict[str, str], cv_path: str, job_id: int
 ) -> dict[str, str]:
     status = await applier.fill_form(answers, cv_path)
-    if not isinstance(status, dict):
-        return {}
     failed = [field for field, s in status.items() if s.startswith("failed")]
     if failed:
         logger.warning("confirm_apply #%d: fields failed to fill: %s", job_id, failed)

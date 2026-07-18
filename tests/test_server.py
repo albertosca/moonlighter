@@ -606,7 +606,7 @@ async def test_confirm_apply_success(tmp_db, tmp_path):
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
-        mock_applier.fill_form = AsyncMock()
+        mock_applier.fill_form = AsyncMock(return_value={})
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
         from gauntler.server import confirm_apply
@@ -667,6 +667,7 @@ async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
 
     async def fake_fill(answers, cv):
         fill_calls.append(answers.copy())
+        return {}
 
     with (
         patch("gauntler.application.service.browser") as mock_browser,
@@ -705,6 +706,7 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
 
     async def fake_fill(answers, cv):
         fill_calls.append(answers.copy())
+        return {}
 
     test_email = "candidaturas@gmail.com"
     with (
@@ -799,7 +801,7 @@ async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
-        mock_applier.fill_form = AsyncMock()
+        mock_applier.fill_form = AsyncMock(return_value={})
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
         from gauntler.server import retry_apply
@@ -1487,7 +1489,7 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
         mock_browser.show_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
-        mock_applier.fill_form = AsyncMock()
+        mock_applier.fill_form = AsyncMock(return_value={})
         mock_applier.submit = AsyncMock(return_value="failed")
         mock_detect.return_value = mock_applier
         from gauntler.server import confirm_apply
@@ -1524,7 +1526,7 @@ async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db,
         mock_browser.show_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
-        mock_applier.fill_form = AsyncMock()
+        mock_applier.fill_form = AsyncMock(return_value={})
         mock_applier.submit = AsyncMock(return_value="unverified")
         mock_detect.return_value = mock_applier
         from gauntler.server import confirm_apply
@@ -1923,7 +1925,7 @@ async def test_confirm_apply_generates_6_char_ref(tmp_db, tmp_path):
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         applier = AsyncMock()
-        applier.fill_form = AsyncMock()
+        applier.fill_form = AsyncMock(return_value={})
         applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = applier
         await confirm_apply(job_id=job.id, ctx=make_test_context())
@@ -1957,7 +1959,7 @@ async def test_confirm_apply_ref_is_url_safe(tmp_db, tmp_path):
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         applier = AsyncMock()
-        applier.fill_form = AsyncMock()
+        applier.fill_form = AsyncMock(return_value={})
         applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = applier
         await confirm_apply(job_id=job.id, ctx=make_test_context())
@@ -1991,7 +1993,7 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
             mock_browser.hide_window = AsyncMock()
             mock_browser.save_screenshot = AsyncMock()
             applier = AsyncMock()
-            applier.fill_form = AsyncMock()
+            applier.fill_form = AsyncMock(return_value={})
             applier.submit = AsyncMock(return_value="submitted")
             mock_detect.return_value = applier
             await confirm_apply(job_id=job.id, ctx=make_test_context())
@@ -2216,7 +2218,7 @@ async def test_confirm_apply_archives_on_success(tmp_db, tmp_path):
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
-        mock_applier.fill_form = AsyncMock()
+        mock_applier.fill_form = AsyncMock(return_value={})
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
         from gauntler.server import confirm_apply
