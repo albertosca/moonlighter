@@ -37,28 +37,17 @@ _US_MARKERS = (
     "austin",
     "boston",
 )
-# Códigos de estado (", CA"/", NY"/...) precisam de word-boundary: como substring,
-# ", ca" casaria "Toronto, Ca-nada" e marcaria a vaga canadense como US (falso positivo).
+# State codes (", CA"/", NY"/...) need a word-boundary: as a plain substring,
+# ", ca" would match "Toronto, Ca-nada" and misclassify a Canadian posting as US.
+# "CA" itself is ambiguous even with the word-boundary fix: it is both the
+# US-state code (California) and the ISO 3166 alpha-2 country code for Canada.
+# Rather than try to disambiguate by enumerating Canadian cities/provinces,
+# infer_country below treats ANY location whose matched state code is "CA" as
+# unresolvable (returns None, which downstream becomes NEEDS_REVIEW_SENTINEL)
+# — never a guessed country. This is conservative by design: a legitimate
+# California posting also lands in manual review, an accepted tradeoff over
+# risking a wrong work-authorization answer.
 _US_STATE_RE = re.compile(r",\s*(ca|ny|wa|tx)\b")
-# "CA" é ambíguo: sigla de estado (California) OU de país (Canada, ISO 3166 alpha-2).
-# Uma vaga formatada como "Toronto, CA" bateria em _US_STATE_RE e seria classificada
-# como US — falso positivo real (não hipotético). Cidades/província/país canadenses
-# checados ANTES do regex de estado, pra não deixar o "CA" ambíguo decidir sozinho.
-_CANADA_MARKERS = (
-    "canada",
-    "toronto",
-    "vancouver",
-    "montreal",
-    "montréal",
-    "ottawa",
-    "calgary",
-    "edmonton",
-    "winnipeg",
-    "ontario",
-    "quebec",
-    "québec",
-    "british columbia",
-)
 
 
 def _canonical_country(value: str) -> str | None:
@@ -89,10 +78,12 @@ def infer_country(location: str | None, remote_type: str | None) -> str | None:
     text = (location or "").lower()
     if any(m in text for m in _BRAZIL_MARKERS):
         return "brazil"
-    if any(m in text for m in _CANADA_MARKERS):
-        return None
-    if any(m in text for m in _US_MARKERS) or _US_STATE_RE.search(text):
+    if any(m in text for m in _US_MARKERS):
         return "united states"
+    state_match = _US_STATE_RE.search(text)
+    if state_match:
+        # ", CA" is ambiguous (California vs. Canada) — never guess.
+        return None if state_match.group(1) == "ca" else "united states"
     return None
 
 

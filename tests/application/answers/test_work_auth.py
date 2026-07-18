@@ -108,7 +108,7 @@ def test_infer_country_canada_not_misread_as_us():
 
 def test_infer_country_us_state_codes_still_match():
     # cidades FORA da lista de markers → força o caminho do regex de estado
-    assert infer_country("Sacramento, CA", None) == "united states"
+    # 'CA' is handled separately (ambiguous, see the E8 T2 section below) — not tested here.
     assert infer_country("Tacoma, WA", None) == "united states"
     assert infer_country("Dallas, TX", None) == "united states"
 
@@ -135,37 +135,46 @@ def test_resolve_unrecognized_citizenship_needs_review():
     assert r == "__NEEDS_REVIEW__"
 
 
-# ── E8 T2: Canada false-positive (real bug found and fixed here) ─────────────
+# ── E8 T2: ", CA" is always ambiguous — conservative rule, never a guess ─────
 #
-# 'CA' é ambíguo: sigla de estado americano (California) OU sigla de país
-# (Canada, ISO 3166 alpha-2). Antes do fix, uma vaga formatada como
-# "Toronto, CA" (país abreviado) batia em _US_STATE_RE (', ca' = California) e
-# era classificada como 'united states' — um falso positivo REAL, distinto do
-# caso hipotético 'Ca-nada' já coberto acima. Isso faria resolve_work_auth
-# responder autorização/sponsorship como se a vaga fosse nos EUA, quando na
-# verdade é uma vaga canadense sem país suportado -> deveria ser
-# __NEEDS_REVIEW__, nunca 'a vaga é US'.
+# "CA" is ambiguous: US-state code (California) OR country code (Canada, ISO
+# 3166 alpha-2). Rather than disambiguate by enumerating Canadian cities (the
+# allowlist approach tried and reverted here), the chosen rule is: ANY ", CA"
+# location resolves to None (-> __NEEDS_REVIEW__ downstream), regardless of
+# whether the city is Canadian or genuinely Californian. This means legitimate
+# California postings also land in manual review — an accepted tradeoff over
+# ever guessing wrong about work authorization.
 
 
 def test_infer_country_canadian_city_with_ambiguous_ca_country_code_is_not_us():
-    """'Toronto, CA' e 'Vancouver, CA' usam CA como sigla de país (Canada), não
-    de estado americano. Antes do fix isso retornava 'united states' — bug real."""
+    """'Toronto, CA' and 'Vancouver, CA' use CA as the country code (Canada),
+    not the US state code — must never resolve to 'united states'."""
     assert infer_country("Toronto, CA", None) is None
     assert infer_country("Vancouver, CA", None) is None
 
 
-def test_infer_country_us_california_city_with_ca_still_resolves_to_us():
-    """Controle: cidades americanas reais com ', CA' (Sacramento, Los Angeles)
-    continuam corretamente inferidas como US mesmo após o fix — o fix só
-    desliga o match quando há um marcador canadense explícito na string."""
-    assert infer_country("Los Angeles, CA", None) == "united states"
-    assert infer_country("Sacramento, CA", None) == "united states"
+def test_infer_country_ca_is_always_ambiguous_never_resolves_to_a_country():
+    """Conservative rule holds for ANY ', CA' location: a made-up US-California
+    city and a made-up Canadian city both resolve to None (needs review) —
+    the rule does not special-case real Canadian markers or real CA cities."""
+    assert infer_country("Anytown, CA", None) is None
+    assert infer_country("Notrealburg, CA", None) is None
+    # Real US cities with ', CA' are no longer resolved either: conservative
+    # by design, this catches genuine California postings too.
+    assert infer_country("Los Angeles, CA", None) is None
+    assert infer_country("Sacramento, CA", None) is None
+
+
+def test_infer_country_us_state_ny_still_resolves_to_us():
+    """Control: a non-ambiguous US state code (NY) is unaffected by the CA
+    conservative rule and still resolves to 'united states'."""
+    assert infer_country("Buffalo, NY", None) == "united states"
 
 
 def test_resolve_work_auth_for_ambiguous_canada_string_needs_review_not_us():
-    """Fim a fim: campo de autorização com localização 'Toronto, CA' (o país
-    inferido deve ser None, não 'united states') não pode responder como se
-    fosse autorização/sponsorship nos EUA — precisa cair em review."""
+    """End to end: an authorization field with location 'Toronto, CA' (the
+    inferred country must be None, not 'united states') cannot answer as if
+    the job were in the US — it must fall through to review."""
     country = infer_country("Toronto, CA", None)
     assert country is None
     r = resolve_work_auth("Are you authorized to work in the US?", country, WA_CONFIG)
