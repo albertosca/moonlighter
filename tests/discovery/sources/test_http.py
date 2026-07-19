@@ -9,6 +9,7 @@ from gauntler.discovery.sources.http import (
     GreenhouseScanner,
     LeverScanner,
     RecruiteeScanner,
+    SmartRecruitersScanner,
     WorkableScanner,
 )
 
@@ -903,3 +904,370 @@ async def test_recruitee_missing_offers_key_returns_empty():
     with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
+
+
+# --- SmartRecruitersScanner tests ---
+
+_SR_LIST_P1 = {
+    "offset": 0,
+    "limit": 1,
+    "totalFound": 2,
+    "content": [
+        {
+            "id": "744000000000001",
+            "uuid": "u1",
+            "name": "SRE",
+            "location": {"city": "Remote", "country": "US", "remote": True, "hybrid": False},
+        }
+    ],
+}
+_SR_LIST_P2 = {
+    "offset": 1,
+    "limit": 1,
+    "totalFound": 2,
+    "content": [
+        {
+            "id": "744000000000002",
+            "uuid": "u2",
+            "name": "Data Eng",
+            "location": {"city": "NYC", "country": "US", "remote": False, "hybrid": True},
+        }
+    ],
+}
+_SR_DETAIL = {"jobAd": {"sections": {"jobDescription": {"text": "<p>Own the pipeline</p>"}}}}
+
+
+def _sr_response(payload, status_code=200):
+    mock_response = MagicMock()
+    mock_response.status_code = status_code
+    mock_response.json.return_value = payload
+    return mock_response
+
+
+def _make_url_branching_client(url_map):
+    """A mock client whose .get(url) branches on a substring match in url_map.
+
+    url_map: dict[str substring -> response payload]. Raises AssertionError on a URL
+    that matches no substring, so a test with an unexpected call fails loudly instead
+    of silently succeeding.
+    """
+
+    async def fake_get(url, headers=None):
+        for substring, payload in url_map.items():
+            if substring in url:
+                return _sr_response(payload)
+        raise AssertionError(f"unexpected URL requested: {url}")
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    return mock_client
+
+
+async def test_smartrecruiters_paginates_and_fetches_detail():
+    mock_client = _make_url_branching_client(
+        {
+            "postings?limit=100&offset=0": _SR_LIST_P1,
+            "postings?limit=100&offset=1": _SR_LIST_P2,
+            "postings/744000000000001": _SR_DETAIL,
+            "postings/744000000000002": _SR_DETAIL,
+        }
+    )
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["Visa"])
+
+    assert len(jobs) == 2
+    first, second = jobs
+    assert first.source == "smartrecruiters"
+    assert first.company == "Visa"
+    assert first.title == "SRE"
+    assert first.url == "https://jobs.smartrecruiters.com/Visa/744000000000001"
+    assert first.remote_type == "remote"
+    assert first.description == "Own the pipeline"
+
+    assert second.title == "Data Eng"
+    assert second.url == "https://jobs.smartrecruiters.com/Visa/744000000000002"
+    assert second.remote_type == "hybrid"
+    assert second.description == "Own the pipeline"
+
+
+async def test_smartrecruiters_empty_feed_makes_no_detail_call():
+    empty_page = {"offset": 0, "limit": 100, "totalFound": 0, "content": []}
+    mock_client = _make_url_branching_client({"postings?limit=100&offset=0": empty_page})
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()) as mock_sleep,
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+    assert jobs == []
+    mock_sleep.assert_not_called()
+    # only the single list call was made, no detail call (asserted implicitly by
+    # _make_url_branching_client raising on any unmapped URL, e.g. a detail URL)
+    assert mock_client.get.await_count == 1
+
+
+async def test_smartrecruiters_pagination_terminates_when_content_shorter_than_limit():
+    # totalFound overstates what's actually returned; the loop must still terminate
+    # because `content` comes back empty on the second page, not because offset caught up.
+    page = {"offset": 0, "limit": 100, "totalFound": 5, "content": []}
+    mock_client = _make_url_branching_client({"postings?limit=100&offset=0": page})
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+    assert jobs == []
+    assert mock_client.get.await_count == 1
+
+
+async def test_smartrecruiters_pagination_terminates_when_offset_reaches_total():
+    mock_client = _make_url_branching_client(
+        {
+            "postings?limit=100&offset=0": _SR_LIST_P1,
+            "postings?limit=100&offset=1": _SR_LIST_P2,
+            "postings/744000000000001": _SR_DETAIL,
+            "postings/744000000000002": _SR_DETAIL,
+        }
+    )
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        await SmartRecruitersScanner().scan(["Visa"])
+    # exactly 2 list calls (offset=0, offset=1) then it stops -- proves offset>=total
+    # terminates the loop rather than spinning past totalFound.
+    list_calls = [c for c in mock_client.get.await_args_list if "postings?limit=100" in c.args[0]]
+    assert len(list_calls) == 2
+
+
+def _make_flat_client(response=None, status_code=200, raise_exc=None):
+    """Like _make_mock_client but scoped locally to keep SmartRecruiters tests grouped."""
+    mock_client = MagicMock()
+    if raise_exc:
+        mock_client.get = AsyncMock(side_effect=raise_exc)
+    else:
+        mock_client.get = AsyncMock(return_value=_sr_response(response, status_code=status_code))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    return mock_client
+
+
+async def test_smartrecruiters_500_response_returns_empty():
+    mock_client = _make_flat_client({}, status_code=500)
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_smartrecruiters_non_dict_list_response_returns_empty():
+    mock_client = _make_flat_client([{"content": []}])
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_smartrecruiters_network_exception_on_list_skips_company():
+    mock_client = _make_flat_client(raise_exc=httpx.ConnectError("timeout"))
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_smartrecruiters_detail_500_yields_none_description():
+    mock_client = _make_url_branching_client({"postings?limit=100&offset=0": _SR_LIST_P1})
+
+    async def fake_get(url, headers=None):
+        if "postings?limit=100&offset=0" in url:
+            return _sr_response(_SR_LIST_P1)
+        if "postings/744000000000001" in url:
+            return _sr_response({}, status_code=500)
+        raise AssertionError(f"unexpected URL requested: {url}")
+
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+    assert len(jobs) == 1
+    assert jobs[0].description is None
+
+
+async def test_smartrecruiters_detail_network_exception_yields_none_description():
+    async def fake_get(url, headers=None):
+        if "postings?limit=100&offset=0" in url:
+            return _sr_response(_SR_LIST_P1)
+        if "postings/744000000000001" in url:
+            raise httpx.ConnectError("timeout")
+        raise AssertionError(f"unexpected URL requested: {url}")
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+    assert len(jobs) == 1
+    assert jobs[0].description is None
+
+
+async def test_smartrecruiters_detail_non_dict_response_yields_none_description():
+    async def fake_get(url, headers=None):
+        if "postings?limit=100&offset=0" in url:
+            return _sr_response(_SR_LIST_P1)
+        if "postings/744000000000001" in url:
+            return _sr_response([{"jobAd": {}}])
+        raise AssertionError(f"unexpected URL requested: {url}")
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+    assert len(jobs) == 1
+    assert jobs[0].description is None
+
+
+async def test_smartrecruiters_skips_posting_without_id_or_name():
+    page = {
+        "offset": 0,
+        "limit": 100,
+        "totalFound": 2,
+        "content": [
+            {"id": "", "name": "No ID", "location": {}},
+            {"id": "744000000000009", "name": "", "location": {}},
+        ],
+    }
+    mock_client = _make_url_branching_client({"postings?limit=100&offset=0": page})
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_smartrecruiters_no_remote_or_hybrid_flags_uses_location_text():
+    page = {
+        "offset": 0,
+        "limit": 100,
+        "totalFound": 1,
+        "content": [
+            {
+                "id": "744000000000010",
+                "name": "Support",
+                "location": {"city": "Berlin", "country": "Germany"},
+            }
+        ],
+    }
+    mock_client = _make_url_branching_client(
+        {
+            "postings?limit=100&offset=0": page,
+            "postings/744000000000010": _SR_DETAIL,
+        }
+    )
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+    assert jobs[0].location == "Berlin, Germany"
+    assert jobs[0].remote_type == "onsite"
+
+
+async def test_smartrecruiters_missing_location_dict():
+    page = {
+        "offset": 0,
+        "limit": 100,
+        "totalFound": 1,
+        "content": [{"id": "744000000000011", "name": "No Location"}],
+    }
+    mock_client = _make_url_branching_client(
+        {
+            "postings?limit=100&offset=0": page,
+            "postings/744000000000011": _SR_DETAIL,
+        }
+    )
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+    assert jobs[0].location is None
+    assert jobs[0].remote_type is None
+
+
+async def test_smartrecruiters_detail_multiple_sections_concatenated_and_html_stripped():
+    detail = {
+        "jobAd": {
+            "sections": {
+                "jobDescription": {"text": "<p>Own the pipeline.</p>"},
+                "qualifications": {"text": "<ul><li>5+ years</li></ul>"},
+                "notASection": "ignored, not a dict",
+            }
+        }
+    }
+    page = {
+        "offset": 0,
+        "limit": 100,
+        "totalFound": 1,
+        "content": [{"id": "744000000000012", "name": "Eng", "location": {}}],
+    }
+    mock_client = _make_url_branching_client(
+        {
+            "postings?limit=100&offset=0": page,
+            "postings/744000000000012": detail,
+        }
+    )
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+    description = jobs[0].description
+    assert description is not None
+    assert "<" not in description and ">" not in description
+    assert "Own the pipeline." in description
+    assert "5+ years" in description
+
+
+async def test_smartrecruiters_detail_no_sections_yields_none_description():
+    detail = {"jobAd": {"sections": {}}}
+    page = {
+        "offset": 0,
+        "limit": 100,
+        "totalFound": 1,
+        "content": [{"id": "744000000000013", "name": "Eng", "location": {}}],
+    }
+    mock_client = _make_url_branching_client(
+        {
+            "postings?limit=100&offset=0": page,
+            "postings/744000000000013": detail,
+        }
+    )
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+    assert jobs[0].description is None

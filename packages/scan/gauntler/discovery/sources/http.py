@@ -273,3 +273,81 @@ class RecruiteeScanner(BaseScanner):
                 )
             )
         return jobs
+
+
+class SmartRecruitersScanner(BaseScanner):
+    LIST = "https://api.smartrecruiters.com/v1/companies/{slug}/postings?limit=100&offset={offset}"
+    DETAIL = "https://api.smartrecruiters.com/v1/companies/{slug}/postings/{pid}"
+    APPLY = "https://jobs.smartrecruiters.com/{slug}/{pid}"
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "gauntler/0.1"}
+
+    async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
+        return await _gather_jobs("smartrecruiters", company_slugs, self._fetch)
+
+    async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
+        postings = await self._list(client, slug)
+        jobs = []
+        for p in postings:
+            pid, title = p.get("id"), p.get("name")
+            if not pid or not title:
+                continue
+            loc = p.get("location") or {}
+            location = ", ".join(x for x in (loc.get("city"), loc.get("country")) if x) or None
+            remote_type = (
+                "remote"
+                if loc.get("remote")
+                else "hybrid"
+                if loc.get("hybrid")
+                else normalize_remote_type(location)
+            )
+            description = await self._detail(client, slug, pid)
+            jobs.append(
+                RawJob(
+                    source="smartrecruiters",
+                    company=slug,
+                    title=title,
+                    url=self.APPLY.format(slug=slug, pid=pid),
+                    location=location,
+                    remote_type=remote_type,
+                    description=description,
+                )
+            )
+        return jobs
+
+    async def _list(self, client: httpx.AsyncClient, slug: str) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        offset = 0
+        while True:
+            try:
+                r = await client.get(
+                    self.LIST.format(slug=slug, offset=offset), headers=self.HEADERS
+                )
+            except Exception:
+                return out
+            if r.status_code != 200:
+                return out
+            data = r.json()
+            if not isinstance(data, dict):
+                return out
+            content = data.get("content") or []
+            out.extend(content)
+            total = data.get("totalFound", 0)
+            offset += data.get("limit", 100)
+            if offset >= total or not content:
+                return out
+
+    async def _detail(self, client: httpx.AsyncClient, slug: str, pid: str) -> str | None:
+        await asyncio.sleep(0.1)
+        try:
+            r = await client.get(self.DETAIL.format(slug=slug, pid=pid), headers=self.HEADERS)
+        except Exception:
+            return None
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        if not isinstance(data, dict):
+            return None
+        sections = (data.get("jobAd") or {}).get("sections") or {}
+        parts = [s.get("text", "") for s in sections.values() if isinstance(s, dict)]
+        raw = " ".join(p for p in parts if p)
+        return re.sub(r"<[^>]+>", " ", raw).strip() or None if raw else None
