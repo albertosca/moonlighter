@@ -1056,6 +1056,39 @@ def _make_flat_client(response=None, status_code=200, raise_exc=None):
     return mock_client
 
 
+async def test_smartrecruiters_zero_limit_field_does_not_spin():
+    # The server explicitly reports "limit": 0 while still returning content and a
+    # totalFound far larger than what's been consumed so far. If the loop advanced
+    # offset by data.get("limit", 100) it would add 0 and re-request the SAME offset
+    # forever (bounded here only by _make_url_branching_client raising on an
+    # unexpected URL, which would surface as a failure rather than a real hang).
+    # Advancing by len(content) instead guarantees the offset moves forward every
+    # iteration, so the loop terminates as soon as a page comes back empty.
+    spinning_page = {
+        "offset": 0,
+        "limit": 0,
+        "totalFound": 999999,
+        "content": [{"id": "1", "uuid": "u1", "name": "Spinner"}],
+    }
+    empty_page = {"offset": 1, "limit": 0, "totalFound": 999999, "content": []}
+    mock_client = _make_url_branching_client(
+        {
+            "postings?limit=100&offset=0": spinning_page,
+            "postings?limit=100&offset=1": empty_page,
+            "postings/1": _SR_DETAIL,
+        }
+    )
+    with (
+        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+    ):
+        jobs = await SmartRecruitersScanner().scan(["acme"])
+
+    assert len(jobs) == 1
+    list_calls = [c for c in mock_client.get.await_args_list if "postings?limit=100" in c.args[0]]
+    assert len(list_calls) == 2
+
+
 async def test_smartrecruiters_500_response_returns_empty():
     mock_client = _make_flat_client({}, status_code=500)
     with (

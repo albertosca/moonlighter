@@ -332,7 +332,7 @@ class SmartRecruitersScanner(BaseScanner):
             content = data.get("content") or []
             out.extend(content)
             total = data.get("totalFound", 0)
-            offset += data.get("limit", 100)
+            offset += len(content)
             if offset >= total or not content:
                 return out
 
