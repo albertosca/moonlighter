@@ -96,8 +96,21 @@ async def _show_window_safe(page: Page) -> None:
 
 
 async def detect_applier(
-    page: Page, config: dict[str, Any], profile: dict[str, Any]
+    page: Page, config: dict[str, Any], profile: dict[str, Any], source: str | None = None
 ) -> BaseApplier | None:
+    """Detects which applier handles the current page.
+
+    Source-first: if the scanner already tagged the job's ATS (`source`), trust it
+    over the URL — this is how Recruitee's custom career domains (e.g.
+    jobs.channable.com) get routed correctly even though the URL itself carries no
+    "recruitee" signal. Falls back to the existing URL-based `.detect()` loop when
+    there's no source match (or no source at all), preserving current behavior for
+    every other ATS.
+    """
+    if source is not None:
+        for cls in _APPLIER_CLASSES:
+            if source == cls.SOURCE:
+                return cls(page, config, profile)  # type: ignore[abstract]
     for cls in _APPLIER_CLASSES:
         applier = cls(page, config, profile)  # type: ignore[abstract]
         if await applier.detect():
@@ -152,7 +165,7 @@ async def _draft_one(
             await page.wait_for_load_state("networkidle", timeout=15000)
             await browser.save_screenshot(page, job_id, "01-job-page", config)
 
-            applier = await detect_applier(page, config, profile)
+            applier = await detect_applier(page, config, profile, source=job.source)
             if not applier:
                 return f"⚠️  Job #{job_id}: ATS not recognized. URL: {job.url}"
             if isinstance(applier, LinkedInApplier) and not await applier.is_easy_apply():
@@ -309,7 +322,7 @@ async def _fill_open_page(
     recognized. Does NOT close the page — whoever opened it owns its lifecycle."""
     await page.goto(job.url, timeout=30000)
     await page.wait_for_load_state("networkidle", timeout=15000)
-    applier = await detect_applier(page, config, profile)
+    applier = await detect_applier(page, config, profile, source=job.source)
     if applier is None:
         return None
     if isinstance(applier, LinkedInApplier):

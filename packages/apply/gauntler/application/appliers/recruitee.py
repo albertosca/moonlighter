@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any
+from typing import Any, ClassVar
 
 from gauntler.application.appliers.base import (
     BaseApplier,
@@ -54,17 +54,20 @@ class RecruiteeApplier(BaseApplier):
     reviewed.
     """
 
+    SOURCE: ClassVar[str] = "recruitee"
+
     def __init__(self, page: Page, config: dict[str, Any], profile: dict[str, Any]):
         super().__init__(page, config, profile)
         self._dropdown = CustomDropdownFiller(page, config, profile)
 
     async def detect(self) -> bool:
         # LIVE-VERIFY: recruitee.com only matches the default *.recruitee.com career
-        # site. Recruitee also supports fully custom career-page domains (the
-        # employer's own domain, proxied to Recruitee's backend) that this host
-        # check cannot see — discovery's captured `careers_apply_url` is the only
-        # signal in that case, and detect() will report False for those jobs until
-        # a live sample of a custom-domain Recruitee board is inspected.
+        # site. Most real Recruitee companies use fully custom career-page domains
+        # (the employer's own domain, proxied to Recruitee's backend) that this host
+        # check cannot see — those are now routed by `service.detect_applier`'s
+        # source-first pass (scanner-tagged `source="recruitee"`), which returns this
+        # applier without calling detect() at all. This URL check remains only as the
+        # fallback for the rare case where `source` isn't available.
         match = "recruitee.com" in self.page.url
         if match:
             logger.debug("detect: recruitee ✓ (%s)", self.page.url)

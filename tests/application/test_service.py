@@ -84,6 +84,45 @@ async def test_detect_applier_matches_recruitee(tmp_db):
     assert isinstance(applier, RecruiteeApplier)
 
 
+async def test_detect_applier_source_routes_recruitee_custom_domain(tmp_db):
+    """Most real Recruitee companies use a custom career domain (not *.recruitee.com),
+    so the URL-only check in RecruiteeApplier.detect() would never match. Passing
+    the scanner-known source must route to RecruiteeApplier anyway, without relying
+    on the URL at all. This fails against the old (source-less) detect_applier,
+    which falls through the URL loop and returns None for this non-recruitee.com
+    domain."""
+    applier = await apply_service.detect_applier(
+        _page("https://jobs.channable.com/o/backend-engineer"),
+        CONFIG,
+        PROFILE,
+        source="recruitee",
+    )
+    assert isinstance(applier, RecruiteeApplier)
+
+
+async def test_detect_applier_source_greenhouse_falls_back_to_url(tmp_db):
+    """A greenhouse job has no applier whose SOURCE == 'greenhouse', so the
+    source-first pass finds nothing and the existing URL-based loop still applies."""
+    init_db()
+    applier = await apply_service.detect_applier(
+        _page("https://boards.greenhouse.io/stripe/jobs/1"),
+        CONFIG,
+        PROFILE,
+        source="greenhouse",
+    )
+    assert isinstance(applier, GreenhouseApplier)
+
+
+async def test_detect_applier_no_source_uses_url_loop_unchanged(tmp_db):
+    """Backward compat: source=None (the default) runs exactly the pre-existing
+    URL-based detection loop."""
+    init_db()
+    applier = await apply_service.detect_applier(
+        _page("https://acme.recruitee.com/o/backend-engineer"), CONFIG, PROFILE
+    )
+    assert isinstance(applier, RecruiteeApplier)
+
+
 # ── archive_screenshots ─────────────────────────────────────────────────────
 
 

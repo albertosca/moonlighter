@@ -1440,7 +1440,7 @@ async def test_apply_jobs_exception_continues_to_next(tmp_db):
 
     detect_calls = [0]
 
-    async def detect_side_effect(pg, cfg, prof):
+    async def detect_side_effect(pg, cfg, prof, source=None):
         detect_calls[0] += 1
         if detect_calls[0] == 1:
             raise Exception("ATS detection crashed on job 1")

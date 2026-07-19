@@ -2,7 +2,7 @@ import contextlib
 import secrets
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import yaml
 from gauntler.core.config import NEEDS_REVIEW_SENTINEL
@@ -242,6 +242,11 @@ class ApplicationDraft:
 
 
 class BaseApplier(ABC):
+    # Known ATS identity from the scanner's `source` field (e.g. "recruitee"). None
+    # by default — appliers whose apply URL IS the ATS domain (Greenhouse, Lever,
+    # Ashby, LinkedIn) keep routing by URL via detect() and don't need this.
+    SOURCE: ClassVar[str | None] = None
+
     def __init__(self, page: Page, config: dict[str, Any], profile: dict[str, Any]):
         self.page = page
         self.config = config
