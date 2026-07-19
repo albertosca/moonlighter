@@ -351,3 +351,72 @@ class SmartRecruitersScanner(BaseScanner):
         parts = [s.get("text", "") for s in sections.values() if isinstance(s, dict)]
         raw = " ".join(p for p in parts if p)
         return re.sub(r"<[^>]+>", " ", raw).strip() or None if raw else None
+
+
+class GupyScanner(BaseScanner):
+    """Gupy is a portal-wide keyword feed (one global search across all companies
+    hosted on Gupy), not a per-company board -- so unlike the other HTTP scanners
+    it is keyword-driven and builds its own client rather than routing through
+    _gather_jobs(slugs). Not registered in SOURCES; dispatched separately (mirrors
+    the LinkedIn model) and gated behind a config flag in service.py."""
+
+    BASE = "https://employability-portal.gupy.io/api/v1/jobs?jobName={kw}&limit={limit}&offset={offset}"
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "gauntler/0.1"}
+
+    async def scan(
+        self, company_slugs: list[str] | None = None, *, keywords: str = "", **kwargs: Any
+    ) -> list[RawJob]:
+        jobs: list[RawJob] = []
+        offset = 0
+        async with httpx.AsyncClient(timeout=15) as client:
+            while True:
+                try:
+                    r = await client.get(
+                        self.BASE.format(kw=keywords, limit=100, offset=offset),
+                        headers=self.HEADERS,
+                    )
+                except Exception:
+                    return jobs
+                if r.status_code != 200:
+                    return jobs
+                data = r.json()
+                if not isinstance(data, dict):
+                    return jobs
+                page = data.get("data") or []
+                for item in page:
+                    title, url = item.get("name"), item.get("jobUrl")
+                    if not title or not url:
+                        continue
+                    location = (
+                        ", ".join(
+                            x
+                            for x in (item.get("city"), item.get("state"), item.get("country"))
+                            if x
+                        )
+                        or None
+                    )
+                    remote_type = (
+                        "remote"
+                        if item.get("isRemoteWork")
+                        else normalize_remote_type(item.get("workplaceType"))
+                    )
+                    raw = (item.get("description") or "").replace("&nbsp;", " ")
+                    description = re.sub(r"<[^>]+>", " ", raw).strip() if raw else None
+                    jobs.append(
+                        RawJob(
+                            source="gupy",
+                            company=item.get("careerPageName") or "gupy",
+                            title=title,
+                            url=url,
+                            location=location,
+                            remote_type=remote_type,
+                            description=description,
+                        )
+                    )
+                # Advance by the actual page length (never by the server-reported
+                # `limit`, which can legitimately be 0 and spin the loop forever --
+                # the same bug just fixed for SmartRecruiters).
+                offset += len(page)
+                total = (data.get("pagination") or {}).get("total", 0)
+                if not page or offset >= total:
+                    return jobs

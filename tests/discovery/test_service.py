@@ -593,3 +593,35 @@ def test_format_archive_result_archived_and_failed():
     formatted = _format_archive_result(result)
     assert "1 job(s) archived" in formatted
     assert "Could not check: beta" in formatted
+
+
+# ── Gupy dispatch (portal-wide keyword feed, LinkedIn-model, config-gated) ──
+
+
+async def _collect(config):
+    """Runs _collect_raw_jobs with no HTTP-registry scanners and no LinkedIn jobs,
+    isolating the Gupy dispatch branch."""
+    with (
+        patch("gauntler.discovery.service.build_http_scanners", return_value={}),
+        patch("gauntler.discovery.service._scan_linkedin", new=AsyncMock(return_value=([], None))),
+    ):
+        return await scan_service._collect_raw_jobs("engineer", config, {})
+
+
+async def test_collect_raw_jobs_skips_gupy_by_default():
+    with patch("gauntler.discovery.sources.http.GupyScanner") as MockGupy:
+        MockGupy.return_value.scan = AsyncMock(return_value=[])
+        raw_jobs, _ = await _collect({})
+    MockGupy.return_value.scan.assert_not_called()
+    assert raw_jobs == []
+
+
+async def test_collect_raw_jobs_calls_gupy_when_config_enabled():
+    gupy_job = RawJob(
+        source="gupy", company="acme", title="Eng", url="https://acme.gupy.io/1", description="d"
+    )
+    with patch("gauntler.discovery.sources.http.GupyScanner") as MockGupy:
+        MockGupy.return_value.scan = AsyncMock(return_value=[gupy_job])
+        raw_jobs, _ = await _collect({"scan_gupy": True})
+    MockGupy.return_value.scan.assert_awaited_once_with(keywords="engineer")
+    assert raw_jobs == [gupy_job]

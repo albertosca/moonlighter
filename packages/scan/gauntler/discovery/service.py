@@ -141,7 +141,20 @@ async def _collect_raw_jobs(
 
     li_jobs, li_warning = await _scan_linkedin(keywords, config)
     raw_jobs.extend(li_jobs)
+    raw_jobs.extend(await _scan_gupy(keywords, config))
     return raw_jobs, li_warning
+
+
+async def _scan_gupy(keywords: str, config: dict[str, Any]) -> list[RawJob]:
+    """Gupy is a portal-wide keyword feed (all companies hosted on Gupy, not a
+    per-company board), so it's dispatched here like LinkedIn rather than through
+    the SOURCES registry -- and gated hard behind a config flag (default off)
+    since an ungated run returns all-BR jobs that would flood the pipeline."""
+    if not config.get("scan_gupy"):
+        return []
+    from gauntler.discovery.sources.http import GupyScanner
+
+    return await GupyScanner().scan(keywords=keywords or "software engineer")
 
 
 def _drop_already_seen(raw_jobs: list[RawJob]) -> list[RawJob]:
