@@ -37,19 +37,19 @@ ignore = ["RUF001", "RUF002", "RUF003", "E501"]
 
 [tool.coverage.run]
 source_pkgs = [
-    "gauntler.core",
-    "gauntler.discovery",
-    "gauntler.application",
-    "gauntler.tracking",
-    "gauntler.server",
-    "gauntler.startup",
-    "gauntler.views",
-    "gauntler._tool_logging",
+    "moonlighter.core",
+    "moonlighter.discovery",
+    "moonlighter.application",
+    "moonlighter.tracking",
+    "moonlighter.server",
+    "moonlighter.startup",
+    "moonlighter.views",
+    "moonlighter._tool_logging",
 ]
 branch = true
 omit = [
-    "*/gauntler/core/browser.py",
-    "*/gauntler/discovery/sources/playwright.py",
+    "*/moonlighter/core/browser.py",
+    "*/moonlighter/discovery/sources/playwright.py",
 ]
 
 [tool.coverage.report]

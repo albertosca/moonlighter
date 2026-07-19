@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from gauntler.discovery.sources.http import (
+from moonlighter.discovery.sources.http import (
     AshbyScanner,
     GreenhouseScanner,
     GupyScanner,
@@ -136,7 +136,7 @@ async def test_greenhouse_html_stripped_from_description():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert len(jobs) == 1
     assert "<" not in jobs[0].description
@@ -157,7 +157,7 @@ async def test_greenhouse_posted_at_parsed():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].posted_at is not None
     assert isinstance(jobs[0].posted_at, datetime)
@@ -176,7 +176,7 @@ async def test_greenhouse_posted_at_invalid_format():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].posted_at is None
 
@@ -193,7 +193,7 @@ async def test_greenhouse_missing_location():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].location is None
     assert jobs[0].remote_type is None
@@ -201,14 +201,14 @@ async def test_greenhouse_missing_location():
 
 async def test_greenhouse_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_greenhouse_empty_jobs_list():
     mock_client = _make_mock_client({"jobs": []})
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -226,7 +226,7 @@ async def test_greenhouse_multiple_companies():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["stripe", "linear"])
     assert len(jobs) == 2
 
@@ -245,7 +245,7 @@ async def test_lever_skips_entry_without_title():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
@@ -261,7 +261,7 @@ async def test_lever_skips_entry_without_url():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
@@ -277,7 +277,7 @@ async def test_lever_timestamp_is_utc_aware():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs[0].posted_at is not None
     assert jobs[0].posted_at.tzinfo is not None
@@ -293,28 +293,28 @@ async def test_lever_missing_created_at():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs[0].posted_at is None
 
 
 async def test_lever_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_lever_500_response_skips_company():
     mock_client = _make_mock_client([], status_code=500)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_lever_empty_array_response():
     mock_client = _make_mock_client([])
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
@@ -340,7 +340,7 @@ ASHBY_RESPONSE = {
 
 async def test_ashby_scan_success():
     mock_client = _make_mock_client(ASHBY_RESPONSE)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["openai"])
     assert len(jobs) == 1
     assert jobs[0].company == "openai"
@@ -351,7 +351,7 @@ async def test_ashby_scan_success():
 
 async def test_ashby_is_remote_flag_true():
     mock_client = _make_mock_client(ASHBY_RESPONSE)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["openai"])
     assert jobs[0].remote_type == "remote"
 
@@ -372,21 +372,21 @@ async def test_ashby_is_remote_flag_false_uses_location():
         }
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs[0].remote_type == "onsite"
 
 
 async def test_ashby_500_response_skips_company():
     mock_client = _make_mock_client({}, status_code=500)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_ashby_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -395,7 +395,7 @@ async def test_ashby_graphql_error_returns_empty():
     """API returns {"errors": [...]} → no data key → returns []."""
     response = {"errors": [{"message": "Unauthorized"}]}
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -416,7 +416,7 @@ async def test_ashby_missing_published_date_returns_none():
         }
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert len(jobs) == 1
     assert jobs[0].posted_at is None
@@ -439,7 +439,7 @@ async def test_ashby_published_date_parsed_as_datetime():
         }
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs[0].posted_at is not None
     assert isinstance(jobs[0].posted_at, datetime)
@@ -449,7 +449,7 @@ async def test_ashby_empty_job_postings_returns_empty():
     """jobPostings: [] → scan returns []."""
     response = {"data": {"jobPostings": []}}
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -484,7 +484,7 @@ async def test_greenhouse_partial_failure_continues():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["ok1", "fail", "ok2"])
     assert len(jobs) == 2
 
@@ -501,7 +501,7 @@ async def test_lever_multiple_companies_returns_all():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["stripe", "linear"])
     assert len(jobs) == 2
     assert jobs[0].company == "stripe"
@@ -524,7 +524,7 @@ async def test_greenhouse_missing_title_skips_job():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -542,7 +542,7 @@ async def test_greenhouse_missing_absolute_url_skips_job():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -550,7 +550,7 @@ async def test_greenhouse_missing_absolute_url_skips_job():
 async def test_greenhouse_invalid_top_level_schema_returns_empty():
     """API retorna lista em vez de dict com 'jobs' → retorna [] sem crash."""
     mock_client = _make_mock_client([{"title": "Eng"}])  # lista em vez de dict
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -558,7 +558,7 @@ async def test_greenhouse_invalid_top_level_schema_returns_empty():
 async def test_greenhouse_jobs_key_missing_returns_empty():
     """API retorna dict mas sem chave 'jobs' → retorna [] sem crash."""
     mock_client = _make_mock_client({"data": []})  # sem 'jobs'
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -569,7 +569,7 @@ async def test_greenhouse_jobs_key_missing_returns_empty():
 async def test_lever_non_list_response_returns_empty():
     """API retorna dict (ex: erro) em vez de lista → retorna [] sem crash."""
     mock_client = _make_mock_client({"error": "rate limited"})
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
@@ -592,7 +592,7 @@ async def test_ashby_missing_title_skips_job():
         }
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -605,7 +605,7 @@ async def test_ashby_missing_url_skips_job():
         }
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -614,7 +614,7 @@ async def test_ashby_null_job_postings_returns_empty():
     """data.jobPostings is null → returns [] without crashing."""
     response = {"data": {"jobPostings": None}}
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -638,8 +638,8 @@ async def test_greenhouse_logs_scan_start_and_fetched(caplog):
     }
     mock_client = _make_mock_client(payload)
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        caplog.at_level(logging.INFO, logger="gauntler.discovery.sources.http"),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        caplog.at_level(logging.INFO, logger="moonlighter.discovery.sources.http"),
     ):
         await scanner.scan(["co"])
     assert "greenhouse" in caplog.text
@@ -660,8 +660,8 @@ async def test_lever_logs_scan_fetched(caplog):
     ]
     mock_client = _make_mock_client(payload)
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        caplog.at_level(logging.INFO, logger="gauntler.discovery.sources.http"),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        caplog.at_level(logging.INFO, logger="moonlighter.discovery.sources.http"),
     ):
         await scanner.scan(["co"])
     assert "lever" in caplog.text
@@ -672,7 +672,7 @@ async def test_ashby_jobpostings_not_a_list_returns_empty():
     """jobPostings with an unexpected shape (not a list, but truthy) → [] (http_sources.py:171)."""
     response = {"data": {"jobPostings": {"unexpected": "shape"}}}
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -685,7 +685,7 @@ async def test_scan_skips_fetch_exceptions(Scanner):
     """_fetch raises → gather(return_exceptions) returns the exception → ignored (not a list)."""
     mock_client = _make_mock_client({})
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
         patch.object(Scanner, "_fetch", new=AsyncMock(side_effect=RuntimeError("boom"))),
     ):
         jobs = await Scanner().scan(["co"])
@@ -713,7 +713,7 @@ WORKABLE_RESPONSE = {
 
 async def test_workable_maps_fields_and_strips_html():
     mock_client = _make_mock_client(WORKABLE_RESPONSE)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WorkableScanner().scan(["acme"])
     assert len(jobs) == 1
     j = jobs[0]
@@ -737,7 +737,7 @@ async def test_workable_skips_entry_without_title():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs == []
 
@@ -745,7 +745,7 @@ async def test_workable_skips_entry_without_title():
 async def test_workable_skips_entry_without_url():
     response = {"jobs": [{"title": "Eng", "shortcode": "X", "application_url": ""}]}
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs == []
 
@@ -764,7 +764,7 @@ async def test_workable_no_telecommuting_uses_location():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs[0].remote_type == "onsite"
 
@@ -780,7 +780,7 @@ async def test_workable_missing_location_parts():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs[0].location is None
     assert jobs[0].remote_type is None
@@ -788,28 +788,28 @@ async def test_workable_missing_location_parts():
 
 async def test_workable_500_response_skips_company():
     mock_client = _make_mock_client({}, status_code=500)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_workable_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_workable_non_dict_response_returns_empty():
     mock_client = _make_mock_client([{"title": "Eng"}])
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_workable_missing_jobs_key_returns_empty():
     mock_client = _make_mock_client({"name": "Acme"})
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs == []
 
@@ -833,7 +833,7 @@ RECRUITEE_RESPONSE = {
 
 async def test_recruitee_maps_fields_and_strips_html():
     mock_client = _make_mock_client(RECRUITEE_RESPONSE)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert len(jobs) == 1
     j = jobs[0]
@@ -858,7 +858,7 @@ async def test_recruitee_remote_flag_true():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs[0].remote_type == "remote"
 
@@ -866,7 +866,7 @@ async def test_recruitee_remote_flag_true():
 async def test_recruitee_skips_entry_without_title():
     response = {"offers": [{"title": "", "careers_apply_url": ""}]}
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
 
@@ -874,35 +874,35 @@ async def test_recruitee_skips_entry_without_title():
 async def test_recruitee_skips_entry_without_url():
     response = {"offers": [{"title": "Eng", "careers_apply_url": ""}]}
     mock_client = _make_mock_client(response)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_recruitee_500_response_skips_company():
     mock_client = _make_mock_client({}, status_code=500)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_recruitee_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_recruitee_non_dict_response_returns_empty():
     mock_client = _make_mock_client([{"title": "Eng"}])
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_recruitee_missing_offers_key_returns_empty():
     mock_client = _make_mock_client({"other": []})
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
 
@@ -976,8 +976,8 @@ async def test_smartrecruiters_paginates_and_fetches_detail():
         }
     )
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["Visa"])
 
@@ -1000,8 +1000,8 @@ async def test_smartrecruiters_empty_feed_makes_no_detail_call():
     empty_page = {"offset": 0, "limit": 100, "totalFound": 0, "content": []}
     mock_client = _make_url_branching_client({"postings?limit=100&offset=0": empty_page})
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()) as mock_sleep,
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()) as mock_sleep,
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs == []
@@ -1017,8 +1017,8 @@ async def test_smartrecruiters_pagination_terminates_when_content_shorter_than_l
     page = {"offset": 0, "limit": 100, "totalFound": 5, "content": []}
     mock_client = _make_url_branching_client({"postings?limit=100&offset=0": page})
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs == []
@@ -1035,8 +1035,8 @@ async def test_smartrecruiters_pagination_terminates_when_offset_reaches_total()
         }
     )
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         await SmartRecruitersScanner().scan(["Visa"])
     # exactly 2 list calls (offset=0, offset=1) then it stops -- proves offset>=total
@@ -1080,8 +1080,8 @@ async def test_smartrecruiters_zero_limit_field_does_not_spin():
         }
     )
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
 
@@ -1093,8 +1093,8 @@ async def test_smartrecruiters_zero_limit_field_does_not_spin():
 async def test_smartrecruiters_500_response_returns_empty():
     mock_client = _make_flat_client({}, status_code=500)
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs == []
@@ -1103,8 +1103,8 @@ async def test_smartrecruiters_500_response_returns_empty():
 async def test_smartrecruiters_non_dict_list_response_returns_empty():
     mock_client = _make_flat_client([{"content": []}])
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs == []
@@ -1113,8 +1113,8 @@ async def test_smartrecruiters_non_dict_list_response_returns_empty():
 async def test_smartrecruiters_network_exception_on_list_skips_company():
     mock_client = _make_flat_client(raise_exc=httpx.ConnectError("timeout"))
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs == []
@@ -1132,8 +1132,8 @@ async def test_smartrecruiters_detail_500_yields_none_description():
 
     mock_client.get = AsyncMock(side_effect=fake_get)
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert len(jobs) == 1
@@ -1153,8 +1153,8 @@ async def test_smartrecruiters_detail_network_exception_yields_none_description(
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert len(jobs) == 1
@@ -1174,8 +1174,8 @@ async def test_smartrecruiters_detail_non_dict_response_yields_none_description(
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert len(jobs) == 1
@@ -1194,8 +1194,8 @@ async def test_smartrecruiters_skips_posting_without_id_or_name():
     }
     mock_client = _make_url_branching_client({"postings?limit=100&offset=0": page})
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs == []
@@ -1221,8 +1221,8 @@ async def test_smartrecruiters_no_remote_or_hybrid_flags_uses_location_text():
         }
     )
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs[0].location == "Berlin, Germany"
@@ -1243,8 +1243,8 @@ async def test_smartrecruiters_missing_location_dict():
         }
     )
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs[0].location is None
@@ -1274,8 +1274,8 @@ async def test_smartrecruiters_detail_multiple_sections_concatenated_and_html_st
         }
     )
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     description = jobs[0].description
@@ -1300,8 +1300,8 @@ async def test_smartrecruiters_detail_no_sections_yields_none_description():
         }
     )
     with (
-        patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("gauntler.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs[0].description is None
@@ -1350,7 +1350,7 @@ def _make_gupy_client(url_map):
 
 async def test_gupy_scan_maps_fields_and_strips_html():
     mock_client = _make_gupy_client({"offset=0": _GUPY_P1})
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan(keywords="engenheiro")
 
     assert len(jobs) == 1
@@ -1372,7 +1372,7 @@ async def test_gupy_missing_title_or_url_is_skipped():
         "pagination": {"total": 2, "limit": 10, "offset": 0},
     }
     mock_client = _make_gupy_client({"offset=0": page})
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs == []
 
@@ -1392,7 +1392,7 @@ async def test_gupy_no_remote_work_uses_workplace_type():
         "pagination": {"total": 1, "limit": 10, "offset": 0},
     }
     mock_client = _make_gupy_client({"offset=0": page})
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs[0].remote_type == "hybrid"
 
@@ -1403,7 +1403,7 @@ async def test_gupy_missing_careerpagename_falls_back_to_gupy():
         "pagination": {"total": 1, "limit": 10, "offset": 0},
     }
     mock_client = _make_gupy_client({"offset=0": page})
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs[0].company == "gupy"
 
@@ -1414,7 +1414,7 @@ async def test_gupy_no_description_yields_none():
         "pagination": {"total": 1, "limit": 10, "offset": 0},
     }
     mock_client = _make_gupy_client({"offset=0": page})
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs[0].description is None
 
@@ -1429,7 +1429,7 @@ async def test_gupy_paginates_across_pages():
         "pagination": {"total": 2, "limit": 1, "offset": 1},
     }
     mock_client = _make_gupy_client({"offset=0": p1, "offset=1": p2})
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan(keywords="eng")
     assert [j.title for j in jobs] == ["Eng One", "Eng Two"]
     assert mock_client.get.await_count == 2
@@ -1448,7 +1448,7 @@ async def test_gupy_zero_limit_field_does_not_spin():
     }
     empty_page = {"data": [], "pagination": {"total": 999999, "limit": 0, "offset": 1}}
     mock_client = _make_gupy_client({"offset=0": spinning_page, "offset=1": empty_page})
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan(keywords="eng")
     assert len(jobs) == 1
     assert mock_client.get.await_count == 2
@@ -1457,7 +1457,7 @@ async def test_gupy_zero_limit_field_does_not_spin():
 async def test_gupy_empty_page_terminates_immediately():
     page = {"data": [], "pagination": {"total": 0, "limit": 10, "offset": 0}}
     mock_client = _make_gupy_client({"offset=0": page})
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs == []
     assert mock_client.get.await_count == 1
@@ -1470,7 +1470,7 @@ async def test_gupy_500_response_returns_empty():
     mock_client.get = AsyncMock(return_value=mock_response)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs == []
 
@@ -1483,7 +1483,7 @@ async def test_gupy_non_dict_response_returns_empty():
     mock_client.get = AsyncMock(return_value=mock_response)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs == []
 
@@ -1493,7 +1493,7 @@ async def test_gupy_network_exception_returns_empty():
     mock_client.get = AsyncMock(side_effect=httpx.ConnectError("timeout"))
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs == []
 
@@ -1501,6 +1501,6 @@ async def test_gupy_network_exception_returns_empty():
 async def test_gupy_default_keyword_when_not_provided():
     page = {"data": [], "pagination": {"total": 0, "limit": 10, "offset": 0}}
     mock_client = _make_gupy_client({"jobName=&limit=100&offset=0": page})
-    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan()
     assert jobs == []

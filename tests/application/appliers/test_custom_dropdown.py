@@ -1,9 +1,9 @@
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from gauntler.application.appliers.custom_dropdown import CustomDropdownFiller
+from moonlighter.application.appliers.custom_dropdown import CustomDropdownFiller
 
-LOGGER_NAME = "gauntler.application.appliers.custom_dropdown"
+LOGGER_NAME = "moonlighter.application.appliers.custom_dropdown"
 
 
 def make_filler():
@@ -537,11 +537,11 @@ async def test_llm_pick_returns_choice():
     filler.config = {"llm_model": "m"}
     with (
         patch(
-            "gauntler.application.answers.option_matcher.pick_option_with_llm",
+            "moonlighter.application.answers.option_matcher.pick_option_with_llm",
             new=AsyncMock(return_value="Native"),
         ),
         patch(
-            "gauntler.application.appliers.custom_dropdown.make_caller",
+            "moonlighter.application.appliers.custom_dropdown.make_caller",
             return_value=AsyncMock(),
         ),
     ):
@@ -557,7 +557,7 @@ async def test_llm_pick_returns_none_without_options():
 async def test_llm_pick_returns_none_on_exception():
     filler = make_filler()
     with patch(
-        "gauntler.application.appliers.custom_dropdown.make_caller",
+        "moonlighter.application.appliers.custom_dropdown.make_caller",
         side_effect=Exception("boom"),
     ):
         assert await filler._llm_pick("English", "Fluent", ["Native"]) is None

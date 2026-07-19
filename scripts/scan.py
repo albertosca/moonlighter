@@ -10,12 +10,12 @@ also archives stale jobs, same as the tool.)
 import argparse
 import asyncio
 
-from gauntler.core.config import load_config, load_profile, validate_config
-from gauntler.core.db import init_db
-from gauntler.core.llm import make_caller
-from gauntler.core.log import setup as setup_logging
-from gauntler.core.metrics import operation_metrics
-from gauntler.discovery import service as scan_service
+from moonlighter.core.config import load_config, load_profile, validate_config
+from moonlighter.core.db import init_db
+from moonlighter.core.llm import make_caller
+from moonlighter.core.log import setup as setup_logging
+from moonlighter.core.metrics import operation_metrics
+from moonlighter.discovery import service as scan_service
 
 
 async def _run(keywords: str, phase: str) -> str:

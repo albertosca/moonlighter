@@ -6,15 +6,15 @@ apply_jobs/confirm_apply branches that test_mcp_server's happy path doesn't touc
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from gauntler.application import service as apply_service
-from gauntler.application.answers.cv import CVNotFoundError
-from gauntler.application.appliers.base import ApplicationDraft
-from gauntler.application.appliers.greenhouse import GreenhouseApplier
-from gauntler.application.appliers.recruitee import RecruiteeApplier
-from gauntler.application.service import _anomaly_reasons, _render_draft
-from gauntler.core.db import Application, Job, init_db
+from moonlighter.application import service as apply_service
+from moonlighter.application.answers.cv import CVNotFoundError
+from moonlighter.application.appliers.base import ApplicationDraft
+from moonlighter.application.appliers.greenhouse import GreenhouseApplier
+from moonlighter.application.appliers.recruitee import RecruiteeApplier
+from moonlighter.application.service import _anomaly_reasons, _render_draft
+from moonlighter.core.db import Application, Job, init_db
 
-CONFIG = {"screenshots_dir": "/tmp/gauntler-test-shots", "llm_model": "x", "email": {}}
+CONFIG = {"screenshots_dir": "/tmp/moonlighter-test-shots", "llm_model": "x", "email": {}}
 PROFILE: dict = {}
 
 
@@ -44,11 +44,13 @@ def _job(**kw):
 
 
 async def test_page_session_closes_on_error():
-    from gauntler.application.service import page_session
+    from moonlighter.application.service import page_session
 
     fake_page = AsyncMock()
     with (
-        patch("gauntler.application.service.browser.new_page", AsyncMock(return_value=fake_page)),
+        patch(
+            "moonlighter.application.service.browser.new_page", AsyncMock(return_value=fake_page)
+        ),
         pytest.raises(RuntimeError),
     ):
         async with page_session({}) as p:
@@ -134,7 +136,7 @@ def test_archive_screenshots_noop_when_missing(tmp_path):
 def test_archive_screenshots_swallows_exception(tmp_path):
     src = tmp_path / "456"
     src.mkdir()
-    with patch("gauntler.application.service.shutil.move", side_effect=OSError("disk")):
+    with patch("moonlighter.application.service.shutil.move", side_effect=OSError("disk")):
         # exception is logged as non-critical, does not propagate
         apply_service.archive_screenshots(456, {"screenshots_dir": str(tmp_path)})
 
@@ -151,12 +153,12 @@ async def test_apply_jobs_shows_needs_review_fields(tmp_db):
         form_fields=["Work auth?", "Name"],
     )
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.browser") as mock_browser,
         patch(
-            "gauntler.application.service.generate_answers",
+            "moonlighter.application.service.generate_answers",
             new=AsyncMock(return_value=draft),
         ),
-        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.save_screenshot = AsyncMock()
@@ -247,9 +249,11 @@ async def test_confirm_apply_without_email_config_skips_alias(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x"}  # no "email" key
     applier = _confirm_mocks(job, fill_status={"Name": "filled"})
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch(
+            "moonlighter.application.service.detect_applier", new=AsyncMock(return_value=applier)
+        ),
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.hide_window = AsyncMock()
@@ -268,9 +272,11 @@ async def test_confirm_apply_logs_failed_fields_but_submits(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     applier = _confirm_mocks(job, fill_status={"Name": "filled", "X": "failed:not_found"})
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch(
+            "moonlighter.application.service.detect_applier", new=AsyncMock(return_value=applier)
+        ),
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.hide_window = AsyncMock()
@@ -290,8 +296,10 @@ async def test_fill_open_page_fills_and_screenshots_without_submit(tmp_db, tmp_p
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     page = _page(job.url)
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch(
+            "moonlighter.application.service.detect_applier", new=AsyncMock(return_value=applier)
+        ),
     ):
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service._fill_open_page(
@@ -311,8 +319,8 @@ async def test_fill_open_page_returns_none_for_unknown_ats(tmp_db, tmp_path):
     job = _job(url="https://unknown/jobs/1")
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier", new=AsyncMock(return_value=None)),
     ):
         mock_browser.save_screenshot = AsyncMock()
         result = await apply_service._fill_open_page(
@@ -334,9 +342,11 @@ async def test_fill_application_fills_stops_persists(tmp_db, tmp_path):
     applier = _confirm_mocks(job, fill_status={"Name": "filled"})
     page = _page(job.url)
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch(
+            "moonlighter.application.service.detect_applier", new=AsyncMock(return_value=applier)
+        ),
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -368,7 +378,7 @@ async def test_fill_application_aborts_on_missing_cv(tmp_db, tmp_path):
     Application.create(job=job, status="draft", form_data='{"Name": "Alberto"}')
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     with patch(
-        "gauntler.application.service.resolve_cv_path",
+        "moonlighter.application.service.resolve_cv_path",
         side_effect=CVNotFoundError("cv.pdf does not exist"),
     ):
         result = await apply_service.fill_application(job.id, None, cfg, PROFILE)
@@ -385,9 +395,11 @@ async def test_fill_application_reports_failed_fields(tmp_db, tmp_path):
     applier = _confirm_mocks(job, fill_status={"Name": "filled", "X": "failed:not_found"})
     page = _page(job.url)
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch(
+            "moonlighter.application.service.detect_applier", new=AsyncMock(return_value=applier)
+        ),
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -416,9 +428,9 @@ async def test_fill_application_unknown_ats(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     page = _page(job.url)
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)),
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier", new=AsyncMock(return_value=None)),
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -438,12 +450,12 @@ async def test_fill_application_handles_exception(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     page = _page(job.url)
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.browser") as mock_browser,
         patch(
-            "gauntler.application.service._fill_open_page",
+            "moonlighter.application.service._fill_open_page",
             new=AsyncMock(side_effect=RuntimeError("unexpected failure")),
         ),
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -467,9 +479,11 @@ async def test_confirm_apply_survives_hide_window_failure(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     applier = _confirm_mocks(job, fill_status={"Name": "filled"})
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch(
+            "moonlighter.application.service.detect_applier", new=AsyncMock(return_value=applier)
+        ),
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         page = _page(job.url)
         mock_browser.new_page = AsyncMock(return_value=page)
@@ -491,12 +505,12 @@ async def test_confirm_apply_survives_show_window_failure_on_exception(tmp_db, t
     cv.write_text("x")
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.browser") as mock_browser,
         patch(
-            "gauntler.application.service._fill_open_page",
+            "moonlighter.application.service._fill_open_page",
             new=AsyncMock(side_effect=RuntimeError("unexpected failure")),
         ),
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.hide_window = AsyncMock()
@@ -535,9 +549,11 @@ async def test_submit_application_refills_and_submits(tmp_db, tmp_path):
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     applier = _confirm_mocks(job, fill_status={"Name": "filled"}, submit="submitted")
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=applier)),
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch(
+            "moonlighter.application.service.detect_applier", new=AsyncMock(return_value=applier)
+        ),
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv)),
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.hide_window = AsyncMock()
@@ -561,7 +577,7 @@ async def test_submit_application_missing_cv(tmp_db, tmp_path):
     Application.create(job=job, status="filled", form_data='{"Name": "Alberto"}', email_ref="r")
     cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
     with patch(
-        "gauntler.application.service.resolve_cv_path",
+        "moonlighter.application.service.resolve_cv_path",
         side_effect=CVNotFoundError("cv.pdf does not exist"),
     ):
         result = await apply_service.submit_application(job.id, cfg, PROFILE)

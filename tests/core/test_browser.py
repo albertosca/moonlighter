@@ -1,6 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import gauntler.core.browser as browser_mod
+import moonlighter.core.browser as browser_mod
 import pytest
 
 _CONFIG = {
@@ -83,9 +83,9 @@ async def test_launch_browser_uses_random_port_flag(tmp_path):
     mock_proc = MagicMock()
     mock_proc.kill = MagicMock()
     with (
-        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc) as popen,
-        patch("gauntler.core.browser._read_devtools_port", side_effect=[None, 9333]),
-        patch("gauntler.core.browser._devtools_ready", return_value=True),
+        patch("moonlighter.core.browser.subprocess.Popen", return_value=mock_proc) as popen,
+        patch("moonlighter.core.browser._read_devtools_port", side_effect=[None, 9333]),
+        patch("moonlighter.core.browser._devtools_ready", return_value=True),
     ):
         port = await browser_mod._launch_browser(_CONFIG, tmp_path)
     assert port == 9333
@@ -104,9 +104,9 @@ async def test_launch_browser_deletes_stale_port_file_before_launch(tmp_path):
     mock_proc.kill = MagicMock()
 
     with (
-        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
-        patch("gauntler.core.browser._read_devtools_port", return_value=None),
-        patch("gauntler.core.browser.asyncio.sleep", new=AsyncMock()),
+        patch("moonlighter.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("moonlighter.core.browser._read_devtools_port", return_value=None),
+        patch("moonlighter.core.browser.asyncio.sleep", new=AsyncMock()),
         pytest.raises(RuntimeError),
     ):
         await browser_mod._launch_browser(_CONFIG, tmp_path)
@@ -118,9 +118,9 @@ async def test_launch_browser_raises_when_port_never_appears(tmp_path):
     mock_proc = MagicMock()
     mock_proc.kill = MagicMock()
     with (
-        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
-        patch("gauntler.core.browser._read_devtools_port", return_value=None),
-        patch("gauntler.core.browser.asyncio.sleep", new=AsyncMock()),
+        patch("moonlighter.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("moonlighter.core.browser._read_devtools_port", return_value=None),
+        patch("moonlighter.core.browser.asyncio.sleep", new=AsyncMock()),
         pytest.raises(RuntimeError, match="Browser"),
     ):
         await browser_mod._launch_browser(_CONFIG, tmp_path)
@@ -134,11 +134,11 @@ async def test_get_context_launches_browser_when_devtools_not_ready(tmp_path):
     mock_pw, mock_playwright, _mock_browser, mock_context, mock_proc = _make_cdp_mocks()
     config = {**_CONFIG, "browser_session_dir": str(tmp_path)}
     with (
-        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
-        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc) as popen,
-        patch("gauntler.core.browser._read_devtools_port", side_effect=[None, 9333]),
-        patch("gauntler.core.browser._devtools_ready", return_value=True),
-        patch("gauntler.core.browser.asyncio.sleep", new=AsyncMock()),
+        patch("moonlighter.core.browser.async_playwright", return_value=mock_pw),
+        patch("moonlighter.core.browser.subprocess.Popen", return_value=mock_proc) as popen,
+        patch("moonlighter.core.browser._read_devtools_port", side_effect=[None, 9333]),
+        patch("moonlighter.core.browser._devtools_ready", return_value=True),
+        patch("moonlighter.core.browser.asyncio.sleep", new=AsyncMock()),
     ):
         ctx = await browser_mod.get_context(config)
     assert ctx is mock_context
@@ -151,10 +151,10 @@ async def test_get_context_skips_launch_when_devtools_already_ready(tmp_path):
     mock_pw, mock_playwright, _mock_browser, mock_context, mock_proc = _make_cdp_mocks()
     config = {**_CONFIG, "browser_session_dir": str(tmp_path)}
     with (
-        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
-        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc) as popen,
-        patch("gauntler.core.browser._read_devtools_port", return_value=9222),
-        patch("gauntler.core.browser._devtools_ready", return_value=True),
+        patch("moonlighter.core.browser.async_playwright", return_value=mock_pw),
+        patch("moonlighter.core.browser.subprocess.Popen", return_value=mock_proc) as popen,
+        patch("moonlighter.core.browser._read_devtools_port", return_value=9222),
+        patch("moonlighter.core.browser._devtools_ready", return_value=True),
     ):
         ctx = await browser_mod.get_context(config)
     assert ctx is mock_context
@@ -167,8 +167,8 @@ async def test_get_context_reuses_connected_browser():
     _, _, mock_browser, mock_context, _ = _make_cdp_mocks()
     browser_mod._browser = mock_browser
     with (
-        patch("gauntler.core.browser.async_playwright") as pw,
-        patch("gauntler.core.browser.subprocess.Popen") as popen,
+        patch("moonlighter.core.browser.async_playwright") as pw,
+        patch("moonlighter.core.browser.subprocess.Popen") as popen,
     ):
         ctx = await browser_mod.get_context(_CONFIG)
     assert ctx is mock_context
@@ -180,10 +180,10 @@ async def test_get_context_passes_cdp_url_and_slow_mo(tmp_path):
     mock_pw, mock_playwright, _, _, mock_proc = _make_cdp_mocks()
     config = {**_CONFIG, "slow_mo_ms": 123, "browser_session_dir": str(tmp_path)}
     with (
-        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
-        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
-        patch("gauntler.core.browser._read_devtools_port", return_value=9444),
-        patch("gauntler.core.browser._devtools_ready", return_value=True),
+        patch("moonlighter.core.browser.async_playwright", return_value=mock_pw),
+        patch("moonlighter.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("moonlighter.core.browser._read_devtools_port", return_value=9444),
+        patch("moonlighter.core.browser._devtools_ready", return_value=True),
     ):
         await browser_mod.get_context(config)
     call = mock_playwright.chromium.connect_over_cdp.call_args
@@ -195,10 +195,10 @@ async def test_get_context_creates_session_dir(tmp_path):
     config = {**_CONFIG, "browser_session_dir": str(tmp_path / "new_session")}
     mock_pw, _, _, _, mock_proc = _make_cdp_mocks()
     with (
-        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
-        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
-        patch("gauntler.core.browser._read_devtools_port", return_value=9555),
-        patch("gauntler.core.browser._devtools_ready", return_value=True),
+        patch("moonlighter.core.browser.async_playwright", return_value=mock_pw),
+        patch("moonlighter.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("moonlighter.core.browser._read_devtools_port", return_value=9555),
+        patch("moonlighter.core.browser._devtools_ready", return_value=True),
     ):
         await browser_mod.get_context(config)
     assert (tmp_path / "new_session").exists()
@@ -208,10 +208,10 @@ async def test_get_context_raises_when_browser_never_ready(tmp_path):
     mock_pw, _, _, _, mock_proc = _make_cdp_mocks()
     config = {**_CONFIG, "browser_session_dir": str(tmp_path)}
     with (
-        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
-        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
-        patch("gauntler.core.browser._read_devtools_port", return_value=None),
-        patch("gauntler.core.browser.asyncio.sleep", new=AsyncMock()),
+        patch("moonlighter.core.browser.async_playwright", return_value=mock_pw),
+        patch("moonlighter.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("moonlighter.core.browser._read_devtools_port", return_value=None),
+        patch("moonlighter.core.browser.asyncio.sleep", new=AsyncMock()),
         pytest.raises(RuntimeError, match="Browser"),
     ):
         await browser_mod.get_context(config)
@@ -227,10 +227,10 @@ async def test_new_page_returns_page_from_context(tmp_path):
     mock_context.new_page = AsyncMock(return_value=mock_page)
     config = {**_CONFIG, "browser_session_dir": str(tmp_path)}
     with (
-        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
-        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
-        patch("gauntler.core.browser._read_devtools_port", return_value=9666),
-        patch("gauntler.core.browser._devtools_ready", return_value=True),
+        patch("moonlighter.core.browser.async_playwright", return_value=mock_pw),
+        patch("moonlighter.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("moonlighter.core.browser._read_devtools_port", return_value=9666),
+        patch("moonlighter.core.browser._devtools_ready", return_value=True),
     ):
         page = await browser_mod.new_page(config)
     assert page is mock_page
@@ -329,11 +329,11 @@ async def test_get_context_logs_cdp_connected(caplog, tmp_path):
     config = {**_CONFIG, "browser_session_dir": str(tmp_path)}
 
     with (
-        patch("gauntler.core.browser.async_playwright", return_value=mock_pw),
-        patch("gauntler.core.browser.subprocess.Popen", return_value=mock_proc),
-        patch("gauntler.core.browser._read_devtools_port", return_value=9777),
-        patch("gauntler.core.browser._devtools_ready", return_value=True),
-        caplog.at_level(logging.INFO, logger="gauntler.core.browser"),
+        patch("moonlighter.core.browser.async_playwright", return_value=mock_pw),
+        patch("moonlighter.core.browser.subprocess.Popen", return_value=mock_proc),
+        patch("moonlighter.core.browser._read_devtools_port", return_value=9777),
+        patch("moonlighter.core.browser._devtools_ready", return_value=True),
+        caplog.at_level(logging.INFO, logger="moonlighter.core.browser"),
     ):
         await browser_mod.get_context(config)
 

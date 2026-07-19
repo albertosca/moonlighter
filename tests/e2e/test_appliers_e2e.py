@@ -1,10 +1,10 @@
 from unittest.mock import patch
 
 import pytest
-from gauntler.application.appliers.ashby import AshbyApplier
-from gauntler.application.appliers.greenhouse import GreenhouseApplier
-from gauntler.application.appliers.lever import LeverApplier
-from gauntler.application.appliers.linkedin import LinkedInApplier
+from moonlighter.application.appliers.ashby import AshbyApplier
+from moonlighter.application.appliers.greenhouse import GreenhouseApplier
+from moonlighter.application.appliers.lever import LeverApplier
+from moonlighter.application.appliers.linkedin import LinkedInApplier
 
 # e2e suite: requires a real browser (launches Brave/Chromium). Outside the default run —
 # run with `pytest -m e2e`. The coverage gate runs over the unit suite.

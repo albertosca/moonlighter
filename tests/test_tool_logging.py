@@ -1,6 +1,6 @@
 import inspect
 
-from gauntler._tool_logging import tool_logged
+from moonlighter._tool_logging import tool_logged
 
 
 async def test_returns_value_unchanged():

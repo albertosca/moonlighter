@@ -3,8 +3,8 @@ import time
 
 import peewee
 import pytest
-from gauntler.core import migrations
-from gauntler.core.migrations import MIGRATIONS, current_version, run_migrations
+from moonlighter.core import migrations
+from moonlighter.core.migrations import MIGRATIONS, current_version, run_migrations
 from peewee import SqliteDatabase
 
 
@@ -76,7 +76,7 @@ def test_run_migrations_resumes_from_existing_schema_version_row(tmp_path, monke
     leave that row alone rather than re-seeding it back to 0 — only the
     still-pending migrations run, and the version continues climbing from
     where it left off."""
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     db = _fresh_db(tmp_path / "t.db", open_dbs)
     db.execute_sql("CREATE TABLE schema_version (version INTEGER NOT NULL)")
     db.execute_sql("INSERT INTO schema_version (version) VALUES (1)")
@@ -93,7 +93,7 @@ def test_run_migrations_resumes_from_existing_schema_version_row(tmp_path, monke
 
 
 def test_fresh_db_applies_all_migrations(tmp_path, monkeypatch, open_dbs):
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     db = _fresh_db(tmp_path / "t.db", open_dbs)
 
     applied = run_migrations(db)
@@ -110,7 +110,7 @@ def test_idempotence_on_real_shaped_db_never_raises(tmp_path, monkeypatch, open_
     from the old ad-hoc ALTERs but no schema_version table (detected version 0).
     Running the migrations against it must be a safe no-op per column and
     converge to the latest version — never raise "column already exists"."""
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     db = _real_shaped_db(tmp_path / "t.db", open_dbs)
 
     assert current_version(db) == 0
@@ -126,7 +126,7 @@ def test_idempotence_on_real_shaped_db_never_raises(tmp_path, monkeypatch, open_
 
 def test_second_run_is_a_no_op_and_takes_no_backup(tmp_path, monkeypatch, open_dbs):
     home = tmp_path / "home"
-    monkeypatch.setenv("GAUNTLER_HOME", str(home))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(home))
     db = _fresh_db(tmp_path / "t.db", open_dbs)
 
     run_migrations(db)
@@ -142,7 +142,7 @@ def test_second_run_is_a_no_op_and_takes_no_backup(tmp_path, monkeypatch, open_d
 
 def test_backup_taken_only_when_migrations_are_pending(tmp_path, monkeypatch, open_dbs):
     home = tmp_path / "home"
-    monkeypatch.setenv("GAUNTLER_HOME", str(home))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(home))
     backups_dir = home / "backups"
     db = _fresh_db(tmp_path / "t.db", open_dbs)
 
@@ -167,7 +167,7 @@ def test_backup_taken_only_when_migrations_are_pending(tmp_path, monkeypatch, op
 
 def test_backup_retention_keeps_last_five(tmp_path, monkeypatch, open_dbs):
     home = tmp_path / "home"
-    monkeypatch.setenv("GAUNTLER_HOME", str(home))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(home))
     backups_dir = home / "backups"
     backups_dir.mkdir(parents=True)
     for i in range(7):
@@ -187,7 +187,7 @@ def test_backup_retention_keeps_last_five(tmp_path, monkeypatch, open_dbs):
 
 
 def test_failed_migration_leaves_version_at_last_fully_applied(tmp_path, monkeypatch, open_dbs):
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     db = _fresh_db(tmp_path / "t.db", open_dbs)
 
     def _boom(_db):
@@ -221,7 +221,7 @@ def test_locked_db_retries_then_succeeds(tmp_path, monkeypatch, open_dbs, raw_lo
     itself busy-loops against an externally-held exclusive lock indefinitely
     regardless of `timeout=0` (verified empirically), which would make the
     stub's own setup hang if the lock were taken any earlier."""
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(migrations, "_LOCK_BACKOFF_S", 0)
     db = _fresh_db(tmp_path / "t.db", open_dbs, timeout=0)
 
@@ -261,7 +261,7 @@ def test_locked_db_exhausts_retries_and_raises(tmp_path, monkeypatch, open_dbs, 
     `sqlite3.OperationalError` and re-running this test: it failed with
     `sleep_calls["n"] == 0` instead of the expected `_LOCK_RETRIES - 1`.
     """
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(migrations, "_LOCK_BACKOFF_S", 0)
     db = _fresh_db(tmp_path / "t.db", open_dbs, timeout=0)
 

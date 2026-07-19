@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from anthropic.types import TextBlock
-from gauntler.core.llm import LLMCaller, _call_cli, is_spend_limit, make_api_caller, make_caller
+from moonlighter.core.llm import LLMCaller, _call_cli, is_spend_limit, make_api_caller, make_caller
 
 
 @pytest.fixture(autouse=True)
@@ -15,7 +15,7 @@ def _fake_claude_on_path():
     fake path for every test in this module; tests that need a different
     resolution (found elsewhere, or absent) patch it explicitly, which
     overrides this outer patch for their duration."""
-    with patch("gauntler.core.llm.shutil.which", return_value="/usr/local/bin/claude"):
+    with patch("moonlighter.core.llm.shutil.which", return_value="/usr/local/bin/claude"):
         yield
 
 
@@ -28,7 +28,7 @@ def test_make_caller_cli_returns_call_cli():
 
 
 def test_make_caller_api_returns_callable():
-    with patch("gauntler.core.llm.anthropic"):
+    with patch("moonlighter.core.llm.anthropic"):
         caller = make_caller({"llm_backend": "api"})
     assert callable(caller)
     assert inspect.iscoroutinefunction(caller)
@@ -36,7 +36,7 @@ def test_make_caller_api_returns_callable():
 
 def test_make_caller_defaults_to_api_when_key_missing():
     """No 'llm_backend' key → falls back to api caller (not _call_cli)."""
-    with patch("gauntler.core.llm.anthropic"):
+    with patch("moonlighter.core.llm.anthropic"):
         caller = make_caller({})
     assert caller is not _call_cli
     assert callable(caller)
@@ -44,7 +44,7 @@ def test_make_caller_defaults_to_api_when_key_missing():
 
 def test_make_caller_unknown_backend_falls_back_to_api():
     """Unknown backend string → api caller (safe default)."""
-    with patch("gauntler.core.llm.anthropic"):
+    with patch("moonlighter.core.llm.anthropic"):
         caller = make_caller({"llm_backend": "unknown-backend"})
     assert caller is not _call_cli
     assert callable(caller)
@@ -57,7 +57,7 @@ async def test_call_cli_uses_sandbox_argv_and_stdin():
     """S-01/S-02/S-14/S-15: the prompt is never in argv (kills ps disclosure and
     argument injection at once); the CLI is spawned with an explicit no-tool,
     no-MCP, no-session-persistence, no-CLAUDE.md posture."""
-    from gauntler.core.llm import _CLI_SANDBOX_ARGS
+    from moonlighter.core.llm import _CLI_SANDBOX_ARGS
 
     mock_proc = MagicMock()
     mock_proc.returncode = 0
@@ -65,9 +65,9 @@ async def test_call_cli_uses_sandbox_argv_and_stdin():
 
     with (
         patch(
-            "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+            "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
         ) as mock_exec,
-        patch("gauntler.core.llm.shutil.which", return_value="/usr/local/bin/claude"),
+        patch("moonlighter.core.llm.shutil.which", return_value="/usr/local/bin/claude"),
     ):
         result = await _call_cli("my prompt", "ignored-model")
 
@@ -87,7 +87,7 @@ async def test_call_cli_uses_sandbox_argv_and_stdin():
 async def test_call_cli_sandbox_args_contents():
     """Each lockdown flag is load-bearing (validated empirically in the canary) —
     locks the exact list so a future edit doesn't silently loosen it."""
-    from gauntler.core.llm import _CLI_SANDBOX_ARGS
+    from moonlighter.core.llm import _CLI_SANDBOX_ARGS
 
     assert "--safe-mode" in _CLI_SANDBOX_ARGS
     assert "--no-session-persistence" in _CLI_SANDBOX_ARGS
@@ -100,14 +100,14 @@ async def test_call_cli_sandbox_args_contents():
 
 
 async def test_call_cli_cwd_is_neutral_workdir(tmp_path, monkeypatch):
-    """cwd is never the repository — it's a dedicated directory inside GAUNTLER_HOME."""
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    """cwd is never the repository — it's a dedicated directory inside MOONLIGHTER_HOME."""
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     mock_proc = MagicMock()
     mock_proc.returncode = 0
     mock_proc.communicate = AsyncMock(return_value=(b"ok", b""))
 
     with patch(
-        "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+        "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
     ) as mock_exec:
         await _call_cli("prompt", "model")
 
@@ -116,8 +116,8 @@ async def test_call_cli_cwd_is_neutral_workdir(tmp_path, monkeypatch):
 
 
 def test_cli_workdir_created_with_0700(tmp_path, monkeypatch):
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
-    from gauntler.core.llm import _cli_workdir
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    from moonlighter.core.llm import _cli_workdir
 
     workdir = _cli_workdir()
     assert workdir.exists()
@@ -126,8 +126,8 @@ def test_cli_workdir_created_with_0700(tmp_path, monkeypatch):
 
 def test_cli_workdir_is_idempotent(tmp_path, monkeypatch):
     """Calling it twice does not fail nor recreate the directory."""
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
-    from gauntler.core.llm import _cli_workdir
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    from moonlighter.core.llm import _cli_workdir
 
     first = _cli_workdir()
     second = _cli_workdir()
@@ -142,7 +142,7 @@ async def test_call_cli_ignores_model_param():
     mock_proc.communicate = AsyncMock(return_value=(b"output", b""))
 
     with patch(
-        "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+        "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
     ) as mock_exec:
         await _call_cli("prompt", "claude-opus-99")
 
@@ -158,7 +158,7 @@ async def test_call_cli_raises_on_nonzero_exit():
     mock_proc.communicate = AsyncMock(return_value=(b"", b"some error message"))
 
     with (
-        patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
         pytest.raises(RuntimeError) as exc_info,
     ):
         await _call_cli("prompt", "model")
@@ -175,7 +175,7 @@ async def test_call_cli_stderr_truncated_to_300_chars():
     mock_proc.communicate = AsyncMock(return_value=(b"", long_stderr))
 
     with (
-        patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
         pytest.raises(RuntimeError) as exc_info,
     ):
         await _call_cli("p", "m")
@@ -191,7 +191,7 @@ async def test_call_cli_empty_prompt_still_calls_subprocess():
     mock_proc.returncode = 0
     mock_proc.communicate = AsyncMock(return_value=(b"response", b""))
 
-    with patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
+    with patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
         result = await _call_cli("", "model")
 
     assert result == "response"
@@ -208,9 +208,9 @@ async def test_cli_launch_invariants():
 
     with (
         patch(
-            "gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+            "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
         ) as mock_exec,
-        patch("gauntler.core.llm.shutil.which", return_value="/usr/local/bin/claude"),
+        patch("moonlighter.core.llm.shutil.which", return_value="/usr/local/bin/claude"),
     ):
         await _call_cli("the prompt", "model")
 
@@ -230,7 +230,7 @@ async def test_cli_launch_invariants():
 
 async def test_call_cli_errors_clearly_when_claude_is_not_on_path():
     with (
-        patch("gauntler.core.llm.shutil.which", return_value=None),
+        patch("moonlighter.core.llm.shutil.which", return_value=None),
         pytest.raises(RuntimeError, match="claude"),
     ):
         await _call_cli("the prompt", "model")
@@ -248,7 +248,7 @@ async def test_make_api_caller_calls_messages_create():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("gauntler.core.llm.anthropic", mock_anthropic):
+    with patch("moonlighter.core.llm.anthropic", mock_anthropic):
         caller = make_api_caller()
         result = await caller("my prompt", "claude-sonnet-4-6")
 
@@ -269,7 +269,7 @@ async def test_make_api_caller_custom_max_tokens():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("gauntler.core.llm.anthropic", mock_anthropic):
+    with patch("moonlighter.core.llm.anthropic", mock_anthropic):
         caller = make_api_caller(max_tokens=512)
         await caller("prompt", "model")
 
@@ -286,7 +286,7 @@ async def test_make_api_caller_forwards_model():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("gauntler.core.llm.anthropic", mock_anthropic):
+    with patch("moonlighter.core.llm.anthropic", mock_anthropic):
         caller = make_api_caller()
         await caller("prompt", "claude-opus-4-7")
 
@@ -307,7 +307,7 @@ async def test_make_api_caller_returns_first_content_text():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("gauntler.core.llm.anthropic", mock_anthropic):
+    with patch("moonlighter.core.llm.anthropic", mock_anthropic):
         caller = make_api_caller()
         result = await caller("prompt", "model")
 
@@ -322,7 +322,7 @@ async def test_make_api_caller_propagates_exception():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("gauntler.core.llm.anthropic", mock_anthropic):
+    with patch("moonlighter.core.llm.anthropic", mock_anthropic):
         caller = make_api_caller()
         with pytest.raises(Exception, match="rate limit"):
             await caller("prompt", "model")
@@ -338,7 +338,7 @@ def test_make_api_caller_reuses_client_across_calls():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("gauntler.core.llm.anthropic", mock_anthropic):
+    with patch("moonlighter.core.llm.anthropic", mock_anthropic):
         make_api_caller()
 
     assert mock_anthropic.AsyncAnthropic.call_count == 1
@@ -348,7 +348,7 @@ def test_make_api_caller_reuses_client_across_calls():
 
 
 def test_llm_caller_type_is_exported():
-    """LLMCaller is importable from gauntler.core.llm."""
+    """LLMCaller is importable from moonlighter.core.llm."""
     assert LLMCaller is not None
 
 
@@ -358,7 +358,7 @@ async def test_cli_caller_satisfies_llm_caller_contract():
     mock_proc.returncode = 0
     mock_proc.communicate = AsyncMock(return_value=(b"result", b""))
 
-    with patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
+    with patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
         result = await _call_cli("hello", "any-model")
 
     assert isinstance(result, str)
@@ -374,7 +374,7 @@ async def test_api_caller_satisfies_llm_caller_contract():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("gauntler.core.llm.anthropic", mock_anthropic):
+    with patch("moonlighter.core.llm.anthropic", mock_anthropic):
         caller = make_api_caller()
         result = await caller("hello", "any-model")
 
@@ -389,7 +389,7 @@ async def test_make_api_caller_raises_on_non_text_block():
     mock_client.messages.create = AsyncMock(return_value=mock_message)
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
-    with patch("gauntler.core.llm.anthropic", mock_anthropic):
+    with patch("moonlighter.core.llm.anthropic", mock_anthropic):
         caller = make_api_caller()
         with pytest.raises(RuntimeError, match="non-text block"):
             await caller("prompt", "model")
@@ -410,7 +410,7 @@ async def test_cli_concatenates_cache_prefix():
     mock_proc.returncode = 0
     mock_proc.communicate = fake_communicate
 
-    with patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
+    with patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
         await _call_cli("DYN", "m", cache_prefix="STATIC")
     assert captured["input"] == b"STATIC\n\nDYN"
 
@@ -427,7 +427,7 @@ async def test_cli_no_cache_prefix_keeps_prompt_unchanged():
     mock_proc.returncode = 0
     mock_proc.communicate = fake_communicate
 
-    with patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
+    with patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
         await _call_cli("PROMPT_ONLY", "m")
     assert captured["input"] == b"PROMPT_ONLY"
 
@@ -442,7 +442,7 @@ async def test_api_uses_cache_control_block():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("gauntler.core.llm.anthropic", mock_anthropic):
+    with patch("moonlighter.core.llm.anthropic", mock_anthropic):
         caller = make_api_caller()
         await caller("DYN", "m", cache_prefix="STATIC")
 
@@ -463,7 +463,7 @@ async def test_api_no_cache_prefix_sends_plain_string():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("gauntler.core.llm.anthropic", mock_anthropic):
+    with patch("moonlighter.core.llm.anthropic", mock_anthropic):
         caller = make_api_caller()
         await caller("PROMPT_ONLY", "m")
 

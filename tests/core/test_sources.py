@@ -1,4 +1,4 @@
-from gauntler.core.sources import Source
+from moonlighter.core.sources import Source
 
 
 def test_members_serialize_to_plain_strings():

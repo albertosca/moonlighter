@@ -3,7 +3,7 @@ import re
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from gauntler.application.appliers.base import (
+from moonlighter.application.appliers.base import (
     _MAX_LABEL_LEN,
     _MAX_LLM_FIELDS,
     _SKIP_SENTINELS,
@@ -16,7 +16,7 @@ from gauntler.application.appliers.base import (
     is_skip,
     profile_for_answers,
 )
-from gauntler.core.config import NEEDS_REVIEW_SENTINEL
+from moonlighter.core.config import NEEDS_REVIEW_SENTINEL
 
 MOCK_ANSWERS = json.dumps(
     {
@@ -175,7 +175,7 @@ async def test_generate_answers_uses_injected_caller():
         called.append((prompt, model))
         return json.dumps({"Q": "a"})
 
-    with patch("gauntler.application.appliers.base.make_api_caller") as mock_factory:
+    with patch("moonlighter.application.appliers.base.make_api_caller") as mock_factory:
         await generate_answers(
             company="Co",
             title="Eng",
@@ -441,7 +441,7 @@ async def test_ask_llm_duplicate_label_collision_is_logged(caplog):
     async def caller(prompt, model):
         return '{"0": "first", "Field A": "second"}'
 
-    with caplog.at_level(logging.WARNING, logger="gauntler.application.appliers.base"):
+    with caplog.at_level(logging.WARNING, logger="moonlighter.application.appliers.base"):
         answers, err = await _ask_llm(["Field A"], "Acme", "T", "body", {}, "m", caller)
     assert err is None
     assert answers == {"Field A": "second"}
@@ -812,7 +812,7 @@ async def test_generate_answers_unanswered_field_blocks_submission_gate():
     the two halves that must agree actually do: the producer (generate_answers, for
     a field the LLM omits) emits the same constant the consumer (service._pending_
     review_message, the submission gate) checks for."""
-    from gauntler.application.service import _pending_review_message
+    from moonlighter.application.service import _pending_review_message
 
     async def caller(prompt, model):
         return "{}"
@@ -853,11 +853,11 @@ async def test_generate_answers_pre_populated_still_wins_over_llm():
 async def test_generate_answers_logs_start_and_ok(caplog):
     import logging
 
-    from gauntler.application.appliers.base import generate_answers
+    from moonlighter.application.appliers.base import generate_answers
 
     mock_caller = AsyncMock(return_value=json.dumps({"Why Stripe?": "Because it's great"}))
 
-    with caplog.at_level(logging.INFO, logger="gauntler.application.appliers.base"):
+    with caplog.at_level(logging.INFO, logger="moonlighter.application.appliers.base"):
         await generate_answers(
             company="Stripe",
             title="SRE",
@@ -876,11 +876,11 @@ async def test_generate_answers_logs_start_and_ok(caplog):
 async def test_generate_answers_logs_error(caplog):
     import logging
 
-    from gauntler.application.appliers.base import generate_answers
+    from moonlighter.application.appliers.base import generate_answers
 
     mock_caller = AsyncMock(side_effect=Exception("timeout"))
 
-    with caplog.at_level(logging.INFO, logger="gauntler.application.appliers.base"):
+    with caplog.at_level(logging.INFO, logger="moonlighter.application.appliers.base"):
         result = await generate_answers(
             company="Nubank",
             title="Dev",
@@ -898,7 +898,7 @@ async def test_generate_answers_logs_error(caplog):
 
 
 async def test_classify_submit_outcome_confirmed():
-    from gauntler.application.appliers.base import classify_submit_outcome
+    from moonlighter.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
     page.inner_text = AsyncMock(return_value="Thank you for applying!")
@@ -908,7 +908,7 @@ async def test_classify_submit_outcome_confirmed():
 
 
 async def test_classify_submit_outcome_validation_failed_when_form_visible():
-    from gauntler.application.appliers.base import classify_submit_outcome
+    from moonlighter.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
     page.inner_text = AsyncMock(return_value="no confirmation here")
@@ -921,7 +921,7 @@ async def test_classify_submit_outcome_validation_failed_when_form_visible():
 
 
 async def test_classify_submit_outcome_unverified_when_ambiguous():
-    from gauntler.application.appliers.base import classify_submit_outcome
+    from moonlighter.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
     page.inner_text = AsyncMock(return_value="some page with no marker")
@@ -935,7 +935,7 @@ async def test_classify_submit_outcome_unverified_when_ambiguous():
 
 async def test_confirm_submitted_swallows_inner_text_exception():
     """inner_text('body') raises → body becomes '' and falls through to the URL (53-54)."""
-    from gauntler.application.appliers.base import classify_submit_outcome
+    from moonlighter.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
     page.inner_text = AsyncMock(side_effect=Exception("detached"))
@@ -947,7 +947,7 @@ async def test_confirm_submitted_swallows_inner_text_exception():
 
 async def test_classify_form_visible_evaluate_exception_is_false():
     """page.evaluate(form_visible) raises → treated as not visible → unverified (93-94)."""
-    from gauntler.application.appliers.base import classify_submit_outcome
+    from moonlighter.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
     page.inner_text = AsyncMock(return_value="no marker")
@@ -958,7 +958,7 @@ async def test_classify_form_visible_evaluate_exception_is_false():
 
 async def test_classify_error_messages_evaluate_exception_is_empty():
     """form visible but the 2nd evaluate (error messages) raises → errors=[] (98-99)."""
-    from gauntler.application.appliers.base import classify_submit_outcome
+    from moonlighter.application.appliers.base import classify_submit_outcome
 
     page = MagicMock()
     page.inner_text = AsyncMock(return_value="no marker")
@@ -980,7 +980,7 @@ async def test_generate_answers_builds_default_caller_when_none():
     """_caller=None → uses make_api_caller() as a fallback (line 225)."""
     fake_caller = AsyncMock(return_value='{"Q": "A"}')
     with patch(
-        "gauntler.application.appliers.base.make_api_caller", return_value=fake_caller
+        "moonlighter.application.appliers.base.make_api_caller", return_value=fake_caller
     ) as mock_factory:
         result = await generate_answers(
             company="Co", title="Eng", description="d", fields=["Q"], profile={}, _caller=None

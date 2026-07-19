@@ -9,9 +9,9 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from gauntler.core.db import Job, ScanLog, init_db
-from gauntler.discovery import service as scan_service
-from gauntler.discovery.evaluator import EvaluationResult
+from moonlighter.core.db import Job, ScanLog, init_db
+from moonlighter.discovery import service as scan_service
+from moonlighter.discovery.evaluator import EvaluationResult
 
 CONFIG = {
     "score_threshold": 7.0,
@@ -61,9 +61,9 @@ async def test_add_job_fetches_description_when_empty(tmp_db):
     init_db()
     acm, _ = _http_client(text="<html><body>Real desc</body></html>")
     with (
-        patch("gauntler.discovery.service.httpx.AsyncClient", return_value=acm),
+        patch("moonlighter.discovery.service.httpx.AsyncClient", return_value=acm),
         patch(
-            "gauntler.discovery.service.evaluate_job",
+            "moonlighter.discovery.service.evaluate_job",
             new=AsyncMock(return_value=_eval(8.0)),
         ),
     ):
@@ -78,7 +78,7 @@ async def test_add_job_fetches_description_when_empty(tmp_db):
 async def test_add_job_http_non_200_returns_error(tmp_db):
     init_db()
     acm, _ = _http_client(status_code=404)
-    with patch("gauntler.discovery.service.httpx.AsyncClient", return_value=acm):
+    with patch("moonlighter.discovery.service.httpx.AsyncClient", return_value=acm):
         result = await scan_service.add_job(
             "https://x.com/3", "Stripe", "Engineer", "", CONFIG, PROFILE, MagicMock()
         )
@@ -90,7 +90,7 @@ async def test_add_job_http_exception_returns_error(tmp_db):
     acm = MagicMock()
     acm.__aenter__ = AsyncMock(side_effect=Exception("connection refused"))
     acm.__aexit__ = AsyncMock(return_value=False)
-    with patch("gauntler.discovery.service.httpx.AsyncClient", return_value=acm):
+    with patch("moonlighter.discovery.service.httpx.AsyncClient", return_value=acm):
         result = await scan_service.add_job(
             "https://x.com/4", "Stripe", "Engineer", "", CONFIG, PROFILE, MagicMock()
         )
@@ -124,7 +124,7 @@ async def test_add_job_scanlog_without_job_proceeds_to_eval(tmp_db):
     # collides with the existing record → IntegrityError → conflict message.
     ScanLog.create(job_url="https://x.com/6", source="manual")
     with patch(
-        "gauntler.discovery.service.evaluate_job",
+        "moonlighter.discovery.service.evaluate_job",
         new=AsyncMock(return_value=_eval(8.0)),
     ):
         result = await scan_service.add_job(
@@ -163,7 +163,7 @@ async def test_add_job_title_blocklist_integrity_swallowed(tmp_db):
 async def test_add_job_new_above_threshold_with_caveats(tmp_db):
     init_db()
     with patch(
-        "gauntler.discovery.service.evaluate_job",
+        "moonlighter.discovery.service.evaluate_job",
         new=AsyncMock(return_value=_eval(9.0, caveats=["visa", "relocation"])),
     ):
         result = await scan_service.add_job(
@@ -178,7 +178,7 @@ async def test_add_job_new_above_threshold_with_caveats(tmp_db):
 async def test_add_job_below_threshold_archived(tmp_db):
     init_db()
     with patch(
-        "gauntler.discovery.service.evaluate_job",
+        "moonlighter.discovery.service.evaluate_job",
         new=AsyncMock(return_value=_eval(3.0)),
     ):
         result = await scan_service.add_job(
@@ -193,7 +193,7 @@ async def test_add_job_integrity_conflict_on_create(tmp_db):
     init_db()
     Job.create(source="manual", company="Acme", title="x", url="https://x.com/11", status="new")
     with patch(
-        "gauntler.discovery.service.evaluate_job",
+        "moonlighter.discovery.service.evaluate_job",
         new=AsyncMock(return_value=_eval(8.0)),
     ):
         result = await scan_service.add_job(
@@ -204,7 +204,7 @@ async def test_add_job_integrity_conflict_on_create(tmp_db):
 
 # ── scan_and_evaluate edge branches ──────────────────────────────────────────
 
-from gauntler.discovery.sources.base import RawJob  # noqa: E402
+from moonlighter.discovery.sources.base import RawJob  # noqa: E402
 
 
 def _raw(i, title="Engineer", source="greenhouse"):
@@ -235,13 +235,15 @@ async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=No
         return [await _eval_per_job(j.company, model) for j in jobs]
 
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
-        patch("gauntler.discovery.service.evaluate_jobs_batch", new=_batch),
-        patch("gauntler.discovery.sources.playwright.LinkedInScanner") as MockLI,
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch),
+        patch("moonlighter.discovery.sources.playwright.LinkedInScanner") as MockLI,
+        patch(
+            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -283,7 +285,7 @@ async def test_scan_title_filtered_archives_with_score_zero(tmp_db):
 
 async def test_scan_linkedin_session_expired_adds_warning(tmp_db):
     init_db()
-    from gauntler.discovery.sources.playwright import LinkedInSessionExpiredError
+    from moonlighter.discovery.sources.playwright import LinkedInSessionExpiredError
 
     result = await _run_scan([_raw(2)], linkedin_exc=LinkedInSessionExpiredError("session expired"))
     assert "LinkedIn" in result
@@ -434,8 +436,8 @@ async def test_scan_batches_jobs_into_one_call(tmp_db):
 
 # ── archive_stale_jobs ──────────────────────────────────────────────────────
 
-from gauntler.discovery.archive import ArchiveStaleJobsError, archive_stale_jobs  # noqa: E402
-from gauntler.discovery.staleness import StalenessResult  # noqa: E402
+from moonlighter.discovery.archive import ArchiveStaleJobsError, archive_stale_jobs  # noqa: E402
+from moonlighter.discovery.staleness import StalenessResult  # noqa: E402
 
 
 def _stale_job(tmp_db, **kwargs):
@@ -470,7 +472,7 @@ async def test_archive_stale_jobs_marks_stale_job_closed(tmp_db, monkeypatch):
     async def fake_find(jobs_by_company, scanners, config):
         return StalenessResult(stale=[job], failed_companies=[])
 
-    monkeypatch.setattr("gauntler.discovery.archive.find_stale_jobs", fake_find)
+    monkeypatch.setattr("moonlighter.discovery.archive.find_stale_jobs", fake_find)
     result = await archive_stale_jobs(None, None, CONFIG)
 
     saved = Job.get_by_id(job.id)
@@ -488,7 +490,7 @@ async def test_archive_stale_jobs_reports_failed_companies(tmp_db, monkeypatch):
     async def fake_find(jobs_by_company, scanners, config):
         return StalenessResult(stale=[], failed_companies=["acme"])
 
-    monkeypatch.setattr("gauntler.discovery.archive.find_stale_jobs", fake_find)
+    monkeypatch.setattr("moonlighter.discovery.archive.find_stale_jobs", fake_find)
     result = await archive_stale_jobs(None, None, CONFIG)
 
     assert result.archived == []
@@ -510,7 +512,7 @@ async def test_archive_stale_jobs_filters_by_job_id(tmp_db, monkeypatch):
         seen_groups.append(jobs_by_company)
         return StalenessResult()
 
-    monkeypatch.setattr("gauntler.discovery.archive.find_stale_jobs", fake_find)
+    monkeypatch.setattr("moonlighter.discovery.archive.find_stale_jobs", fake_find)
     await archive_stale_jobs(target.id, None, CONFIG)
 
     jobs_checked = seen_groups[0][("greenhouse", "acme")]
@@ -529,7 +531,7 @@ async def test_archive_stale_jobs_filters_by_company_case_insensitive(tmp_db, mo
         seen_groups.append(jobs_by_company)
         return StalenessResult()
 
-    monkeypatch.setattr("gauntler.discovery.archive.find_stale_jobs", fake_find)
+    monkeypatch.setattr("moonlighter.discovery.archive.find_stale_jobs", fake_find)
     await archive_stale_jobs(None, "ACME", CONFIG)
 
     jobs_checked = seen_groups[0][("greenhouse", "acme")]
@@ -548,7 +550,7 @@ async def test_archive_stale_jobs_excludes_resolved_statuses(tmp_db, monkeypatch
         seen_groups.append(jobs_by_company)
         return StalenessResult()
 
-    monkeypatch.setattr("gauntler.discovery.archive.find_stale_jobs", fake_find)
+    monkeypatch.setattr("moonlighter.discovery.archive.find_stale_jobs", fake_find)
     await archive_stale_jobs(None, None, CONFIG)
 
     assert seen_groups[0] == {}
@@ -558,13 +560,13 @@ async def test_archive_stale_jobs_excludes_resolved_statuses(tmp_db, monkeypatch
 
 
 def test_format_archive_result_empty():
-    from gauntler.discovery.archive import ArchiveResult, _format_archive_result
+    from moonlighter.discovery.archive import ArchiveResult, _format_archive_result
 
     assert _format_archive_result(ArchiveResult()) == "No closed jobs found."
 
 
 def test_format_archive_result_archived_only():
-    from gauntler.discovery.archive import ArchiveResult, _format_archive_result
+    from moonlighter.discovery.archive import ArchiveResult, _format_archive_result
 
     result = ArchiveResult(
         archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}]
@@ -575,7 +577,7 @@ def test_format_archive_result_archived_only():
 
 
 def test_format_archive_result_failed_only():
-    from gauntler.discovery.archive import ArchiveResult, _format_archive_result
+    from moonlighter.discovery.archive import ArchiveResult, _format_archive_result
 
     result = ArchiveResult(failed_companies=["acme"])
     formatted = _format_archive_result(result)
@@ -584,7 +586,7 @@ def test_format_archive_result_failed_only():
 
 
 def test_format_archive_result_archived_and_failed():
-    from gauntler.discovery.archive import ArchiveResult, _format_archive_result
+    from moonlighter.discovery.archive import ArchiveResult, _format_archive_result
 
     result = ArchiveResult(
         archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}],
@@ -602,14 +604,16 @@ async def _collect(config):
     """Runs _collect_raw_jobs with no HTTP-registry scanners and no LinkedIn jobs,
     isolating the Gupy dispatch branch."""
     with (
-        patch("gauntler.discovery.service.build_http_scanners", return_value={}),
-        patch("gauntler.discovery.service._scan_linkedin", new=AsyncMock(return_value=([], None))),
+        patch("moonlighter.discovery.service.build_http_scanners", return_value={}),
+        patch(
+            "moonlighter.discovery.service._scan_linkedin", new=AsyncMock(return_value=([], None))
+        ),
     ):
         return await scan_service._collect_raw_jobs("engineer", config, {})
 
 
 async def test_collect_raw_jobs_skips_gupy_by_default():
-    with patch("gauntler.discovery.sources.http.GupyScanner") as MockGupy:
+    with patch("moonlighter.discovery.sources.http.GupyScanner") as MockGupy:
         MockGupy.return_value.scan = AsyncMock(return_value=[])
         raw_jobs, _ = await _collect({})
     MockGupy.return_value.scan.assert_not_called()
@@ -620,7 +624,7 @@ async def test_collect_raw_jobs_calls_gupy_when_config_enabled():
     gupy_job = RawJob(
         source="gupy", company="acme", title="Eng", url="https://acme.gupy.io/1", description="d"
     )
-    with patch("gauntler.discovery.sources.http.GupyScanner") as MockGupy:
+    with patch("moonlighter.discovery.sources.http.GupyScanner") as MockGupy:
         MockGupy.return_value.scan = AsyncMock(return_value=[gupy_job])
         raw_jobs, _ = await _collect({"scan_gupy": True})
     MockGupy.return_value.scan.assert_awaited_once_with(keywords="engineer")

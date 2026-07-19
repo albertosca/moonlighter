@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 from typing import Any
 
-from gauntler.server import AppContext
+from moonlighter.server import AppContext
 
 
 def make_test_context(
@@ -12,7 +12,7 @@ def make_test_context(
 ) -> SimpleNamespace:
     """Build a stand-in Context whose .request_context.lifespan_context is an AppContext.
     Tool tests pass ctx=make_test_context(...) instead of building the chain by hand."""
-    from gauntler.core.config import load_config
+    from moonlighter.core.config import load_config
 
     app = AppContext(
         config=config if config is not None else load_config(),

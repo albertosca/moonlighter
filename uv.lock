@@ -8,11 +8,11 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "gauntler-apply",
-    "gauntler-core",
-    "gauntler-email",
-    "gauntler-full",
-    "gauntler-scan",
+    "moonlighter-apply",
+    "moonlighter-core",
+    "moonlighter-email",
+    "moonlighter-full",
+    "moonlighter-scan",
 ]
 
 [manifest.dependency-groups]
@@ -491,93 +491,6 @@ server = [
 ]
 
 [[package]]
-name = "gauntler-apply"
-version = "0.1.0"
-source = { editable = "packages/apply" }
-dependencies = [
-    { name = "gauntler-core" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "gauntler-core", editable = "packages/core" }]
-
-[[package]]
-name = "gauntler-core"
-version = "0.1.0"
-source = { editable = "packages/core" }
-dependencies = [
-    { name = "anthropic" },
-    { name = "peewee" },
-    { name = "playwright" },
-    { name = "pyyaml" },
-    { name = "rich" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anthropic", specifier = ">=0.40" },
-    { name = "peewee", specifier = ">=3.17" },
-    { name = "playwright", specifier = ">=1.47" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "rich", specifier = ">=13.7" },
-]
-
-[[package]]
-name = "gauntler-email"
-version = "0.1.0"
-source = { editable = "packages/email" }
-dependencies = [
-    { name = "gauntler-core" },
-    { name = "google-api-python-client" },
-    { name = "google-auth-httplib2" },
-    { name = "google-auth-oauthlib" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "gauntler-core", editable = "packages/core" },
-    { name = "google-api-python-client", specifier = ">=2.100" },
-    { name = "google-auth-httplib2", specifier = ">=0.2" },
-    { name = "google-auth-oauthlib", specifier = ">=1.1" },
-]
-
-[[package]]
-name = "gauntler-full"
-version = "0.1.0"
-source = { editable = "packages/full" }
-dependencies = [
-    { name = "fastmcp" },
-    { name = "gauntler-apply" },
-    { name = "gauntler-core" },
-    { name = "gauntler-email" },
-    { name = "gauntler-scan" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastmcp", specifier = ">=2.0" },
-    { name = "gauntler-apply", editable = "packages/apply" },
-    { name = "gauntler-core", editable = "packages/core" },
-    { name = "gauntler-email", editable = "packages/email" },
-    { name = "gauntler-scan", editable = "packages/scan" },
-]
-
-[[package]]
-name = "gauntler-scan"
-version = "0.1.0"
-source = { editable = "packages/scan" }
-dependencies = [
-    { name = "gauntler-core" },
-    { name = "httpx" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "gauntler-core", editable = "packages/core" },
-    { name = "httpx", specifier = ">=0.27" },
-]
-
-[[package]]
 name = "google-api-core"
 version = "2.31.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1027,6 +940,93 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
+]
+
+[[package]]
+name = "moonlighter-apply"
+version = "0.1.0"
+source = { editable = "packages/apply" }
+dependencies = [
+    { name = "moonlighter-core" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "moonlighter-core", editable = "packages/core" }]
+
+[[package]]
+name = "moonlighter-core"
+version = "0.1.0"
+source = { editable = "packages/core" }
+dependencies = [
+    { name = "anthropic" },
+    { name = "peewee" },
+    { name = "playwright" },
+    { name = "pyyaml" },
+    { name = "rich" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anthropic", specifier = ">=0.40" },
+    { name = "peewee", specifier = ">=3.17" },
+    { name = "playwright", specifier = ">=1.47" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "rich", specifier = ">=13.7" },
+]
+
+[[package]]
+name = "moonlighter-email"
+version = "0.1.0"
+source = { editable = "packages/email" }
+dependencies = [
+    { name = "google-api-python-client" },
+    { name = "google-auth-httplib2" },
+    { name = "google-auth-oauthlib" },
+    { name = "moonlighter-core" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "google-api-python-client", specifier = ">=2.100" },
+    { name = "google-auth-httplib2", specifier = ">=0.2" },
+    { name = "google-auth-oauthlib", specifier = ">=1.1" },
+    { name = "moonlighter-core", editable = "packages/core" },
+]
+
+[[package]]
+name = "moonlighter-full"
+version = "0.1.0"
+source = { editable = "packages/full" }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "moonlighter-apply" },
+    { name = "moonlighter-core" },
+    { name = "moonlighter-email" },
+    { name = "moonlighter-scan" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastmcp", specifier = ">=2.0" },
+    { name = "moonlighter-apply", editable = "packages/apply" },
+    { name = "moonlighter-core", editable = "packages/core" },
+    { name = "moonlighter-email", editable = "packages/email" },
+    { name = "moonlighter-scan", editable = "packages/scan" },
+]
+
+[[package]]
+name = "moonlighter-scan"
+version = "0.1.0"
+source = { editable = "packages/scan" }
+dependencies = [
+    { name = "httpx" },
+    { name = "moonlighter-core" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "moonlighter-core", editable = "packages/core" },
 ]
 
 [[package]]

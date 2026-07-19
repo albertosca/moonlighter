@@ -28,12 +28,12 @@ import yaml
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from gauntler.core.config import gauntler_home, load_config, load_profile
-from gauntler.core.db import Job, init_db
-from gauntler.core.llm import make_caller
-from gauntler.core.log import setup as setup_logging
-from gauntler.core.metrics import operation_metrics
-from gauntler.core.parsing import extract_json
+from moonlighter.core.config import load_config, load_profile, moonlighter_home
+from moonlighter.core.db import Job, init_db
+from moonlighter.core.llm import make_caller
+from moonlighter.core.log import setup as setup_logging
+from moonlighter.core.metrics import operation_metrics
+from moonlighter.core.parsing import extract_json
 
 
 def _make_proposal_prompt(company: str, threshold: float, titles_block: str, profile: dict) -> str:
@@ -90,7 +90,7 @@ QUOTA_MARKERS = (
 
 
 def _learned_path() -> Path:
-    return gauntler_home() / "blocklist_learned.yaml"
+    return moonlighter_home() / "blocklist_learned.yaml"
 
 
 def _load_learned() -> list[str]:
@@ -263,10 +263,10 @@ def main() -> None:
         profile = load_profile()
     except FileNotFoundError:
         profile = {}
-    init_db()  # resolve o path via gauntler_home() / GAUNTLER_DB_PATH (fonte única em db.py)
+    init_db()  # resolve o path via moonlighter_home() / MOONLIGHTER_DB_PATH (fonte única em db.py)
 
     model = config.get("eval_model", "claude-haiku-4-5-20251001")
-    learned_path = gauntler_home() / "blocklist_learned.yaml"
+    learned_path = moonlighter_home() / "blocklist_learned.yaml"
     print(f"Modelo: {model}  |  blocklist_learned: {learned_path}")
     print()
 

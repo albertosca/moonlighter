@@ -3,7 +3,7 @@ import json
 import os
 
 import pytest
-from gauntler.core.db import Application, Job, ScanLog, init_db
+from moonlighter.core.db import Application, Job, ScanLog, init_db
 from peewee import IntegrityError
 
 
@@ -20,7 +20,7 @@ def _make_job(**kwargs):
 
 
 def test_init_creates_tables(tmp_db):
-    os.environ["GAUNTLER_DB_PATH"] = tmp_db
+    os.environ["MOONLIGHTER_DB_PATH"] = tmp_db
     init_db()
     # Tables exist and accept writes
     job = Job.create(
@@ -34,7 +34,7 @@ def test_init_creates_tables(tmp_db):
 
 
 def test_scan_log_dedup(tmp_db):
-    os.environ["GAUNTLER_DB_PATH"] = tmp_db
+    os.environ["MOONLIGHTER_DB_PATH"] = tmp_db
     init_db()
     ScanLog.create(job_url="https://example.com/job/1", source="greenhouse")
     urls = {row.job_url for row in ScanLog.select()}
@@ -145,14 +145,14 @@ def test_job_posted_at_nullable(tmp_db):
 
 
 def test_job_closed_at_is_null_by_default(tmp_db):
-    os.environ["GAUNTLER_DB_PATH"] = tmp_db
+    os.environ["MOONLIGHTER_DB_PATH"] = tmp_db
     init_db()
     job = _make_job()
     assert job.closed_at is None
 
 
 def test_job_closed_at_stored_and_retrieved(tmp_db):
-    os.environ["GAUNTLER_DB_PATH"] = tmp_db
+    os.environ["MOONLIGHTER_DB_PATH"] = tmp_db
     init_db()
     when = datetime.datetime(2026, 7, 1, 12, 0, 0)
     job = _make_job(status="closed", closed_at=when)
@@ -163,7 +163,7 @@ def test_job_closed_at_stored_and_retrieved(tmp_db):
 
 def test_init_db_migrates_old_job_table(tmp_db):
     """Old 'job' table (without closed_at) → init_db adds the column via ALTER TABLE."""
-    from gauntler.core.db import db
+    from moonlighter.core.db import db
 
     db.init(tmp_db)
     db.connect(reuse_if_open=True)
@@ -278,8 +278,8 @@ def test_job_salary_notes_field(tmp_db):
 
 
 def test_db_path_reads_env_var(tmp_db):
-    """_db_path() returns value of GAUNTLER_DB_PATH env var when set."""
-    from gauntler.core.db import _db_path
+    """_db_path() returns value of MOONLIGHTER_DB_PATH env var when set."""
+    from moonlighter.core.db import _db_path
 
     assert _db_path() == tmp_db
 
@@ -370,7 +370,7 @@ def test_application_email_ref_lookup_by_ref(tmp_db):
 def test_init_db_migrates_old_application_table(tmp_db):
     """Old 'application' table (with no email_ref/current_stage) → init_db adds
     the columns via ALTER TABLE (db.py:98-99, 104)."""
-    from gauntler.core.db import db
+    from moonlighter.core.db import db
 
     db.init(tmp_db)
     db.connect(reuse_if_open=True)
@@ -387,28 +387,28 @@ def test_init_db_migrates_old_application_table(tmp_db):
 
 
 def test_db_path_default_when_env_unset(monkeypatch):
-    """No GAUNTLER_DB_PATH nor GAUNTLER_HOME → default ~/.gauntler/gauntler.db."""
-    from gauntler.core.db import _db_path
+    """No MOONLIGHTER_DB_PATH nor MOONLIGHTER_HOME → default ~/.moonlighter/moonlighter.db."""
+    from moonlighter.core.db import _db_path
 
-    monkeypatch.delenv("GAUNTLER_DB_PATH", raising=False)
-    monkeypatch.delenv("GAUNTLER_HOME", raising=False)
-    assert _db_path().endswith("/.gauntler/gauntler.db")
+    monkeypatch.delenv("MOONLIGHTER_DB_PATH", raising=False)
+    monkeypatch.delenv("MOONLIGHTER_HOME", raising=False)
+    assert _db_path().endswith("/.moonlighter/moonlighter.db")
 
 
 def test_db_path_respects_env(monkeypatch):
-    from gauntler.core.db import _db_path
+    from moonlighter.core.db import _db_path
 
-    monkeypatch.setenv("GAUNTLER_DB_PATH", "/tmp/custom-gauntler.db")
-    assert _db_path() == "/tmp/custom-gauntler.db"
+    monkeypatch.setenv("MOONLIGHTER_DB_PATH", "/tmp/custom-moonlighter.db")
+    assert _db_path() == "/tmp/custom-moonlighter.db"
 
 
-def test_db_path_follows_gauntler_home(monkeypatch, tmp_path):
-    """With no GAUNTLER_DB_PATH, the database follows GAUNTLER_HOME (single source)."""
-    from gauntler.core.db import _db_path
+def test_db_path_follows_moonlighter_home(monkeypatch, tmp_path):
+    """With no MOONLIGHTER_DB_PATH, the database follows MOONLIGHTER_HOME (single source)."""
+    from moonlighter.core.db import _db_path
 
-    monkeypatch.delenv("GAUNTLER_DB_PATH", raising=False)
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
-    assert _db_path() == str(tmp_path / "gauntler.db")
+    monkeypatch.delenv("MOONLIGHTER_DB_PATH", raising=False)
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    assert _db_path() == str(tmp_path / "moonlighter.db")
 
 
 # --- init_db delegates schema evolution to run_migrations (E7 T2) ─────────────
@@ -417,8 +417,8 @@ def test_db_path_follows_gauntler_home(monkeypatch, tmp_path):
 def test_init_db_fresh_db_reaches_version_3_with_all_columns(tmp_db):
     """A fresh temp DB, after init_db(), is at schema_version 3 and has every
     column the migrations add (behavior-preserving vs. the old inline ALTERs)."""
-    from gauntler.core.db import db
-    from gauntler.core.migrations import current_version
+    from moonlighter.core.db import db
+    from moonlighter.core.migrations import current_version
 
     init_db()
 
@@ -432,8 +432,8 @@ def test_init_db_fresh_db_reaches_version_3_with_all_columns(tmp_db):
 
 def test_init_db_called_twice_stays_at_version_3(tmp_db):
     """Calling init_db() a second time is a no-op: no error, version unchanged."""
-    from gauntler.core.db import db
-    from gauntler.core.migrations import current_version
+    from moonlighter.core.db import db
+    from moonlighter.core.migrations import current_version
 
     init_db()
     init_db()
@@ -442,11 +442,11 @@ def test_init_db_called_twice_stays_at_version_3(tmp_db):
 
 
 def test_init_db_converges_real_db_shape_without_schema_version(tmp_db):
-    """A DB that already has the migrated columns (the real ~/.gauntler shape,
+    """A DB that already has the migrated columns (the real ~/.moonlighter shape,
     pre-existing before this schema_version table existed) converges to version
     3 with no error — run_migrations must not choke on already-applied columns."""
-    from gauntler.core.db import db
-    from gauntler.core.migrations import current_version
+    from moonlighter.core.db import db
+    from moonlighter.core.migrations import current_version
 
     db.init(tmp_db)
     db.connect(reuse_if_open=True)

@@ -1,7 +1,7 @@
 from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from gauntler.application.appliers.simple_form import SimpleFormApplier
+from moonlighter.application.appliers.simple_form import SimpleFormApplier
 
 
 class _Demo(SimpleFormApplier):

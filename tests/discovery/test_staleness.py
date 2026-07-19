@@ -2,8 +2,8 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
-from gauntler.discovery.sources.base import RawJob
-from gauntler.discovery.staleness import StalenessResult, find_stale_jobs
+from moonlighter.discovery.sources.base import RawJob
+from moonlighter.discovery.staleness import StalenessResult, find_stale_jobs
 
 CONFIG: dict = {}
 
@@ -76,7 +76,7 @@ async def test_linkedin_job_returns_404_is_stale(monkeypatch):
     page.content = AsyncMock(return_value="<html></html>")
     page.close = AsyncMock()
     monkeypatch.setattr(
-        "gauntler.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
+        "moonlighter.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
     )
     result = await find_stale_jobs({("linkedin", "linkedin"): [job]}, {}, CONFIG)
     assert result.stale == [job]
@@ -90,7 +90,7 @@ async def test_linkedin_job_closed_marker_in_page_is_stale(monkeypatch):
     page.content = AsyncMock(return_value="<html>No longer accepting applications</html>")
     page.close = AsyncMock()
     monkeypatch.setattr(
-        "gauntler.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
+        "moonlighter.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
     )
     result = await find_stale_jobs({("linkedin", "linkedin"): [job]}, {}, CONFIG)
     assert result.stale == [job]
@@ -103,7 +103,7 @@ async def test_linkedin_job_still_open_is_not_stale(monkeypatch):
     page.content = AsyncMock(return_value="<html>Apply now</html>")
     page.close = AsyncMock()
     monkeypatch.setattr(
-        "gauntler.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
+        "moonlighter.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
     )
     result = await find_stale_jobs({("linkedin", "linkedin"): [job]}, {}, CONFIG)
     assert result.stale == []
@@ -112,7 +112,7 @@ async def test_linkedin_job_still_open_is_not_stale(monkeypatch):
 async def test_linkedin_browser_launch_failure_marks_failed(monkeypatch):
     job = _job(source="linkedin", company="linkedin", url="https://linkedin.com/jobs/1")
     monkeypatch.setattr(
-        "gauntler.discovery.staleness.browser.new_page",
+        "moonlighter.discovery.staleness.browser.new_page",
         AsyncMock(side_effect=Exception("no browser")),
     )
     result = await find_stale_jobs({("linkedin", "linkedin"): [job]}, {}, CONFIG)
@@ -128,7 +128,7 @@ async def test_linkedin_goto_timeout_marks_failed(monkeypatch):
     page.goto = AsyncMock(side_effect=PlaywrightTimeout("timeout"))
     page.close = AsyncMock()
     monkeypatch.setattr(
-        "gauntler.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
+        "moonlighter.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
     )
     result = await find_stale_jobs({("linkedin", "linkedin"): [job]}, {}, CONFIG)
     assert result.stale == []
@@ -146,7 +146,7 @@ async def test_linkedin_goto_network_error_marks_failed_and_other_groups_continu
     page.goto = AsyncMock(side_effect=PlaywrightError("net::ERR_CONNECTION_RESET"))
     page.close = AsyncMock()
     monkeypatch.setattr(
-        "gauntler.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
+        "moonlighter.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
     )
     scanners = {
         "greenhouse": _scanner(
@@ -175,7 +175,7 @@ async def test_linkedin_multiple_failing_jobs_dedup_failed_companies(monkeypatch
     page.goto = AsyncMock(side_effect=PlaywrightTimeout("timeout"))
     page.close = AsyncMock()
     monkeypatch.setattr(
-        "gauntler.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
+        "moonlighter.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
     )
     result = await find_stale_jobs({("linkedin", "linkedin"): [job1, job2]}, {}, CONFIG)
     assert result.stale == []
@@ -194,7 +194,7 @@ async def test_linkedin_distinct_companies_reported_under_own_name(monkeypatch):
     page.goto = AsyncMock(side_effect=PlaywrightTimeout("timeout"))
     page.close = AsyncMock()
     monkeypatch.setattr(
-        "gauntler.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
+        "moonlighter.discovery.staleness.browser.new_page", AsyncMock(return_value=page)
     )
     result = await find_stale_jobs(
         {

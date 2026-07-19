@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from gauntler.discovery.sources.base import RawJob, normalize_remote_type
+from moonlighter.discovery.sources.base import RawJob, normalize_remote_type
 
 
 def test_rawjob_defaults():

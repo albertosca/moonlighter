@@ -3,12 +3,12 @@ from unittest.mock import patch
 
 import pytest
 import yaml
-from gauntler.core.config import (
+from moonlighter.core.config import (
     ConfigError,
-    gauntler_home,
     load_company_list,
     load_config,
     load_profile,
+    moonlighter_home,
     validate_config,
 )
 
@@ -100,13 +100,13 @@ def test_load_config_all_path_keys_no_tilde(tmp_path):
 
 
 def test_browser_executable_prefers_browser_path():
-    from gauntler.core.config import browser_executable
+    from moonlighter.core.config import browser_executable
 
     assert browser_executable({"browser_path": "/usr/bin/chrome"}) == "/usr/bin/chrome"
 
 
 def test_browser_executable_falls_back_to_legacy_brave_path():
-    from gauntler.core.config import browser_executable
+    from moonlighter.core.config import browser_executable
 
     assert (
         browser_executable({"browser_path": "", "brave_path": "/legacy/brave"}) == "/legacy/brave"
@@ -175,25 +175,25 @@ ashby:
         assert key in result, f"key '{key}' missing from company list"
 
 
-# --- gauntler_home ---
+# --- moonlighter_home ---
 
 
-def test_gauntler_home_default(monkeypatch):
-    monkeypatch.delenv("GAUNTLER_HOME", raising=False)
-    home = gauntler_home()
-    assert home == (Path.home() / ".gauntler")
+def test_moonlighter_home_default(monkeypatch):
+    monkeypatch.delenv("MOONLIGHTER_HOME", raising=False)
+    home = moonlighter_home()
+    assert home == (Path.home() / ".moonlighter")
 
 
-def test_gauntler_home_env_var(monkeypatch, tmp_path):
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
-    assert gauntler_home() == tmp_path
+def test_moonlighter_home_env_var(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    assert moonlighter_home() == tmp_path
 
 
 # --- load_config default path ---
 
 
-def test_load_config_default_path_uses_gauntler_home(monkeypatch, tmp_path):
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+def test_load_config_default_path_uses_moonlighter_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     config = load_config()  # sem config.yaml → usa defaults
     assert config["score_threshold"] == 6.5
 
@@ -203,14 +203,14 @@ def test_load_config_default_path_uses_gauntler_home(monkeypatch, tmp_path):
 
 def test_load_config_no_learned_blocklist(tmp_path, monkeypatch):
     """No blocklist_learned.yaml → config proceeds without merging."""
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
     assert "title_blocklist" in config
 
 
 def test_load_config_learned_blocklist_empty(tmp_path, monkeypatch):
     """blocklist_learned.yaml exists but has no patterns → does not change anything."""
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     learned = tmp_path / "blocklist_learned.yaml"
     learned.write_text("title_blocklist: []\n")
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
@@ -219,7 +219,7 @@ def test_load_config_learned_blocklist_empty(tmp_path, monkeypatch):
 
 def test_load_config_learned_blocklist_merges(tmp_path, monkeypatch):
     """Learned patterns are merged after the manual ones, without duplicating."""
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     learned = tmp_path / "blocklist_learned.yaml"
     learned.write_text("title_blocklist:\n  - recruiter\n  - intern\n")
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
@@ -257,23 +257,23 @@ def test_load_company_list_with_phase_filter(tmp_path):
 
 
 def test_scan_concurrency_default(tmp_path, monkeypatch):
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
-    from gauntler.core.config import load_config
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    from moonlighter.core.config import load_config
 
     assert load_config()["scan_concurrency"] == 5
 
 
 def test_scan_concurrency_override(tmp_path, monkeypatch):
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text("scan_concurrency: 3\n")
-    from gauntler.core.config import load_config
+    from moonlighter.core.config import load_config
 
     assert load_config()["scan_concurrency"] == 3
 
 
 def test_scan_batch_size_default(tmp_path, monkeypatch):
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
-    from gauntler.core.config import load_config
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    from moonlighter.core.config import load_config
 
     assert load_config()["scan_batch_size"] == 5
 
@@ -282,30 +282,30 @@ def test_scan_batch_size_default(tmp_path, monkeypatch):
 
 
 def test_harden_permissions_chmods_files_0600(tmp_path, monkeypatch):
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
-    (tmp_path / "gauntler.db").write_text("x")
-    (tmp_path / "gauntler.db").chmod(0o644)
-    from gauntler.core.config import harden_permissions
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "moonlighter.db").write_text("x")
+    (tmp_path / "moonlighter.db").chmod(0o644)
+    from moonlighter.core.config import harden_permissions
 
     warnings = harden_permissions()
     assert warnings == []
-    assert oct((tmp_path / "gauntler.db").stat().st_mode)[-3:] == "600"
+    assert oct((tmp_path / "moonlighter.db").stat().st_mode)[-3:] == "600"
 
 
 def test_harden_permissions_chmods_dirs_0700(tmp_path, monkeypatch):
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     (tmp_path / "browser-session").mkdir()
     (tmp_path / "browser-session").chmod(0o755)
-    from gauntler.core.config import harden_permissions
+    from moonlighter.core.config import harden_permissions
 
     harden_permissions()
     assert oct((tmp_path / "browser-session").stat().st_mode)[-3:] == "700"
 
 
 def test_harden_permissions_skips_missing_files(tmp_path, monkeypatch):
-    """No real files in GAUNTLER_HOME → nothing to fix, no error."""
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
-    from gauntler.core.config import harden_permissions
+    """No real files in MOONLIGHTER_HOME → nothing to fix, no error."""
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    from moonlighter.core.config import harden_permissions
 
     assert harden_permissions() == []
 
@@ -368,7 +368,7 @@ class TestValidateConfig:
         validate_config(cfg)
 
     def test_example_config_validates(self):
-        from gauntler.core.config import DEFAULTS
+        from moonlighter.core.config import DEFAULTS
 
         example = Path(__file__).resolve().parents[2] / "config.example.yaml"
         user = yaml.safe_load(example.read_text()) or {}
@@ -379,10 +379,10 @@ class TestValidateConfig:
 def test_harden_permissions_warns_on_chmod_failure_without_raising(tmp_path, monkeypatch):
     """A permission error must never crash the server's startup — it becomes
     a warning, not an exception."""
-    monkeypatch.setenv("GAUNTLER_HOME", str(tmp_path))
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     (tmp_path / "profile.yaml").write_text("x")
     (tmp_path / "browser-session").mkdir()
-    from gauntler.core import config as config_mod
+    from moonlighter.core import config as config_mod
 
     with patch.object(config_mod.Path, "chmod", side_effect=OSError("read-only fs")):
         warnings = config_mod.harden_permissions()

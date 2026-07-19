@@ -1,7 +1,7 @@
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from gauntler.application.appliers.lever import LeverApplier
+from moonlighter.application.appliers.lever import LeverApplier
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 
@@ -276,7 +276,7 @@ async def test_fill_form_swallows_exceptions(caplog):
     applier.page.query_selector = AsyncMock(side_effect=Exception("boom"))
     with (
         patch("asyncio.sleep", new=AsyncMock()),
-        caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.simple_form"),
+        caplog.at_level(logging.DEBUG, logger="moonlighter.application.appliers.simple_form"),
     ):
         status = await applier.fill_form({"Q": "A"}, cv_path="/cv.pdf")
     assert "fill failed for 'Q'" in caplog.text

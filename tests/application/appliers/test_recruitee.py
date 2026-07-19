@@ -2,7 +2,7 @@ import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from gauntler.application.appliers.recruitee import RecruiteeApplier
+from moonlighter.application.appliers.recruitee import RecruiteeApplier
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 
@@ -66,7 +66,7 @@ async def test_detect_unrelated_url():
 @pytest.mark.asyncio
 async def test_recruitee_detect_logs_match(caplog):
     applier = make_applier("https://acme.recruitee.com/o/backend-engineer")
-    with caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.recruitee"):
+    with caplog.at_level(logging.DEBUG, logger="moonlighter.application.appliers.recruitee"):
         await applier.detect()
     assert "detect: recruitee" in caplog.text
 
@@ -565,7 +565,7 @@ async def test_recruitee_submit_logs_outcome(caplog):
     applier.page.inner_text = AsyncMock(return_value="application submitted successfully")
     applier.page.url = "https://acme.recruitee.com/confirmation"
 
-    with caplog.at_level(logging.INFO, logger="gauntler.application.appliers.recruitee"):
+    with caplog.at_level(logging.INFO, logger="moonlighter.application.appliers.recruitee"):
         outcome = await applier.submit()
 
     assert "submit" in caplog.text

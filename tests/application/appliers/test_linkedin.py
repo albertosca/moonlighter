@@ -1,7 +1,7 @@
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from gauntler.application.appliers.linkedin import LinkedInApplier
+from moonlighter.application.appliers.linkedin import LinkedInApplier
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 
@@ -284,7 +284,7 @@ async def test_fill_form_exception_continues_to_next_field(caplog):
 
     with (
         patch("asyncio.sleep", new=AsyncMock()),
-        caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.linkedin"),
+        caplog.at_level(logging.DEBUG, logger="moonlighter.application.appliers.linkedin"),
     ):
         status = await applier.fill_form({"Field1": "v1", "Field2": "v2"}, cv_path="")
 
@@ -513,7 +513,7 @@ async def test_fill_form_swallows_cv_upload_exception(caplog):
     applier.page.query_selector = qs
     with (
         patch("asyncio.sleep", new=AsyncMock()),
-        caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.linkedin"),
+        caplog.at_level(logging.DEBUG, logger="moonlighter.application.appliers.linkedin"),
     ):
         status = await applier.fill_form({}, cv_path="/cv.pdf")
     assert "CV upload failed" in caplog.text

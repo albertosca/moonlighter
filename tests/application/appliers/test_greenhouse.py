@@ -2,7 +2,7 @@ import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from gauntler.application.appliers.greenhouse import GreenhouseApplier
+from moonlighter.application.appliers.greenhouse import GreenhouseApplier
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 
@@ -597,7 +597,7 @@ async def test_submit_logs_empty_required_fields(caplog):
     # evaluate: (1) empty required fields presentes, (2) form not visible after submit
     applier.page.evaluate = AsyncMock(side_effect=[["First Name *"], False, []])
 
-    with caplog.at_level(logging.WARNING, logger="gauntler.application.appliers.greenhouse"):
+    with caplog.at_level(logging.WARNING, logger="moonlighter.application.appliers.greenhouse"):
         await applier.submit()
 
     assert "First Name" in caplog.text
@@ -610,7 +610,7 @@ async def test_submit_logs_empty_required_fields(caplog):
 async def test_greenhouse_detect_logs_match(caplog):
 
     applier = make_applier("https://boards.greenhouse.io/stripe/jobs/1")
-    with caplog.at_level(logging.DEBUG, logger="gauntler.application.appliers.greenhouse"):
+    with caplog.at_level(logging.DEBUG, logger="moonlighter.application.appliers.greenhouse"):
         await applier.detect()
     assert "detect: greenhouse" in caplog.text
 
@@ -626,7 +626,7 @@ async def test_greenhouse_submit_logs_outcome(caplog):
     applier.page.inner_text = AsyncMock(return_value="application submitted successfully")
     applier.page.url = "https://boards.greenhouse.io/confirmation"
 
-    with caplog.at_level(logging.INFO, logger="gauntler.application.appliers.greenhouse"):
+    with caplog.at_level(logging.INFO, logger="moonlighter.application.appliers.greenhouse"):
         outcome = await applier.submit()
 
     assert "submit" in caplog.text

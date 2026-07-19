@@ -1,5 +1,5 @@
 """
-Tests for gauntler.tracking.email_monitor
+Tests for moonlighter.tracking.email_monitor
 
 Coverage:
   - extract_ref: pure, no mocks
@@ -20,7 +20,7 @@ from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from gauntler.core.db import Application, Job, init_db
+from moonlighter.core.db import Application, Job, init_db
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -100,52 +100,52 @@ def _make_application(job, **kwargs):
 
 class TestExtractRef:
     def test_alias_with_ref_returns_ref(self):
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "candidaturas+x7k2mp@gmail.com"
         assert extract_ref(to, BASE_EMAIL) == "x7k2mp"
 
     def test_no_alias_returns_none(self):
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         assert extract_ref(BASE_EMAIL, BASE_EMAIL) is None
 
     def test_empty_string_returns_none(self):
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         assert extract_ref("", BASE_EMAIL) is None
 
     def test_unrelated_address_returns_none(self):
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         assert extract_ref("other@example.com", BASE_EMAIL) is None
 
     def test_strips_display_name(self):
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "Alberto <candidaturas+abc123@gmail.com>"
         assert extract_ref(to, BASE_EMAIL) == "abc123"
 
     def test_multiple_recipients_finds_alias(self):
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "hr@acme.com, candidaturas+zz9900@gmail.com"
         assert extract_ref(to, BASE_EMAIL) == "zz9900"
 
     def test_base_address_without_plus_returns_none(self):
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "candidaturas@gmail.com"
         assert extract_ref(to, BASE_EMAIL) is None
 
     def test_different_domain_returns_none(self):
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "candidaturas+ref123@hotmail.com"
         assert extract_ref(to, BASE_EMAIL) is None
 
     def test_ref_with_special_chars_in_urlsafe_b64(self):
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "candidaturas+Ab-_12@gmail.com"
         assert extract_ref(to, BASE_EMAIL) == "Ab-_12"
@@ -154,25 +154,25 @@ class TestExtractRef:
         """Documents the actual partition behavior: only the FIRST '+' splits
         local-part from ref, so a second '+' becomes part of the ref value
         itself rather than being treated as a delimiter."""
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "candidaturas+ref+extra@gmail.com"
         assert extract_ref(to, BASE_EMAIL) == "ref+extra"
 
     def test_uppercase_local_and_domain_still_matches(self):
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "CANDIDATURAS+REF123@GMAIL.COM"
         assert extract_ref(to, BASE_EMAIL) == "REF123"
 
     def test_leading_trailing_whitespace_around_address_is_tolerated(self):
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "   candidaturas+ws001@gmail.com   "
         assert extract_ref(to, BASE_EMAIL) == "ws001"
 
     def test_whitespace_inside_angle_brackets_is_tolerated(self):
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "Alberto < candidaturas+ab001@gmail.com >"
         assert extract_ref(to, BASE_EMAIL) == "ab001"
@@ -183,7 +183,7 @@ class TestExtractRef:
         callers only ever use it for an EXACT equality lookup against
         Application.email_ref (see _match_by_ref) — never interpolated into a
         query or command, so there is no injection surface here."""
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "candidaturas+'; DROP TABLE apps;--@gmail.com"
         assert extract_ref(to, BASE_EMAIL) == "'; DROP TABLE apps;--"
@@ -193,7 +193,7 @@ class TestExtractRef:
         security property extract_ref exists for (S-06: unspoofable +ref
         signal) requires the domain comparison to be an exact match, not a
         suffix/substring check."""
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "candidaturas+ref@gmail.com.evil.com"
         assert extract_ref(to, BASE_EMAIL) is None
@@ -202,13 +202,13 @@ class TestExtractRef:
         """An attacker-chosen local part that merely CONTAINS the real local
         part is not a match — comparison is on the full local part before '+',
         not a substring/suffix check."""
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "evilcandidaturas+ref@gmail.com"
         assert extract_ref(to, BASE_EMAIL) is None
 
     def test_none_to_field_returns_none(self):
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         assert extract_ref(None, BASE_EMAIL) is None  # type: ignore[arg-type]
 
@@ -216,7 +216,7 @@ class TestExtractRef:
         """Multiple recipients could, in principle, both match the base
         address with different refs (e.g. forwarded/CC'd copies) — the first
         one found in iteration order is returned, deterministically."""
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = "candidaturas+first@gmail.com, candidaturas+second@gmail.com"
         assert extract_ref(to, BASE_EMAIL) == "first"
@@ -237,7 +237,7 @@ class TestExtractRef:
         """Property: for any To-field that does not contain a genuine alias of
         base_address, extract_ref must return None — never fabricate a ref
         from an unrelated address. This is the core anti-spoofing guarantee."""
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         assert extract_ref(to, BASE_EMAIL) is None
 
@@ -246,7 +246,7 @@ class TestExtractRef:
         """Property: for a well-formed alias of base_address, extract_ref
         recovers exactly the ref that was embedded — no truncation, no
         mangling, for a range of ref shapes."""
-        from gauntler.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.email_monitor import extract_ref
 
         to = f"candidaturas+{ref}@gmail.com"
         assert extract_ref(to, BASE_EMAIL) == ref
@@ -266,7 +266,7 @@ class TestClassifyResponse:
         }
 
     async def test_returns_interview_type(self, message):
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -286,7 +286,7 @@ class TestClassifyResponse:
     async def test_passes_model_to_caller(self, message):
         """Regression BUG-02: the real caller (_call_cli/api) requires (prompt, model)
         with no default. classify_response must pass the model positionally."""
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         received = {}
 
@@ -298,7 +298,7 @@ class TestClassifyResponse:
         assert received["model"] == "claude-test"
 
     async def test_returns_rejection(self, message):
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -315,7 +315,7 @@ class TestClassifyResponse:
         assert result["stage"] is None
 
     async def test_returns_offer(self, message):
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -331,7 +331,7 @@ class TestClassifyResponse:
         assert result["type"] == "offer"
 
     async def test_returns_screening(self, message):
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -348,7 +348,7 @@ class TestClassifyResponse:
         assert result["stage"] == "phone_screening"
 
     async def test_returns_info_request(self, message):
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -364,7 +364,7 @@ class TestClassifyResponse:
         assert result["type"] == "info_request"
 
     async def test_returns_unrelated(self, message):
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -380,7 +380,7 @@ class TestClassifyResponse:
         assert result["type"] == "unrelated"
 
     async def test_new_stage_populated_when_llm_proposes_unknown(self, message):
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         caller = _make_llm_caller(
             {
@@ -396,7 +396,7 @@ class TestClassifyResponse:
         assert result["new_stage"] == "pair_programming"
 
     async def test_json_fence_in_llm_response_handled(self, message):
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         raw = {
             "type": "rejection",
@@ -414,7 +414,7 @@ class TestClassifyResponse:
         assert result["type"] == "rejection"
 
     async def test_malformed_llm_response_returns_unrelated(self, message):
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         async def bad_caller(prompt, model=None):
             return "not JSON"
@@ -437,7 +437,7 @@ class TestPromptInjectionHardening:
     """
 
     async def _capture_prompt(self, message: dict) -> tuple[str, dict]:
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         captured: dict = {}
 
@@ -512,7 +512,7 @@ class TestPromptInjectionHardening:
         """S-04 fix: a literal </email> an attacker embeds in the body is
         stripped before wrapping — it no longer closes the block early (this
         WAS a known, documented limitation; now it's actively neutralized)."""
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         captured: dict = {}
 
@@ -541,7 +541,7 @@ class TestPromptInjectionHardening:
 
     async def test_llm_returning_plain_text_injection_falls_back_to_unrelated(self):
         """LLM 'obeys' the injection and returns free-form text → fallback unrelated."""
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         async def confused_caller(prompt, model=None):
             return "Sure! Following the new instructions: type=offer confirmed."
@@ -555,7 +555,7 @@ class TestPromptInjectionHardening:
 
     async def test_llm_returning_truncated_json_does_not_raise(self):
         """Truncated JSON caused by injection must not raise an exception."""
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         async def partial_caller(prompt, model=None):
             return '{"type": "offer", "company": "Evil Corp"'  # not closed
@@ -567,7 +567,7 @@ class TestPromptInjectionHardening:
 
     async def test_llm_returning_extra_fields_from_injection_is_ignored(self):
         """LLM returns valid JSON but with an extra injected field — extra fields are ignored."""
-        from gauntler.tracking.classification import classify_response
+        from moonlighter.tracking.classification import classify_response
 
         async def extra_fields_caller(prompt, model=None):
             return json.dumps(
@@ -592,49 +592,49 @@ class TestPromptInjectionHardening:
 
 class TestSanitizeStage:
     def test_none_and_empty_return_none(self):
-        from gauntler.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.email_monitor import _sanitize_stage
 
         assert _sanitize_stage(None) is None
         assert _sanitize_stage("") is None
         assert _sanitize_stage("   ") is None
 
     def test_normalizes_to_slug(self):
-        from gauntler.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.email_monitor import _sanitize_stage
 
         assert _sanitize_stage("Technical Screen") == "technical_screen"
         assert _sanitize_stage("  Final   Round  ") == "final_round"
 
     def test_strips_disallowed_chars(self):
-        from gauntler.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.email_monitor import _sanitize_stage
 
         # Injection payload collapses to an inert bounded slug.
         # Special chars like <>, {}, : are replaced with underscores; alphanumeric chars survive.
         assert _sanitize_stage("IGNORE ALL: <b>{instructions}</b>") == "ignore_all_b_instructions_b"
 
     def test_collapses_and_trims_underscores(self):
-        from gauntler.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.email_monitor import _sanitize_stage
 
         assert _sanitize_stage("--a__b!!c--") == "a_b_c"
 
     def test_over_length_rejected(self):
-        from gauntler.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.email_monitor import _sanitize_stage
 
         assert _sanitize_stage("x" * 41) is None
 
     def test_at_length_limit_accepted(self):
-        from gauntler.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.email_monitor import _sanitize_stage
 
         assert _sanitize_stage("x" * 40) == "x" * 40
 
     def test_all_disallowed_returns_none(self):
-        from gauntler.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.email_monitor import _sanitize_stage
 
         assert _sanitize_stage("!@#$%^&*()") is None
 
 
 class TestRegisterNewStageBounds:
     def test_registers_sanitized_slug_not_raw(self):
-        from gauntler.tracking.email_monitor import _register_new_stage
+        from moonlighter.tracking.email_monitor import _register_new_stage
 
         stages = ["applied"]
         email_cfg: dict = {}
@@ -643,7 +643,7 @@ class TestRegisterNewStageBounds:
         assert email_cfg["interview_stages"] == ["applied", "technical_screen"]
 
     def test_rejects_unsanitizable(self):
-        from gauntler.tracking.email_monitor import _register_new_stage
+        from moonlighter.tracking.email_monitor import _register_new_stage
 
         stages = ["applied"]
         email_cfg: dict = {}
@@ -652,7 +652,7 @@ class TestRegisterNewStageBounds:
         assert "interview_stages" not in email_cfg
 
     def test_does_not_duplicate_after_sanitize(self):
-        from gauntler.tracking.email_monitor import _register_new_stage
+        from moonlighter.tracking.email_monitor import _register_new_stage
 
         stages = ["technical_screen"]
         email_cfg: dict = {}
@@ -660,7 +660,7 @@ class TestRegisterNewStageBounds:
         assert stages == ["technical_screen"]
 
     def test_count_cap_blocks_further_growth(self):
-        from gauntler.tracking.email_monitor import _MAX_STAGES, _register_new_stage
+        from moonlighter.tracking.email_monitor import _MAX_STAGES, _register_new_stage
 
         stages = [f"s{i}" for i in range(_MAX_STAGES)]
         email_cfg: dict = {}
@@ -674,7 +674,7 @@ class TestRegisterNewStageBounds:
 
 class TestParseMessage:
     def test_extracts_plain_text_body(self):
-        from gauntler.tracking.gmail_client import parse_message
+        from moonlighter.tracking.gmail_client import parse_message
 
         raw_msg = _build_gmail_message(
             to=BASE_EMAIL,
@@ -694,7 +694,7 @@ class TestParseMessage:
         assert "Congratulations" in result["body"]
 
     def test_falls_back_to_html_when_no_plain(self):
-        from gauntler.tracking.gmail_client import parse_message
+        from moonlighter.tracking.gmail_client import parse_message
 
         raw_msg = {
             "id": "msg456",
@@ -720,7 +720,7 @@ class TestParseMessage:
         assert "Hello" in result["body"]
 
     def test_prefers_plain_over_html_in_multipart(self):
-        from gauntler.tracking.gmail_client import parse_message
+        from moonlighter.tracking.gmail_client import parse_message
 
         raw_msg = {
             "id": "msg789",
@@ -750,7 +750,7 @@ class TestParseMessage:
         assert result["body"] == "Texto puro"
 
     def test_handles_missing_body_gracefully(self):
-        from gauntler.tracking.gmail_client import parse_message
+        from moonlighter.tracking.gmail_client import parse_message
 
         raw_msg = {
             "id": "msg000",
@@ -776,7 +776,7 @@ class TestParseMessage:
 
 class TestFetchUnreadMessages:
     def test_returns_list_of_id_and_thread_id(self):
-        from gauntler.tracking.gmail_client import fetch_unread_messages
+        from moonlighter.tracking.gmail_client import fetch_unread_messages
 
         service = MagicMock()
         msgs = [{"id": "a1", "threadId": "t1"}, {"id": "a2", "threadId": "t2"}]
@@ -789,7 +789,7 @@ class TestFetchUnreadMessages:
         assert result[1]["threadId"] == "t2"
 
     def test_returns_empty_list_when_no_messages(self):
-        from gauntler.tracking.gmail_client import fetch_unread_messages
+        from moonlighter.tracking.gmail_client import fetch_unread_messages
 
         service = MagicMock()
         service.users().messages().list().execute.return_value = {}
@@ -798,7 +798,7 @@ class TestFetchUnreadMessages:
         assert result == []
 
     def test_respects_max_results(self):
-        from gauntler.tracking.gmail_client import fetch_unread_messages
+        from moonlighter.tracking.gmail_client import fetch_unread_messages
 
         service = MagicMock()
         service.users().messages().list().execute.return_value = {}
@@ -814,7 +814,7 @@ class TestFetchUnreadMessages:
 
 class TestMarkProcessed:
     def test_removes_unread_label_and_adds_processed_label(self):
-        from gauntler.tracking.gmail_client import mark_processed
+        from moonlighter.tracking.gmail_client import mark_processed
 
         service = MagicMock()
         service.users().messages().modify().execute.return_value = {}
@@ -830,7 +830,7 @@ class TestMarkProcessed:
         assert "Label_123" in body.get("addLabelIds", [])
 
     def test_calls_execute(self):
-        from gauntler.tracking.gmail_client import mark_processed
+        from moonlighter.tracking.gmail_client import mark_processed
 
         service = MagicMock()
         service.users().messages().modify().execute.return_value = {}
@@ -845,7 +845,7 @@ class TestMarkProcessed:
 
 class TestSetupGmailService:
     def test_returns_service_when_token_exists(self, tmp_path):
-        from gauntler.tracking.gmail_client import setup_gmail_service
+        from moonlighter.tracking.gmail_client import setup_gmail_service
 
         token_path = str(tmp_path / "gmail-token.json")
         creds_path = str(tmp_path / "gmail-client.json")
@@ -862,8 +862,8 @@ class TestSetupGmailService:
         }
 
         with (
-            patch("gauntler.tracking.gmail_client.Credentials") as MockCreds,
-            patch("gauntler.tracking.gmail_client.build") as mock_build,
+            patch("moonlighter.tracking.gmail_client.Credentials") as MockCreds,
+            patch("moonlighter.tracking.gmail_client.build") as mock_build,
             patch("os.path.exists", return_value=True),
         ):
             MockCreds.from_authorized_user_file.return_value = mock_creds
@@ -875,7 +875,7 @@ class TestSetupGmailService:
         mock_build.assert_called_once_with("gmail", "v1", credentials=mock_creds)
 
     def test_raises_gmail_auth_error_when_token_missing(self, tmp_path):
-        from gauntler.tracking.gmail_client import GmailAuthError, setup_gmail_service
+        from moonlighter.tracking.gmail_client import GmailAuthError, setup_gmail_service
 
         config = {
             "email": {
@@ -888,7 +888,7 @@ class TestSetupGmailService:
             setup_gmail_service(config)
 
     def test_gmail_oauth_sets_chmod_600_on_token(self, tmp_path):
-        from gauntler.tracking.gmail_client import _run_gmail_oauth
+        from moonlighter.tracking.gmail_client import _run_gmail_oauth
 
         token_path = str(tmp_path / "subdir" / "gmail-token.json")
         creds_path = str(tmp_path / "creds.json")
@@ -899,7 +899,7 @@ class TestSetupGmailService:
         mock_flow = MagicMock()
         mock_flow.run_local_server.return_value = mock_creds
 
-        with patch("gauntler.tracking.gmail_client.InstalledAppFlow") as MockFlow:
+        with patch("moonlighter.tracking.gmail_client.InstalledAppFlow") as MockFlow:
             MockFlow.from_client_secrets_file.return_value = mock_flow
             _run_gmail_oauth(creds_path, token_path)
 
@@ -908,7 +908,7 @@ class TestSetupGmailService:
         assert written.stat().st_mode & 0o777 == 0o600
 
     def test_refreshes_expired_token(self, tmp_path):
-        from gauntler.tracking.gmail_client import setup_gmail_service
+        from moonlighter.tracking.gmail_client import setup_gmail_service
 
         token_path = str(tmp_path / "gmail-token.json")
         config = {
@@ -927,9 +927,9 @@ class TestSetupGmailService:
         mock_creds.to_json.return_value = '{"token": "refreshed"}'
 
         with (
-            patch("gauntler.tracking.gmail_client.Credentials") as MockCreds,
-            patch("gauntler.tracking.gmail_client.Request"),
-            patch("gauntler.tracking.gmail_client.build") as mock_build,
+            patch("moonlighter.tracking.gmail_client.Credentials") as MockCreds,
+            patch("moonlighter.tracking.gmail_client.Request"),
+            patch("moonlighter.tracking.gmail_client.build") as mock_build,
         ):
             MockCreds.from_authorized_user_file.return_value = mock_creds
             mock_build.return_value = MagicMock()
@@ -940,13 +940,13 @@ class TestSetupGmailService:
         assert Path(token_path).read_text() == '{"token": "refreshed"}'
 
     def test_required_scope_defaults_to_readonly(self):
-        from gauntler.tracking.gmail_client import SCOPE_READONLY, _required_scope
+        from moonlighter.tracking.gmail_client import SCOPE_READONLY, _required_scope
 
         assert _required_scope({}) == SCOPE_READONLY
         assert _required_scope({"email": {"mark_processed": False}}) == SCOPE_READONLY
 
     def test_required_scope_is_modify_when_opted_in(self):
-        from gauntler.tracking.gmail_client import SCOPE_MODIFY, _required_scope
+        from moonlighter.tracking.gmail_client import SCOPE_MODIFY, _required_scope
 
         assert _required_scope({"email": {"mark_processed": True}}) == SCOPE_MODIFY
 
@@ -956,7 +956,7 @@ class TestSetupGmailService:
         auto-revoke, just say so plainly."""
         import logging
 
-        from gauntler.tracking.gmail_client import setup_gmail_service
+        from moonlighter.tracking.gmail_client import setup_gmail_service
 
         token_path = str(tmp_path / "gmail-token.json")
         config = {
@@ -973,10 +973,10 @@ class TestSetupGmailService:
         mock_creds.scopes = ["https://www.googleapis.com/auth/gmail.modify"]
 
         with (
-            patch("gauntler.tracking.gmail_client.Credentials") as MockCreds,
-            patch("gauntler.tracking.gmail_client.build") as mock_build,
+            patch("moonlighter.tracking.gmail_client.Credentials") as MockCreds,
+            patch("moonlighter.tracking.gmail_client.build") as mock_build,
             patch("os.path.exists", return_value=True),
-            caplog.at_level(logging.WARNING, logger="gauntler.tracking.gmail_client"),
+            caplog.at_level(logging.WARNING, logger="moonlighter.tracking.gmail_client"),
         ):
             MockCreds.from_authorized_user_file.return_value = mock_creds
             mock_build.return_value = MagicMock()
@@ -987,7 +987,7 @@ class TestSetupGmailService:
     def test_setup_gmail_service_no_warning_when_scope_already_matches(self, tmp_path, caplog):
         import logging
 
-        from gauntler.tracking.gmail_client import setup_gmail_service
+        from moonlighter.tracking.gmail_client import setup_gmail_service
 
         token_path = str(tmp_path / "gmail-token.json")
         config = {
@@ -1004,10 +1004,10 @@ class TestSetupGmailService:
         mock_creds.scopes = ["https://www.googleapis.com/auth/gmail.readonly"]
 
         with (
-            patch("gauntler.tracking.gmail_client.Credentials") as MockCreds,
-            patch("gauntler.tracking.gmail_client.build") as mock_build,
+            patch("moonlighter.tracking.gmail_client.Credentials") as MockCreds,
+            patch("moonlighter.tracking.gmail_client.build") as mock_build,
             patch("os.path.exists", return_value=True),
-            caplog.at_level(logging.WARNING, logger="gauntler.tracking.gmail_client"),
+            caplog.at_level(logging.WARNING, logger="moonlighter.tracking.gmail_client"),
         ):
             MockCreds.from_authorized_user_file.return_value = mock_creds
             mock_build.return_value = MagicMock()
@@ -1020,7 +1020,7 @@ class TestSetupGmailService:
         never be iterated — the mismatch check is a no-op in that case."""
         import logging
 
-        from gauntler.tracking.gmail_client import setup_gmail_service
+        from moonlighter.tracking.gmail_client import setup_gmail_service
 
         token_path = str(tmp_path / "gmail-token.json")
         config = {
@@ -1036,10 +1036,10 @@ class TestSetupGmailService:
         # .scopes NOT explicitly configured — it's a MagicMock, not a real list
 
         with (
-            patch("gauntler.tracking.gmail_client.Credentials") as MockCreds,
-            patch("gauntler.tracking.gmail_client.build") as mock_build,
+            patch("moonlighter.tracking.gmail_client.Credentials") as MockCreds,
+            patch("moonlighter.tracking.gmail_client.build") as mock_build,
             patch("os.path.exists", return_value=True),
-            caplog.at_level(logging.WARNING, logger="gauntler.tracking.gmail_client"),
+            caplog.at_level(logging.WARNING, logger="moonlighter.tracking.gmail_client"),
         ):
             MockCreds.from_authorized_user_file.return_value = mock_creds
             mock_build.return_value = MagicMock()
@@ -1060,9 +1060,9 @@ class TestSyncResponses:
     CONFIG: ClassVar[dict] = {
         "email": {
             "address": BASE_EMAIL,
-            "credentials_path": "~/.gauntler/gmail-client.json",
-            "token_path": "~/.gauntler/gmail-token.json",
-            "processed_label": "gauntler/processed",
+            "credentials_path": "~/.moonlighter/gmail-client.json",
+            "token_path": "~/.moonlighter/gmail-token.json",
+            "processed_label": "moonlighter/processed",
             "interview_stages": list(BASE_STAGES),
         },
         "llm_model": "claude-sonnet-4-6",
@@ -1102,22 +1102,22 @@ class TestSyncResponses:
         service = self._mock_service(messages)
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=service),
+            patch("moonlighter.tracking.email_monitor.setup_gmail_service", return_value=service),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=messages[0]),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=messages[0]),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed") as mock_mark,
+            patch("moonlighter.tracking.email_monitor.mark_processed") as mock_mark,
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             updates = await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
@@ -1128,7 +1128,7 @@ class TestSyncResponses:
         assert "match: ref" in app_refreshed.notes
         # Read-only by default: Gmail is not touched; dedup is local (ProcessedEmail).
         mock_mark.assert_not_called()
-        from gauntler.core.db import ProcessedEmail
+        from moonlighter.core.db import ProcessedEmail
 
         assert ProcessedEmail.select().where(ProcessedEmail.message_id == "msg0").exists()
         assert len(updates) == 1
@@ -1158,22 +1158,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             updates = await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
@@ -1208,22 +1210,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             updates = await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
@@ -1255,22 +1259,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             updates = await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
@@ -1298,22 +1304,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
@@ -1343,22 +1351,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
@@ -1386,22 +1396,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
@@ -1428,22 +1440,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed") as mock_mark,
+            patch("moonlighter.tracking.email_monitor.mark_processed") as mock_mark,
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             updates = await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
@@ -1451,7 +1465,7 @@ class TestSyncResponses:
         assert Application.get_by_id(app.id).status == "submitted"
         # Read-only by default: Gmail not touched, but the email is recorded locally.
         mock_mark.assert_not_called()
-        from gauntler.core.db import ProcessedEmail
+        from moonlighter.core.db import ProcessedEmail
 
         assert ProcessedEmail.select().where(ProcessedEmail.message_id == "msg0").exists()
         # Does not return an update for unrelated
@@ -1483,22 +1497,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             await sync_responses(config, _make_llm_caller(classify_result))
 
@@ -1534,22 +1550,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             await sync_responses(config, _make_llm_caller(classify_result))
 
@@ -1576,22 +1594,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
@@ -1624,22 +1644,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
@@ -1669,22 +1691,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
@@ -1715,22 +1739,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
@@ -1767,22 +1793,24 @@ class TestSyncResponses:
         }
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message", return_value=message),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed"),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             await sync_responses(config, _make_llm_caller(classify_result))
 
@@ -1808,21 +1836,23 @@ class TestSyncResponses:
         raw_ids = [{"id": f"msg{i}", "threadId": f"t{i}"} for i in range(3)]
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
-            patch("gauntler.tracking.email_monitor.fetch_unread_messages", return_value=raw_ids),
-            patch("gauntler.tracking.email_monitor.parse_message", side_effect=messages),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch("moonlighter.tracking.email_monitor.fetch_unread_messages", return_value=raw_ids),
+            patch("moonlighter.tracking.email_monitor.parse_message", side_effect=messages),
+            patch(
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed") as mock_mark,
-            patch("gauntler.tracking.email_monitor._get_or_create_label") as mock_label,
+            patch("moonlighter.tracking.email_monitor.mark_processed") as mock_mark,
+            patch("moonlighter.tracking.email_monitor._get_or_create_label") as mock_label,
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
 
-        from gauntler.core.db import ProcessedEmail
+        from moonlighter.core.db import ProcessedEmail
 
         mock_mark.assert_not_called()  # nada escrito no Gmail
         mock_label.assert_not_called()  # not even the label is created
@@ -1844,19 +1874,21 @@ class TestSyncResponses:
         cfg = {**self.CONFIG, "email": {**self.CONFIG["email"], "mark_processed": True}}
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
-            patch("gauntler.tracking.email_monitor.fetch_unread_messages", return_value=raw_ids),
-            patch("gauntler.tracking.email_monitor.parse_message", side_effect=messages),
             patch(
-                "gauntler.tracking.email_monitor.classify_response",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch("moonlighter.tracking.email_monitor.fetch_unread_messages", return_value=raw_ids),
+            patch("moonlighter.tracking.email_monitor.parse_message", side_effect=messages),
+            patch(
+                "moonlighter.tracking.email_monitor.classify_response",
                 new=AsyncMock(return_value=classify_result),
             ),
-            patch("gauntler.tracking.email_monitor.mark_processed") as mock_mark,
+            patch("moonlighter.tracking.email_monitor.mark_processed") as mock_mark,
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             await sync_responses(cfg, _make_llm_caller(classify_result))
 
@@ -1865,7 +1897,7 @@ class TestSyncResponses:
     async def test_already_processed_email_is_skipped(self, tmp_db):
         """An email already recorded in ProcessedEmail is not reprocessed (no re-calling the LLM)."""
         init_db()
-        from gauntler.core.db import ProcessedEmail
+        from moonlighter.core.db import ProcessedEmail
 
         ProcessedEmail.create(message_id="msg0")
         classify_mock = AsyncMock(
@@ -1880,15 +1912,17 @@ class TestSyncResponses:
         )
 
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
             patch(
-                "gauntler.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_unread_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
-            patch("gauntler.tracking.email_monitor.parse_message") as mock_parse,
-            patch("gauntler.tracking.email_monitor.classify_response", new=classify_mock),
+            patch("moonlighter.tracking.email_monitor.parse_message") as mock_parse,
+            patch("moonlighter.tracking.email_monitor.classify_response", new=classify_mock),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             updates = await sync_responses(self.CONFIG, _make_llm_caller({}))
 
@@ -1899,13 +1933,15 @@ class TestSyncResponses:
     async def test_returns_empty_list_when_no_emails(self, tmp_db):
         init_db()
         with (
-            patch("gauntler.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()),
-            patch("gauntler.tracking.email_monitor.fetch_unread_messages", return_value=[]),
             patch(
-                "gauntler.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
+            ),
+            patch("moonlighter.tracking.email_monitor.fetch_unread_messages", return_value=[]),
+            patch(
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),
         ):
-            from gauntler.tracking.email_monitor import sync_responses
+            from moonlighter.tracking.email_monitor import sync_responses
 
             updates = await sync_responses(self.CONFIG, _make_llm_caller({}))
 
@@ -1917,17 +1953,17 @@ class TestSyncResponses:
 
 def test_extract_ref_skips_wrong_base_with_plus():
     """Address with +ref but a different base → continues and returns None (84->loop)."""
-    from gauntler.tracking.email_monitor import extract_ref
+    from moonlighter.tracking.email_monitor import extract_ref
 
     assert extract_ref("someoneelse+abc@gmail.com", BASE_EMAIL) is None
 
 
 def test_setup_gmail_service_raises_without_google_libs():
     """Credentials None (libs ausentes) → GmailAuthError (email_monitor.py:98)."""
-    from gauntler.tracking.gmail_client import GmailAuthError, setup_gmail_service
+    from moonlighter.tracking.gmail_client import GmailAuthError, setup_gmail_service
 
     with (
-        patch("gauntler.tracking.gmail_client.Credentials", None),
+        patch("moonlighter.tracking.gmail_client.Credentials", None),
         pytest.raises(GmailAuthError, match="google-api-python-client"),
     ):
         setup_gmail_service({"email": {}})
@@ -1938,7 +1974,7 @@ def test_setup_gmail_service_raises_without_google_libs():
 
 def test_extract_body_html_top_level():
     """Top-level text/html payload is decoded (169)."""
-    from gauntler.tracking.gmail_client import _extract_body
+    from moonlighter.tracking.gmail_client import _extract_body
 
     payload = {"mimeType": "text/html", "body": {"data": _b64("<p>Hi</p>")}}
     assert "Hi" in _extract_body(payload)
@@ -1947,7 +1983,7 @@ def test_extract_body_html_top_level():
 def test_extract_body_multipart_skips_empty_parts_then_finds_html():
     """text/plain and text/html parts with empty data are skipped (177->174, 181->180);
     the html with data is accepted (183)."""
-    from gauntler.tracking.gmail_client import _extract_body
+    from moonlighter.tracking.gmail_client import _extract_body
 
     payload = {
         "mimeType": "multipart/alternative",
@@ -1962,7 +1998,7 @@ def test_extract_body_multipart_skips_empty_parts_then_finds_html():
 
 def test_extract_body_recurses_into_nested_multipart():
     """Nested multipart is resolved via recursion (186-189)."""
-    from gauntler.tracking.gmail_client import _extract_body
+    from moonlighter.tracking.gmail_client import _extract_body
 
     payload = {
         "mimeType": "multipart/mixed",
@@ -1977,14 +2013,14 @@ def test_extract_body_recurses_into_nested_multipart():
 
 
 def test_extract_body_unknown_mime_returns_empty():
-    from gauntler.tracking.gmail_client import _extract_body
+    from moonlighter.tracking.gmail_client import _extract_body
 
     assert _extract_body({"mimeType": "application/pdf", "body": {}}) == ""
 
 
 def test_decode_data_invalid_base64_returns_empty():
     """Invalid Base64 → '' without raising (199-200)."""
-    from gauntler.tracking.gmail_client import _decode_data
+    from moonlighter.tracking.gmail_client import _decode_data
 
     assert _decode_data("!!!notbase64@@@") == ""
 
@@ -1994,30 +2030,30 @@ def test_decode_data_invalid_base64_returns_empty():
 
 def test_get_or_create_label_returns_existing():
     """Label already exists → returns the existing id (280-282)."""
-    from gauntler.tracking.gmail_client import _get_or_create_label
+    from moonlighter.tracking.gmail_client import _get_or_create_label
 
     service = MagicMock()
     service.users().labels().list().execute.return_value = {
-        "labels": [{"name": "gauntler/processed", "id": "Label_42"}]
+        "labels": [{"name": "moonlighter/processed", "id": "Label_42"}]
     }
-    assert _get_or_create_label(service, "gauntler/processed") == "Label_42"
+    assert _get_or_create_label(service, "moonlighter/processed") == "Label_42"
 
 
 def test_get_or_create_label_creates_when_missing():
     """Label doesn't exist → creates it and returns the new id (283-296)."""
-    from gauntler.tracking.gmail_client import _get_or_create_label
+    from moonlighter.tracking.gmail_client import _get_or_create_label
 
     service = MagicMock()
     service.users().labels().list().execute.return_value = {"labels": []}
     service.users().labels().create().execute.return_value = {"id": "Label_new"}
-    assert _get_or_create_label(service, "gauntler/processed") == "Label_new"
+    assert _get_or_create_label(service, "moonlighter/processed") == "Label_new"
 
 
 # ── _status_rank ────────────────────────────────────────────────────────────
 
 
 def test_status_rank_unknown_returns_minus_one():
-    from gauntler.tracking.email_monitor import _status_rank
+    from moonlighter.tracking.email_monitor import _status_rank
 
     assert _status_rank("status_inexistente") == -1
 
@@ -2033,7 +2069,7 @@ class TestMatchByCompanyTitle:
 
     def test_exact_single_match_returns_application(self, tmp_db):
         init_db()
-        from gauntler.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.email_monitor import _match_by_company_title
 
         job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
         app = _make_application(job, status="submitted")
@@ -2044,7 +2080,7 @@ class TestMatchByCompanyTitle:
 
     def test_no_match_returns_none(self, tmp_db):
         init_db()
-        from gauntler.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.email_monitor import _match_by_company_title
 
         job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
         _make_application(job, status="submitted")
@@ -2057,7 +2093,7 @@ class TestMatchByCompanyTitle:
         picking either one at random would risk mutating the WRONG
         application's status/notes."""
         init_db()
-        from gauntler.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.email_monitor import _match_by_company_title
 
         job1 = _make_job(tmp_db, company="Stripe", title="Engineer", url="https://x.com/a")
         job2 = _make_job(tmp_db, company="Stripe", title="Engineer", url="https://x.com/b")
@@ -2068,7 +2104,7 @@ class TestMatchByCompanyTitle:
 
     def test_both_none_returns_none_without_querying(self, tmp_db):
         init_db()
-        from gauntler.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.email_monitor import _match_by_company_title
 
         job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
         _make_application(job, status="submitted")
@@ -2077,7 +2113,7 @@ class TestMatchByCompanyTitle:
 
     def test_case_insensitive_company_match(self, tmp_db):
         init_db()
-        from gauntler.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.email_monitor import _match_by_company_title
 
         job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
         app = _make_application(job, status="submitted")
@@ -2089,7 +2125,7 @@ class TestMatchByCompanyTitle:
     def test_partial_substring_match(self, tmp_db):
         """Matching uses LIKE %term% — a partial title still matches."""
         init_db()
-        from gauntler.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.email_monitor import _match_by_company_title
 
         job = _make_job(tmp_db, company="Anthropic", title="Senior Backend Engineer")
         app = _make_application(job, status="submitted")
@@ -2100,7 +2136,7 @@ class TestMatchByCompanyTitle:
 
     def test_only_company_given_filters_by_company_alone(self, tmp_db):
         init_db()
-        from gauntler.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.email_monitor import _match_by_company_title
 
         job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
         app = _make_application(job, status="submitted")
@@ -2111,7 +2147,7 @@ class TestMatchByCompanyTitle:
 
     def test_only_title_given_filters_by_title_alone(self, tmp_db):
         init_db()
-        from gauntler.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.email_monitor import _match_by_company_title
 
         job = _make_job(tmp_db, company="Anthropic", title="Staff Platform Engineer")
         app = _make_application(job, status="submitted")
@@ -2125,7 +2161,7 @@ class TestMatchByCompanyTitle:
         match target — only _ACTIVE_STATUSES are eligible, so a stale/closed
         application can't get reopened by a coincidental company+title hit."""
         init_db()
-        from gauntler.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.email_monitor import _match_by_company_title
 
         job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
         _make_application(job, status="rejected")
@@ -2137,7 +2173,7 @@ class TestMatchByCompanyTitle:
         """A rejected duplicate for the same company+title must not make an
         otherwise-unique active match look ambiguous."""
         init_db()
-        from gauntler.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.email_monitor import _match_by_company_title
 
         job = _make_job(tmp_db, company="Anthropic", title="Senior Engineer")
         _make_application(job, status="rejected")
@@ -2151,7 +2187,7 @@ class TestMatchByCompanyTitle:
         """Same company, two different active roles, no job_title given to
         disambiguate → None, not an arbitrary pick."""
         init_db()
-        from gauntler.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.email_monitor import _match_by_company_title
 
         job1 = _make_job(tmp_db, company="Anthropic", title="Backend Engineer", url="https://x/1")
         job2 = _make_job(tmp_db, company="Anthropic", title="Frontend Engineer", url="https://x/2")
@@ -2167,7 +2203,7 @@ class TestMatchByCompanyTitle:
 def test_resolve_application_ref_no_match_falls_through(tmp_db):
     """ref given but no Application → DoesNotExist swallowed, falls through to fuzzy (422-423)."""
     init_db()
-    from gauntler.tracking.email_monitor import _resolve_application
+    from moonlighter.tracking.email_monitor import _resolve_application
 
     app, match = _resolve_application("nonexistent_ref", {"company": None, "job_title": None})
     assert app is None
@@ -2177,7 +2213,7 @@ def test_resolve_application_ref_no_match_falls_through(tmp_db):
 def test_resolve_application_fuzzy_by_title_only(tmp_db):
     """No company, only job_title → filters by title only (436->438) and matches 1 (fuzzy)."""
     init_db()
-    from gauntler.tracking.email_monitor import _resolve_application
+    from moonlighter.tracking.email_monitor import _resolve_application
 
     job = _make_job(tmp_db, title="Staff Backend Engineer")
     _make_application(job, status="submitted")
@@ -2189,7 +2225,7 @@ def test_resolve_application_fuzzy_by_title_only(tmp_db):
 def test_resolve_application_fuzzy_by_company_only(tmp_db):
     """Only company, no job_title → filters by company only (438->441)."""
     init_db()
-    from gauntler.tracking.email_monitor import _resolve_application
+    from moonlighter.tracking.email_monitor import _resolve_application
 
     job = _make_job(tmp_db, company="Anthropic")
     _make_application(job, status="submitted")
@@ -2201,7 +2237,7 @@ def test_resolve_application_fuzzy_by_company_only(tmp_db):
 def test_resolve_application_no_company_no_title_is_uncertain(tmp_db):
     """No ref, no company, and no job_title → uncertain (448)."""
     init_db()
-    from gauntler.tracking.email_monitor import _resolve_application
+    from moonlighter.tracking.email_monitor import _resolve_application
 
     app, match = _resolve_application(None, {"company": None, "job_title": None})
     assert app is None
@@ -2210,10 +2246,10 @@ def test_resolve_application_no_company_no_title_is_uncertain(tmp_db):
 
 def test_run_gmail_oauth_raises_without_oauthlib():
     """InstalledAppFlow None → GmailAuthError (454)."""
-    from gauntler.tracking.gmail_client import GmailAuthError, _run_gmail_oauth
+    from moonlighter.tracking.gmail_client import GmailAuthError, _run_gmail_oauth
 
     with (
-        patch("gauntler.tracking.gmail_client.InstalledAppFlow", None),
+        patch("moonlighter.tracking.gmail_client.InstalledAppFlow", None),
         pytest.raises(GmailAuthError, match="google-auth-oauthlib"),
     ):
         _run_gmail_oauth("creds.json", "token.json")
@@ -2221,7 +2257,7 @@ def test_run_gmail_oauth_raises_without_oauthlib():
 
 def test_extract_body_multipart_unresolvable_returns_empty():
     """Parts that don't resolve to text → recursion ends without finding anything (186->191, 188->186)."""
-    from gauntler.tracking.gmail_client import _extract_body
+    from moonlighter.tracking.gmail_client import _extract_body
 
     payload = {
         "mimeType": "multipart/mixed",
@@ -2232,20 +2268,20 @@ def test_extract_body_multipart_unresolvable_returns_empty():
 
 def test_get_or_create_label_skips_non_matching_then_creates():
     """An existing label that doesn't match is skipped (281->280) and the target is created."""
-    from gauntler.tracking.gmail_client import _get_or_create_label
+    from moonlighter.tracking.gmail_client import _get_or_create_label
 
     service = MagicMock()
     service.users().labels().list().execute.return_value = {
         "labels": [{"name": "OTHER", "id": "x"}]
     }
     service.users().labels().create().execute.return_value = {"id": "Label_new"}
-    assert _get_or_create_label(service, "gauntler/processed") == "Label_new"
+    assert _get_or_create_label(service, "moonlighter/processed") == "Label_new"
 
 
 def test_resolve_application_fuzzy_zero_matches_is_uncertain(tmp_db):
     """company with no matching Application → 0 results → uncertain (444->448)."""
     init_db()
-    from gauntler.tracking.email_monitor import _resolve_application
+    from moonlighter.tracking.email_monitor import _resolve_application
 
     app, match = _resolve_application(None, {"company": "NonexistentCompany", "job_title": None})
     assert app is None

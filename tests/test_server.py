@@ -3,12 +3,12 @@ import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from gauntler.application.answers.cv import CVNotFoundError
-from gauntler.application.appliers.base import ApplicationDraft
-from gauntler.application.appliers.linkedin import LinkedInApplier
-from gauntler.core.db import Application, Job, ScanLog, init_db
-from gauntler.core.metrics import record_call
-from gauntler.discovery.evaluator import EvaluationResult
+from moonlighter.application.answers.cv import CVNotFoundError
+from moonlighter.application.appliers.base import ApplicationDraft
+from moonlighter.application.appliers.linkedin import LinkedInApplier
+from moonlighter.core.db import Application, Job, ScanLog, init_db
+from moonlighter.core.metrics import record_call
+from moonlighter.discovery.evaluator import EvaluationResult
 
 from tests._context import make_test_context
 
@@ -61,13 +61,13 @@ def create_application(job, **kwargs):
 
 async def test_scan_no_new_jobs(tmp_db):
     init_db()
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.server import scan_and_evaluate
 
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
     ):
         for M in (MockGH, MockLV, MockAB):
             instance = AsyncMock()
@@ -80,7 +80,7 @@ async def test_scan_no_new_jobs(tmp_db):
 
 async def test_scan_and_evaluate_reports_archived_stale_jobs(tmp_db):
     init_db()
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.server import scan_and_evaluate
 
     # Pre-existing eligible job whose company listing will come back empty → stale.
     create_job(
@@ -88,10 +88,10 @@ async def test_scan_and_evaluate_reports_archived_stale_jobs(tmp_db):
     )
 
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
     ):
         for M in (MockGH, MockLV, MockAB):
             instance = AsyncMock()
@@ -109,13 +109,13 @@ async def test_scan_and_evaluate_reports_archived_stale_jobs(tmp_db):
 async def test_scan_and_evaluate_no_new_jobs_still_runs_archive_check(tmp_db):
     """Regression: the 'no new jobs' early-exit message must still show the archive section."""
     init_db()
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.server import scan_and_evaluate
 
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
     ):
         for M in (MockGH, MockLV, MockAB):
             instance = AsyncMock()
@@ -130,22 +130,24 @@ async def test_scan_and_evaluate_no_new_jobs_still_runs_archive_check(tmp_db):
 
 async def test_scan_all_below_threshold(tmp_db):
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse", company="co", title="Eng", url="https://x.com/1", description="desc"
     )
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
         patch(
-            "gauntler.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=4.0)),
         ),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch(
+            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -160,8 +162,8 @@ async def test_scan_all_below_threshold(tmp_db):
 
 async def test_scan_above_threshold_shows_table(tmp_db):
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse",
@@ -171,16 +173,17 @@ async def test_scan_above_threshold_shows_table(tmp_db):
         description="desc",
     )
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
         patch(
-            "gauntler.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
         ),
         patch(
-            "gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}
+            "moonlighter.discovery.service.load_company_list",
+            return_value={"greenhouse": ["stripe"]},
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
@@ -195,17 +198,19 @@ async def test_scan_above_threshold_shows_table(tmp_db):
 async def test_scan_dedup_against_scan_log(tmp_db):
     init_db()
     ScanLog.create(job_url="https://x.com/3", source="greenhouse")
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(source="greenhouse", company="co", title="Eng", url="https://x.com/3")
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
-        patch("gauntler.discovery.service.evaluate_jobs_batch") as mock_batch,
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.service.evaluate_jobs_batch") as mock_batch,
+        patch(
+            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -220,22 +225,24 @@ async def test_scan_dedup_against_scan_log(tmp_db):
 
 async def test_scan_linkedin_failure_doesnt_block(tmp_db):
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse", company="co", title="Eng", url="https://x.com/4", description="desc"
     )
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
         patch(
-            "gauntler.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
         ),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch(
+            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -248,8 +255,8 @@ async def test_scan_linkedin_failure_doesnt_block(tmp_db):
 
 async def test_scan_saves_salary_fields(tmp_db):
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse",
@@ -268,16 +275,17 @@ async def test_scan_saves_salary_fields(tmp_db):
         salary_source="stated",
     )
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
         patch(
-            "gauntler.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(eval_result),
         ),
         patch(
-            "gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}
+            "moonlighter.discovery.service.load_company_list",
+            return_value={"greenhouse": ["stripe"]},
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
@@ -293,8 +301,8 @@ async def test_scan_saves_salary_fields(tmp_db):
 
 async def test_scan_saves_caveats_as_json(tmp_db):
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse", company="co", title="Eng", url="https://x.com/6", description="desc"
@@ -303,15 +311,17 @@ async def test_scan_saves_caveats_as_json(tmp_db):
         score=7.0, score_notes="ok", caveats=["US only", "requires visa"]
     )
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
         patch(
-            "gauntler.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(eval_result),
         ),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch(
+            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -326,22 +336,24 @@ async def test_scan_saves_caveats_as_json(tmp_db):
 
 async def test_scan_status_archived_if_below_threshold(tmp_db):
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse", company="co", title="Eng", url="https://x.com/7", description="desc"
     )
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
         patch(
-            "gauntler.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=3.0)),
         ),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch(
+            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -359,7 +371,7 @@ async def test_scan_status_archived_if_below_threshold(tmp_db):
 async def test_list_jobs_default_new(tmp_db):
     init_db()
     create_job(tmp_db, url="https://x.com/lj1", status="new", score=8.0)
-    from gauntler.server import list_jobs
+    from moonlighter.server import list_jobs
 
     result = await list_jobs(status="new", ctx=make_test_context())
     assert "Stripe" in result
@@ -369,7 +381,7 @@ async def test_list_jobs_filtered_by_status(tmp_db):
     init_db()
     create_job(tmp_db, url="https://x.com/lj2", status="reviewed", score=7.0, company="Linear")
     create_job(tmp_db, url="https://x.com/lj3", status="new", score=8.0, company="Vercel")
-    from gauntler.server import list_jobs
+    from moonlighter.server import list_jobs
 
     result = await list_jobs(status="reviewed", ctx=make_test_context())
     assert "Linear" in result
@@ -386,7 +398,7 @@ async def test_list_jobs_limit(tmp_db):
             score=float(i),
             company=f"Co{i}",
         )
-    from gauntler.server import list_jobs
+    from moonlighter.server import list_jobs
 
     result = await list_jobs(status="new", limit=3, ctx=make_test_context())
     # Verify it returned without error
@@ -396,7 +408,7 @@ async def test_list_jobs_limit(tmp_db):
 
 async def test_list_jobs_empty(tmp_db):
     init_db()
-    from gauntler.server import list_jobs
+    from moonlighter.server import list_jobs
 
     result = await list_jobs(status="offer", ctx=make_test_context())
     assert "No jobs" in result
@@ -406,7 +418,7 @@ async def test_list_jobs_ordered_by_score_desc(tmp_db):
     init_db()
     create_job(tmp_db, url="https://x.com/lj-lo", status="new", score=6.0, company="LowScore")
     create_job(tmp_db, url="https://x.com/lj-hi", status="new", score=9.5, company="HighScore")
-    from gauntler.server import list_jobs
+    from moonlighter.server import list_jobs
 
     result = await list_jobs(status="new", ctx=make_test_context())
     # HighScore should appear before LowScore in the output
@@ -419,7 +431,7 @@ async def test_list_jobs_ordered_by_score_desc(tmp_db):
 async def test_get_job_existing(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/gj1")
-    from gauntler.server import get_job
+    from moonlighter.server import get_job
 
     result = await get_job(id=job.id, ctx=make_test_context())
     assert "Stripe" in result
@@ -429,7 +441,7 @@ async def test_get_job_existing(tmp_db):
 
 async def test_get_job_nonexistent(tmp_db):
     init_db()
-    from gauntler.server import get_job
+    from moonlighter.server import get_job
 
     result = await get_job(id=99999, ctx=make_test_context())
     assert "not found" in result
@@ -438,7 +450,7 @@ async def test_get_job_nonexistent(tmp_db):
 async def test_get_job_with_caveats(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/gj2", caveats='["US only"]')
-    from gauntler.server import get_job
+    from moonlighter.server import get_job
 
     result = await get_job(id=job.id, ctx=make_test_context())
     assert "US only" in result
@@ -454,7 +466,7 @@ async def test_get_job_with_salary(tmp_db):
         salary_currency="USD",
         salary_source="stated",
     )
-    from gauntler.server import get_job
+    from moonlighter.server import get_job
 
     result = await get_job(id=job.id, ctx=make_test_context())
     assert "150" in result or "200" in result
@@ -463,7 +475,7 @@ async def test_get_job_with_salary(tmp_db):
 async def test_get_job_without_salary(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/gj4")
-    from gauntler.server import get_job
+    from moonlighter.server import get_job
 
     result = await get_job(id=job.id, ctx=make_test_context())
     # Should not crash; salary line absent
@@ -473,7 +485,7 @@ async def test_get_job_without_salary(tmp_db):
 async def test_get_job_without_posted_at(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/gj5", posted_at=None)
-    from gauntler.server import get_job
+    from moonlighter.server import get_job
 
     result = await get_job(id=job.id, ctx=make_test_context())
     assert "n/a" in result
@@ -485,7 +497,7 @@ async def test_get_job_description_is_framed_as_external_data(tmp_db):
     instructions, so a posting can't try to talk directly to the orchestrator."""
     init_db()
     job = create_job(tmp_db, url="https://x.com/gj6", description="A normal job description.")
-    from gauntler.server import get_job
+    from moonlighter.server import get_job
 
     result = await get_job(id=job.id, ctx=make_test_context())
     import re
@@ -516,19 +528,19 @@ async def test_apply_jobs_creates_draft(tmp_db):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/apply1")
     draft = ApplicationDraft(job_id=job.id, answers={"Q": "A"}, form_fields=["Q"])
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.browser") as mock_browser,
         patch(
-            "gauntler.application.service.generate_answers",
+            "moonlighter.application.service.generate_answers",
             new=AsyncMock(return_value=draft),
         ),
-        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.extract_fields = AsyncMock(return_value=["Q"])
         mock_detect.return_value = mock_applier
-        from gauntler.server import apply_jobs
+        from moonlighter.server import apply_jobs
 
         result = await apply_jobs(ids=[job.id], ctx=make_test_context())
     app = Application.get(Application.job == job)
@@ -538,7 +550,7 @@ async def test_apply_jobs_creates_draft(tmp_db):
 
 async def test_apply_jobs_job_not_found(tmp_db):
     init_db()
-    from gauntler.server import apply_jobs
+    from moonlighter.server import apply_jobs
 
     result = await apply_jobs(ids=[99999], ctx=make_test_context())
     assert "not found" in result
@@ -549,12 +561,12 @@ async def test_apply_jobs_unknown_ats(tmp_db):
     job = create_job(tmp_db, url="https://unknownats.com/jobs/1")
     page = make_mock_page(url="https://unknownats.com/jobs/1")
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier", new=AsyncMock(return_value=None)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
-        from gauntler.server import apply_jobs
+        from moonlighter.server import apply_jobs
 
         result = await apply_jobs(ids=[job.id], ctx=make_test_context())
     assert "ATS not recognized" in result
@@ -566,19 +578,19 @@ async def test_apply_jobs_updates_job_status(tmp_db):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/apply2")
     draft = ApplicationDraft(job_id=job.id, answers={"Q": "A"}, form_fields=["Q"])
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.browser") as mock_browser,
         patch(
-            "gauntler.application.service.generate_answers",
+            "moonlighter.application.service.generate_answers",
             new=AsyncMock(return_value=draft),
         ),
-        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.extract_fields = AsyncMock(return_value=["Q"])
         mock_detect.return_value = mock_applier
-        from gauntler.server import apply_jobs
+        from moonlighter.server import apply_jobs
 
         await apply_jobs(ids=[job.id], ctx=make_test_context())
     job_fresh = Job.get_by_id(job.id)
@@ -598,9 +610,9 @@ async def test_confirm_apply_success(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ca1")
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier") as mock_detect,
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -609,7 +621,7 @@ async def test_confirm_apply_success(tmp_db, tmp_path):
         mock_applier.fill_form = AsyncMock(return_value={})
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
-        from gauntler.server import confirm_apply
+        from moonlighter.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id, ctx=make_test_context())
 
@@ -625,7 +637,7 @@ async def test_confirm_apply_no_application(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca2")
     # No application created
-    from gauntler.server import confirm_apply
+    from moonlighter.server import confirm_apply
 
     result = await confirm_apply(job_id=job.id, ctx=make_test_context())
     assert "no draft" in result or "not found" in result
@@ -633,7 +645,7 @@ async def test_confirm_apply_no_application(tmp_db):
 
 async def test_confirm_apply_job_not_found(tmp_db):
     init_db()
-    from gauntler.server import confirm_apply
+    from moonlighter.server import confirm_apply
 
     result = await confirm_apply(job_id=88888, ctx=make_test_context())
     assert "not found" in result or "no draft" in result
@@ -644,10 +656,10 @@ async def test_confirm_apply_cv_not_found(tmp_db):
     job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca3", status="applying")
     create_application(job)
     with patch(
-        "gauntler.application.service.resolve_cv_path",
+        "moonlighter.application.service.resolve_cv_path",
         side_effect=CVNotFoundError("CV not found"),
     ):
-        from gauntler.server import confirm_apply
+        from moonlighter.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id, ctx=make_test_context())
     assert "CV" in result and "not found" in result
@@ -670,9 +682,9 @@ async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
         return {}
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier") as mock_detect,
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -681,7 +693,7 @@ async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
         mock_applier.fill_form = fake_fill
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
-        from gauntler.server import confirm_apply
+        from moonlighter.server import confirm_apply
 
         await confirm_apply(job_id=job.id, answers={"Q1": "overridden"}, ctx=make_test_context())
 
@@ -710,9 +722,9 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
 
     test_email = "candidaturas@gmail.com"
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier") as mock_detect,
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -721,8 +733,8 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
         mock_applier.fill_form = fake_fill
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
-        from gauntler.application.answers.email_alias import build_email_alias
-        from gauntler.server import confirm_apply
+        from moonlighter.application.answers.email_alias import build_email_alias
+        from moonlighter.server import confirm_apply
 
         await confirm_apply(
             job_id=job.id,
@@ -747,9 +759,9 @@ async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ca5")
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier") as mock_detect,
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -758,7 +770,7 @@ async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
         mock_applier = MagicMock()
         mock_applier.fill_form = AsyncMock(side_effect=Exception("browser crash"))
         mock_detect.return_value = mock_applier
-        from gauntler.server import confirm_apply
+        from moonlighter.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id, ctx=make_test_context())
 
@@ -778,7 +790,7 @@ async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
 async def test_retry_apply_no_draft(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ra1")
-    from gauntler.server import retry_apply
+    from moonlighter.server import retry_apply
 
     result = await retry_apply(job_id=job.id, ctx=make_test_context())
     assert "apply_jobs" in result or "first" in result
@@ -793,9 +805,9 @@ async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ra2")
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier") as mock_detect,
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -804,7 +816,7 @@ async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
         mock_applier.fill_form = AsyncMock(return_value={})
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
-        from gauntler.server import retry_apply
+        from moonlighter.server import retry_apply
 
         result = await retry_apply(job_id=job.id, ctx=make_test_context())
     assert "submetida" in result or "✓" in result
@@ -814,7 +826,7 @@ async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
 
 
 async def test_fill_application_tool_delegates_to_service(monkeypatch):
-    import gauntler.server as server
+    import moonlighter.server as server
 
     called = {}
 
@@ -829,7 +841,7 @@ async def test_fill_application_tool_delegates_to_service(monkeypatch):
 
 
 async def test_submit_application_tool_delegates_to_service(monkeypatch):
-    import gauntler.server as server
+    import moonlighter.server as server
 
     called = {}
 
@@ -848,7 +860,7 @@ async def test_submit_application_tool_delegates_to_service(monkeypatch):
 
 async def test_get_pipeline_empty(tmp_db):
     init_db()
-    from gauntler.server import get_pipeline
+    from moonlighter.server import get_pipeline
 
     result = await get_pipeline(ctx=make_test_context())
     assert "0" in result or "Total" in result
@@ -860,7 +872,7 @@ async def test_get_pipeline_groups_by_status(tmp_db):
     job2 = create_job(tmp_db, url="https://x.com/pl2", company="Linear")
     create_application(job1, status="submitted")
     create_application(job2, status="interviews")
-    from gauntler.server import get_pipeline
+    from moonlighter.server import get_pipeline
 
     result = await get_pipeline(ctx=make_test_context())
     assert "Submitted" in result or "submitted" in result.lower()
@@ -871,7 +883,7 @@ async def test_get_pipeline_shows_next_action(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/pl3")
     create_application(job, status="submitted", next_action="follow up em 2026-06-01")
-    from gauntler.server import get_pipeline
+    from moonlighter.server import get_pipeline
 
     result = await get_pipeline(ctx=make_test_context())
     assert "follow up" in result
@@ -881,7 +893,7 @@ async def test_get_pipeline_skips_empty_statuses(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/pl4")
     create_application(job, status="submitted")
-    from gauntler.server import get_pipeline
+    from moonlighter.server import get_pipeline
 
     result = await get_pipeline(ctx=make_test_context())
     # "Offer" section should not appear since no offer apps
@@ -895,7 +907,7 @@ async def test_update_status_success(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/us1")
     create_application(job)
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     result = await update_status(job_id=job.id, status="screening", ctx=make_test_context())
     app = Application.get(Application.job == job)
@@ -907,7 +919,7 @@ async def test_update_status_with_notes(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/us2")
     create_application(job)
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     await update_status(
         job_id=job.id,
@@ -923,7 +935,7 @@ async def test_update_status_with_next_action(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/us3")
     create_application(job)
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     result = await update_status(
         job_id=job.id, status="screening", next_action="Call Friday", ctx=make_test_context()
@@ -935,7 +947,7 @@ async def test_update_status_with_next_action(tmp_db):
 
 async def test_update_status_invalid(tmp_db):
     init_db()
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     result = await update_status(job_id=1, status="banana", ctx=make_test_context())
     assert "Invalid" in result or "Status" in result
@@ -943,7 +955,7 @@ async def test_update_status_invalid(tmp_db):
 
 async def test_update_status_job_not_found(tmp_db):
     init_db()
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     result = await update_status(job_id=77777, status="screening", ctx=make_test_context())
     assert "not found" in result
@@ -953,7 +965,7 @@ async def test_update_status_no_application(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/us5")
     # No application
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     result = await update_status(job_id=job.id, status="screening", ctx=make_test_context())
     assert "application" in result or "not found" in result
@@ -964,7 +976,7 @@ async def test_update_status_invalid_leaves_db_untouched(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/us6")
     create_application(job, status="draft", notes="original notes")
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     result = await update_status(
         job_id=job.id, status="banana", notes="should not stick", ctx=make_test_context()
@@ -984,7 +996,7 @@ async def test_update_status_accepts_every_valid_status(tmp_db, status):
     init_db()
     job = create_job(tmp_db, url=f"https://x.com/us-valid-{status}")
     create_application(job)
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     result = await update_status(job_id=job.id, status=status, ctx=make_test_context())
     app = Application.get(Application.job == job)
@@ -995,7 +1007,7 @@ async def test_update_status_accepts_every_valid_status(tmp_db, status):
 async def test_update_status_invalid_lists_accepted_values_sorted(tmp_db):
     """Error message enumerates the accepted statuses, alphabetically sorted."""
     init_db()
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     result = await update_status(job_id=1, status="not-a-real-status", ctx=make_test_context())
     expected_order = ", ".join(
@@ -1009,7 +1021,7 @@ async def test_update_status_appends_multiple_notes_instead_of_overwriting(tmp_d
     init_db()
     job = create_job(tmp_db, url="https://x.com/us7")
     create_application(job)
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     await update_status(
         job_id=job.id, status="screening", notes="First note", ctx=make_test_context()
@@ -1029,7 +1041,7 @@ async def test_update_status_without_notes_preserves_existing_notes(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/us8")
     create_application(job)
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     await update_status(job_id=job.id, status="screening", notes="Keep me", ctx=make_test_context())
     await update_status(job_id=job.id, status="interviews", ctx=make_test_context())
@@ -1042,7 +1054,7 @@ async def test_update_status_without_next_action_preserves_existing_value(tmp_db
     init_db()
     job = create_job(tmp_db, url="https://x.com/us9")
     create_application(job, next_action="original follow-up")
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     result = await update_status(job_id=job.id, status="screening", ctx=make_test_context())
     app = Application.get(Application.job == job)
@@ -1055,7 +1067,7 @@ async def test_update_status_job_not_found_does_not_leak_other_jobs(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/us10")
     create_application(job, status="draft")
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     result = await update_status(job_id=999999, status="offer", ctx=make_test_context())
     assert "not found" in result
@@ -1069,7 +1081,7 @@ async def test_update_status_updates_updated_at_timestamp(tmp_db):
     job = create_job(tmp_db, url="https://x.com/us11")
     app = create_application(job)
     original_updated_at = app.updated_at
-    from gauntler.server import update_status
+    from moonlighter.server import update_status
 
     await update_status(job_id=job.id, status="screening", ctx=make_test_context())
     refreshed = Application.get(Application.job == job)
@@ -1082,8 +1094,8 @@ async def test_update_status_updates_updated_at_timestamp(tmp_db):
 async def test_scan_concurrent_batch_all_processed(tmp_db):
     """15 jobs → 3 chunks of 5 (scan_batch_size=5) → evaluate_jobs_batch called 3× → all 15 in DB."""
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raws = [
         RawJob(
@@ -1097,12 +1109,14 @@ async def test_scan_concurrent_batch_all_processed(tmp_db):
     ]
     mock_batch = AsyncMock(side_effect=_batch_of(make_eval_result(score=7.0)))
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
-        patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
+        patch(
+            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1129,8 +1143,8 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
     This test FAILS if the _release loop is removed from the spend-limit except
     clause: without release, chunk 0's 4 jobs end up with a ScanLog but no Job."""
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raws = [
         RawJob(
@@ -1147,12 +1161,14 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
     mock_batch = AsyncMock(side_effect=spend_limit_err)
 
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
-        patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
+        patch(
+            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1183,8 +1199,8 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
     releases the semaphore; chunks 1 and 2 see the stop before calling
     evaluate_jobs_batch. Concrete proof of early stop: call_count == 1, not 3."""
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raws = [
         RawJob(
@@ -1201,12 +1217,14 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
     mock_batch = AsyncMock(side_effect=spend_limit_err)
 
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
-        patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
+        patch(
+            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1240,8 +1258,8 @@ async def test_scan_non_spend_error_keeps_title_filtered_in_report(tmp_db):
     title-filtered jobs already persisted earlier in the same chunk from the report
     count — they're already saved in the DB, the report must reflect that too."""
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raws = [
         RawJob(
@@ -1262,12 +1280,14 @@ async def test_scan_non_spend_error_keeps_title_filtered_in_report(tmp_db):
     mock_batch = AsyncMock(side_effect=Exception("unexpected LLM error"))
 
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
-        patch("gauntler.discovery.service.evaluate_jobs_batch", new=mock_batch),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
+        patch(
+            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1301,8 +1321,8 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tmp
     return_exceptions=True catches it, this chunk contributes nothing, other chunks
     are unaffected."""
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raws = [
         RawJob(
@@ -1315,12 +1335,14 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tmp
     ]
 
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
-        patch("gauntler.discovery.service._claim", side_effect=Exception("db corrupted")),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.service._claim", side_effect=Exception("db corrupted")),
+        patch(
+            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1355,15 +1377,15 @@ async def test_apply_jobs_linkedin_not_easy_apply(tmp_db):
     li_applier = LinkedInApplier(page, {}, {})
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.browser") as mock_browser,
         patch(
-            "gauntler.application.service.detect_applier",
+            "moonlighter.application.service.detect_applier",
             new=AsyncMock(return_value=li_applier),
         ),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
-        from gauntler.server import apply_jobs
+        from moonlighter.server import apply_jobs
 
         result = await apply_jobs(ids=[job.id], ctx=make_test_context())
 
@@ -1378,19 +1400,19 @@ async def test_apply_jobs_llm_error_still_creates_draft(tmp_db):
     error_draft = ApplicationDraft(job_id=job.id, answers={}, form_fields=[], error="LLM timeout")
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.browser") as mock_browser,
         patch(
-            "gauntler.application.service.generate_answers",
+            "moonlighter.application.service.generate_answers",
             new=AsyncMock(return_value=error_draft),
         ),
-        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.extract_fields = AsyncMock(return_value=["Q"])
         mock_detect.return_value = mock_applier
-        from gauntler.server import apply_jobs
+        from moonlighter.server import apply_jobs
 
         result = await apply_jobs(ids=[job.id], ctx=make_test_context())
 
@@ -1408,19 +1430,19 @@ async def test_apply_jobs_updates_existing_draft(tmp_db):
     new_draft = ApplicationDraft(job_id=job.id, answers={"NewQ": "NewA"}, form_fields=["NewQ"])
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.browser") as mock_browser,
         patch(
-            "gauntler.application.service.generate_answers",
+            "moonlighter.application.service.generate_answers",
             new=AsyncMock(return_value=new_draft),
         ),
-        patch("gauntler.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
         mock_applier.extract_fields = AsyncMock(return_value=["NewQ"])
         mock_detect.return_value = mock_applier
-        from gauntler.server import apply_jobs
+        from moonlighter.server import apply_jobs
 
         await apply_jobs(ids=[job.id], ctx=make_test_context())
 
@@ -1449,16 +1471,16 @@ async def test_apply_jobs_exception_continues_to_next(tmp_db):
         return mock_applier
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.browser") as mock_browser,
         patch(
-            "gauntler.application.service.generate_answers",
+            "moonlighter.application.service.generate_answers",
             new=AsyncMock(return_value=draft),
         ),
-        patch("gauntler.application.service.detect_applier", side_effect=detect_side_effect),
+        patch("moonlighter.application.service.detect_applier", side_effect=detect_side_effect),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
-        from gauntler.server import apply_jobs
+        from moonlighter.server import apply_jobs
 
         result = await apply_jobs(ids=[job1.id, job2.id], ctx=make_test_context())
 
@@ -1480,9 +1502,9 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/sf1")
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier") as mock_detect,
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -1492,7 +1514,7 @@ async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
         mock_applier.fill_form = AsyncMock(return_value={})
         mock_applier.submit = AsyncMock(return_value="failed")
         mock_detect.return_value = mock_applier
-        from gauntler.server import confirm_apply
+        from moonlighter.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id, ctx=make_test_context())
 
@@ -1517,9 +1539,9 @@ async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db,
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/uv1")
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier") as mock_detect,
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -1529,7 +1551,7 @@ async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db,
         mock_applier.fill_form = AsyncMock(return_value={})
         mock_applier.submit = AsyncMock(return_value="unverified")
         mock_detect.return_value = mock_applier
-        from gauntler.server import confirm_apply
+        from moonlighter.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id, ctx=make_test_context())
 
@@ -1553,7 +1575,7 @@ async def test_retry_apply_refuses_needs_review(tmp_db):
         tmp_db, url="https://boards.greenhouse.io/stripe/jobs/nr1", status="needs_review"
     )
     create_application(job, status="needs_review")
-    from gauntler.server import retry_apply
+    from moonlighter.server import retry_apply
 
     result = await retry_apply(job_id=job.id, ctx=make_test_context())
     assert "needs_review" in result
@@ -1564,7 +1586,7 @@ async def test_get_pipeline_shows_needs_review(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/pl-nr", company="Stripe")
     create_application(job, status="needs_review")
-    from gauntler.server import get_pipeline
+    from moonlighter.server import get_pipeline
 
     result = await get_pipeline(ctx=make_test_context())
     assert "needs_review" in result.lower()
@@ -1580,14 +1602,14 @@ async def test_confirm_apply_unknown_ats(tmp_db, tmp_path):
     page = make_mock_page(url="https://unknownats.com/jobs/ca99")
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier", new=AsyncMock(return_value=None)),
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier", new=AsyncMock(return_value=None)),
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
-        from gauntler.server import confirm_apply
+        from moonlighter.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id, ctx=make_test_context())
 
@@ -1619,17 +1641,17 @@ async def test_confirm_apply_linkedin_calls_extract_fields(tmp_db, tmp_path):
     li_applier = TrackingLinkedInApplier(page, {}, {})
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.browser") as mock_browser,
         patch(
-            "gauntler.application.service.detect_applier",
+            "moonlighter.application.service.detect_applier",
             new=AsyncMock(return_value=li_applier),
         ),
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
-        from gauntler.server import confirm_apply
+        from moonlighter.server import confirm_apply
 
         await confirm_apply(job_id=job.id, ctx=make_test_context())
 
@@ -1643,7 +1665,7 @@ async def test_get_job_score_null(tmp_db):
     """get_job with score=None must not raise TypeError (bug fix)."""
     init_db()
     job = create_job(tmp_db, url="https://x.com/gj-null-score", score=None)
-    from gauntler.server import get_job
+    from moonlighter.server import get_job
 
     result = await get_job(id=job.id, ctx=make_test_context())
     assert "—" in result
@@ -1656,7 +1678,7 @@ async def test_get_job_score_null(tmp_db):
 async def test_login_unsupported_platform(tmp_db):
     """login() with unsupported platform returns error message."""
     init_db()
-    from gauntler.server import login
+    from moonlighter.server import login
 
     result = await login(platform="github", ctx=make_test_context())
     assert "not supported" in result or "suport" in result.lower() or "github" in result.lower()
@@ -1666,9 +1688,9 @@ async def test_login_linkedin_returns_instruction(tmp_db):
     """login('linkedin') opens browser and returns instruction string."""
     init_db()
     page = make_mock_page(url="https://www.linkedin.com/login")
-    with patch("gauntler.server._browser_mod") as mock_browser:
+    with patch("moonlighter.server._browser_mod") as mock_browser:
         mock_browser.new_page = AsyncMock(return_value=page)
-        from gauntler.server import login
+        from moonlighter.server import login
 
         result = await login(platform="linkedin", ctx=make_test_context())
     assert "linkedin" in result.lower()
@@ -1690,7 +1712,7 @@ async def test_list_jobs_salary_estimate_shows_asterisk(tmp_db):
         salary_source="llm_estimate",
         status="new",
     )
-    from gauntler.server import list_jobs
+    from moonlighter.server import list_jobs
 
     result = await list_jobs(status="new", ctx=make_test_context())
     assert " *" in result
@@ -1708,7 +1730,7 @@ async def test_list_jobs_salary_min_only_shows_plus(tmp_db):
         salary_source="stated",
         status="new",
     )
-    from gauntler.server import list_jobs
+    from moonlighter.server import list_jobs
 
     result = await list_jobs(status="new", ctx=make_test_context())
     assert "k+" in result or "120" in result
@@ -1726,7 +1748,7 @@ async def test_get_pipeline_total_count(tmp_db):
     create_application(job1, status="submitted")
     create_application(job2, status="interviews")
     create_application(job3, status="rejected")
-    from gauntler.server import get_pipeline
+    from moonlighter.server import get_pipeline
 
     result = await get_pipeline(ctx=make_test_context())
     assert "3" in result
@@ -1747,7 +1769,7 @@ async def test_get_pipeline_every_status_bucket_appears(tmp_db):
     for i, status in enumerate(statuses):
         job = create_job(tmp_db, url=f"https://x.com/pl-all-{i}", company=f"Co{i}")
         create_application(job, status=status)
-    from gauntler.server import get_pipeline
+    from moonlighter.server import get_pipeline
 
     result = await get_pipeline(ctx=make_test_context())
     headers = [f"## {status.capitalize()} (1)" for status in statuses]
@@ -1770,7 +1792,7 @@ async def test_get_pipeline_multiple_applications_same_status_ordered_by_updated
     app_new = Application.get(Application.job == job_new)
     app_new.updated_at = app_new.updated_at + timedelta(days=1)
     app_new.save()
-    from gauntler.server import get_pipeline
+    from moonlighter.server import get_pipeline
 
     result = await get_pipeline(ctx=make_test_context())
     assert result.index("NewCo") < result.index("OldCo")
@@ -1781,7 +1803,7 @@ async def test_get_pipeline_no_applied_at_shows_dash(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/pl-noapplied")
     create_application(job, status="draft", applied_at=None)
-    from gauntler.server import get_pipeline
+    from moonlighter.server import get_pipeline
 
     result = await get_pipeline(ctx=make_test_context())
     assert "(—)" in result
@@ -1792,7 +1814,7 @@ async def test_get_pipeline_shows_job_company_and_title(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/pl-fmt", company="Acme Corp", title="Backend Dev")
     create_application(job, status="submitted")
-    from gauntler.server import get_pipeline
+    from moonlighter.server import get_pipeline
 
     result = await get_pipeline(ctx=make_test_context())
     assert f"#{job.id} Acme Corp/Backend Dev" in result
@@ -1801,7 +1823,7 @@ async def test_get_pipeline_shows_job_company_and_title(tmp_db):
 async def test_get_pipeline_empty_has_zero_total_and_no_bucket_headers(tmp_db):
     """With zero applications, no '## Status' header appears anywhere, and total is 0."""
     init_db()
-    from gauntler.server import get_pipeline
+    from moonlighter.server import get_pipeline
 
     result = await get_pipeline(ctx=make_test_context())
     assert "## " not in result
@@ -1815,13 +1837,13 @@ def test_validate_startup_called_at_import_with_real_config():
     """validate_startup does not raise an exception during mcp_server startup."""
     # mcp_server was already imported in previous tests.
     # This test ensures the module imports without crashing even without an API key.
-    import gauntler.server  # noqa: F401 — verifies it imports ok
+    import moonlighter.server  # noqa: F401 — verifies it imports ok
 
     assert True  # if we got here, it didn't crash
 
 
 def test_startup_warning_level_values():
-    from gauntler.startup import StartupWarning
+    from moonlighter.startup import StartupWarning
 
     w_err = StartupWarning(level="error", message="msg")
     w_warn = StartupWarning(level="warn", message="msg")
@@ -1835,15 +1857,15 @@ def test_startup_warning_level_values():
 async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
     """LinkedInSessionExpiredError → explicit warning in the result (no silence)."""
     init_db()
-    from gauntler.discovery.sources.playwright import LinkedInSessionExpiredError
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.playwright import LinkedInSessionExpiredError
+    from moonlighter.server import scan_and_evaluate
 
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
-        patch("gauntler.discovery.sources.playwright.LinkedInScanner") as MockLI,
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.sources.playwright.LinkedInScanner") as MockLI,
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[])
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -1861,9 +1883,9 @@ async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
 async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db):
     """LinkedInSessionExpiredError does not prevent HTTP jobs from being returned."""
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.discovery.sources.playwright import LinkedInSessionExpiredError
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.discovery.sources.playwright import LinkedInSessionExpiredError
+    from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
         source="greenhouse",
@@ -1874,17 +1896,18 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
     )
 
     with (
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
-        patch("gauntler.discovery.sources.playwright.LinkedInScanner") as MockLI,
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.sources.playwright.LinkedInScanner") as MockLI,
         patch(
-            "gauntler.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
         ),
         patch(
-            "gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["stripe"]}
+            "moonlighter.discovery.service.load_company_list",
+            return_value={"greenhouse": ["stripe"]},
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
@@ -1914,12 +1937,12 @@ async def test_confirm_apply_generates_6_char_ref(tmp_db, tmp_path):
     cv_path.write_bytes(b"fake pdf")
     page = make_mock_page(url=job.url)
 
-    from gauntler.server import confirm_apply
+    from moonlighter.server import confirm_apply
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier") as mock_detect,
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -1948,12 +1971,12 @@ async def test_confirm_apply_ref_is_url_safe(tmp_db, tmp_path):
     cv_path.write_bytes(b"fake pdf")
     page = make_mock_page(url=job.url)
 
-    from gauntler.server import confirm_apply
+    from moonlighter.server import confirm_apply
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier") as mock_detect,
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -1975,7 +1998,7 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
     cv_path.write_bytes(b"fake pdf")
     refs = set()
 
-    from gauntler.server import confirm_apply
+    from moonlighter.server import confirm_apply
 
     for i in range(10):
         job = create_job(
@@ -1985,9 +2008,9 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
         page = make_mock_page(url=job.url)
 
         with (
-            patch("gauntler.application.service.browser") as mock_browser,
-            patch("gauntler.application.service.detect_applier") as mock_detect,
-            patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
+            patch("moonlighter.application.service.browser") as mock_browser,
+            patch("moonlighter.application.service.detect_applier") as mock_detect,
+            patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
         ):
             mock_browser.new_page = AsyncMock(return_value=page)
             mock_browser.hide_window = AsyncMock()
@@ -2009,18 +2032,18 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
 
 async def test_setup_email_calls_gmail_flow():
     """setup_email should start the OAuth flow and confirm success."""
-    from gauntler.server import setup_email
+    from moonlighter.server import setup_email
 
     test_config = {
         "email": {
             "address": "candidaturas@gmail.com",
-            "credentials_path": "~/.gauntler/gmail-client.json",
-            "token_path": "~/.gauntler/gmail-token.json",
+            "credentials_path": "~/.moonlighter/gmail-client.json",
+            "token_path": "~/.moonlighter/gmail-token.json",
         }
     }
     with (
-        patch("gauntler.server.setup_gmail_service") as mock_setup,
-        patch("gauntler.server._run_gmail_oauth") as mock_oauth,
+        patch("moonlighter.server.setup_gmail_service") as mock_setup,
+        patch("moonlighter.server._run_gmail_oauth") as mock_oauth,
         patch("os.path.exists", return_value=True),
     ):
         mock_oauth.return_value = None
@@ -2032,13 +2055,13 @@ async def test_setup_email_calls_gmail_flow():
 
 async def test_setup_email_raises_friendly_error_when_client_json_missing():
     """setup_email should return a clear message if gmail-client.json does not exist."""
-    from gauntler.server import setup_email
+    from moonlighter.server import setup_email
 
     test_config = {
         "email": {
             "address": "candidaturas@gmail.com",
             "credentials_path": "/nonexistent/gmail-client.json",
-            "token_path": "~/.gauntler/gmail-token.json",
+            "token_path": "~/.moonlighter/gmail-token.json",
         }
     }
     result = await setup_email(ctx=make_test_context(config=test_config))
@@ -2052,7 +2075,7 @@ async def test_setup_email_raises_friendly_error_when_client_json_missing():
 async def test_sync_email_responses_returns_summary(tmp_db):
     """sync_email_responses should call sync_responses and return a readable summary."""
     init_db()
-    from gauntler.server import sync_email_responses
+    from moonlighter.server import sync_email_responses
 
     fake_updates = [
         {
@@ -2073,15 +2096,15 @@ async def test_sync_email_responses_returns_summary(tmp_db):
     test_config = {
         "email": {
             "address": "candidaturas@gmail.com",
-            "credentials_path": "~/.gauntler/gmail-client.json",
-            "token_path": "~/.gauntler/gmail-token.json",
-            "processed_label": "gauntler/processed",
+            "credentials_path": "~/.moonlighter/gmail-client.json",
+            "token_path": "~/.moonlighter/gmail-token.json",
+            "processed_label": "moonlighter/processed",
             "interview_stages": [],
         },
         "llm_model": "claude-sonnet-4-6",
     }
 
-    with patch("gauntler.server.sync_responses", new=AsyncMock(return_value=fake_updates)):
+    with patch("moonlighter.server.sync_responses", new=AsyncMock(return_value=fake_updates)):
         result = await sync_email_responses(ctx=make_test_context(config=test_config))
 
     assert "Anthropic" in result
@@ -2092,20 +2115,20 @@ async def test_sync_email_responses_returns_summary(tmp_db):
 async def test_sync_email_responses_empty_inbox(tmp_db):
     """sync_email_responses with an empty inbox should return an appropriate message."""
     init_db()
-    from gauntler.server import sync_email_responses
+    from moonlighter.server import sync_email_responses
 
     test_config = {
         "email": {
             "address": "candidaturas@gmail.com",
-            "credentials_path": "~/.gauntler/gmail-client.json",
-            "token_path": "~/.gauntler/gmail-token.json",
-            "processed_label": "gauntler/processed",
+            "credentials_path": "~/.moonlighter/gmail-client.json",
+            "token_path": "~/.moonlighter/gmail-token.json",
+            "processed_label": "moonlighter/processed",
             "interview_stages": [],
         },
         "llm_model": "claude-sonnet-4-6",
     }
 
-    with patch("gauntler.server.sync_responses", new=AsyncMock(return_value=[])):
+    with patch("moonlighter.server.sync_responses", new=AsyncMock(return_value=[])):
         result = await sync_email_responses(ctx=make_test_context(config=test_config))
 
     assert "no new" in result.lower() or "0" in result
@@ -2115,10 +2138,10 @@ async def test_sync_email_responses_flags_fuzzy_match_as_suggestion(tmp_db):
     """S-06: the sync_email_responses report must tell the human a fuzzy match
     was NOT applied and needs manual update_status confirmation."""
     init_db()
-    from gauntler.server import sync_email_responses
+    from moonlighter.server import sync_email_responses
 
     with patch(
-        "gauntler.server.sync_responses",
+        "moonlighter.server.sync_responses",
         new=AsyncMock(
             return_value=[
                 {
@@ -2143,7 +2166,7 @@ async def test_sync_email_responses_flags_fuzzy_match_as_suggestion(tmp_db):
 
 def test_mcp_server_initializes_logging():
     """Importing mcp_server must not blow up and must have logging set up."""
-    import gauntler.core.log as log_mod
+    import moonlighter.core.log as log_mod
 
     # if the module was already imported, _initialized should be True
     assert log_mod._initialized is True
@@ -2154,7 +2177,7 @@ def test_mcp_server_initializes_logging():
 
 def test_archive_screenshots_moves_dir(tmp_path):
     """_archive_screenshots moves the screenshots dir to done/<job_id>/."""
-    from gauntler.application.service import archive_screenshots
+    from moonlighter.application.service import archive_screenshots
 
     job_dir = tmp_path / "42"
     job_dir.mkdir()
@@ -2172,7 +2195,7 @@ def test_archive_screenshots_moves_dir(tmp_path):
 
 def test_archive_screenshots_no_dir_is_noop(tmp_path):
     """_archive_screenshots does not fail when the dir does not exist yet."""
-    from gauntler.application.service import archive_screenshots
+    from moonlighter.application.service import archive_screenshots
 
     config = {"screenshots_dir": str(tmp_path)}
     archive_screenshots(999, config)  # must not raise
@@ -2180,7 +2203,7 @@ def test_archive_screenshots_no_dir_is_noop(tmp_path):
 
 def test_archive_screenshots_overwrites_existing_done(tmp_path):
     """_archive_screenshots replaces done/<job_id>/ if it already exists."""
-    from gauntler.application.service import archive_screenshots
+    from moonlighter.application.service import archive_screenshots
 
     job_dir = tmp_path / "7"
     job_dir.mkdir()
@@ -2209,10 +2232,10 @@ async def test_confirm_apply_archives_on_success(tmp_db, tmp_path):
     page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/arch1")
 
     with (
-        patch("gauntler.application.service.browser") as mock_browser,
-        patch("gauntler.application.service.detect_applier") as mock_detect,
-        patch("gauntler.application.service.resolve_cv_path", return_value=str(cv_path)),
-        patch("gauntler.application.service.archive_screenshots") as mock_archive,
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
+        patch("moonlighter.application.service.archive_screenshots") as mock_archive,
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
@@ -2221,7 +2244,7 @@ async def test_confirm_apply_archives_on_success(tmp_db, tmp_path):
         mock_applier.fill_form = AsyncMock(return_value={})
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
-        from gauntler.server import confirm_apply
+        from moonlighter.server import confirm_apply
 
         await confirm_apply(job_id=job.id, ctx=make_test_context())
 
@@ -2239,25 +2262,25 @@ def _scan_patches(raw_jobs, eval_mock):
     stack = ExitStack()
     stack.enter_context(
         patch(
-            "gauntler.discovery.sources.http.GreenhouseScanner",
+            "moonlighter.discovery.sources.http.GreenhouseScanner",
             **{"return_value.scan": AsyncMock(return_value=raw_jobs)},
         )
     )
     stack.enter_context(
         patch(
-            "gauntler.discovery.sources.http.LeverScanner",
+            "moonlighter.discovery.sources.http.LeverScanner",
             **{"return_value.scan": AsyncMock(return_value=[])},
         )
     )
     stack.enter_context(
         patch(
-            "gauntler.discovery.sources.http.AshbyScanner",
+            "moonlighter.discovery.sources.http.AshbyScanner",
             **{"return_value.scan": AsyncMock(return_value=[])},
         )
     )
     stack.enter_context(
         patch(
-            "gauntler.discovery.service.browser",
+            "moonlighter.discovery.service.browser",
             **{"new_page": AsyncMock(side_effect=Exception("no browser"))},
         )
     )
@@ -2268,10 +2291,10 @@ def _scan_patches(raw_jobs, eval_mock):
             await eval_mock(j.company, j.title, j.description, profile, model, caller) for j in jobs
         ]
 
-    stack.enter_context(patch("gauntler.discovery.service.evaluate_jobs_batch", new=_batch))
+    stack.enter_context(patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch))
     stack.enter_context(
         patch(
-            "gauntler.discovery.service.load_company_list",
+            "moonlighter.discovery.service.load_company_list",
             return_value={"greenhouse": ["co"]},
         )
     )
@@ -2287,8 +2310,8 @@ async def test_scan_concurrent_calls_evaluate_same_url_only_once(tmp_db):
     import asyncio
 
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     url = "https://x.com/race-1"
     raw = RawJob(source="greenhouse", company="Co", title="Eng", url=url, description="desc")
@@ -2310,8 +2333,8 @@ async def test_scan_spend_limit_releases_scan_log_claim(tmp_db):
     it releases the claim in ScanLog (URL retryable on the next scan), does not create
     a Job, and warns in the return. Conservative contract — no exception propagates to the tool."""
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     url = "https://x.com/spend-limit-1"
     raw = RawJob(source="greenhouse", company="Co", title="Eng", url=url, description="desc")
@@ -2335,8 +2358,8 @@ async def test_scan_already_in_scan_log_skips_llm(tmp_db):
     """URL already in ScanLog at scan start → evaluate_job not called (existing dedup)."""
     init_db()
     ScanLog.create(job_url="https://x.com/already-seen", source="greenhouse")
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(source="greenhouse", company="Co", title="Eng", url="https://x.com/already-seen")
     eval_mock = AsyncMock(return_value=make_eval_result(score=8.0))
@@ -2358,10 +2381,10 @@ async def test_confirm_apply_aborts_when_cv_missing(tmp_db):
     )
     create_application(job)
     with patch(
-        "gauntler.application.service.resolve_cv_path",
+        "moonlighter.application.service.resolve_cv_path",
         side_effect=CVNotFoundError("not found"),
     ):
-        from gauntler.server import confirm_apply
+        from moonlighter.server import confirm_apply
 
         result = await confirm_apply(job_id=job.id, ctx=make_test_context())
     assert "CV" in result and "not found" in result
@@ -2378,7 +2401,7 @@ async def test_confirm_apply_aborts_on_pending_needs_review(tmp_db, tmp_path):
         company="stripe",
     )
     create_application(job, form_data='{"Authorized to work?": "__NEEDS_REVIEW__"}')
-    from gauntler.server import confirm_apply
+    from moonlighter.server import confirm_apply
 
     result = await confirm_apply(job_id=job.id, ctx=make_test_context())
     assert "NOT submitted" in result or "decision" in result.lower()
@@ -2391,10 +2414,10 @@ async def test_confirm_apply_aborts_on_pending_needs_review(tmp_db, tmp_path):
 async def test_add_job_tool_delegates_to_service(tmp_db):
     """O wrapper MCP add_job delega ao scan_service e devolve o resultado."""
     init_db()
-    from gauntler.server import add_job
+    from moonlighter.server import add_job
 
     with patch(
-        "gauntler.discovery.service.evaluate_job",
+        "moonlighter.discovery.service.evaluate_job",
         new=AsyncMock(return_value=make_eval_result(8.0)),
     ):
         result = await add_job(
@@ -2412,15 +2435,15 @@ async def test_add_job_tool_delegates_to_service(tmp_db):
 
 async def test_tool_archive_stale_jobs_delegates_and_formats(tmp_db):
     init_db()
-    from gauntler.discovery.archive import ArchiveResult
-    from gauntler.server import archive_stale_jobs
+    from moonlighter.discovery.archive import ArchiveResult
+    from moonlighter.server import archive_stale_jobs
 
     fake_result = ArchiveResult(
         archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}],
         failed_companies=["beta"],
     )
     with patch(
-        "gauntler.server.scan_service.archive_stale_jobs",
+        "moonlighter.server.scan_service.archive_stale_jobs",
         new=AsyncMock(return_value=fake_result),
     ):
         result = await archive_stale_jobs(ctx=make_test_context())
@@ -2431,11 +2454,11 @@ async def test_tool_archive_stale_jobs_delegates_and_formats(tmp_db):
 
 async def test_tool_archive_stale_jobs_passes_filters(tmp_db):
     init_db()
-    from gauntler.discovery.archive import ArchiveResult
-    from gauntler.server import archive_stale_jobs
+    from moonlighter.discovery.archive import ArchiveResult
+    from moonlighter.server import archive_stale_jobs
 
     mock_service = AsyncMock(return_value=ArchiveResult())
-    with patch("gauntler.server.scan_service.archive_stale_jobs", new=mock_service):
+    with patch("moonlighter.server.scan_service.archive_stale_jobs", new=mock_service):
         await archive_stale_jobs(job_id=123, company=None, ctx=make_test_context())
 
     mock_service.assert_awaited_once()
@@ -2446,11 +2469,11 @@ async def test_tool_archive_stale_jobs_passes_filters(tmp_db):
 
 async def test_tool_archive_stale_jobs_rejects_both_filters(tmp_db):
     init_db()
-    from gauntler.discovery.archive import ArchiveStaleJobsError
-    from gauntler.server import archive_stale_jobs
+    from moonlighter.discovery.archive import ArchiveStaleJobsError
+    from moonlighter.server import archive_stale_jobs
 
     with patch(
-        "gauntler.server.scan_service.archive_stale_jobs",
+        "moonlighter.server.scan_service.archive_stale_jobs",
         new=AsyncMock(side_effect=ArchiveStaleJobsError("Provide job_id OR company, not both.")),
     ):
         result = await archive_stale_jobs(job_id=1, company="acme", ctx=make_test_context())
@@ -2460,29 +2483,29 @@ async def test_tool_archive_stale_jobs_rejects_both_filters(tmp_db):
 
 async def test_setup_email_handles_auth_error(tmp_path):
     """GmailAuthError during OAuth → friendly message (server.py setup_email)."""
-    from gauntler.server import setup_email
-    from gauntler.tracking.gmail_client import GmailAuthError
+    from moonlighter.server import setup_email
+    from moonlighter.tracking.gmail_client import GmailAuthError
 
     creds = tmp_path / "gmail-client.json"
     creds.write_text("{}")
     test_config = {
         "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
     }
-    with patch("gauntler.server._run_gmail_oauth", side_effect=GmailAuthError("invalid token")):
+    with patch("moonlighter.server._run_gmail_oauth", side_effect=GmailAuthError("invalid token")):
         result = await setup_email(ctx=make_test_context(config=test_config))
     assert "Gmail" in result and "invalid token" in result
 
 
 async def test_setup_email_handles_unexpected_error(tmp_path):
     """Unexpected exception during OAuth → unexpected-error message (server.py setup_email)."""
-    from gauntler.server import setup_email
+    from moonlighter.server import setup_email
 
     creds = tmp_path / "gmail-client.json"
     creds.write_text("{}")
     test_config = {
         "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
     }
-    with patch("gauntler.server._run_gmail_oauth", side_effect=RuntimeError("boom")):
+    with patch("moonlighter.server._run_gmail_oauth", side_effect=RuntimeError("boom")):
         result = await setup_email(ctx=make_test_context(config=test_config))
     assert "unexpected" in result.lower()
 
@@ -2497,8 +2520,8 @@ async def test_scan_and_evaluate_logs_one_metrics_summary(tmp_db, caplog):
     tool wraps its whole body in a single operation_metrics scope, not one
     scope per job/batch (which would split the counts across many lines)."""
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raws = [
         RawJob(
@@ -2521,12 +2544,14 @@ async def test_scan_and_evaluate_logs_one_metrics_summary(tmp_db, caplog):
 
     with (
         caplog.at_level(logging.INFO),
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
-        patch("gauntler.discovery.service.evaluate_jobs_batch", new=_batch_records_calls),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch_records_calls),
+        patch(
+            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
@@ -2546,8 +2571,8 @@ async def test_scan_and_evaluate_spend_limit_abort_increments_hits(tmp_db, caplo
     scan_and_evaluate summary (evaluator/service call record_spend_limit_hit()
     before propagating, inside the tool's one operation_metrics scope)."""
     init_db()
-    from gauntler.discovery.sources.base import RawJob
-    from gauntler.server import scan_and_evaluate
+    from moonlighter.discovery.sources.base import RawJob
+    from moonlighter.server import scan_and_evaluate
 
     raws = [
         RawJob(
@@ -2562,18 +2587,20 @@ async def test_scan_and_evaluate_spend_limit_abort_increments_hits(tmp_db, caplo
     async def _batch_raises_spend_limit(jobs, profile, model, caller):
         # Deliberately does NOT call record_spend_limit_hit() itself — the
         # production `except is_spend_limit(e)` catch site in
-        # gauntler.discovery.service is what must record the hit, exactly
+        # moonlighter.discovery.service is what must record the hit, exactly
         # once, before propagating.
         raise RuntimeError("spend limit reached")
 
     with (
         caplog.at_level(logging.INFO),
-        patch("gauntler.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("gauntler.discovery.sources.http.LeverScanner") as MockLV,
-        patch("gauntler.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("gauntler.discovery.service.browser") as mock_browser,
-        patch("gauntler.discovery.service.evaluate_jobs_batch", new=_batch_raises_spend_limit),
-        patch("gauntler.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}),
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch_raises_spend_limit),
+        patch(
+            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+        ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])

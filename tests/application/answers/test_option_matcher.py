@@ -1,7 +1,7 @@
 import re
 
 import pytest
-from gauntler.application.answers.option_matcher import (
+from moonlighter.application.answers.option_matcher import (
     match_option_locally,
     pick_option_with_llm,
 )
@@ -203,7 +203,7 @@ def test_custom_threshold_below_default_allows_looser_fuzzy_match():
 
 def test_starts_with_word_equal_strings_is_prefix():
     """prefix == the entire string is a valid word-boundary (option_matcher.py:28)."""
-    from gauntler.application.answers.option_matcher import _starts_with_word
+    from moonlighter.application.answers.option_matcher import _starts_with_word
 
     assert _starts_with_word("yes", "yes") is True
 

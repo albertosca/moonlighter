@@ -6,8 +6,8 @@ import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from anthropic.types import TextBlock
-from gauntler.core.llm import _call_cli, make_api_caller
-from gauntler.core.metrics import operation_metrics
+from moonlighter.core.llm import _call_cli, make_api_caller
+from moonlighter.core.metrics import operation_metrics
 
 
 async def test_cli_caller_records_a_call():
@@ -16,8 +16,8 @@ async def test_cli_caller_records_a_call():
     mock_proc.communicate = AsyncMock(return_value=(b"ok", b""))
 
     with (
-        patch("gauntler.core.llm.shutil.which", return_value="/usr/local/bin/claude"),
-        patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
+        patch("moonlighter.core.llm.shutil.which", return_value="/usr/local/bin/claude"),
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
         operation_metrics("op") as m,
     ):
         out = await _call_cli("hi", "model")
@@ -36,8 +36,8 @@ async def test_cli_caller_records_even_on_failure():
     mock_proc.communicate = AsyncMock(return_value=(b"", b"boom"))
 
     with (
-        patch("gauntler.core.llm.shutil.which", return_value="/usr/local/bin/claude"),
-        patch("gauntler.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
+        patch("moonlighter.core.llm.shutil.which", return_value="/usr/local/bin/claude"),
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
         operation_metrics("op") as m,
         contextlib.suppress(RuntimeError),
     ):
@@ -56,7 +56,7 @@ async def test_api_caller_records_usage():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("gauntler.core.llm.anthropic", mock_anthropic):
+    with patch("moonlighter.core.llm.anthropic", mock_anthropic):
         caller = make_api_caller()
         with operation_metrics("op") as m:
             out = await caller("hi", "model")
@@ -76,7 +76,7 @@ async def test_api_caller_records_even_on_failure():
     mock_anthropic = MagicMock()
     mock_anthropic.AsyncAnthropic.return_value = mock_client
 
-    with patch("gauntler.core.llm.anthropic", mock_anthropic):
+    with patch("moonlighter.core.llm.anthropic", mock_anthropic):
         caller = make_api_caller()
         with operation_metrics("op") as m, contextlib.suppress(RuntimeError):
             await caller("hi", "model")

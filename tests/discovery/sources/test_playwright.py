@@ -27,7 +27,7 @@ async def test_linkedin_scanner_raises_on_login_redirect():
 
     page.goto = AsyncMock(side_effect=goto_side_effect)
 
-    from gauntler.discovery.sources.playwright import (
+    from moonlighter.discovery.sources.playwright import (
         LinkedInScanner,
         LinkedInSessionExpiredError,
     )
@@ -46,7 +46,7 @@ async def test_linkedin_scanner_raises_on_checkpoint_redirect():
 
     page.goto = AsyncMock(side_effect=goto_side_effect)
 
-    from gauntler.discovery.sources.playwright import (
+    from moonlighter.discovery.sources.playwright import (
         LinkedInScanner,
         LinkedInSessionExpiredError,
     )
@@ -65,7 +65,7 @@ async def test_linkedin_scanner_raises_on_authwall():
 
     page.goto = AsyncMock(side_effect=goto_side_effect)
 
-    from gauntler.discovery.sources.playwright import (
+    from moonlighter.discovery.sources.playwright import (
         LinkedInScanner,
         LinkedInSessionExpiredError,
     )
@@ -80,7 +80,7 @@ async def test_linkedin_scanner_valid_session_no_exception():
     page = make_page(initial_url="https://www.linkedin.com/jobs/search/?keywords=engineer")
     page.wait_for_selector = AsyncMock(side_effect=Exception("no results"))  # timeout ok
 
-    from gauntler.discovery.sources.playwright import LinkedInScanner
+    from moonlighter.discovery.sources.playwright import LinkedInScanner
 
     scanner = LinkedInScanner(page)
     # Does not raise LinkedInSessionExpiredError, may raise something else
@@ -116,7 +116,7 @@ async def test_linkedin_scanner_returns_jobs_on_success():
     page.query_selector_all = AsyncMock(return_value=[listing])
 
     with patch("asyncio.sleep", new=AsyncMock()):
-        from gauntler.discovery.sources.playwright import LinkedInScanner
+        from moonlighter.discovery.sources.playwright import LinkedInScanner
 
         scanner = LinkedInScanner(page)
         with patch.object(LinkedInScanner, "_fetch_description", new=AsyncMock(return_value=None)):
@@ -134,7 +134,7 @@ async def test_linkedin_scanner_returns_jobs_on_success():
 class TestFetchDescription:
     def _make_scanner(self):
         page = make_page()
-        from gauntler.discovery.sources.playwright import LinkedInScanner
+        from moonlighter.discovery.sources.playwright import LinkedInScanner
 
         return LinkedInScanner(page), page
 
@@ -189,7 +189,7 @@ class TestFetchDescription:
         card = MagicMock()
         card.click = AsyncMock(side_effect=Exception("element detached"))
 
-        with caplog.at_level(logging.DEBUG, logger="gauntler.discovery.sources.playwright"):
+        with caplog.at_level(logging.DEBUG, logger="moonlighter.discovery.sources.playwright"):
             result = await scanner._fetch_description(card)
         assert result is None
         assert "description fetch failed" in caplog.text
@@ -219,7 +219,7 @@ class TestFetchDescription:
         page.query_selector_all = AsyncMock(return_value=[listing])
 
         with patch("asyncio.sleep", new=AsyncMock()):
-            from gauntler.discovery.sources.playwright import LinkedInScanner
+            from moonlighter.discovery.sources.playwright import LinkedInScanner
 
             scanner = LinkedInScanner(page)
             with patch.object(
@@ -237,7 +237,7 @@ class TestFetchDescription:
 async def test_linkedin_scanner_logs_start_and_found(caplog):
     import logging
 
-    from gauntler.discovery.sources.playwright import LinkedInScanner
+    from moonlighter.discovery.sources.playwright import LinkedInScanner
 
     page = AsyncMock()
     page.url = "https://www.linkedin.com/jobs/search/?keywords=eng"
@@ -248,7 +248,7 @@ async def test_linkedin_scanner_logs_start_and_found(caplog):
     page.query_selector_all = AsyncMock(return_value=[])  # 0 results
 
     scanner = LinkedInScanner(page)
-    with caplog.at_level(logging.INFO, logger="gauntler.discovery.sources.playwright"):
+    with caplog.at_level(logging.INFO, logger="moonlighter.discovery.sources.playwright"):
         await scanner.scan(keywords="eng")
 
     assert "LinkedIn scan: starting" in caplog.text

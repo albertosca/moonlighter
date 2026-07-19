@@ -1,7 +1,7 @@
 import logging
 
 import pytest
-from gauntler.core.metrics import (
+from moonlighter.core.metrics import (
     LLMMetrics,
     operation_metrics,
     record_call,

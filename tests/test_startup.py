@@ -1,4 +1,4 @@
-from gauntler.startup import StartupWarning, validate_startup
+from moonlighter.startup import StartupWarning, validate_startup
 
 # ── profile ───────────────────────────────────────────────────────────────────
 

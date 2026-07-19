@@ -4,7 +4,7 @@ from dataclasses import FrozenInstanceError
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from gauntler.discovery.evaluator import (
+from moonlighter.discovery.evaluator import (
     EvalInput,
     EvaluationResult,
     _as_float,
@@ -329,7 +329,7 @@ async def test_evaluate_job_uses_injected_caller():
         called.append((prompt, model))
         return response
 
-    with patch("gauntler.discovery.evaluator.make_api_caller") as mock_factory:
+    with patch("moonlighter.discovery.evaluator.make_api_caller") as mock_factory:
         await evaluate_job(
             company="Co",
             title="Eng",
@@ -693,7 +693,7 @@ async def test_evaluate_job_logs_score(caplog):
     )
     mock_caller = AsyncMock(return_value=good_response)
 
-    with caplog.at_level(logging.DEBUG, logger="gauntler.discovery.evaluator"):
+    with caplog.at_level(logging.DEBUG, logger="moonlighter.discovery.evaluator"):
         await evaluate_job(
             company="Stripe",
             title="Backend Engineer",
@@ -710,7 +710,7 @@ async def test_evaluate_job_logs_score(caplog):
 async def test_evaluate_job_builds_default_caller_when_none():
     """_caller=None → usa make_api_caller() como fallback (evaluator.py:78)."""
     fake = _make_caller(MOCK_LLM_RESPONSE)
-    with patch("gauntler.discovery.evaluator.make_api_caller", return_value=fake) as factory:
+    with patch("moonlighter.discovery.evaluator.make_api_caller", return_value=fake) as factory:
         result = await evaluate_job(
             company="Co", title="Eng", description=JD, profile=PROFILE, _caller=None
         )
@@ -1083,7 +1083,7 @@ async def test_evaluate_job_passes_cache_prefix():
         captured["dynamic"] = prompt
         return '{"score": 8.0, "score_notes": "x", "caveats": []}'
 
-    from gauntler.discovery.evaluator import evaluate_job
+    from moonlighter.discovery.evaluator import evaluate_job
 
     await evaluate_job("Co", "Eng", "JD here", {"skills": ["python"]}, "m", caller)
     assert captured["prefix"] is not None and "python" in captured["prefix"]

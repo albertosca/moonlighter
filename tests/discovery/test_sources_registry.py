@@ -1,5 +1,5 @@
-from gauntler.core.sources import Source
-from gauntler.discovery.sources.http import (
+from moonlighter.core.sources import Source
+from moonlighter.discovery.sources.http import (
     AshbyScanner,
     GreenhouseScanner,
     LeverScanner,
@@ -7,7 +7,7 @@ from gauntler.discovery.sources.http import (
     SmartRecruitersScanner,
     WorkableScanner,
 )
-from gauntler.discovery.sources.registry import (
+from moonlighter.discovery.sources.registry import (
     LISTING_SOURCES,
     SOURCES,
     build_http_scanners,
