@@ -188,3 +188,88 @@ class AshbyScanner(BaseScanner):
                 )
             )
         return jobs
+
+
+class WorkableScanner(BaseScanner):
+    BASE = "https://apply.workable.com/api/v1/widget/accounts/{slug}?details=true"
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "gauntler/0.1"}
+
+    async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
+        return await _gather_jobs("workable", company_slugs, self._fetch)
+
+    async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
+        try:
+            r = await client.get(self.BASE.format(slug=slug), headers=self.HEADERS)
+        except Exception:
+            return []
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        if not isinstance(data, dict):
+            return []
+        jobs = []
+        for item in data.get("jobs", []):
+            title, url = item.get("title"), item.get("application_url")
+            if not title or not url:
+                continue
+            location = (
+                ", ".join(
+                    p for p in (item.get("city"), item.get("state"), item.get("country")) if p
+                )
+                or None
+            )
+            remote_type = "remote" if item.get("telecommuting") else normalize_remote_type(location)
+            raw = item.get("description") or ""
+            description = re.sub(r"<[^>]+>", " ", raw).strip() if raw else None
+            jobs.append(
+                RawJob(
+                    source="workable",
+                    company=slug,
+                    title=title,
+                    url=url,
+                    location=location,
+                    remote_type=remote_type,
+                    description=description,
+                )
+            )
+        return jobs
+
+
+class RecruiteeScanner(BaseScanner):
+    BASE = "https://{slug}.recruitee.com/api/offers/"
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "gauntler/0.1"}
+
+    async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
+        return await _gather_jobs("recruitee", company_slugs, self._fetch)
+
+    async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
+        try:
+            r = await client.get(self.BASE.format(slug=slug), headers=self.HEADERS)
+        except Exception:
+            return []
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        if not isinstance(data, dict):
+            return []
+        jobs = []
+        for item in data.get("offers", []):
+            title, url = item.get("title"), item.get("careers_apply_url")
+            if not title or not url:
+                continue
+            location = item.get("location")
+            remote_type = "remote" if item.get("remote") else normalize_remote_type(location)
+            raw = item.get("description") or ""
+            description = re.sub(r"<[^>]+>", " ", raw).strip() if raw else None
+            jobs.append(
+                RawJob(
+                    source="recruitee",
+                    company=slug,
+                    title=title,
+                    url=url,
+                    location=location,
+                    remote_type=remote_type,
+                    description=description,
+                )
+            )
+        return jobs

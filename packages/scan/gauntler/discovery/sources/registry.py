@@ -17,6 +17,8 @@ SOURCES: dict[Source, ScannerSpec] = {
     Source.GREENHOUSE: ScannerSpec(http.GreenhouseScanner, supports_listing=True),
     Source.LEVER: ScannerSpec(http.LeverScanner, supports_listing=True),
     Source.ASHBY: ScannerSpec(http.AshbyScanner, supports_listing=True),
+    Source.WORKABLE: ScannerSpec(http.WorkableScanner, supports_listing=True),
+    Source.RECRUITEE: ScannerSpec(http.RecruiteeScanner, supports_listing=True),
 }
 
 

@@ -4,7 +4,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from gauntler.discovery.sources.http import AshbyScanner, GreenhouseScanner, LeverScanner
+from gauntler.discovery.sources.http import (
+    AshbyScanner,
+    GreenhouseScanner,
+    LeverScanner,
+    RecruiteeScanner,
+    WorkableScanner,
+)
 
 GREENHOUSE_RESPONSE = {
     "jobs": [
@@ -669,7 +675,10 @@ async def test_ashby_jobpostings_not_a_list_returns_empty():
     assert jobs == []
 
 
-@pytest.mark.parametrize("Scanner", [GreenhouseScanner, LeverScanner, AshbyScanner])
+@pytest.mark.parametrize(
+    "Scanner",
+    [GreenhouseScanner, LeverScanner, AshbyScanner, WorkableScanner, RecruiteeScanner],
+)
 async def test_scan_skips_fetch_exceptions(Scanner):
     """_fetch raises → gather(return_exceptions) returns the exception → ignored (not a list)."""
     mock_client = _make_mock_client({})
@@ -678,4 +687,219 @@ async def test_scan_skips_fetch_exceptions(Scanner):
         patch.object(Scanner, "_fetch", new=AsyncMock(side_effect=RuntimeError("boom"))),
     ):
         jobs = await Scanner().scan(["co"])
+    assert jobs == []
+
+
+# --- WorkableScanner tests ---
+
+WORKABLE_RESPONSE = {
+    "name": "Acme",
+    "jobs": [
+        {
+            "title": "Staff Engineer",
+            "shortcode": "ABC123",
+            "application_url": "https://apply.workable.com/j/ABC123/apply",
+            "city": "Lisbon",
+            "state": "",
+            "country": "Portugal",
+            "telecommuting": True,
+            "description": "<p>Build <b>things</b></p>",
+        }
+    ],
+}
+
+
+async def test_workable_maps_fields_and_strips_html():
+    mock_client = _make_mock_client(WORKABLE_RESPONSE)
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WorkableScanner().scan(["acme"])
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.source == "workable"
+    assert j.company == "acme"
+    assert j.title == "Staff Engineer"
+    assert j.url == "https://apply.workable.com/j/ABC123/apply"
+    assert j.location == "Lisbon, Portugal"
+    assert j.remote_type == "remote"  # telecommuting True wins over location
+    assert j.description == "Build  things"
+
+
+async def test_workable_skips_entry_without_title():
+    response = {
+        "jobs": [
+            {
+                "title": "",
+                "shortcode": "X",
+                "application_url": "https://apply.workable.com/j/X/apply",
+            }
+        ]
+    }
+    mock_client = _make_mock_client(response)
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WorkableScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_workable_skips_entry_without_url():
+    response = {"jobs": [{"title": "Eng", "shortcode": "X", "application_url": ""}]}
+    mock_client = _make_mock_client(response)
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WorkableScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_workable_no_telecommuting_uses_location():
+    response = {
+        "jobs": [
+            {
+                "title": "Eng",
+                "shortcode": "X",
+                "application_url": "https://apply.workable.com/j/X/apply",
+                "city": "Berlin",
+                "country": "Germany",
+                "telecommuting": False,
+            }
+        ]
+    }
+    mock_client = _make_mock_client(response)
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WorkableScanner().scan(["acme"])
+    assert jobs[0].remote_type == "onsite"
+
+
+async def test_workable_missing_location_parts():
+    response = {
+        "jobs": [
+            {
+                "title": "Eng",
+                "shortcode": "X",
+                "application_url": "https://apply.workable.com/j/X/apply",
+            }
+        ]
+    }
+    mock_client = _make_mock_client(response)
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WorkableScanner().scan(["acme"])
+    assert jobs[0].location is None
+    assert jobs[0].remote_type is None
+
+
+async def test_workable_500_response_skips_company():
+    mock_client = _make_mock_client({}, status_code=500)
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WorkableScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_workable_network_exception_skips_company():
+    mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WorkableScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_workable_non_dict_response_returns_empty():
+    mock_client = _make_mock_client([{"title": "Eng"}])
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WorkableScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_workable_missing_jobs_key_returns_empty():
+    mock_client = _make_mock_client({"name": "Acme"})
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WorkableScanner().scan(["acme"])
+    assert jobs == []
+
+
+# --- RecruiteeScanner tests ---
+
+RECRUITEE_RESPONSE = {
+    "offers": [
+        {
+            "title": "Backend Dev",
+            "id": 42,
+            "slug": "backend-dev",
+            "careers_apply_url": "https://x.recruitee.com/o/backend-dev/c/new",
+            "location": "Amsterdam, Netherlands",
+            "remote": False,
+            "description": "<ul><li>Go</li></ul>",
+        }
+    ]
+}
+
+
+async def test_recruitee_maps_fields_and_strips_html():
+    mock_client = _make_mock_client(RECRUITEE_RESPONSE)
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RecruiteeScanner().scan(["acme"])
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.source == "recruitee"
+    assert j.company == "acme"
+    assert j.title == "Backend Dev"
+    assert j.url == "https://x.recruitee.com/o/backend-dev/c/new"
+    assert j.location == "Amsterdam, Netherlands"
+    assert j.remote_type == "onsite"  # remote False, falls back to location text
+    assert j.description == "Go"
+
+
+async def test_recruitee_remote_flag_true():
+    response = {
+        "offers": [
+            {
+                "title": "Eng",
+                "careers_apply_url": "https://x.recruitee.com/o/eng/c/new",
+                "location": "Anywhere",
+                "remote": True,
+            }
+        ]
+    }
+    mock_client = _make_mock_client(response)
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RecruiteeScanner().scan(["acme"])
+    assert jobs[0].remote_type == "remote"
+
+
+async def test_recruitee_skips_entry_without_title():
+    response = {"offers": [{"title": "", "careers_apply_url": ""}]}
+    mock_client = _make_mock_client(response)
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RecruiteeScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_recruitee_skips_entry_without_url():
+    response = {"offers": [{"title": "Eng", "careers_apply_url": ""}]}
+    mock_client = _make_mock_client(response)
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RecruiteeScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_recruitee_500_response_skips_company():
+    mock_client = _make_mock_client({}, status_code=500)
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RecruiteeScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_recruitee_network_exception_skips_company():
+    mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RecruiteeScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_recruitee_non_dict_response_returns_empty():
+    mock_client = _make_mock_client([{"title": "Eng"}])
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RecruiteeScanner().scan(["acme"])
+    assert jobs == []
+
+
+async def test_recruitee_missing_offers_key_returns_empty():
+    mock_client = _make_mock_client({"other": []})
+    with patch("gauntler.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []

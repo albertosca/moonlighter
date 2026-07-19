@@ -13,3 +13,7 @@ class Source(StrEnum):
     LEVER = "lever"
     ASHBY = "ashby"
     LINKEDIN = "linkedin"
+    WORKABLE = "workable"
+    SMARTRECRUITERS = "smartrecruiters"
+    RECRUITEE = "recruitee"
+    GUPY = "gupy"

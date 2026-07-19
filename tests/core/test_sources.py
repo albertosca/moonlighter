@@ -14,7 +14,16 @@ def test_str_and_fstring_yield_plain_value():
 
 
 def test_is_iterable_over_all_sources():
-    assert {s.value for s in Source} == {"greenhouse", "lever", "ashby", "linkedin"}
+    assert {s.value for s in Source} == {
+        "greenhouse",
+        "lever",
+        "ashby",
+        "linkedin",
+        "workable",
+        "smartrecruiters",
+        "recruitee",
+        "gupy",
+    }
 
 
 def test_str_key_lookup_matches_member_key():
