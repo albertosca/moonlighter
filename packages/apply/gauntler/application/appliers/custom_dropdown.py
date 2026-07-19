@@ -98,14 +98,14 @@ class CustomDropdownFiller:
             if result.get("clicked"):
                 return True
             logger.warning(
-                "_fill_custom_element typeahead: '%s' did not find '%s'. Visible options: %s",
+                "fill_custom_element typeahead: '%s' did not find '%s'. Visible options: %s",
                 label_text,
                 answer,
                 result.get("options") or "(none)",
             )
             return False
         except Exception as e:
-            logger.warning("_fill_custom_element typeahead: '%s' exception — %s", label_text, e)
+            logger.warning("fill_custom_element typeahead: '%s' exception — %s", label_text, e)
             return False
 
     async def select_custom_option(self, element: Any, label_text: str, answer: str) -> bool:
@@ -128,7 +128,7 @@ class CustomDropdownFiller:
                 return True
 
             logger.warning(
-                "_select_custom_option: '%s' did not select '%s'. Options: %s",
+                "select_custom_option: '%s' did not select '%s'. Options: %s",
                 label_text,
                 answer,
                 options or "(none — dropdown did not open/load?)",
@@ -137,7 +137,7 @@ class CustomDropdownFiller:
                 await self.page.keyboard.press("Escape")
             return False
         except Exception as e:
-            logger.warning("_select_custom_option: '%s' exception — %s", label_text, e)
+            logger.warning("select_custom_option: '%s' exception — %s", label_text, e)
             return False
 
     async def _option_texts_snapshot(self) -> list[str]:
