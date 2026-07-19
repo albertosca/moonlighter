@@ -23,6 +23,7 @@ from gauntler.application.appliers.base import BaseApplier, generate_answers
 from gauntler.application.appliers.greenhouse import GreenhouseApplier
 from gauntler.application.appliers.lever import LeverApplier
 from gauntler.application.appliers.linkedin import LinkedInApplier
+from gauntler.application.appliers.recruitee import RecruiteeApplier
 from gauntler.core import browser
 from gauntler.core.config import NEEDS_REVIEW_SENTINEL
 from gauntler.core.db import Application, Job
@@ -57,7 +58,13 @@ def _anomaly_reasons(answer: str, other_answers: list[str]) -> list[str]:
     return reasons
 
 
-_APPLIER_CLASSES = [LinkedInApplier, GreenhouseApplier, LeverApplier, AshbyApplier]
+_APPLIER_CLASSES = [
+    LinkedInApplier,
+    GreenhouseApplier,
+    LeverApplier,
+    AshbyApplier,
+    RecruiteeApplier,
+]
 
 
 @asynccontextmanager

@@ -10,6 +10,7 @@ from gauntler.application import service as apply_service
 from gauntler.application.answers.cv import CVNotFoundError
 from gauntler.application.appliers.base import ApplicationDraft
 from gauntler.application.appliers.greenhouse import GreenhouseApplier
+from gauntler.application.appliers.recruitee import RecruiteeApplier
 from gauntler.application.service import _anomaly_reasons, _render_draft
 from gauntler.core.db import Application, Job, init_db
 
@@ -73,6 +74,14 @@ async def test_detect_applier_returns_none_for_unknown(tmp_db):
         _page("https://unknown-ats.example/jobs/1"), CONFIG, PROFILE
     )
     assert applier is None
+
+
+async def test_detect_applier_matches_recruitee(tmp_db):
+    init_db()
+    applier = await apply_service.detect_applier(
+        _page("https://acme.recruitee.com/o/backend-engineer"), CONFIG, PROFILE
+    )
+    assert isinstance(applier, RecruiteeApplier)
 
 
 # ── archive_screenshots ─────────────────────────────────────────────────────
