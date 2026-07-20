@@ -13,6 +13,7 @@ from moonlighter.application.appliers.greenhouse import GreenhouseApplier
 from moonlighter.application.appliers.recruitee import RecruiteeApplier
 from moonlighter.application.service import _anomaly_reasons, _render_draft
 from moonlighter.core.db import Application, Job, init_db
+from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 CONFIG = {"screenshots_dir": "/tmp/moonlighter-test-shots", "llm_model": "x", "email": {}}
 PROFILE: dict = {}
@@ -169,6 +170,35 @@ async def test_apply_jobs_shows_needs_review_fields(tmp_db):
     assert "NEED YOUR DECISION" in result
     assert "Work auth?" in result
     # NEEDS_REVIEW field is not rendered as a normal answer, but Name is
+    assert "Alberto" in result
+
+
+async def test_apply_jobs_survives_networkidle_timeout_on_spa_with_persistent_traffic(tmp_db):
+    """SPA-heavy ATS pages (Recruitee, Workable, ...) often keep a background
+    connection open (chat widget, analytics beacon) so Playwright's networkidle
+    never fires even though the page finished loading and is fully usable — see
+    the live Ziflow/Recruitee repro. goto() succeeding is the real load signal;
+    a networkidle timeout on top of that must not abort the whole draft."""
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/idle")
+    draft = ApplicationDraft(job_id=job.id, answers={"Name": "Alberto"}, form_fields=["Name"])
+    page = _page(job.url)
+    page.wait_for_load_state = AsyncMock(side_effect=PlaywrightTimeout("Timeout 15000ms exceeded."))
+    with (
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch(
+            "moonlighter.application.service.generate_answers",
+            new=AsyncMock(return_value=draft),
+        ),
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
+    ):
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        applier = AsyncMock()
+        applier.extract_fields = AsyncMock(return_value=["Name"])
+        mock_detect.return_value = applier
+        result = await apply_service.apply_jobs([job.id], CONFIG, PROFILE, MagicMock())
+    assert "error" not in result.lower()
     assert "Alberto" in result
 
 

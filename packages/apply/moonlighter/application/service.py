@@ -5,6 +5,7 @@ The MCP tools in server.py are thin wrappers that call these functions passing
 config/profile/caller. The logic lives here, testable in isolation.
 """
 
+import contextlib
 import json
 import re
 import secrets
@@ -30,6 +31,7 @@ from moonlighter.core.db import Application, Job
 from moonlighter.core.llm import LLMCaller
 from moonlighter.core.log import get_logger
 from playwright.async_api import Page
+from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 logger = get_logger(__name__)
 
@@ -162,7 +164,11 @@ async def _draft_one(
     try:
         async with page_session(config) as page:
             await page.goto(job.url, timeout=30000)
-            await page.wait_for_load_state("networkidle", timeout=15000)
+            # SPA-heavy ATS pages (Recruitee, Workable, ...) often keep a background
+            # connection open (chat widget, analytics beacon), so networkidle never
+            # fires even though goto() already confirmed the page loaded and is usable.
+            with contextlib.suppress(PlaywrightTimeout):
+                await page.wait_for_load_state("networkidle", timeout=15000)
             await browser.save_screenshot(page, job_id, "01-job-page", config)
 
             applier = await detect_applier(page, config, profile, source=job.source)
