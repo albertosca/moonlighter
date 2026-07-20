@@ -34,14 +34,14 @@ jobs:
       - name: Type check (mypy)
         run: |
           uv run mypy \
-            --package gauntler.core \
-            --package gauntler.discovery \
-            --package gauntler.application \
-            --package gauntler.tracking \
-            --package gauntler.server \
-            --package gauntler.startup \
-            --package gauntler.views \
-            --package gauntler._tool_logging
+            --package moonlighter.core \
+            --package moonlighter.discovery \
+            --package moonlighter.application \
+            --package moonlighter.tracking \
+            --package moonlighter.server \
+            --package moonlighter.startup \
+            --package moonlighter.views \
+            --package moonlighter._tool_logging
 
       - name: Tests (unit, coverage gate 100%)
         run: uv run pytest -m "not e2e"
