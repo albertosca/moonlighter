@@ -93,17 +93,18 @@ class RecruiteeApplier(BaseApplier):
         return labels
 
     async def _open_application(self) -> None:
-        """Clicks the 'Apply for this job' button when the form is not yet open.
+        """Clicks the 'Apply' button when the form is not yet open.
 
-        LIVE-VERIFY: Recruitee job pages sometimes render the form inline and
-        sometimes behind an "Apply for this job" CTA that scrolls to / mounts the
-        form. The selector below is a best guess; confirm against a real page
-        whether the button exists at all, and whether it needs a click or just a
-        scroll-into-view.
+        LIVE-VERIFIED (Ziflow, a real *.recruitee.com posting, 2026-07-20): the
+        real CTA carries data-cy='apply-button' and switches a tab panel to
+        reveal the form (labels exist in the DOM but are not visible/fillable
+        until clicked). The other selectors are kept as fallbacks for Recruitee
+        instances that render differently.
         """
         try:
             apply_btn = await self.page.query_selector(
-                "a#apply-button, button#apply-button, a[href='#apply'], button[data-testid='apply-button']"
+                "[data-cy='apply-button'], a#apply-button, button#apply-button, "
+                "a[href='#apply'], button[data-testid='apply-button']"
             )
             if apply_btn:
                 await apply_btn.click()

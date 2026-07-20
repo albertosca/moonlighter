@@ -95,6 +95,26 @@ async def test_extract_fields_with_apply_button():
     apply_btn.click.assert_called_once()
 
 
+async def test_open_application_selector_matches_live_recruitee_apply_button():
+    """LIVE-VERIFY confirmed (Ziflow, a real *.recruitee.com posting): the actual
+    'Apply' CTA carries data-cy='apply-button', not any of the previously guessed
+    selectors (a#apply-button, button#apply-button, a[href='#apply'],
+    button[data-testid='apply-button']) — none of those matched and the form
+    stayed collapsed/hidden, so every text field failed to fill with
+    'element is not visible'. The selector query must include the confirmed one."""
+    applier = make_applier()
+    captured_selector = None
+
+    async def query_selector_side_effect(selector):
+        nonlocal captured_selector
+        captured_selector = selector
+        return
+
+    applier.page.query_selector = query_selector_side_effect
+    await applier.extract_fields()
+    assert "[data-cy='apply-button']" in captured_selector
+
+
 async def test_extract_fields_no_apply_button():
     applier = make_applier()
     applier.page.query_selector = AsyncMock(return_value=None)
