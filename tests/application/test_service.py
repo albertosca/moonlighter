@@ -344,6 +344,33 @@ async def test_fill_open_page_fills_and_screenshots_without_submit(tmp_db, tmp_p
     mock_browser.save_screenshot.assert_awaited()  # screenshot 03 tirado
 
 
+async def test_fill_open_page_survives_networkidle_timeout_on_spa_with_persistent_traffic(
+    tmp_db, tmp_path
+):
+    """Same networkidle unreliability as apply_jobs (see the sibling test in
+    _draft_one) — _fill_open_page is a separate call site with the same pattern
+    and needs the same tolerance."""
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/fop-idle")
+    applier = _confirm_mocks(job, fill_status={"Name": "filled"})
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    page = _page(job.url)
+    page.wait_for_load_state = AsyncMock(side_effect=PlaywrightTimeout("Timeout 15000ms exceeded."))
+    with (
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch(
+            "moonlighter.application.service.detect_applier", new=AsyncMock(return_value=applier)
+        ),
+    ):
+        mock_browser.save_screenshot = AsyncMock()
+        result = await apply_service._fill_open_page(
+            page, job, {"Name": "Alberto"}, "/tmp/cv.pdf", cfg, PROFILE
+        )
+    assert result is not None
+    _, fill_status = result
+    assert fill_status == {"Name": "filled"}
+
+
 async def test_fill_open_page_returns_none_for_unknown_ats(tmp_db, tmp_path):
     init_db()
     job = _job(url="https://unknown/jobs/1")

@@ -327,7 +327,8 @@ async def _fill_open_page(
     ALREADY OPEN page. Returns (applier, fill_status) or None if the ATS is not
     recognized. Does NOT close the page — whoever opened it owns its lifecycle."""
     await page.goto(job.url, timeout=30000)
-    await page.wait_for_load_state("networkidle", timeout=15000)
+    with contextlib.suppress(PlaywrightTimeout):
+        await page.wait_for_load_state("networkidle", timeout=15000)
     applier = await detect_applier(page, config, profile, source=job.source)
     if applier is None:
         return None
