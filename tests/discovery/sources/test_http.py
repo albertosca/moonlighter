@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,6 +11,7 @@ from moonlighter.discovery.sources.http import (
     GupyScanner,
     LeverScanner,
     RecruiteeScanner,
+    RemoteOKScanner,
     SmartRecruitersScanner,
     WorkableScanner,
 )
@@ -1503,4 +1505,98 @@ async def test_gupy_default_keyword_when_not_provided():
     mock_client = _make_gupy_client({"jobName=&limit=100&offset=0": page})
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan()
+    assert jobs == []
+
+
+# --- RemoteOKScanner tests ---
+
+
+def _make_simple_client(payload, status=200):
+    """Single-GET JSON mock client — for scanners that don't paginate."""
+
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        mock_response.status_code = status
+        mock_response.json.return_value = payload
+        mock_response.text = json.dumps(payload) if not isinstance(payload, str) else payload
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    return mock_client
+
+
+_REMOTEOK_RESPONSE = [
+    {"legal": "API Terms of Service: link back to Remote OK..."},
+    {
+        "id": "123",
+        "company": "Acme",
+        "position": "Senior Backend Engineer",
+        "url": "https://remoteok.com/remote-jobs/123",
+        "location": "Worldwide",
+        "tags": ["python", "backend"],
+        "description": "<p>Build <strong>things</strong>.</p>",
+    },
+    {
+        "id": "124",
+        "company": "",
+        "position": "Frontend Dev",
+        "url": "",  # missing url -> skipped
+    },
+]
+
+
+async def test_remoteok_scan_maps_fields_and_skips_legal_notice_and_missing_url():
+    mock_client = _make_simple_client(_REMOTEOK_RESPONSE)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemoteOKScanner().scan()
+
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job.source == "remoteok"
+    assert job.company == "Acme"
+    assert job.title == "Senior Backend Engineer"
+    assert job.url == "https://remoteok.com/remote-jobs/123"
+    assert job.location == "Worldwide"
+    assert job.remote_type == "remote"
+    assert job.description == "Build things."
+
+
+async def test_remoteok_missing_company_falls_back_to_source_name():
+    response = [
+        {
+            "position": "Eng",
+            "url": "https://remoteok.com/remote-jobs/1",
+            "company": "",
+        }
+    ]
+    mock_client = _make_simple_client(response)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemoteOKScanner().scan()
+    assert jobs[0].company == "RemoteOK"
+
+
+async def test_remoteok_network_exception_returns_empty():
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemoteOKScanner().scan()
+    assert jobs == []
+
+
+async def test_remoteok_non_200_returns_empty():
+    mock_client = _make_simple_client({}, status=500)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemoteOKScanner().scan()
+    assert jobs == []
+
+
+async def test_remoteok_non_list_json_returns_empty():
+    mock_client = _make_simple_client({"unexpected": "shape"})
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemoteOKScanner().scan()
     assert jobs == []

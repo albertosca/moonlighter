@@ -420,3 +420,48 @@ class GupyScanner(BaseScanner):
                 total = (data.get("pagination") or {}).get("total", 0)
                 if not page or offset >= total:
                     return jobs
+
+
+class RemoteOKScanner(BaseScanner):
+    """RemoteOK is a portal-wide remote-jobs board (all companies, all
+    categories) -- like GupyScanner, it doesn't route through
+    _gather_jobs(slugs). Not registered in SOURCES; dispatched separately
+    in service.py, gated behind a config flag (off by default)."""
+
+    BASE = "https://remoteok.com/api"
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
+
+    async def scan(self, company_slugs: list[str] | None = None, **kwargs: Any) -> list[RawJob]:
+        jobs: list[RawJob] = []
+        async with httpx.AsyncClient(timeout=15) as client:
+            try:
+                r = await client.get(self.BASE, headers=self.HEADERS)
+            except Exception:
+                return jobs
+            if r.status_code != 200:
+                return jobs
+            data = r.json()
+        if not isinstance(data, list):
+            return jobs
+        for item in data:
+            title, url = item.get("position"), item.get("url")
+            if not title or not url:
+                continue
+            raw_desc = item.get("description") or ""
+            description = None
+            if raw_desc:
+                description = re.sub(r"<[^>]+>", " ", raw_desc).strip()
+                description = re.sub(r"\s+", " ", description)
+                description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
+            jobs.append(
+                RawJob(
+                    source="remoteok",
+                    company=item.get("company") or "RemoteOK",
+                    title=title,
+                    url=url,
+                    location=item.get("location") or None,
+                    remote_type="remote",
+                    description=description,
+                )
+            )
+        return jobs
