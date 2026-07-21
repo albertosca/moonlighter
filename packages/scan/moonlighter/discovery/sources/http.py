@@ -566,9 +566,13 @@ class WeWorkRemotelyScanner(BaseScanner):
             # Same 3-pass normalization as RemotiveScanner (Task 2) -- a single
             # tag-strip regex leaves double spaces / space-before-punctuation on
             # nested tags. See that task's code comment for the concrete example.
-            description = re.sub(r"<[^>]+>", " ", raw_desc).strip()
-            description = re.sub(r"\s+", " ", description)
-            description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
+            # None-init + if-guard (matching RemoteOKScanner/RemotiveScanner)
+            # keeps mypy's inferred type as str | None throughout, not just str.
+            description = None
+            if raw_desc:
+                description = re.sub(r"<[^>]+>", " ", raw_desc).strip()
+                description = re.sub(r"\s+", " ", description)
+                description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
             location = (item.findtext("region") or "").strip() or None
             posted_at = None
             pub_date = item.findtext("pubDate")

@@ -1784,6 +1784,23 @@ async def test_wwr_missing_pubdate_leaves_posted_at_none():
     assert jobs[0].posted_at is None
 
 
+async def test_wwr_missing_description_yields_none():
+    rss = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <item>
+      <title>Acme: No Description Role</title>
+      <region>Worldwide</region>
+      <link>https://weworkremotely.com/remote-jobs/acme-no-description-role</link>
+    </item>
+  </channel>
+</rss>"""
+    mock_client = _make_rss_client(rss)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+    assert jobs[0].description is None
+
+
 # --- HNWhoIsHiringScanner tests ---
 
 
