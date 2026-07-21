@@ -81,6 +81,7 @@ _RULES: list[tuple[str, _RuleFn]] = [
     (r"^city$", _city),
     (r"^country$", lambda p: p.get("country_en") or None),
     (r"^pa[ií]s", lambda p: p.get("country_pt") or None),
+    (r"^address$", lambda p: p.get("location") or None),
     # Work authorization / visa / sponsorship: NOT handled here — dealt with in a
     # country-dependent way in work_auth (a fixed answer would be a lie for a US job).
     # Languages

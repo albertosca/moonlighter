@@ -57,6 +57,11 @@ def test_location_city():
     assert r["Location (City)"] == "São Paulo"
 
 
+def test_address():
+    r = pre_populate_answers(["Address"], PROFILE)
+    assert r["Address"] == "São Paulo, SP, Brasil"
+
+
 def test_country():
     r = pre_populate_answers(["Country"], PROFILE)
     assert r["Country"] == "Brazil"
