@@ -3,6 +3,7 @@ from typing import Any, ClassVar
 
 from moonlighter.application.appliers.base import (
     BaseApplier,
+    _detect_closed_set,
     classify_submit_outcome,
     fill_field,
     is_skip,
@@ -73,7 +74,7 @@ class RecruiteeApplier(BaseApplier):
             logger.debug("detect: recruitee ✓ (%s)", self.page.url)
         return match
 
-    async def extract_fields(self) -> list[str]:
+    async def extract_fields(self) -> tuple[list[str], frozenset[str]]:
         await self._open_application()
         # LIVE-VERIFY: Recruitee renders questions inside a form built from React
         # components; the exact wrapper class (kaleidoscope design-system classes
@@ -85,12 +86,15 @@ class RecruiteeApplier(BaseApplier):
             ["label", "[data-testid*='question'] label", "[class*='question'] label"],
         )
         labels = []
+        closed_set: set[str] = set()
         for el in label_els:
             text = (await el.inner_text()).strip()
             if text and text.lower() not in _UPLOAD_LABELS:
                 labels.append(text)
+                if await _detect_closed_set(el):
+                    closed_set.add(text)
         logger.debug("extract_fields: %d fields", len(labels))
-        return labels
+        return labels, frozenset(closed_set)
 
     async def _open_application(self) -> None:
         """Clicks the 'Apply' button when the form is not yet open.

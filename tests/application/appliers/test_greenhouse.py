@@ -101,7 +101,7 @@ async def test_extract_fields_no_apply_button():
     label_mock.inner_text = AsyncMock(return_value="Full Name")
     applier.page.query_selector_all = AsyncMock(return_value=[label_mock])
 
-    fields = await applier.extract_fields()
+    fields, _ = await applier.extract_fields()
     assert "Full Name" in fields
 
 
@@ -113,7 +113,7 @@ async def test_extract_fields_excludes_resume_cv():
     label_mock.inner_text = AsyncMock(return_value="Resume/CV")
     applier.page.query_selector_all = AsyncMock(return_value=[label_mock])
 
-    fields = await applier.extract_fields()
+    fields, _ = await applier.extract_fields()
     assert "Resume/CV" not in fields
 
 
@@ -125,7 +125,7 @@ async def test_extract_fields_excludes_cover_letter():
     label_mock.inner_text = AsyncMock(return_value="Cover Letter")
     applier.page.query_selector_all = AsyncMock(return_value=[label_mock])
 
-    fields = await applier.extract_fields()
+    fields, _ = await applier.extract_fields()
     assert "Cover Letter" not in fields
 
 
@@ -141,8 +141,29 @@ async def test_extract_fields_returns_non_empty_labels():
         labels.append(m)
     applier.page.query_selector_all = AsyncMock(return_value=labels)
 
-    fields = await applier.extract_fields()
+    fields, _ = await applier.extract_fields()
     assert fields == ["Full Name", "Email Address"]
+
+
+async def test_extract_fields_reports_closed_set_labels():
+    """A label whose control is closed-set (select/radio/checkbox) lands in
+    the returned closed_set frozenset; a plain text-input label does not."""
+    applier = make_applier()
+    applier.page.query_selector = AsyncMock(return_value=None)
+
+    select_label = MagicMock()
+    select_label.inner_text = AsyncMock(return_value="English level")
+    select_label.evaluate = AsyncMock(return_value=True)
+
+    text_label = MagicMock()
+    text_label.inner_text = AsyncMock(return_value="Full Name")
+    text_label.evaluate = AsyncMock(return_value=False)
+
+    applier.page.query_selector_all = AsyncMock(return_value=[select_label, text_label])
+
+    fields, closed_set = await applier.extract_fields()
+    assert fields == ["English level", "Full Name"]
+    assert closed_set == frozenset({"English level"})
 
 
 async def test_extract_fields_timeout_on_load_state():
@@ -156,7 +177,7 @@ async def test_extract_fields_timeout_on_load_state():
     label_mock.inner_text = AsyncMock(return_value="Full Name")
     applier.page.query_selector_all = AsyncMock(return_value=[label_mock])
 
-    fields = await applier.extract_fields()
+    fields, _ = await applier.extract_fields()
     assert "Full Name" in fields
 
 
@@ -365,7 +386,7 @@ async def test_extract_fields_falls_back_when_primary_selector_empty():
         return [fallback_label]  # fallback retorna label
 
     applier.page.query_selector_all = qs_all
-    fields = await applier.extract_fields()
+    fields, _ = await applier.extract_fields()
     assert "Portfolio URL" in fields
     assert call_count[0] >= 2  # tentou mais de um seletor
 
@@ -658,7 +679,7 @@ async def test_extract_fields_excludes_upload_alternatives():
         labels.append(m)
     applier.page.query_selector_all = AsyncMock(return_value=labels)
 
-    fields = await applier.extract_fields()
+    fields, _ = await applier.extract_fields()
     for excluded in ("Attach", "Anexar", "Enter manually", "Informe manualmente"):
         assert excluded not in fields
     assert "First Name" in fields
