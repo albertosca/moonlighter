@@ -1,8 +1,11 @@
 import asyncio
 import contextlib
+import html
 import re
+import xml.etree.ElementTree as ET
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any, ClassVar
 
 import httpx
@@ -420,3 +423,278 @@ class GupyScanner(BaseScanner):
                 total = (data.get("pagination") or {}).get("total", 0)
                 if not page or offset >= total:
                     return jobs
+
+
+class RemoteOKScanner(BaseScanner):
+    """RemoteOK is a portal-wide remote-jobs board (all companies, all
+    categories) -- like GupyScanner, it doesn't route through
+    _gather_jobs(slugs). Not registered in SOURCES; dispatched separately
+    in service.py, gated behind a config flag (off by default)."""
+
+    BASE = "https://remoteok.com/api"
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
+
+    async def scan(self, company_slugs: list[str] | None = None, **kwargs: Any) -> list[RawJob]:
+        jobs: list[RawJob] = []
+        async with httpx.AsyncClient(timeout=15) as client:
+            try:
+                r = await client.get(self.BASE, headers=self.HEADERS)
+            except Exception:
+                return jobs
+            if r.status_code != 200:
+                return jobs
+            data = r.json()
+        if not isinstance(data, list):
+            return jobs
+        for item in data:
+            title, url = item.get("position"), item.get("url")
+            if not title or not url:
+                continue
+            raw_desc = item.get("description") or ""
+            description = None
+            if raw_desc:
+                description = re.sub(r"<[^>]+>", " ", raw_desc).strip()
+                description = re.sub(r"\s+", " ", description)
+                description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
+            jobs.append(
+                RawJob(
+                    source="remoteok",
+                    company=item.get("company") or "RemoteOK",
+                    title=title,
+                    url=url,
+                    location=item.get("location") or None,
+                    remote_type="remote",
+                    description=description,
+                )
+            )
+        return jobs
+
+
+class RemotiveScanner(BaseScanner):
+    """Remotive is a portal-wide remote-jobs board like RemoteOKScanner --
+    not registered in SOURCES, dispatched separately in service.py, gated
+    behind a config flag (off by default).
+
+    ToS note: max 4 requests/day, must link back to Remotive as source. No
+    rate-limiter here (no precedent for one in this codebase) -- the config
+    flag is the control point; whoever enables this scanner is responsible
+    for not scanning more than a few times a day."""
+
+    BASE = "https://remotive.com/api/remote-jobs?category=software-dev"
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
+
+    async def scan(self, company_slugs: list[str] | None = None, **kwargs: Any) -> list[RawJob]:
+        jobs: list[RawJob] = []
+        async with httpx.AsyncClient(timeout=15) as client:
+            try:
+                r = await client.get(self.BASE, headers=self.HEADERS)
+            except Exception:
+                return jobs
+            if r.status_code != 200:
+                return jobs
+            data = r.json()
+        if not isinstance(data, dict):
+            return jobs
+        for item in data.get("jobs") or []:
+            title, url = item.get("title"), item.get("url")
+            if not title or not url:
+                continue
+            raw_desc = item.get("description") or ""
+            description = None
+            if raw_desc:
+                description = re.sub(r"<[^>]+>", " ", raw_desc).strip()
+                description = re.sub(r"\s+", " ", description)
+                description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
+            jobs.append(
+                RawJob(
+                    source="remotive",
+                    company=item.get("company_name") or "Remotive",
+                    title=title,
+                    url=url,
+                    location=item.get("candidate_required_location") or None,
+                    remote_type="remote",
+                    description=description,
+                )
+            )
+        return jobs
+
+
+class WeWorkRemotelyScanner(BaseScanner):
+    """WeWorkRemotely is a portal-wide RSS feed, like RemoteOKScanner -- not
+    registered in SOURCES, dispatched separately in service.py, gated
+    behind a config flag (off by default)."""
+
+    BASE = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
+
+    async def scan(self, company_slugs: list[str] | None = None, **kwargs: Any) -> list[RawJob]:
+        jobs: list[RawJob] = []
+        async with httpx.AsyncClient(timeout=15) as client:
+            try:
+                r = await client.get(self.BASE, headers=self.HEADERS)
+            except Exception:
+                return jobs
+            if r.status_code != 200:
+                return jobs
+            body = r.text
+        try:
+            # S314: stdlib ElementTree parses untrusted network data (the RSS
+            # feed is external, fetched over the network). Accepted: Python's
+            # ElementTree does not resolve external entities/DTDs by default
+            # (unlike some other XML parsers), so the residual risk is
+            # entity-expansion DoS (e.g. "billion laughs"), not XXE file
+            # disclosure -- a local nuisance (this call briefly hangs), not a
+            # security breach, for a single-user local tool. No new
+            # dependency (defusedxml) added for this; revisit if that
+            # tradeoff changes.
+            root = ET.fromstring(body)  # noqa: S314
+        except ET.ParseError:
+            return jobs
+        for item in root.findall(".//item"):
+            raw_title = (item.findtext("title") or "").strip()
+            url = (item.findtext("link") or "").strip()
+            if not raw_title or not url:
+                continue
+            if ":" in raw_title:
+                company, _, position = raw_title.partition(":")
+                company = company.strip()
+                title = position.strip()
+            else:
+                company = "WeWorkRemotely"
+                title = raw_title
+            raw_desc = item.findtext("description") or ""
+            # Same 3-pass normalization as RemotiveScanner (Task 2) -- a single
+            # tag-strip regex leaves double spaces / space-before-punctuation on
+            # nested tags. See that task's code comment for the concrete example.
+            # None-init + if-guard (matching RemoteOKScanner/RemotiveScanner)
+            # keeps mypy's inferred type as str | None throughout, not just str.
+            description = None
+            if raw_desc:
+                description = re.sub(r"<[^>]+>", " ", raw_desc).strip()
+                description = re.sub(r"\s+", " ", description)
+                description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
+            location = (item.findtext("region") or "").strip() or None
+            posted_at = None
+            pub_date = item.findtext("pubDate")
+            if pub_date:
+                with contextlib.suppress(Exception):
+                    posted_at = parsedate_to_datetime(pub_date)
+            jobs.append(
+                RawJob(
+                    source="weworkremotely",
+                    company=company,
+                    title=title,
+                    url=url,
+                    location=location,
+                    remote_type="remote",
+                    description=description,
+                    posted_at=posted_at,
+                )
+            )
+        return jobs
+
+
+class HNWhoIsHiringScanner(BaseScanner):
+    """Hacker News' monthly 'Who is hiring?' thread, via the official HN
+    Firebase API (no auth, no bot-detection concern). Portal-wide like
+    RemoteOKScanner -- not registered in SOURCES, dispatched separately in
+    service.py, gated behind a config flag (off by default).
+
+    The weakest signal of the 4 new boards: postings are free-text comments,
+    not structured fields. Title/company extraction is best-effort (first
+    line, split on '|' or '-'); when parsing fails, the comment's own HN
+    permalink is still a reliable url, so a job is never dropped just
+    because title/company parsing came back fuzzy -- only deleted/dead/
+    empty comments are dropped."""
+
+    BASE = "https://hacker-news.firebaseio.com/v0"
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
+    _MAX_CONCURRENT_COMMENTS = 20
+    _SUBMITTED_LOOKBACK = 10
+
+    async def scan(self, company_slugs: list[str] | None = None, **kwargs: Any) -> list[RawJob]:
+        async with httpx.AsyncClient(timeout=15) as client:
+            thread_id = await self._find_latest_thread(client)
+            if thread_id is None:
+                return []
+            kids = await self._fetch_kids(client, thread_id)
+            if not kids:
+                return []
+            sem = asyncio.Semaphore(self._MAX_CONCURRENT_COMMENTS)
+
+            async def _fetch_one(kid: int) -> RawJob | None:
+                async with sem:
+                    return await self._fetch_comment(client, kid)
+
+            results = await asyncio.gather(
+                *(_fetch_one(kid) for kid in kids), return_exceptions=True
+            )
+        return [r for r in results if isinstance(r, RawJob)]
+
+    async def _find_latest_thread(self, client: httpx.AsyncClient) -> int | None:
+        try:
+            r = await client.get(f"{self.BASE}/user/whoishiring.json", headers=self.HEADERS)
+            if r.status_code != 200:
+                return None
+            submitted = (r.json() or {}).get("submitted") or []
+        except Exception:
+            return None
+        for item_id in submitted[: self._SUBMITTED_LOOKBACK]:
+            try:
+                r = await client.get(f"{self.BASE}/item/{item_id}.json", headers=self.HEADERS)
+                if r.status_code != 200:
+                    continue
+                item = r.json() or {}
+            except Exception:  # noqa: S112
+                continue
+            if "who is hiring" in (item.get("title") or "").lower():
+                return int(item_id)
+        return None
+
+    async def _fetch_kids(self, client: httpx.AsyncClient, thread_id: int) -> list[int]:
+        try:
+            r = await client.get(f"{self.BASE}/item/{thread_id}.json", headers=self.HEADERS)
+            if r.status_code != 200:
+                return []
+            return list((r.json() or {}).get("kids") or [])
+        except Exception:
+            return []
+
+    async def _fetch_comment(self, client: httpx.AsyncClient, kid: int) -> RawJob | None:
+        try:
+            r = await client.get(f"{self.BASE}/item/{kid}.json", headers=self.HEADERS)
+            if r.status_code != 200:
+                return None
+            item = r.json() or {}
+        except Exception:
+            return None
+        if not item or item.get("deleted") or item.get("dead"):
+            return None
+        raw_text = item.get("text") or ""
+        if not raw_text:
+            return None
+        text = re.sub(r"<[^>]+>", " ", html.unescape(raw_text)).strip()
+        if not text:
+            return None
+        first_line = text.splitlines()[0]
+        company, title = self._parse_title(first_line, text)
+        return RawJob(
+            source="hn_whoishiring",
+            company=company,
+            title=title,
+            url=f"https://news.ycombinator.com/item?id={kid}",
+            location=None,
+            remote_type=None,
+            description=text,
+        )
+
+    @staticmethod
+    def _parse_title(first_line: str, full_text: str) -> tuple[str, str]:
+        for sep in ("|", "-"):
+            if sep in first_line:
+                company, _, rest = first_line.partition(sep)
+                company = company.strip()
+                if company:
+                    return company, rest.strip() or first_line.strip()
+        fallback = (full_text[:80] + "…") if len(full_text) > 80 else full_text
+        return "HN Who's Hiring", fallback or "Untitled posting"

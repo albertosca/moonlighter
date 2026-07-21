@@ -92,6 +92,11 @@ _CONFIG_SCHEMA: dict[str, tuple[type, ...]] = {
     "cv": (dict,),
     "work_authorization": (dict,),
     "email": (dict,),
+    "scan_gupy": (bool,),
+    "scan_remoteok": (bool,),
+    "scan_remotive": (bool,),
+    "scan_wwr": (bool,),
+    "scan_hn_whoishiring": (bool,),
 }
 
 _CV_SCHEMA: dict[str, tuple[type, ...]] = {"default": (str,), "by_company": (dict,)}

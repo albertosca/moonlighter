@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -8,9 +9,13 @@ from moonlighter.discovery.sources.http import (
     AshbyScanner,
     GreenhouseScanner,
     GupyScanner,
+    HNWhoIsHiringScanner,
     LeverScanner,
     RecruiteeScanner,
+    RemoteOKScanner,
+    RemotiveScanner,
     SmartRecruitersScanner,
+    WeWorkRemotelyScanner,
     WorkableScanner,
 )
 
@@ -1504,3 +1509,593 @@ async def test_gupy_default_keyword_when_not_provided():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan()
     assert jobs == []
+
+
+# --- RemoteOKScanner tests ---
+
+
+def _make_simple_client(payload, status=200):
+    """Single-GET JSON mock client — for scanners that don't paginate."""
+
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        mock_response.status_code = status
+        mock_response.json.return_value = payload
+        mock_response.text = json.dumps(payload) if not isinstance(payload, str) else payload
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    return mock_client
+
+
+_REMOTEOK_RESPONSE = [
+    {"legal": "API Terms of Service: link back to Remote OK..."},
+    {
+        "id": "123",
+        "company": "Acme",
+        "position": "Senior Backend Engineer",
+        "url": "https://remoteok.com/remote-jobs/123",
+        "location": "Worldwide",
+        "tags": ["python", "backend"],
+        "description": "<p>Build <strong>things</strong>.</p>",
+    },
+    {
+        "id": "124",
+        "company": "",
+        "position": "Frontend Dev",
+        "url": "",  # missing url -> skipped
+    },
+]
+
+
+async def test_remoteok_scan_maps_fields_and_skips_legal_notice_and_missing_url():
+    mock_client = _make_simple_client(_REMOTEOK_RESPONSE)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemoteOKScanner().scan()
+
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job.source == "remoteok"
+    assert job.company == "Acme"
+    assert job.title == "Senior Backend Engineer"
+    assert job.url == "https://remoteok.com/remote-jobs/123"
+    assert job.location == "Worldwide"
+    assert job.remote_type == "remote"
+    assert job.description == "Build things."
+
+
+async def test_remoteok_missing_company_falls_back_to_source_name():
+    response = [
+        {
+            "position": "Eng",
+            "url": "https://remoteok.com/remote-jobs/1",
+            "company": "",
+        }
+    ]
+    mock_client = _make_simple_client(response)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemoteOKScanner().scan()
+    assert jobs[0].company == "RemoteOK"
+
+
+async def test_remoteok_network_exception_returns_empty():
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemoteOKScanner().scan()
+    assert jobs == []
+
+
+async def test_remoteok_non_200_returns_empty():
+    mock_client = _make_simple_client({}, status=500)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemoteOKScanner().scan()
+    assert jobs == []
+
+
+async def test_remoteok_non_list_json_returns_empty():
+    mock_client = _make_simple_client({"unexpected": "shape"})
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemoteOKScanner().scan()
+    assert jobs == []
+
+
+# --- RemotiveScanner tests ---
+
+_REMOTIVE_RESPONSE = {
+    "jobs": [
+        {
+            "id": 1,
+            "title": "Senior Python Engineer",
+            "company_name": "Acme",
+            "url": "https://remotive.com/remote-jobs/1",
+            "candidate_required_location": "Worldwide",
+            "description": "<p>Build <strong>things</strong>.</p>",
+        },
+        {
+            "id": 2,
+            "title": "",  # missing title -> skipped
+            "company_name": "Beta",
+            "url": "https://remotive.com/remote-jobs/2",
+        },
+    ]
+}
+
+
+async def test_remotive_scan_maps_fields_and_skips_missing_title():
+    mock_client = _make_simple_client(_REMOTIVE_RESPONSE)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
+
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job.source == "remotive"
+    assert job.company == "Acme"
+    assert job.title == "Senior Python Engineer"
+    assert job.url == "https://remotive.com/remote-jobs/1"
+    assert job.location == "Worldwide"
+    assert job.remote_type == "remote"
+    assert job.description == "Build things."
+
+
+async def test_remotive_missing_company_falls_back_to_source_name():
+    response = {"jobs": [{"title": "Eng", "url": "https://remotive.com/1", "company_name": ""}]}
+    mock_client = _make_simple_client(response)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
+    assert jobs[0].company == "Remotive"
+
+
+async def test_remotive_no_jobs_key_returns_empty():
+    mock_client = _make_simple_client({"job-count": 0})
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
+    assert jobs == []
+
+
+async def test_remotive_network_exception_returns_empty():
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
+    assert jobs == []
+
+
+async def test_remotive_non_dict_json_returns_empty():
+    mock_client = _make_simple_client(["unexpected", "shape"])
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
+    assert jobs == []
+
+
+async def test_remotive_non_200_returns_empty():
+    mock_client = _make_simple_client({}, status=500)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
+    assert jobs == []
+
+
+# --- WeWorkRemotelyScanner tests ---
+
+_WWR_RSS = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>We Work Remotely</title>
+    <item>
+      <title>Acme: Senior Backend Engineer</title>
+      <region>Anywhere in the World</region>
+      <description>&lt;p&gt;Build &lt;strong&gt;things&lt;/strong&gt;.&lt;/p&gt;</description>
+      <pubDate>Tue, 30 Jun 2026 20:32:52 +0000</pubDate>
+      <link>https://weworkremotely.com/remote-jobs/acme-senior-backend-engineer</link>
+    </item>
+    <item>
+      <title>Frontend Developer Wanted</title>
+      <region>USA Only</region>
+      <description>No colon in title, no company prefix.</description>
+      <pubDate>Wed, 01 Jul 2026 10:00:00 +0000</pubDate>
+      <link>https://weworkremotely.com/remote-jobs/frontend-developer-wanted</link>
+    </item>
+    <item>
+      <title>Missing Link Co: Some Role</title>
+      <region>Worldwide</region>
+      <description>No link element -- must be skipped.</description>
+      <pubDate>Wed, 01 Jul 2026 10:00:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>"""
+
+
+def _make_rss_client(body, status=200):
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        mock_response.status_code = status
+        mock_response.text = body
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    return mock_client
+
+
+async def test_wwr_scan_splits_company_from_title_and_strips_html():
+    mock_client = _make_rss_client(_WWR_RSS)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+
+    assert len(jobs) == 2  # third item has no <link>, skipped
+    job = jobs[0]
+    assert job.source == "weworkremotely"
+    assert job.company == "Acme"
+    assert job.title == "Senior Backend Engineer"
+    assert job.url == "https://weworkremotely.com/remote-jobs/acme-senior-backend-engineer"
+    assert job.location == "Anywhere in the World"
+    assert job.remote_type == "remote"
+    assert job.description == "Build things."
+    assert job.posted_at is not None
+    assert job.posted_at.year == 2026 and job.posted_at.month == 6 and job.posted_at.day == 30
+
+
+async def test_wwr_title_without_colon_falls_back_to_source_name_company():
+    mock_client = _make_rss_client(_WWR_RSS)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+    no_colon_job = next(j for j in jobs if j.title == "Frontend Developer Wanted")
+    assert no_colon_job.company == "WeWorkRemotely"
+
+
+async def test_wwr_network_exception_returns_empty():
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+    assert jobs == []
+
+
+async def test_wwr_non_200_returns_empty():
+    mock_client = _make_rss_client("", status=500)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+    assert jobs == []
+
+
+async def test_wwr_malformed_xml_returns_empty():
+    mock_client = _make_rss_client("<not-valid-xml")
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+    assert jobs == []
+
+
+async def test_wwr_missing_pubdate_leaves_posted_at_none():
+    rss = _WWR_RSS.replace("<pubDate>Tue, 30 Jun 2026 20:32:52 +0000</pubDate>", "", 1)
+    mock_client = _make_rss_client(rss)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+    assert jobs[0].posted_at is None
+
+
+async def test_wwr_missing_description_yields_none():
+    rss = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <item>
+      <title>Acme: No Description Role</title>
+      <region>Worldwide</region>
+      <link>https://weworkremotely.com/remote-jobs/acme-no-description-role</link>
+    </item>
+  </channel>
+</rss>"""
+    mock_client = _make_rss_client(rss)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+    assert jobs[0].description is None
+
+
+# --- HNWhoIsHiringScanner tests ---
+
+
+def _make_hn_client(url_map):
+    """Branches on exact URL match (HN's API is one-resource-per-URL, no
+    query params to substring-match on)."""
+
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        if url in url_map:
+            mock_response.status_code = 200
+            mock_response.json.return_value = url_map[url]
+        else:
+            mock_response.status_code = 404
+            mock_response.json.return_value = None
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    return mock_client
+
+
+_HN_BASE = "https://hacker-news.firebaseio.com/v0"
+
+
+def _hn_url_map(*, thread_id=100, kids=(201, 202, 203)):
+    return {
+        f"{_HN_BASE}/user/whoishiring.json": {"submitted": [99, thread_id]},
+        f"{_HN_BASE}/item/99.json": {"id": 99, "title": "Ask HN: Freelancer? Seeking freelancer?"},
+        f"{_HN_BASE}/item/{thread_id}.json": {
+            "id": thread_id,
+            "title": "Ask HN: Who is hiring? (July 2026)",
+            "kids": list(kids),
+        },
+        f"{_HN_BASE}/item/201.json": {
+            "id": 201,
+            "text": "Acme | Remote | Full-time&lt;p&gt;Build things.&lt;/p&gt;",
+        },
+        f"{_HN_BASE}/item/202.json": {
+            "id": 202,
+            "text": "No separator in this first line at all just prose",
+        },
+        f"{_HN_BASE}/item/203.json": {"id": 203, "deleted": True, "text": "gone"},
+    }
+
+
+async def test_hn_scan_finds_thread_and_parses_pipe_separated_title():
+    mock_client = _make_hn_client(_hn_url_map())
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+
+    acme = next(j for j in jobs if j.company == "Acme")
+    assert acme.source == "hn_whoishiring"
+    assert acme.title == "Remote | Full-time Build things."
+    assert acme.url == "https://news.ycombinator.com/item?id=201"
+    assert acme.remote_type is None
+
+
+async def test_hn_scan_falls_back_to_prose_when_no_separator():
+    mock_client = _make_hn_client(_hn_url_map())
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+
+    fallback = next(j for j in jobs if j.url.endswith("id=202"))
+    assert fallback.company == "HN Who's Hiring"
+    assert "No separator in this first line" in fallback.title
+
+
+async def test_hn_scan_skips_deleted_comments():
+    mock_client = _make_hn_client(_hn_url_map())
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert all(not j.url.endswith("id=203") for j in jobs)
+
+
+async def test_hn_no_who_is_hiring_thread_found_returns_empty():
+    url_map = {
+        f"{_HN_BASE}/user/whoishiring.json": {"submitted": [99]},
+        f"{_HN_BASE}/item/99.json": {"id": 99, "title": "Ask HN: Freelancer? Seeking freelancer?"},
+    }
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_thread_with_no_kids_returns_empty():
+    url_map = {
+        f"{_HN_BASE}/user/whoishiring.json": {"submitted": [100]},
+        f"{_HN_BASE}/item/100.json": {"id": 100, "title": "Ask HN: Who is hiring? (July 2026)"},
+    }
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_network_exception_on_user_lookup_returns_empty():
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_user_lookup_non_200_returns_empty():
+    mock_client = _make_hn_client({})  # every URL 404s
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_thread_lookup_skips_item_non_200_and_continues():
+    url_map = {
+        f"{_HN_BASE}/user/whoishiring.json": {"submitted": [98, 100]},
+        # 98 is the first candidate but its own item fetch 404s -- loop must
+        # continue to 100 rather than stopping.
+        f"{_HN_BASE}/item/100.json": {
+            "id": 100,
+            "title": "Ask HN: Who is hiring? (July 2026)",
+            "kids": [201],
+        },
+        f"{_HN_BASE}/item/201.json": {"id": 201, "text": "Acme | Remote"},
+    }
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert len(jobs) == 1
+    assert jobs[0].company == "Acme"
+
+
+async def test_hn_thread_lookup_skips_item_exception_and_continues():
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        if url == f"{_HN_BASE}/user/whoishiring.json":
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"submitted": [98, 100]}
+            return mock_response
+        if url == f"{_HN_BASE}/item/98.json":
+            raise httpx.ConnectError("boom")
+        if url == f"{_HN_BASE}/item/100.json":
+            mock_response.status_code = 200
+            mock_response.json.return_value = {
+                "id": 100,
+                "title": "Ask HN: Who is hiring? (July 2026)",
+                "kids": [],
+            }
+            return mock_response
+        mock_response.status_code = 404
+        mock_response.json.return_value = None
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []  # thread found (id 100), but it has no kids
+
+
+async def test_hn_fetch_kids_non_200_returns_empty():
+    """The first call to /item/100.json (inside _find_latest_thread, checking
+    the title) must succeed; the SECOND call to that same URL (inside
+    _fetch_kids) is what returns non-200."""
+
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        if url == f"{_HN_BASE}/user/whoishiring.json":
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"submitted": [100]}
+            return mock_response
+        if url == f"{_HN_BASE}/item/100.json":
+            if not getattr(fake_get, "_seen", False):
+                fake_get._seen = True
+                mock_response.status_code = 200
+                mock_response.json.return_value = {
+                    "id": 100,
+                    "title": "Ask HN: Who is hiring? (July 2026)",
+                }
+                return mock_response
+            mock_response.status_code = 500
+            mock_response.json.return_value = None
+            return mock_response
+        mock_response.status_code = 404
+        mock_response.json.return_value = None
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_fetch_kids_exception_returns_empty():
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        if url == f"{_HN_BASE}/user/whoishiring.json":
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"submitted": [100]}
+            return mock_response
+        if url == f"{_HN_BASE}/item/100.json":
+            # First call (thread-title lookup, inside _find_latest_thread)
+            # must succeed; the SECOND call to the same URL (_fetch_kids)
+            # is what raises.
+            if not getattr(fake_get, "_seen", False):
+                fake_get._seen = True
+                mock_response.status_code = 200
+                mock_response.json.return_value = {
+                    "id": 100,
+                    "title": "Ask HN: Who is hiring? (July 2026)",
+                }
+                return mock_response
+            raise httpx.ConnectError("boom")
+        mock_response.status_code = 404
+        mock_response.json.return_value = None
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_fetch_comment_non_200_is_dropped():
+    url_map = _hn_url_map(kids=(201,))
+    del url_map[f"{_HN_BASE}/item/201.json"]  # 201 now 404s -> comment dropped
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_fetch_comment_exception_is_dropped():
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        if url == f"{_HN_BASE}/item/201.json":
+            raise httpx.ConnectError("boom")
+        base_map = _hn_url_map(kids=(201,))
+        if url in base_map:
+            mock_response.status_code = 200
+            mock_response.json.return_value = base_map[url]
+            return mock_response
+        mock_response.status_code = 404
+        mock_response.json.return_value = None
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_comment_with_empty_text_is_dropped():
+    url_map = _hn_url_map(kids=(201,))
+    url_map[f"{_HN_BASE}/item/201.json"] = {"id": 201, "text": ""}
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_comment_with_only_tags_strips_to_empty_and_is_dropped():
+    url_map = _hn_url_map(kids=(201,))
+    url_map[f"{_HN_BASE}/item/201.json"] = {"id": 201, "text": "<p></p>"}
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_parse_title_falls_through_when_separator_leads_with_empty_company():
+    """A first line starting with the '|' separator strips to an empty
+    company on that attempt -- must fall through (not return an empty
+    company) to try '-' next and, since this fixture has no '-' either,
+    all the way to the final prose fallback."""
+    text = "| Remote position available now for engineers"
+    url_map = _hn_url_map(kids=(201,))
+    url_map[f"{_HN_BASE}/item/201.json"] = {"id": 201, "text": text}
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert len(jobs) == 1
+    assert jobs[0].company == "HN Who's Hiring"
+    assert jobs[0].title == text

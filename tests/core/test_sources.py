@@ -23,6 +23,10 @@ def test_is_iterable_over_all_sources():
         "smartrecruiters",
         "recruitee",
         "gupy",
+        "remoteok",
+        "remotive",
+        "weworkremotely",
+        "hn_whoishiring",
     }
 
 
@@ -30,3 +34,12 @@ def test_str_key_lookup_matches_member_key():
     # StrEnum members hash-equal their str value, so dict lookups interop.
     d = {Source.GREENHOUSE: 1}
     assert d["greenhouse"] == 1
+
+
+def test_source_has_remote_board_members():
+    from moonlighter.core.sources import Source
+
+    assert Source.REMOTEOK == "remoteok"
+    assert Source.REMOTIVE == "remotive"
+    assert Source.WEWORKREMOTELY == "weworkremotely"
+    assert Source.HN_WHOISHIRING == "hn_whoishiring"
