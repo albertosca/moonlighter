@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import html
 import re
 import xml.etree.ElementTree as ET
 from collections.abc import Awaitable, Callable
@@ -587,3 +588,109 @@ class WeWorkRemotelyScanner(BaseScanner):
                 )
             )
         return jobs
+
+
+class HNWhoIsHiringScanner(BaseScanner):
+    """Hacker News' monthly 'Who is hiring?' thread, via the official HN
+    Firebase API (no auth, no bot-detection concern). Portal-wide like
+    RemoteOKScanner -- not registered in SOURCES, dispatched separately in
+    service.py, gated behind a config flag (off by default).
+
+    The weakest signal of the 4 new boards: postings are free-text comments,
+    not structured fields. Title/company extraction is best-effort (first
+    line, split on '|' or '-'); when parsing fails, the comment's own HN
+    permalink is still a reliable url, so a job is never dropped just
+    because title/company parsing came back fuzzy -- only deleted/dead/
+    empty comments are dropped."""
+
+    BASE = "https://hacker-news.firebaseio.com/v0"
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
+    _MAX_CONCURRENT_COMMENTS = 20
+    _SUBMITTED_LOOKBACK = 10
+
+    async def scan(self, company_slugs: list[str] | None = None, **kwargs: Any) -> list[RawJob]:
+        async with httpx.AsyncClient(timeout=15) as client:
+            thread_id = await self._find_latest_thread(client)
+            if thread_id is None:
+                return []
+            kids = await self._fetch_kids(client, thread_id)
+            if not kids:
+                return []
+            sem = asyncio.Semaphore(self._MAX_CONCURRENT_COMMENTS)
+
+            async def _fetch_one(kid: int) -> RawJob | None:
+                async with sem:
+                    return await self._fetch_comment(client, kid)
+
+            results = await asyncio.gather(
+                *(_fetch_one(kid) for kid in kids), return_exceptions=True
+            )
+        return [r for r in results if isinstance(r, RawJob)]
+
+    async def _find_latest_thread(self, client: httpx.AsyncClient) -> int | None:
+        try:
+            r = await client.get(f"{self.BASE}/user/whoishiring.json", headers=self.HEADERS)
+            if r.status_code != 200:
+                return None
+            submitted = (r.json() or {}).get("submitted") or []
+        except Exception:
+            return None
+        for item_id in submitted[: self._SUBMITTED_LOOKBACK]:
+            try:
+                r = await client.get(f"{self.BASE}/item/{item_id}.json", headers=self.HEADERS)
+                if r.status_code != 200:
+                    continue
+                item = r.json() or {}
+            except Exception:  # noqa: S112
+                continue
+            if "who is hiring" in (item.get("title") or "").lower():
+                return int(item_id)
+        return None
+
+    async def _fetch_kids(self, client: httpx.AsyncClient, thread_id: int) -> list[int]:
+        try:
+            r = await client.get(f"{self.BASE}/item/{thread_id}.json", headers=self.HEADERS)
+            if r.status_code != 200:
+                return []
+            return list((r.json() or {}).get("kids") or [])
+        except Exception:
+            return []
+
+    async def _fetch_comment(self, client: httpx.AsyncClient, kid: int) -> RawJob | None:
+        try:
+            r = await client.get(f"{self.BASE}/item/{kid}.json", headers=self.HEADERS)
+            if r.status_code != 200:
+                return None
+            item = r.json() or {}
+        except Exception:
+            return None
+        if not item or item.get("deleted") or item.get("dead"):
+            return None
+        raw_text = item.get("text") or ""
+        if not raw_text:
+            return None
+        text = re.sub(r"<[^>]+>", " ", html.unescape(raw_text)).strip()
+        if not text:
+            return None
+        first_line = text.splitlines()[0]
+        company, title = self._parse_title(first_line, text)
+        return RawJob(
+            source="hn_whoishiring",
+            company=company,
+            title=title,
+            url=f"https://news.ycombinator.com/item?id={kid}",
+            location=None,
+            remote_type=None,
+            description=text,
+        )
+
+    @staticmethod
+    def _parse_title(first_line: str, full_text: str) -> tuple[str, str]:
+        for sep in ("|", "-"):
+            if sep in first_line:
+                company, _, rest = first_line.partition(sep)
+                company = company.strip()
+                if company:
+                    return company, rest.strip() or first_line.strip()
+        fallback = (full_text[:80] + "…") if len(full_text) > 80 else full_text
+        return "HN Who's Hiring", fallback or "Untitled posting"

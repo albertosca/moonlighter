@@ -9,6 +9,7 @@ from moonlighter.discovery.sources.http import (
     AshbyScanner,
     GreenhouseScanner,
     GupyScanner,
+    HNWhoIsHiringScanner,
     LeverScanner,
     RecruiteeScanner,
     RemoteOKScanner,
@@ -1781,3 +1782,303 @@ async def test_wwr_missing_pubdate_leaves_posted_at_none():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WeWorkRemotelyScanner().scan()
     assert jobs[0].posted_at is None
+
+
+# --- HNWhoIsHiringScanner tests ---
+
+
+def _make_hn_client(url_map):
+    """Branches on exact URL match (HN's API is one-resource-per-URL, no
+    query params to substring-match on)."""
+
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        if url in url_map:
+            mock_response.status_code = 200
+            mock_response.json.return_value = url_map[url]
+        else:
+            mock_response.status_code = 404
+            mock_response.json.return_value = None
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    return mock_client
+
+
+_HN_BASE = "https://hacker-news.firebaseio.com/v0"
+
+
+def _hn_url_map(*, thread_id=100, kids=(201, 202, 203)):
+    return {
+        f"{_HN_BASE}/user/whoishiring.json": {"submitted": [99, thread_id]},
+        f"{_HN_BASE}/item/99.json": {"id": 99, "title": "Ask HN: Freelancer? Seeking freelancer?"},
+        f"{_HN_BASE}/item/{thread_id}.json": {
+            "id": thread_id,
+            "title": "Ask HN: Who is hiring? (July 2026)",
+            "kids": list(kids),
+        },
+        f"{_HN_BASE}/item/201.json": {
+            "id": 201,
+            "text": "Acme | Remote | Full-time&lt;p&gt;Build things.&lt;/p&gt;",
+        },
+        f"{_HN_BASE}/item/202.json": {
+            "id": 202,
+            "text": "No separator in this first line at all just prose",
+        },
+        f"{_HN_BASE}/item/203.json": {"id": 203, "deleted": True, "text": "gone"},
+    }
+
+
+async def test_hn_scan_finds_thread_and_parses_pipe_separated_title():
+    mock_client = _make_hn_client(_hn_url_map())
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+
+    acme = next(j for j in jobs if j.company == "Acme")
+    assert acme.source == "hn_whoishiring"
+    assert acme.title == "Remote | Full-time Build things."
+    assert acme.url == "https://news.ycombinator.com/item?id=201"
+    assert acme.remote_type is None
+
+
+async def test_hn_scan_falls_back_to_prose_when_no_separator():
+    mock_client = _make_hn_client(_hn_url_map())
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+
+    fallback = next(j for j in jobs if j.url.endswith("id=202"))
+    assert fallback.company == "HN Who's Hiring"
+    assert "No separator in this first line" in fallback.title
+
+
+async def test_hn_scan_skips_deleted_comments():
+    mock_client = _make_hn_client(_hn_url_map())
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert all(not j.url.endswith("id=203") for j in jobs)
+
+
+async def test_hn_no_who_is_hiring_thread_found_returns_empty():
+    url_map = {
+        f"{_HN_BASE}/user/whoishiring.json": {"submitted": [99]},
+        f"{_HN_BASE}/item/99.json": {"id": 99, "title": "Ask HN: Freelancer? Seeking freelancer?"},
+    }
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_thread_with_no_kids_returns_empty():
+    url_map = {
+        f"{_HN_BASE}/user/whoishiring.json": {"submitted": [100]},
+        f"{_HN_BASE}/item/100.json": {"id": 100, "title": "Ask HN: Who is hiring? (July 2026)"},
+    }
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_network_exception_on_user_lookup_returns_empty():
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_user_lookup_non_200_returns_empty():
+    mock_client = _make_hn_client({})  # every URL 404s
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_thread_lookup_skips_item_non_200_and_continues():
+    url_map = {
+        f"{_HN_BASE}/user/whoishiring.json": {"submitted": [98, 100]},
+        # 98 is the first candidate but its own item fetch 404s -- loop must
+        # continue to 100 rather than stopping.
+        f"{_HN_BASE}/item/100.json": {
+            "id": 100,
+            "title": "Ask HN: Who is hiring? (July 2026)",
+            "kids": [201],
+        },
+        f"{_HN_BASE}/item/201.json": {"id": 201, "text": "Acme | Remote"},
+    }
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert len(jobs) == 1
+    assert jobs[0].company == "Acme"
+
+
+async def test_hn_thread_lookup_skips_item_exception_and_continues():
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        if url == f"{_HN_BASE}/user/whoishiring.json":
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"submitted": [98, 100]}
+            return mock_response
+        if url == f"{_HN_BASE}/item/98.json":
+            raise httpx.ConnectError("boom")
+        if url == f"{_HN_BASE}/item/100.json":
+            mock_response.status_code = 200
+            mock_response.json.return_value = {
+                "id": 100,
+                "title": "Ask HN: Who is hiring? (July 2026)",
+                "kids": [],
+            }
+            return mock_response
+        mock_response.status_code = 404
+        mock_response.json.return_value = None
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []  # thread found (id 100), but it has no kids
+
+
+async def test_hn_fetch_kids_non_200_returns_empty():
+    """The first call to /item/100.json (inside _find_latest_thread, checking
+    the title) must succeed; the SECOND call to that same URL (inside
+    _fetch_kids) is what returns non-200."""
+
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        if url == f"{_HN_BASE}/user/whoishiring.json":
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"submitted": [100]}
+            return mock_response
+        if url == f"{_HN_BASE}/item/100.json":
+            if not getattr(fake_get, "_seen", False):
+                fake_get._seen = True
+                mock_response.status_code = 200
+                mock_response.json.return_value = {
+                    "id": 100,
+                    "title": "Ask HN: Who is hiring? (July 2026)",
+                }
+                return mock_response
+            mock_response.status_code = 500
+            mock_response.json.return_value = None
+            return mock_response
+        mock_response.status_code = 404
+        mock_response.json.return_value = None
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_fetch_kids_exception_returns_empty():
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        if url == f"{_HN_BASE}/user/whoishiring.json":
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"submitted": [100]}
+            return mock_response
+        if url == f"{_HN_BASE}/item/100.json":
+            # First call (thread-title lookup, inside _find_latest_thread)
+            # must succeed; the SECOND call to the same URL (_fetch_kids)
+            # is what raises.
+            if not getattr(fake_get, "_seen", False):
+                fake_get._seen = True
+                mock_response.status_code = 200
+                mock_response.json.return_value = {
+                    "id": 100,
+                    "title": "Ask HN: Who is hiring? (July 2026)",
+                }
+                return mock_response
+            raise httpx.ConnectError("boom")
+        mock_response.status_code = 404
+        mock_response.json.return_value = None
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_fetch_comment_non_200_is_dropped():
+    url_map = _hn_url_map(kids=(201,))
+    del url_map[f"{_HN_BASE}/item/201.json"]  # 201 now 404s -> comment dropped
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_fetch_comment_exception_is_dropped():
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        if url == f"{_HN_BASE}/item/201.json":
+            raise httpx.ConnectError("boom")
+        base_map = _hn_url_map(kids=(201,))
+        if url in base_map:
+            mock_response.status_code = 200
+            mock_response.json.return_value = base_map[url]
+            return mock_response
+        mock_response.status_code = 404
+        mock_response.json.return_value = None
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_comment_with_empty_text_is_dropped():
+    url_map = _hn_url_map(kids=(201,))
+    url_map[f"{_HN_BASE}/item/201.json"] = {"id": 201, "text": ""}
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_comment_with_only_tags_strips_to_empty_and_is_dropped():
+    url_map = _hn_url_map(kids=(201,))
+    url_map[f"{_HN_BASE}/item/201.json"] = {"id": 201, "text": "<p></p>"}
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+
+
+async def test_hn_parse_title_falls_through_when_separator_leads_with_empty_company():
+    """A first line starting with the '|' separator strips to an empty
+    company on that attempt -- must fall through (not return an empty
+    company) to try '-' next and, since this fixture has no '-' either,
+    all the way to the final prose fallback."""
+    text = "| Remote position available now for engineers"
+    url_map = _hn_url_map(kids=(201,))
+    url_map[f"{_HN_BASE}/item/201.json"] = {"id": 201, "text": text}
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert len(jobs) == 1
+    assert jobs[0].company == "HN Who's Hiring"
+    assert jobs[0].title == text
