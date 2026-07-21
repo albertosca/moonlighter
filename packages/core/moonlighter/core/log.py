@@ -26,6 +26,28 @@ _VIVID_LEVEL_STYLES = {
     "repr.job_id": "bold blue",
 }
 
+# 5 real packages in the monorepo (packages/*/moonlighter/<this>). Colors
+# deliberately outside the green/red/yellow/blue family already used by
+# level and status highlighting, so the two color systems don't collide.
+_PACKAGE_STYLES = {
+    "core": "grey70",
+    "discovery": "sea_green3",
+    "application": "dodger_blue2",
+    "tracking": "orchid",
+    "full": "grey54",
+}
+
+
+def _package_tag(logger_name: str) -> str | None:
+    """First dotted segment after 'moonlighter.', if it's one of the 5 known
+    packages. None for the bare 'moonlighter' logger, an unprefixed name, or
+    an unmapped package — callers must treat None as "no prefix"."""
+    remainder = logger_name.removeprefix("moonlighter.")
+    if remainder == logger_name:
+        return None
+    package = remainder.split(".", 1)[0]
+    return package if package in _PACKAGE_STYLES else None
+
 
 try:
     from rich.highlighter import ReprHighlighter as _ReprHighlighter
@@ -45,6 +67,23 @@ try:
             r"\b(?P<status_attn>skipped|needs_review|unverified)\b",
             r"(?P<job_id>#\d+)",
         ]
+
+    from rich.logging import RichHandler as _RichHandler
+    from rich.text import Text as _Text
+
+    class _PackageRichHandler(_RichHandler):
+        """Prepends a colored package-name tag (core/discovery/application/
+        tracking/full) to every rendered message, derived from the logger
+        name, so log lines from different subsystems are visually grouped."""
+
+        def render_message(self, record: logging.LogRecord, message: str) -> _Text:
+            text = super().render_message(record, message)
+            package = _package_tag(record.name)
+            if package is None:
+                return text  # type: ignore[return-value]
+            style = _PACKAGE_STYLES[package]
+            return _Text.assemble((f"{package:<12}", style), text)  # type: ignore[arg-type]
+
 except ImportError:  # pragma: no cover - rich optional, mirrors setup()'s own guard
     pass
 
@@ -75,10 +114,9 @@ def setup(log_path: str | None = None) -> None:
 
     try:
         from rich.console import Console
-        from rich.logging import RichHandler
         from rich.theme import Theme
 
-        rh = RichHandler(
+        rh = _PackageRichHandler(
             console=Console(stderr=True, theme=Theme(_VIVID_LEVEL_STYLES)),
             level=logging.INFO,
             show_path=True,

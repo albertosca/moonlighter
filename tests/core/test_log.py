@@ -192,3 +192,83 @@ def test_metrics_highlighter_status_words_need_word_boundary():
     styled = {text.plain[s.start : s.end]: s.style for s in text.spans}
     assert "filled" not in styled
     assert "fulfilled" not in styled
+
+
+def test_package_tag_maps_known_packages():
+    from moonlighter.core.log import _package_tag
+
+    assert _package_tag("moonlighter.discovery.evaluator") == "discovery"
+    assert _package_tag("moonlighter.application.appliers.recruitee") == "application"
+    assert _package_tag("moonlighter.core.browser") == "core"
+    assert _package_tag("moonlighter.tracking.gmail_client") == "tracking"
+    assert _package_tag("moonlighter.full.server") == "full"
+
+
+def test_package_tag_returns_none_for_unknown_or_bare_name():
+    """Defensive fallback: an unmapped package or a name with no
+    'moonlighter.' prefix must not crash — just skip the prefix."""
+    from moonlighter.core.log import _package_tag
+
+    assert _package_tag("moonlighter.unknownpkg.mod") is None
+    assert _package_tag("moonlighter") is None
+    assert _package_tag("some_other_root.mod") is None
+
+
+def test_package_rich_handler_prefixes_message_with_package_color(tmp_path):
+    import logging
+
+    from moonlighter.core import log as log_mod
+
+    log_mod._initialized = False
+    root = logging.getLogger("moonlighter")
+    for h in root.handlers[:]:
+        root.removeHandler(h)
+
+    log_mod.setup(log_path=str(tmp_path / "app.log"))
+
+    handlers = [h for h in root.handlers if isinstance(h, log_mod._PackageRichHandler)]
+    assert len(handlers) == 1
+    handler = handlers[0]
+
+    record = logging.LogRecord(
+        name="moonlighter.discovery.evaluator",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="scan complete",
+        args=(),
+        exc_info=None,
+    )
+    text = handler.render_message(record, "scan complete")
+
+    assert text.plain.startswith("discovery")
+    assert "scan complete" in text.plain
+    assert text.spans[0].style == log_mod._PACKAGE_STYLES["discovery"]
+
+
+def test_package_rich_handler_no_prefix_for_unmapped_package(tmp_path):
+    """A logger name outside the 5 known packages (shouldn't happen in
+    practice, but must degrade safely) renders with no prefix at all."""
+    import logging
+
+    from moonlighter.core import log as log_mod
+
+    log_mod._initialized = False
+    root = logging.getLogger("moonlighter")
+    for h in root.handlers[:]:
+        root.removeHandler(h)
+
+    log_mod.setup(log_path=str(tmp_path / "app.log"))
+    handler = next(h for h in root.handlers if isinstance(h, log_mod._PackageRichHandler))
+
+    record = logging.LogRecord(
+        name="moonlighter.unknownpkg.mod",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="hello",
+        args=(),
+        exc_info=None,
+    )
+    text = handler.render_message(record, "hello")
+    assert text.plain == "hello"
