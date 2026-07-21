@@ -465,3 +465,53 @@ class RemoteOKScanner(BaseScanner):
                 )
             )
         return jobs
+
+
+
+class RemotiveScanner(BaseScanner):
+    """Remotive is a portal-wide remote-jobs board like RemoteOKScanner --
+    not registered in SOURCES, dispatched separately in service.py, gated
+    behind a config flag (off by default).
+
+    ToS note: max 4 requests/day, must link back to Remotive as source. No
+    rate-limiter here (no precedent for one in this codebase) -- the config
+    flag is the control point; whoever enables this scanner is responsible
+    for not scanning more than a few times a day."""
+
+    BASE = "https://remotive.com/api/remote-jobs?category=software-dev"
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
+
+    async def scan(self, company_slugs: list[str] | None = None, **kwargs: Any) -> list[RawJob]:
+        jobs: list[RawJob] = []
+        async with httpx.AsyncClient(timeout=15) as client:
+            try:
+                r = await client.get(self.BASE, headers=self.HEADERS)
+            except Exception:
+                return jobs
+            if r.status_code != 200:
+                return jobs
+            data = r.json()
+        if not isinstance(data, dict):
+            return jobs
+        for item in data.get("jobs") or []:
+            title, url = item.get("title"), item.get("url")
+            if not title or not url:
+                continue
+            raw_desc = item.get("description") or ""
+            description = None
+            if raw_desc:
+                description = re.sub(r"<[^>]+>", " ", raw_desc).strip()
+                description = re.sub(r"\s+", " ", description)
+                description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
+            jobs.append(
+                RawJob(
+                    source="remotive",
+                    company=item.get("company_name") or "Remotive",
+                    title=title,
+                    url=url,
+                    location=item.get("candidate_required_location") or None,
+                    remote_type="remote",
+                    description=description,
+                )
+            )
+        return jobs

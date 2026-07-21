@@ -12,6 +12,7 @@ from moonlighter.discovery.sources.http import (
     LeverScanner,
     RecruiteeScanner,
     RemoteOKScanner,
+    RemotiveScanner,
     SmartRecruitersScanner,
     WorkableScanner,
 )
@@ -1599,4 +1600,74 @@ async def test_remoteok_non_list_json_returns_empty():
     mock_client = _make_simple_client({"unexpected": "shape"})
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RemoteOKScanner().scan()
+    assert jobs == []
+
+
+# --- RemotiveScanner tests ---
+
+_REMOTIVE_RESPONSE = {
+    "jobs": [
+        {
+            "id": 1,
+            "title": "Senior Python Engineer",
+            "company_name": "Acme",
+            "url": "https://remotive.com/remote-jobs/1",
+            "candidate_required_location": "Worldwide",
+            "description": "<p>Build <strong>things</strong>.</p>",
+        },
+        {
+            "id": 2,
+            "title": "",  # missing title -> skipped
+            "company_name": "Beta",
+            "url": "https://remotive.com/remote-jobs/2",
+        },
+    ]
+}
+
+
+async def test_remotive_scan_maps_fields_and_skips_missing_title():
+    mock_client = _make_simple_client(_REMOTIVE_RESPONSE)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
+
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job.source == "remotive"
+    assert job.company == "Acme"
+    assert job.title == "Senior Python Engineer"
+    assert job.url == "https://remotive.com/remote-jobs/1"
+    assert job.location == "Worldwide"
+    assert job.remote_type == "remote"
+    assert job.description == "Build things."
+
+
+async def test_remotive_missing_company_falls_back_to_source_name():
+    response = {"jobs": [{"title": "Eng", "url": "https://remotive.com/1", "company_name": ""}]}
+    mock_client = _make_simple_client(response)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
+    assert jobs[0].company == "Remotive"
+
+
+async def test_remotive_no_jobs_key_returns_empty():
+    mock_client = _make_simple_client({"job-count": 0})
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
+    assert jobs == []
+
+
+async def test_remotive_network_exception_returns_empty():
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
+    assert jobs == []
+
+
+async def test_remotive_non_dict_json_returns_empty():
+    mock_client = _make_simple_client(["unexpected", "shape"])
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
     assert jobs == []
