@@ -25,6 +25,7 @@ from moonlighter.application.appliers.greenhouse import GreenhouseApplier
 from moonlighter.application.appliers.lever import LeverApplier
 from moonlighter.application.appliers.linkedin import LinkedInApplier
 from moonlighter.application.appliers.recruitee import RecruiteeApplier
+from moonlighter.application.appliers.workable import WorkableApplier
 from moonlighter.core import browser
 from moonlighter.core.config import NEEDS_REVIEW_SENTINEL
 from moonlighter.core.db import Application, Job
@@ -72,6 +73,7 @@ _APPLIER_CLASSES = [
     LeverApplier,
     AshbyApplier,
     RecruiteeApplier,
+    WorkableApplier,
 ]
 
 

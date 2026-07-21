@@ -11,6 +11,7 @@ from moonlighter.application.answers.cv import CVNotFoundError
 from moonlighter.application.appliers.base import ApplicationDraft
 from moonlighter.application.appliers.greenhouse import GreenhouseApplier
 from moonlighter.application.appliers.recruitee import RecruiteeApplier
+from moonlighter.application.appliers.workable import WorkableApplier
 from moonlighter.application.service import _anomaly_reasons, _render_draft
 from moonlighter.core.db import Application, Job, init_db
 from playwright.async_api import TimeoutError as PlaywrightTimeout
@@ -85,6 +86,14 @@ async def test_detect_applier_matches_recruitee(tmp_db):
         _page("https://acme.recruitee.com/o/backend-engineer"), CONFIG, PROFILE
     )
     assert isinstance(applier, RecruiteeApplier)
+
+
+async def test_detect_applier_matches_workable(tmp_db):
+    init_db()
+    applier = await apply_service.detect_applier(
+        _page("https://apply.workable.com/acme/j/ABCDEF1234/apply/"), CONFIG, PROFILE
+    )
+    assert isinstance(applier, WorkableApplier)
 
 
 async def test_detect_applier_source_routes_recruitee_custom_domain(tmp_db):
