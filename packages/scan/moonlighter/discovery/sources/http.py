@@ -688,13 +688,23 @@ class HNWhoIsHiringScanner(BaseScanner):
             description=text,
         )
 
-    @staticmethod
-    def _parse_title(first_line: str, full_text: str) -> tuple[str, str]:
+    _MAX_TITLE_LEN = 80
+
+    @classmethod
+    def _cap(cls, text: str) -> str:
+        return (text[: cls._MAX_TITLE_LEN] + "…") if len(text) > cls._MAX_TITLE_LEN else text
+
+    @classmethod
+    def _parse_title(cls, first_line: str, full_text: str) -> tuple[str, str]:
+        # HN comments render paragraphs as <p>, which the tag-strip in
+        # _fetch_comment turns into a space, not a newline -- so "first_line"
+        # is really "the whole flattened comment" and `rest` after the first
+        # separator is unbounded (a real ~1200-char title was observed live).
+        # Cap it the same way as the no-separator fallback below.
         for sep in ("|", "-"):
             if sep in first_line:
                 company, _, rest = first_line.partition(sep)
                 company = company.strip()
                 if company:
-                    return company, rest.strip() or first_line.strip()
-        fallback = (full_text[:80] + "…") if len(full_text) > 80 else full_text
-        return "HN Who's Hiring", fallback or "Untitled posting"
+                    return company, cls._cap(rest.strip() or first_line.strip())
+        return "HN Who's Hiring", cls._cap(full_text) or "Untitled posting"

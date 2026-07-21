@@ -1861,6 +1861,26 @@ async def test_hn_scan_finds_thread_and_parses_pipe_separated_title():
     assert acme.remote_type is None
 
 
+async def test_hn_parse_title_truncates_long_rest_after_separator():
+    """Live-discovered (2026-07-21): HN comments render paragraphs as <p>,
+    which the tag-strip turns into a space, not a newline -- so 'first line'
+    is really 'the whole flattened comment' and an unbounded `rest` after
+    the first separator became the entire ~1200-char posting. Cap it like
+    the no-separator fallback already caps full_text."""
+    long_rest = "Senior Engineer, Genomics Infrastructure | Memphis, TN | ONSITE or REMOTE | " + (
+        "x" * 200
+    )
+    text = f"Acme | {long_rest}"
+    url_map = _hn_url_map(kids=(201,))
+    url_map[f"{_HN_BASE}/item/201.json"] = {"id": 201, "text": text}
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    job = next(j for j in jobs if j.company == "Acme")
+    assert len(job.title) <= 81  # 80 chars + the "…" ellipsis
+    assert job.title.endswith("…")
+
+
 async def test_hn_scan_falls_back_to_prose_when_no_separator():
     mock_client = _make_hn_client(_hn_url_map())
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
