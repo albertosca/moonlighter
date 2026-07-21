@@ -1480,6 +1480,22 @@ async def test_gupy_500_response_returns_empty():
     assert jobs == []
 
 
+async def test_gupy_non_json_body_returns_empty():
+    """A 200 response with a non-JSON body (e.g. a Cloudflare/rate-limit
+    interstitial page) must degrade to [] like every other failure mode,
+    not raise json.JSONDecodeError out of scan() and abort the whole run."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.side_effect = json.JSONDecodeError("Expecting value", "<html>", 0)
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await GupyScanner().scan(keywords="eng")
+    assert jobs == []
+
+
 async def test_gupy_non_dict_response_returns_empty():
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -1605,6 +1621,22 @@ async def test_remoteok_non_list_json_returns_empty():
     assert jobs == []
 
 
+async def test_remoteok_non_json_body_returns_empty():
+    """A 200 response with a non-JSON body (e.g. a Cloudflare interstitial --
+    RemoteOK is Cloudflare-fronted) must degrade to [] like every other
+    failure mode, not raise json.JSONDecodeError out of scan()."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.side_effect = json.JSONDecodeError("Expecting value", "<html>", 0)
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemoteOKScanner().scan()
+    assert jobs == []
+
+
 # --- RemotiveScanner tests ---
 
 _REMOTIVE_RESPONSE = {
@@ -1670,6 +1702,21 @@ async def test_remotive_network_exception_returns_empty():
 
 async def test_remotive_non_dict_json_returns_empty():
     mock_client = _make_simple_client(["unexpected", "shape"])
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
+    assert jobs == []
+
+
+async def test_remotive_non_json_body_returns_empty():
+    """A 200 response with a non-JSON body must degrade to [] like every
+    other failure mode, not raise json.JSONDecodeError out of scan()."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.side_effect = json.JSONDecodeError("Expecting value", "<html>", 0)
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RemotiveScanner().scan()
     assert jobs == []

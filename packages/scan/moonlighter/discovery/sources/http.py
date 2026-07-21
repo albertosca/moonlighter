@@ -382,7 +382,10 @@ class GupyScanner(BaseScanner):
                     return jobs
                 if r.status_code != 200:
                     return jobs
-                data = r.json()
+                try:
+                    data = r.json()
+                except ValueError:
+                    return jobs
                 if not isinstance(data, dict):
                     return jobs
                 page = data.get("data") or []
@@ -443,7 +446,10 @@ class RemoteOKScanner(BaseScanner):
                 return jobs
             if r.status_code != 200:
                 return jobs
-            data = r.json()
+            try:
+                data = r.json()
+            except ValueError:
+                return jobs
         if not isinstance(data, list):
             return jobs
         for item in data:
@@ -492,7 +498,10 @@ class RemotiveScanner(BaseScanner):
                 return jobs
             if r.status_code != 200:
                 return jobs
-            data = r.json()
+            try:
+                data = r.json()
+            except ValueError:
+                return jobs
         if not isinstance(data, dict):
             return jobs
         for item in data.get("jobs") or []:
