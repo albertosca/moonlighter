@@ -110,7 +110,7 @@ async def test_extract_fields_returns_labels_from_modal():
     applier.page.query_selector_all = AsyncMock(return_value=[label])
 
     with patch("asyncio.sleep", new=AsyncMock()):
-        fields = await applier.extract_fields()
+        fields, _ = await applier.extract_fields()
 
     assert "Phone Number" in fields
 
@@ -123,7 +123,7 @@ async def test_extract_fields_timeout_on_modal():
     applier.page.wait_for_selector = AsyncMock(side_effect=PlaywrightTimeout("timeout"))
 
     with patch("asyncio.sleep", new=AsyncMock()):
-        fields = await applier.extract_fields()
+        fields, _ = await applier.extract_fields()
 
     assert fields == []
 
@@ -135,7 +135,7 @@ async def test_extract_fields_no_apply_button_returns_empty():
     applier.page.wait_for_selector = AsyncMock(side_effect=PlaywrightTimeout("timeout"))
 
     with patch("asyncio.sleep", new=AsyncMock()):
-        fields = await applier.extract_fields()
+        fields, _ = await applier.extract_fields()
 
     assert fields == []
 
@@ -433,10 +433,25 @@ async def test_extract_fields_falls_back_when_primary_modal_selector_empty():
     applier.page.query_selector_all = qs_all
 
     with patch("asyncio.sleep", new=AsyncMock()):
-        fields = await applier.extract_fields()
+        fields, _ = await applier.extract_fields()
 
     assert "Phone Number" in fields
     assert call_count[0] >= 2
+
+
+async def test_extract_fields_reports_closed_set_labels():
+    applier = make_applier()
+    select_label = MagicMock()
+    select_label.inner_text = AsyncMock(return_value="English level")
+    select_label.evaluate = AsyncMock(return_value=True)
+    text_label = MagicMock()
+    text_label.inner_text = AsyncMock(return_value="Full Name")
+    text_label.evaluate = AsyncMock(return_value=False)
+    applier.page.query_selector_all = AsyncMock(return_value=[select_label, text_label])
+
+    fields, closed_set = await applier.extract_fields()
+    assert fields == ["English level", "Full Name"]
+    assert closed_set == frozenset({"English level"})
 
 
 # ── branches de borda (cobertura) ──────────────────────────────────────────
@@ -449,7 +464,7 @@ async def test_extract_fields_apply_click_exception_returns_empty():
     btn.click = AsyncMock(side_effect=Exception("detached"))
     applier.page.query_selector = AsyncMock(return_value=btn)
     with patch("asyncio.sleep", new=AsyncMock()):
-        assert await applier.extract_fields() == []
+        assert await applier.extract_fields() == ([], frozenset())
 
 
 async def test_extract_fields_skips_empty_modal_label():
@@ -462,7 +477,7 @@ async def test_extract_fields_skips_empty_modal_label():
     applier.page.query_selector = AsyncMock(return_value=None)  # no Apply button
     applier.page.query_selector_all = AsyncMock(return_value=[empty, real])
     with patch("asyncio.sleep", new=AsyncMock()):
-        result = await applier.extract_fields()
+        result, _ = await applier.extract_fields()
     assert result == ["Phone"]
 
 

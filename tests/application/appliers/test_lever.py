@@ -42,7 +42,7 @@ async def test_extract_fields_waits_for_application_form():
 async def test_extract_fields_timeout_returns_empty():
     applier = make_applier()
     applier.page.wait_for_selector = AsyncMock(side_effect=PlaywrightTimeout("timeout"))
-    result = await applier.extract_fields()
+    result, _ = await applier.extract_fields()
     assert result == []
 
 
@@ -54,7 +54,7 @@ async def test_extract_fields_filters_long_labels():
     short_label = MagicMock()
     short_label.inner_text = AsyncMock(return_value="Full Name")
     applier.page.query_selector_all = AsyncMock(return_value=[long_label, short_label])
-    result = await applier.extract_fields()
+    result, _ = await applier.extract_fields()
     assert result == ["Full Name"]
 
 
@@ -65,7 +65,7 @@ async def test_extract_fields_excludes_empty_labels():
     real_label = MagicMock()
     real_label.inner_text = AsyncMock(return_value="Email")
     applier.page.query_selector_all = AsyncMock(return_value=[empty_label, real_label])
-    result = await applier.extract_fields()
+    result, _ = await applier.extract_fields()
     assert result == ["Email"]
 
 
@@ -245,9 +245,24 @@ async def test_extract_fields_falls_back_when_primary_selector_empty():
         return [fallback_label]
 
     applier.page.query_selector_all = qs_all
-    result = await applier.extract_fields()
+    result, _ = await applier.extract_fields()
     assert "LinkedIn Profile" in result
     assert call_count[0] >= 2
+
+
+async def test_extract_fields_reports_closed_set_labels():
+    applier = make_applier()
+    select_label = MagicMock()
+    select_label.inner_text = AsyncMock(return_value="English level")
+    select_label.evaluate = AsyncMock(return_value=True)
+    text_label = MagicMock()
+    text_label.inner_text = AsyncMock(return_value="Full Name")
+    text_label.evaluate = AsyncMock(return_value=False)
+    applier.page.query_selector_all = AsyncMock(return_value=[select_label, text_label])
+
+    fields, closed_set = await applier.extract_fields()
+    assert fields == ["English level", "Full Name"]
+    assert closed_set == frozenset({"English level"})
 
 
 # ── fill_form: edge branches ────────────────────────────────────────────────

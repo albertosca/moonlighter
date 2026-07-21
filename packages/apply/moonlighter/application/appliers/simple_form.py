@@ -3,6 +3,7 @@ from typing import ClassVar
 
 from moonlighter.application.appliers.base import (
     BaseApplier,
+    _detect_closed_set,
     classify_submit_outcome,
     fill_field,
     is_skip,
@@ -28,17 +29,20 @@ class SimpleFormApplier(BaseApplier):
     async def detect(self) -> bool:
         return any(host in self.page.url for host in self.URL_HOSTS)
 
-    async def extract_fields(self) -> list[str]:
+    async def extract_fields(self) -> tuple[list[str], frozenset[str]]:
         try:
             await self.page.wait_for_selector(self.FORM_SELECTOR, timeout=10000)
         except PlaywrightTimeout:
-            return []
+            return [], frozenset()
         labels: list[str] = []
+        closed_set: set[str] = set()
         for el in await query_labels_with_fallback(self.page, self.LABEL_SELECTORS):
             text = (await el.inner_text()).strip()
             if text and len(text) < 200:
                 labels.append(text)
-        return labels
+                if await _detect_closed_set(el):
+                    closed_set.add(text)
+        return labels, frozenset(closed_set)
 
     async def fill_form(self, answers: dict[str, str], cv_path: str) -> dict[str, str]:
         status = {label: await self._fill_one(label, answer) for label, answer in answers.items()}

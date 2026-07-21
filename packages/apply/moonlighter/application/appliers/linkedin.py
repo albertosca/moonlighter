@@ -2,6 +2,7 @@ import asyncio
 
 from moonlighter.application.appliers.base import (
     BaseApplier,
+    _detect_closed_set,
     classify_submit_outcome,
     fill_field,
     is_skip,
@@ -24,7 +25,7 @@ class LinkedInApplier(BaseApplier):
         text = (await btn.inner_text()).strip().lower()
         return "easy apply" in text
 
-    async def extract_fields(self) -> list[str]:
+    async def extract_fields(self) -> tuple[list[str], frozenset[str]]:
         # Click Easy Apply button to open the modal
         try:
             btn = await self.page.query_selector(".jobs-apply-button--top-card .artdeco-button")
@@ -32,9 +33,10 @@ class LinkedInApplier(BaseApplier):
                 await btn.click()
                 await asyncio.sleep(2)
         except Exception:
-            return []
+            return [], frozenset()
 
         fields = []
+        closed_set: set[str] = set()
         try:
             await self.page.wait_for_selector(".jobs-easy-apply-modal", timeout=10000)
             label_els = await query_labels_with_fallback(
@@ -49,9 +51,11 @@ class LinkedInApplier(BaseApplier):
                 text = (await el.inner_text()).strip()
                 if text:
                     fields.append(text)
+                    if await _detect_closed_set(el):
+                        closed_set.add(text)
         except PlaywrightTimeout:
             pass
-        return fields
+        return fields, frozenset(closed_set)
 
     async def fill_form(self, answers: dict[str, str], cv_path: str) -> dict[str, str]:
         """Fill the Easy Apply modal fields and, if given, upload the CV.
