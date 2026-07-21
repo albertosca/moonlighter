@@ -65,7 +65,11 @@ def test_log_message_reaches_file(tmp_path):
 
 
 def test_setup_without_rich_falls_back_silently(tmp_path, monkeypatch):
-    """rich absent → ImportError swallowed, only the FileHandler remains (log.py:35-36)."""
+    """rich absent → ImportError swallowed, only the FileHandler remains.
+
+    setup()'s own try block imports rich.console/rich.theme (not rich.logging
+    — _PackageRichHandler is already bound at module import time), so that's
+    the import that must fail here to actually exercise the except branch."""
     import logging
     import sys
 
@@ -73,10 +77,14 @@ def test_setup_without_rich_falls_back_silently(tmp_path, monkeypatch):
 
     root = logging.getLogger("moonlighter")
     saved = root.handlers[:]
+    for h in root.handlers[:]:
+        root.removeHandler(h)
     monkeypatch.setattr(log_mod, "_initialized", False)
-    monkeypatch.setitem(sys.modules, "rich.logging", None)  # import → ImportError
+    monkeypatch.setitem(sys.modules, "rich.console", None)  # import → ImportError
     try:
         log_mod.setup(log_path=str(tmp_path / "app.log"))
+        assert len(root.handlers) == 1
+        assert isinstance(root.handlers[0], logging.FileHandler)
     finally:
         root.handlers[:] = saved  # restaura o logger global compartilhado
 
