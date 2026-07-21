@@ -101,6 +101,45 @@ def test_setup_uses_rotating_file_handler(tmp_path):
     assert handlers[0].backupCount == 3
 
 
+def test_rich_handler_uses_vivid_level_styles(tmp_path):
+    """The default rich theme (plain 'blue'/'yellow'/'green', no bold) reads as
+    faint on a dark terminal — the operator's actual complaint. Levels must be
+    bold/bright, distinct from rich's own DEFAULT_STYLES."""
+    from moonlighter.core import log as log_mod
+    from rich.default_styles import DEFAULT_STYLES
+    from rich.logging import RichHandler
+
+    log_mod._initialized = False
+    root = logging.getLogger("moonlighter")
+    for h in root.handlers[:]:
+        root.removeHandler(h)
+
+    log_mod.setup(log_path=str(tmp_path / "app.log"))
+    rich_handlers = [h for h in root.handlers if isinstance(h, RichHandler)]
+    assert len(rich_handlers) == 1
+    console = rich_handlers[0].console
+    for level in ("info", "warning", "error"):
+        key = f"logging.level.{level}"
+        assert str(console.get_style(key)) != str(DEFAULT_STYLES[key])
+
+
+def test_metrics_highlighter_colors_op_summary_line():
+    """op= observability lines (core/metrics.py) must stand out from ordinary
+    log text — key=value pairs get their own styles instead of falling through
+    ReprHighlighter's generic 'no style' default."""
+    from moonlighter.core.log import MetricsHighlighter
+    from rich.text import Text
+
+    highlighter = MetricsHighlighter()
+    text = Text("op=scan_and_evaluate calls=1 total_seconds=0.523 spend_limit_hits=0")
+    highlighter.highlight(text)
+
+    styled = {text.plain[s.start : s.end]: s.style for s in text.spans}
+    assert styled.get("op=scan_and_evaluate") == "repr.op_name"
+    assert styled.get("calls") == "repr.metric_key"
+    assert styled.get("1") == "repr.metric_value"
+
+
 def test_rich_handler_writes_to_stderr_not_stdout(tmp_path, capsys):
     """S-13: on a stdio MCP server, stdout IS the JSON-RPC channel — a log line
     at the wrong moment corrupts protocol framing. Nothing but the protocol may

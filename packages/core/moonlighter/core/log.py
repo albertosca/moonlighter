@@ -5,6 +5,40 @@ from pathlib import Path
 _initialized = False
 _DEFAULT_LOG_PATH = str(Path("~/.moonlighter/app.log").expanduser())
 
+# Rich's DEFAULT_STYLES for these keys are plain, unbolded colors (blue/yellow/
+# green) that read as faint on a dark terminal. Bold + brighter variants make
+# levels easy to spot at a glance; DEBUG stays de-emphasized on purpose (it's
+# high-volume noise), everything else is meant to pop.
+_VIVID_LEVEL_STYLES = {
+    "logging.level.debug": "italic grey58",
+    "logging.level.info": "bold bright_cyan",
+    "logging.level.warning": "bold orange1",
+    "logging.level.error": "bold bright_red",
+    "logging.level.critical": "bold white on red",
+    # MetricsHighlighter groups (see below): the op= observability summary line.
+    "repr.op_name": "bold magenta",
+    "repr.metric_key": "cyan",
+    "repr.metric_value": "bright_yellow",
+}
+
+
+try:
+    from rich.highlighter import ReprHighlighter as _ReprHighlighter
+
+    class MetricsHighlighter(_ReprHighlighter):
+        """Highlights the op= observability summary lines emitted by
+        core/metrics.py — key=value pairs get their own styles instead of
+        blending into ordinary log text."""
+
+        highlights = [  # noqa: RUF012 - mirrors ReprHighlighter's own class attr
+            *_ReprHighlighter.highlights,
+            r"\b(?P<op_name>op=\S+)",
+            r"\b(?P<metric_key>calls|total_seconds|input_tokens|output_tokens|spend_limit_hits)="
+            r"(?P<metric_value>\S+)",
+        ]
+except ImportError:  # pragma: no cover - rich optional, mirrors setup()'s own guard
+    pass
+
 
 def setup(log_path: str | None = None) -> None:
     global _initialized
@@ -33,12 +67,15 @@ def setup(log_path: str | None = None) -> None:
     try:
         from rich.console import Console
         from rich.logging import RichHandler
+        from rich.theme import Theme
 
         rh = RichHandler(
-            console=Console(stderr=True),
+            console=Console(stderr=True, theme=Theme(_VIVID_LEVEL_STYLES)),
             level=logging.INFO,
-            show_path=False,
+            show_path=True,
+            enable_link_path=False,
             rich_tracebacks=False,
+            highlighter=MetricsHighlighter(),
         )
         root.addHandler(rh)
     except ImportError:
