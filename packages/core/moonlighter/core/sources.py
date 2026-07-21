@@ -17,3 +17,7 @@ class Source(StrEnum):
     SMARTRECRUITERS = "smartrecruiters"
     RECRUITEE = "recruitee"
     GUPY = "gupy"
+    REMOTEOK = "remoteok"
+    REMOTIVE = "remotive"
+    WEWORKREMOTELY = "weworkremotely"
+    HN_WHOISHIRING = "hn_whoishiring"

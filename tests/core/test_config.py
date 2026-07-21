@@ -375,6 +375,24 @@ class TestValidateConfig:
         merged = {**DEFAULTS, "browser_session_dir": "x", "screenshots_dir": "y", **user}
         validate_config(merged)  # must not raise
 
+    def test_validate_config_accepts_scan_gupy(self):
+        """Regression: scan_gupy (Gupy's config gate) was never added to
+        _CONFIG_SCHEMA, so setting it in config.yaml raised
+        ConfigError: unknown config key 'scan_gupy'. Never triggered in
+        practice because it was never set — caught while adding the 4 new
+        remote-board flags to the same schema section."""
+        validate_config({"scan_gupy": True})
+
+    def test_validate_config_accepts_remote_board_flags(self):
+        validate_config(
+            {
+                "scan_remoteok": True,
+                "scan_remotive": False,
+                "scan_wwr": True,
+                "scan_hn_whoishiring": False,
+            }
+        )
+
 
 def test_harden_permissions_warns_on_chmod_failure_without_raising(tmp_path, monkeypatch):
     """A permission error must never crash the server's startup — it becomes

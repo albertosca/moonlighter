@@ -142,6 +142,10 @@ async def _collect_raw_jobs(
     li_jobs, li_warning = await _scan_linkedin(keywords, config)
     raw_jobs.extend(li_jobs)
     raw_jobs.extend(await _scan_gupy(keywords, config))
+    raw_jobs.extend(await _scan_remoteok(config))
+    raw_jobs.extend(await _scan_remotive(config))
+    raw_jobs.extend(await _scan_wwr(config))
+    raw_jobs.extend(await _scan_hn_whoishiring(config))
     return raw_jobs, li_warning
 
 
@@ -155,6 +159,49 @@ async def _scan_gupy(keywords: str, config: dict[str, Any]) -> list[RawJob]:
     from moonlighter.discovery.sources.http import GupyScanner
 
     return await GupyScanner().scan(keywords=keywords or "software engineer")
+
+
+async def _scan_remoteok(config: dict[str, Any]) -> list[RawJob]:
+    """RemoteOK is a portal-wide remote-jobs board, dispatched like Gupy --
+    config-gated (off by default) to avoid flooding scans without the
+    operator opting in."""
+    if not config.get("scan_remoteok"):
+        return []
+    from moonlighter.discovery.sources.http import RemoteOKScanner
+
+    return await RemoteOKScanner().scan()
+
+
+async def _scan_remotive(config: dict[str, Any]) -> list[RawJob]:
+    """Remotive is a portal-wide remote-jobs board, dispatched like Gupy --
+    config-gated (off by default). ToS caps usage at 4 requests/day -- no
+    rate-limiter here, the operator is responsible for scan frequency."""
+    if not config.get("scan_remotive"):
+        return []
+    from moonlighter.discovery.sources.http import RemotiveScanner
+
+    return await RemotiveScanner().scan()
+
+
+async def _scan_wwr(config: dict[str, Any]) -> list[RawJob]:
+    """WeWorkRemotely is a portal-wide RSS feed, dispatched like Gupy --
+    config-gated (off by default)."""
+    if not config.get("scan_wwr"):
+        return []
+    from moonlighter.discovery.sources.http import WeWorkRemotelyScanner
+
+    return await WeWorkRemotelyScanner().scan()
+
+
+async def _scan_hn_whoishiring(config: dict[str, Any]) -> list[RawJob]:
+    """HN's monthly Who is hiring? thread, dispatched like Gupy -- config-gated
+    (off by default). Weakest signal of the 4 new boards (free-text comments,
+    not structured fields) -- see HNWhoIsHiringScanner's docstring."""
+    if not config.get("scan_hn_whoishiring"):
+        return []
+    from moonlighter.discovery.sources.http import HNWhoIsHiringScanner
+
+    return await HNWhoIsHiringScanner().scan()
 
 
 def _drop_already_seen(raw_jobs: list[RawJob]) -> list[RawJob]:
