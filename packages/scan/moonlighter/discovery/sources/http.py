@@ -467,7 +467,6 @@ class RemoteOKScanner(BaseScanner):
         return jobs
 
 
-
 class RemotiveScanner(BaseScanner):
     """Remotive is a portal-wide remote-jobs board like RemoteOKScanner --
     not registered in SOURCES, dispatched separately in service.py, gated

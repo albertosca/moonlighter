@@ -1671,3 +1671,10 @@ async def test_remotive_non_dict_json_returns_empty():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RemotiveScanner().scan()
     assert jobs == []
+
+
+async def test_remotive_non_200_returns_empty():
+    mock_client = _make_simple_client({}, status=500)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
+    assert jobs == []
