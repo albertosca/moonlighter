@@ -10,6 +10,7 @@ from moonlighter.application.appliers.base import (
     ApplicationDraft,
     _ask_llm,
     _cap_label,
+    _detect_closed_set,
     _resolve_answer_keys,
     fill_field,
     generate_answers,
@@ -60,6 +61,45 @@ def test_application_draft_serialization():
         form_fields=["q1"],
     )
     assert draft.answers["q1"] == "answer1"
+
+
+def test_application_draft_defaults_closed_set_fields_empty():
+    draft = ApplicationDraft(job_id=1, answers={"q1": "a"}, form_fields=["q1"])
+    assert draft.closed_set_fields == frozenset()
+
+
+async def test_generate_answers_propagates_closed_set_fields():
+    result = await generate_answers(
+        company="Stripe",
+        title="Sr Engineer",
+        description="Build payments infra.",
+        fields=["Why do you want to work here?", "English level"],
+        profile=PROFILE,
+        model="claude-sonnet-4-6",
+        _caller=_make_caller(MOCK_ANSWERS),
+        closed_set_fields=frozenset({"English level"}),
+    )
+    assert result.closed_set_fields == frozenset({"English level"})
+
+
+async def test_detect_closed_set_true_for_select():
+    label = MagicMock()
+    label.evaluate = AsyncMock(return_value=True)
+    assert await _detect_closed_set(label) is True
+
+
+async def test_detect_closed_set_false_for_text_input():
+    label = MagicMock()
+    label.evaluate = AsyncMock(return_value=False)
+    assert await _detect_closed_set(label) is False
+
+
+async def test_detect_closed_set_defaults_false_on_error():
+    """Any evaluate() failure (detached element, unexpected DOM shape) must
+    degrade to False, never raise — this is a best-effort classification."""
+    label = MagicMock()
+    label.evaluate = AsyncMock(side_effect=Exception("detached"))
+    assert await _detect_closed_set(label) is False
 
 
 async def test_generate_answers_malformed_json():

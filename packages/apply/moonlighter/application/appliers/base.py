@@ -34,6 +34,35 @@ async def query_labels_with_fallback(page: Page, selectors: list[str]) -> list[A
     return []
 
 
+_CLOSED_SET_JS = """(label) => {
+    let control = null;
+    const forId = label.getAttribute('for');
+    if (forId) control = document.getElementById(forId);
+    if (!control) control = label.querySelector('input, select, [role]');
+    if (!control) return false;
+    const tag = control.tagName.toLowerCase();
+    if (tag === 'select') return true;
+    if (tag === 'input') {
+        const type = (control.getAttribute('type') || 'text').toLowerCase();
+        return type === 'radio' || type === 'checkbox';
+    }
+    const role = (control.getAttribute('role') || '').toLowerCase();
+    return ['radio', 'checkbox', 'combobox', 'listbox'].includes(role);
+}"""
+
+
+async def _detect_closed_set(label_el: Any) -> bool:
+    """True if the label's associated control is a bounded choice (select,
+    radio, checkbox, or an ARIA-role equivalent for custom widgets) rather
+    than free text. Best-effort: any error (unexpected DOM shape, detached
+    element) means "don't know" — defaults to False, never raises. Runs on
+    the same DOM extract_fields() already has in hand, no extra page load."""
+    try:
+        return bool(await label_el.evaluate(_CLOSED_SET_JS))
+    except Exception:
+        return False
+
+
 # Submission-confirmation markers. Conservative by design: when in doubt we
 # return False — a false "sent" is worse (application lost with no follow-up)
 # than a false "failed" (reviewable screenshot, retriable).
@@ -239,6 +268,7 @@ class ApplicationDraft:
     form_fields: list[str]
     error: str | None = None
     pre_populated_fields: frozenset[str] = frozenset()
+    closed_set_fields: frozenset[str] = frozenset()
 
 
 class BaseApplier(ABC):
@@ -258,8 +288,10 @@ class BaseApplier(ABC):
         ...
 
     @abstractmethod
-    async def extract_fields(self) -> list[str]:
-        """Extract all form field labels from the application form."""
+    async def extract_fields(self) -> tuple[list[str], frozenset[str]]:
+        """Extract all form field labels from the application form, plus the
+        subset of those labels whose control is a closed-set choice (select/
+        radio/checkbox) rather than free text."""
         ...
 
     @abstractmethod
@@ -291,6 +323,7 @@ async def generate_answers(
     config: dict[str, Any] | None = None,
     job_location: str | None = None,
     job_remote_type: str | None = None,
+    closed_set_fields: frozenset[str] = frozenset(),
 ) -> ApplicationDraft:
     from moonlighter.application.answers.field_map import pre_populate_answers
 
@@ -338,6 +371,7 @@ async def generate_answers(
         form_fields=fields,
         error=llm_error,
         pre_populated_fields=frozenset(pre_populated),
+        closed_set_fields=closed_set_fields,
     )
 
 
