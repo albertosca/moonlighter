@@ -43,9 +43,15 @@ _EMAIL_RE = re.compile(r"[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,24}")
 _PHONE_RE = re.compile(r"(?:\+?\d[\s\-().]*){9,}")
 
 
-def _anomaly_reasons(answer: str, other_answers: list[str]) -> list[str]:
+def _anomaly_reasons(
+    answer: str, other_answers: list[str], is_closed_set: bool = False
+) -> list[str]:
     """Reasons a free-text answer looks like exfiltration. Empty list = clean.
-    Flags are advisory (they highlight, never block)."""
+    Flags are advisory (they highlight, never block). Closed-set answers (a
+    select/radio/checkbox choice, not free text) skip only the length check —
+    their length reflects the option's label, not attacker-controlled content,
+    and mixing them into the peer pool for OTHER fields' median was itself a
+    source of false positives (see docs/superpowers/specs/2026-07-20-e2-anomaly-closed-set-design.md)."""
     reasons: list[str] = []
     if _URL_RE.search(answer):
         reasons.append("contains a URL")
@@ -53,7 +59,7 @@ def _anomaly_reasons(answer: str, other_answers: list[str]) -> list[str]:
         reasons.append("contains an email address")
     if _PHONE_RE.search(answer):
         reasons.append("contains a phone number")
-    if len(other_answers) >= 3:
+    if not is_closed_set and len(other_answers) >= 3:
         median = statistics.median(len(a) for a in other_answers)
         if median > 0 and len(answer) > 3 * median:
             reasons.append("disproportionately long")
@@ -180,7 +186,7 @@ async def _draft_one(
                     f"Manual application required: {job.url}"
                 )
 
-            fields = await applier.extract_fields()
+            fields, closed_set_fields = await applier.extract_fields()
             await browser.save_screenshot(page, job_id, "02-form", config)
             draft = await generate_answers(
                 company=job.company,
@@ -194,6 +200,7 @@ async def _draft_one(
                 config=config,
                 job_location=job.location,
                 job_remote_type=job.remote_type,
+                closed_set_fields=closed_set_fields,
             )
             _save_draft(job, draft.answers)
             Job.update(status="applying").where(Job.id == job_id).execute()
@@ -239,8 +246,8 @@ def _render_draft(job_id: int, job: Job, draft: Any) -> str:
     }
     flagged: list[str] = []
     for field, answer in scannable.items():
-        peers = [a for g, a in scannable.items() if g != field]
-        reasons = _anomaly_reasons(answer, peers)
+        peers = [a for g, a in scannable.items() if g != field and g not in draft.closed_set_fields]
+        reasons = _anomaly_reasons(answer, peers, is_closed_set=field in draft.closed_set_fields)
         if reasons:
             flagged.append(f"  - **{field}**: {', '.join(reasons)}")
     if flagged:

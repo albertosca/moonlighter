@@ -164,7 +164,7 @@ async def test_apply_jobs_shows_needs_review_fields(tmp_db):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.save_screenshot = AsyncMock()
         applier = AsyncMock()
-        applier.extract_fields = AsyncMock(return_value=["Work auth?", "Name"])
+        applier.extract_fields = AsyncMock(return_value=(["Work auth?", "Name"], frozenset()))
         mock_detect.return_value = applier
         result = await apply_service.apply_jobs([job.id], CONFIG, PROFILE, MagicMock())
     assert "NEED YOUR DECISION" in result
@@ -195,7 +195,7 @@ async def test_apply_jobs_survives_networkidle_timeout_on_spa_with_persistent_tr
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         applier = AsyncMock()
-        applier.extract_fields = AsyncMock(return_value=["Name"])
+        applier.extract_fields = AsyncMock(return_value=(["Name"], frozenset()))
         mock_detect.return_value = applier
         result = await apply_service.apply_jobs([job.id], CONFIG, PROFILE, MagicMock())
     assert "error" not in result.lower()
@@ -244,6 +244,25 @@ def test_anomaly_email_scan_is_linear_on_hostile_long_input():
     assert "contains an email address" not in reasons
 
 
+def test_anomaly_closed_set_answer_never_flagged_for_length():
+    """A long-but-legitimate closed-set option (e.g. a verbose language-level
+    dropdown label) must not be flagged just because it's longer than short
+    free-text peers."""
+    others = ["short one", "short two", "short three"]
+    long_but_closed_set = (
+        "Fluent/Native — I can work fully in English with no communication barriers"
+    )
+    reasons = apply_service._anomaly_reasons(long_but_closed_set, others, is_closed_set=True)
+    assert "disproportionately long" not in " ".join(reasons)
+
+
+def test_anomaly_closed_set_answer_still_flagged_for_url():
+    """is_closed_set only silences the length heuristic — URL/email/phone
+    checks still run."""
+    reasons = apply_service._anomaly_reasons("see https://evil.test/x", [], is_closed_set=True)
+    assert any("URL" in r for r in reasons)
+
+
 def test_render_draft_highlights_anomalous_llm_answer_not_prepopulated_phone(tmp_db):
     init_db()
     draft = ApplicationDraft(
@@ -257,6 +276,46 @@ def test_render_draft_highlights_anomalous_llm_answer_not_prepopulated_phone(tmp
     assert "Why us?" in out and "⚠️" in out
     # ...but the statically-filled phone field is not the thing being flagged.
     assert out.index("⚠️") < out.index("**Why us?**")  # highlight is above the answers
+
+
+def test_render_draft_excludes_closed_set_peers_from_median_and_never_flags_them(tmp_db):
+    """Reproduces the live Ziflow false-positive: several short boolean
+    closed-set answers (radio Yes/No) must not drag the peer median down
+    and cause a normal-length free-text answer to be flagged, AND the
+    closed-set answers themselves must never be flagged for length."""
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/closedset")
+    draft = ApplicationDraft(
+        job_id=job.id,
+        answers={
+            "Full name": "Alberto Albuquerque",
+            "Beginner (A1-A2)": "No",
+            "Intermediate (B1)": "No",
+            "Advanced (C1)": "No",
+            "Native (C2)": "Yes",
+        },
+        form_fields=[
+            "Full name",
+            "Beginner (A1-A2)",
+            "Intermediate (B1)",
+            "Advanced (C1)",
+            "Native (C2)",
+        ],
+        closed_set_fields=frozenset(
+            {"Beginner (A1-A2)", "Intermediate (B1)", "Advanced (C1)", "Native (C2)"}
+        ),
+    )
+    result = _render_draft(job.id, job, draft)
+    assert "Full name" not in _extract_flagged_fields(result)
+
+
+def _extract_flagged_fields(rendered: str) -> list[str]:
+    """Pulls the flagged field names out of the '⚠️ REVIEW CAREFULLY' block,
+    if present — used by the regression test above."""
+    if "REVIEW CAREFULLY" not in rendered:
+        return []
+    block = rendered.split("REVIEW CAREFULLY", 1)[1]
+    return [line.split("**")[1] for line in block.splitlines() if line.strip().startswith("- **")]
 
 
 # ── confirm_apply: branches ─────────────────────────────────────────────────

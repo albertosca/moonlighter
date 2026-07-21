@@ -538,7 +538,7 @@ async def test_apply_jobs_creates_draft(tmp_db):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
-        mock_applier.extract_fields = AsyncMock(return_value=["Q"])
+        mock_applier.extract_fields = AsyncMock(return_value=(["Q"], frozenset()))
         mock_detect.return_value = mock_applier
         from moonlighter.server import apply_jobs
 
@@ -588,7 +588,7 @@ async def test_apply_jobs_updates_job_status(tmp_db):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
-        mock_applier.extract_fields = AsyncMock(return_value=["Q"])
+        mock_applier.extract_fields = AsyncMock(return_value=(["Q"], frozenset()))
         mock_detect.return_value = mock_applier
         from moonlighter.server import apply_jobs
 
@@ -1410,7 +1410,7 @@ async def test_apply_jobs_llm_error_still_creates_draft(tmp_db):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
-        mock_applier.extract_fields = AsyncMock(return_value=["Q"])
+        mock_applier.extract_fields = AsyncMock(return_value=(["Q"], frozenset()))
         mock_detect.return_value = mock_applier
         from moonlighter.server import apply_jobs
 
@@ -1440,7 +1440,7 @@ async def test_apply_jobs_updates_existing_draft(tmp_db):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
         mock_applier = AsyncMock()
-        mock_applier.extract_fields = AsyncMock(return_value=["NewQ"])
+        mock_applier.extract_fields = AsyncMock(return_value=(["NewQ"], frozenset()))
         mock_detect.return_value = mock_applier
         from moonlighter.server import apply_jobs
 
@@ -1467,7 +1467,7 @@ async def test_apply_jobs_exception_continues_to_next(tmp_db):
         if detect_calls[0] == 1:
             raise Exception("ATS detection crashed on job 1")
         mock_applier = AsyncMock()
-        mock_applier.extract_fields = AsyncMock(return_value=["Q"])
+        mock_applier.extract_fields = AsyncMock(return_value=(["Q"], frozenset()))
         return mock_applier
 
     with (
@@ -1630,7 +1630,7 @@ async def test_confirm_apply_linkedin_calls_extract_fields(tmp_db, tmp_path):
     class TrackingLinkedInApplier(LinkedInApplier):
         async def extract_fields(self):
             extract_calls.append(True)
-            return []
+            return ([], frozenset())
 
         async def fill_form(self, *args, **kwargs):
             pass
