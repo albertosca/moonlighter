@@ -19,6 +19,11 @@ _VIVID_LEVEL_STYLES = {
     "repr.op_name": "bold magenta",
     "repr.metric_key": "cyan",
     "repr.metric_value": "bright_yellow",
+    # MetricsHighlighter groups: outcome words and job ids in ordinary messages.
+    "repr.status_ok": "bold green3",
+    "repr.status_fail": "bold red3",
+    "repr.status_attn": "bold gold3",
+    "repr.job_id": "bold blue",
 }
 
 
@@ -35,6 +40,10 @@ try:
             r"\b(?P<op_name>op=\S+)",
             r"\b(?P<metric_key>calls|total_seconds|input_tokens|output_tokens|spend_limit_hits)="
             r"(?P<metric_value>\S+)",
+            r"\b(?P<status_ok>filled|submitted|applied)\b",
+            r"\b(?P<status_fail>failed(?::\w+)?)",
+            r"\b(?P<status_attn>skipped|needs_review|unverified)\b",
+            r"(?P<job_id>#\d+)",
         ]
 except ImportError:  # pragma: no cover - rich optional, mirrors setup()'s own guard
     pass

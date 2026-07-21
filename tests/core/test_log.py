@@ -159,3 +159,36 @@ def test_rich_handler_writes_to_stderr_not_stdout(tmp_path, capsys):
 
     captured = capsys.readouterr()
     assert "this must never reach stdout" not in captured.out
+
+
+def test_metrics_highlighter_colors_status_words_and_job_id():
+    """Scanning a log line for outcome (filled/failed/skipped) and which job
+    it's about (#2646) currently requires reading plain white text word by
+    word — these get their own color so severity/outcome pop at a glance."""
+    from moonlighter.core.log import MetricsHighlighter
+    from rich.text import Text
+
+    highlighter = MetricsHighlighter()
+    text = Text("Job #2646: fill_form 3 filled, 1 failed:not_visible, 1 skipped")
+    highlighter.highlight(text)
+
+    styled = {text.plain[s.start : s.end]: s.style for s in text.spans}
+    assert styled.get("#2646") == "repr.job_id"
+    assert styled.get("filled") == "repr.status_ok"
+    assert styled.get("failed:not_visible") == "repr.status_fail"
+    assert styled.get("skipped") == "repr.status_attn"
+
+
+def test_metrics_highlighter_status_words_need_word_boundary():
+    """'fulfilled' must not light up as status_ok just because it contains
+    the substring 'filled' — only the whole word counts as a status."""
+    from moonlighter.core.log import MetricsHighlighter
+    from rich.text import Text
+
+    highlighter = MetricsHighlighter()
+    text = Text("the request was fulfilled")
+    highlighter.highlight(text)
+
+    styled = {text.plain[s.start : s.end]: s.style for s in text.spans}
+    assert "filled" not in styled
+    assert "fulfilled" not in styled
