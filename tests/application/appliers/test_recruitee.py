@@ -563,6 +563,25 @@ async def test_submit_exception_returns_failed():
     assert result == "failed"
 
 
+async def test_submit_logs_empty_required_fields(caplog):
+    """submit() logs a warning when required fields are empty before submitting.
+    Mirrors greenhouse's _empty_required_fields check — Recruitee's submit()
+    used to go straight to the click with no such warning."""
+    applier = make_applier()
+    btn = MagicMock()
+    btn.click = AsyncMock()
+    applier.page.wait_for_load_state = AsyncMock()
+    applier.page.inner_text = AsyncMock(return_value="thank you for applying")
+    applier.page.query_selector = AsyncMock(return_value=btn)
+    # evaluate: (1) empty required fields present, (2) form not visible after submit
+    applier.page.evaluate = AsyncMock(side_effect=[["Full name *"], False, []])
+
+    with caplog.at_level(logging.WARNING, logger="moonlighter.application.appliers.recruitee"):
+        await applier.submit()
+
+    assert "Full name" in caplog.text
+
+
 async def test_submit_detects_form_still_visible_after_click():
     applier = make_applier()
     btn = MagicMock()
@@ -581,7 +600,7 @@ async def test_submit_detects_form_still_visible_after_click():
 
     applier.page.query_selector = qs_side
 
-    eval_calls = [True, []]
+    eval_calls = [[], True, []]
     eval_n = [0]
 
     async def eval_side(js, *args):

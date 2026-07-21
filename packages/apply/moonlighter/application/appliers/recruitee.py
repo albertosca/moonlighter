@@ -230,7 +230,33 @@ class RecruiteeApplier(BaseApplier):
             return f"failed:{type(e).__name__}"
 
     async def submit(self) -> str:
+        empty = await self._empty_required_fields()
+        if empty:
+            logger.warning("submit: %d required field(s) empty: %s", len(empty), empty)
         return await self._click_submit_and_classify()
+
+    async def _empty_required_fields(self) -> list[str]:
+        """Labels with '*' whose input/select is visibly empty before submit.
+        Mirrors GreenhouseApplier's check — advisory only, never blocks submit."""
+        logger.info("submit: checking required fields")
+        empty: list[str] = await self.page.evaluate("""() => {
+            const empty = [];
+            for (const label of document.querySelectorAll('label')) {
+                if (!label.textContent.includes('*')) continue;
+                const forId = label.getAttribute('for');
+                if (!forId) continue;
+                const el = document.getElementById(forId);
+                if (!el) continue;
+                const tag = el.tagName.toLowerCase();
+                if ((tag === 'input' || tag === 'textarea') && !el.value.trim()) {
+                    empty.push(label.innerText.trim());
+                } else if (tag === 'select' && !el.value) {
+                    empty.push(label.innerText.trim());
+                }
+            }
+            return empty;
+        }""")
+        return empty
 
     async def _click_submit_and_classify(self) -> str:
         # LIVE-VERIFY: assumes a single-step form with one submit button
