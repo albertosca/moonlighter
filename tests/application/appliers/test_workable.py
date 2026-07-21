@@ -159,14 +159,16 @@ async def test_fill_form_skip_sentinel():
 
 async def test_fill_form_uploads_cv():
     applier = make_applier()
+    file_locator_first = MagicMock()
+    file_locator_first.count = AsyncMock(return_value=1)
+    file_locator_first.set_input_files = AsyncMock()
     file_locator = MagicMock()
-    file_locator.count = AsyncMock(return_value=1)
-    file_locator.set_input_files = AsyncMock()
+    file_locator.first = file_locator_first
     applier.page.locator = MagicMock(return_value=file_locator)
 
     status = await applier.fill_form({}, cv_path="/tmp/cv.pdf")
     assert status["__cv__"] == "filled"
-    file_locator.set_input_files.assert_called_once_with("/tmp/cv.pdf")
+    file_locator_first.set_input_files.assert_called_once_with("/tmp/cv.pdf")
 
 
 async def test_fill_form_no_cv_path_skips_upload():
@@ -358,13 +360,14 @@ async def test_find_field_for_id_missing_falls_to_aria():
 
 
 async def test_upload_cv_falls_back_to_query_selector():
+    """_upload_cv uses query_selector when locator.first.count returns 0."""
     applier = make_applier()
     file_input = MagicMock()
     file_input.set_input_files = AsyncMock()
 
-    empty_locator = MagicMock()
-    empty_locator.count = AsyncMock(return_value=0)
-    applier.page.locator = MagicMock(return_value=empty_locator)
+    empty_first = MagicMock()
+    empty_first.count = AsyncMock(return_value=0)
+    applier.page.locator = MagicMock(return_value=MagicMock(first=empty_first))
     applier.page.query_selector = AsyncMock(return_value=file_input)
 
     with patch("asyncio.sleep", new=AsyncMock()):
@@ -375,10 +378,11 @@ async def test_upload_cv_falls_back_to_query_selector():
 
 
 async def test_upload_cv_returns_failed_when_no_input_found():
+    """_upload_cv returns 'failed:no_file_input' when there is no file input."""
     applier = make_applier()
-    empty_locator = MagicMock()
-    empty_locator.count = AsyncMock(return_value=0)
-    applier.page.locator = MagicMock(return_value=empty_locator)
+    empty_first = MagicMock()
+    empty_first.count = AsyncMock(return_value=0)
+    applier.page.locator = MagicMock(return_value=MagicMock(first=empty_first))
     applier.page.query_selector = AsyncMock(return_value=None)
 
     result = await applier._upload_cv("/path/cv.pdf")

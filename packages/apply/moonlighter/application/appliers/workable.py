@@ -147,7 +147,7 @@ class WorkableApplier(BaseApplier):
         if not cv_path:
             return "skipped"
         try:
-            file_locator = self.page.locator("input[type='file']")
+            file_locator = self.page.locator("input[type='file']").first
             if await file_locator.count() > 0:
                 await file_locator.set_input_files(cv_path)
                 await asyncio.sleep(1)
