@@ -1,8 +1,10 @@
 import asyncio
 import contextlib
 import re
+import xml.etree.ElementTree as ET
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any, ClassVar
 
 import httpx
@@ -511,6 +513,77 @@ class RemotiveScanner(BaseScanner):
                     location=item.get("candidate_required_location") or None,
                     remote_type="remote",
                     description=description,
+                )
+            )
+        return jobs
+
+
+class WeWorkRemotelyScanner(BaseScanner):
+    """WeWorkRemotely is a portal-wide RSS feed, like RemoteOKScanner -- not
+    registered in SOURCES, dispatched separately in service.py, gated
+    behind a config flag (off by default)."""
+
+    BASE = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
+
+    async def scan(self, company_slugs: list[str] | None = None, **kwargs: Any) -> list[RawJob]:
+        jobs: list[RawJob] = []
+        async with httpx.AsyncClient(timeout=15) as client:
+            try:
+                r = await client.get(self.BASE, headers=self.HEADERS)
+            except Exception:
+                return jobs
+            if r.status_code != 200:
+                return jobs
+            body = r.text
+        try:
+            # S314: stdlib ElementTree parses untrusted network data (the RSS
+            # feed is external, fetched over the network). Accepted: Python's
+            # ElementTree does not resolve external entities/DTDs by default
+            # (unlike some other XML parsers), so the residual risk is
+            # entity-expansion DoS (e.g. "billion laughs"), not XXE file
+            # disclosure -- a local nuisance (this call briefly hangs), not a
+            # security breach, for a single-user local tool. No new
+            # dependency (defusedxml) added for this; revisit if that
+            # tradeoff changes.
+            root = ET.fromstring(body)  # noqa: S314
+        except ET.ParseError:
+            return jobs
+        for item in root.findall(".//item"):
+            raw_title = (item.findtext("title") or "").strip()
+            url = (item.findtext("link") or "").strip()
+            if not raw_title or not url:
+                continue
+            if ":" in raw_title:
+                company, _, position = raw_title.partition(":")
+                company = company.strip()
+                title = position.strip()
+            else:
+                company = "WeWorkRemotely"
+                title = raw_title
+            raw_desc = item.findtext("description") or ""
+            # Same 3-pass normalization as RemotiveScanner (Task 2) -- a single
+            # tag-strip regex leaves double spaces / space-before-punctuation on
+            # nested tags. See that task's code comment for the concrete example.
+            description = re.sub(r"<[^>]+>", " ", raw_desc).strip()
+            description = re.sub(r"\s+", " ", description)
+            description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
+            location = (item.findtext("region") or "").strip() or None
+            posted_at = None
+            pub_date = item.findtext("pubDate")
+            if pub_date:
+                with contextlib.suppress(Exception):
+                    posted_at = parsedate_to_datetime(pub_date)
+            jobs.append(
+                RawJob(
+                    source="weworkremotely",
+                    company=company,
+                    title=title,
+                    url=url,
+                    location=location,
+                    remote_type="remote",
+                    description=description,
+                    posted_at=posted_at,
                 )
             )
         return jobs

@@ -14,6 +14,7 @@ from moonlighter.discovery.sources.http import (
     RemoteOKScanner,
     RemotiveScanner,
     SmartRecruitersScanner,
+    WeWorkRemotelyScanner,
     WorkableScanner,
 )
 
@@ -1678,3 +1679,105 @@ async def test_remotive_non_200_returns_empty():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RemotiveScanner().scan()
     assert jobs == []
+
+
+# --- WeWorkRemotelyScanner tests ---
+
+_WWR_RSS = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>We Work Remotely</title>
+    <item>
+      <title>Acme: Senior Backend Engineer</title>
+      <region>Anywhere in the World</region>
+      <description>&lt;p&gt;Build &lt;strong&gt;things&lt;/strong&gt;.&lt;/p&gt;</description>
+      <pubDate>Tue, 30 Jun 2026 20:32:52 +0000</pubDate>
+      <link>https://weworkremotely.com/remote-jobs/acme-senior-backend-engineer</link>
+    </item>
+    <item>
+      <title>Frontend Developer Wanted</title>
+      <region>USA Only</region>
+      <description>No colon in title, no company prefix.</description>
+      <pubDate>Wed, 01 Jul 2026 10:00:00 +0000</pubDate>
+      <link>https://weworkremotely.com/remote-jobs/frontend-developer-wanted</link>
+    </item>
+    <item>
+      <title>Missing Link Co: Some Role</title>
+      <region>Worldwide</region>
+      <description>No link element -- must be skipped.</description>
+      <pubDate>Wed, 01 Jul 2026 10:00:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>"""
+
+
+def _make_rss_client(body, status=200):
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        mock_response.status_code = status
+        mock_response.text = body
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    return mock_client
+
+
+async def test_wwr_scan_splits_company_from_title_and_strips_html():
+    mock_client = _make_rss_client(_WWR_RSS)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+
+    assert len(jobs) == 2  # third item has no <link>, skipped
+    job = jobs[0]
+    assert job.source == "weworkremotely"
+    assert job.company == "Acme"
+    assert job.title == "Senior Backend Engineer"
+    assert job.url == "https://weworkremotely.com/remote-jobs/acme-senior-backend-engineer"
+    assert job.location == "Anywhere in the World"
+    assert job.remote_type == "remote"
+    assert job.description == "Build things."
+    assert job.posted_at is not None
+    assert job.posted_at.year == 2026 and job.posted_at.month == 6 and job.posted_at.day == 30
+
+
+async def test_wwr_title_without_colon_falls_back_to_source_name_company():
+    mock_client = _make_rss_client(_WWR_RSS)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+    no_colon_job = next(j for j in jobs if j.title == "Frontend Developer Wanted")
+    assert no_colon_job.company == "WeWorkRemotely"
+
+
+async def test_wwr_network_exception_returns_empty():
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+    assert jobs == []
+
+
+async def test_wwr_non_200_returns_empty():
+    mock_client = _make_rss_client("", status=500)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+    assert jobs == []
+
+
+async def test_wwr_malformed_xml_returns_empty():
+    mock_client = _make_rss_client("<not-valid-xml")
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+    assert jobs == []
+
+
+async def test_wwr_missing_pubdate_leaves_posted_at_none():
+    rss = _WWR_RSS.replace("<pubDate>Tue, 30 Jun 2026 20:32:52 +0000</pubDate>", "", 1)
+    mock_client = _make_rss_client(rss)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+    assert jobs[0].posted_at is None
