@@ -245,6 +245,7 @@ async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=No
             "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
+        MockLI.__name__ = "LinkedInScanner"
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])

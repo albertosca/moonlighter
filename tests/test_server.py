@@ -1867,6 +1867,7 @@ async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
         patch("moonlighter.discovery.service.browser") as mock_browser,
         patch("moonlighter.discovery.sources.playwright.LinkedInScanner") as MockLI,
     ):
+        MockLI.__name__ = "LinkedInScanner"
         MockGH.return_value.scan = AsyncMock(return_value=[])
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
@@ -1910,6 +1911,7 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
             return_value={"greenhouse": ["stripe"]},
         ),
     ):
+        MockLI.__name__ = "LinkedInScanner"
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
