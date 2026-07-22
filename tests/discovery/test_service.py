@@ -289,7 +289,7 @@ async def test_scan_linkedin_session_expired_adds_warning(tmp_db):
     from moonlighter.discovery.sources.playwright import LinkedInSessionExpiredError
 
     result = await _run_scan([_raw(2)], linkedin_exc=LinkedInSessionExpiredError("session expired"))
-    assert "LinkedIn" in result
+    assert "⚠️  LinkedIn: session expired" in result
 
 
 async def test_scan_linkedin_generic_error_is_swallowed(tmp_db):

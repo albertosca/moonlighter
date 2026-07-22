@@ -1877,7 +1877,7 @@ async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
         )
         result = await scan_and_evaluate(ctx=make_test_context())
 
-    assert "LinkedIn" in result
+    assert "⚠️  LinkedIn: Session expired." in result
     assert "expired" in result or "login" in result.lower()
 
 

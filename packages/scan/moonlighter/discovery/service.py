@@ -121,7 +121,8 @@ async def _run_browser_scanner(
         jobs = await scanner_cls(page).scan(keywords=keywords)
         return jobs, None
     except ScannerSessionExpiredError as e:
-        return [], f"⚠️  {scanner_cls.__name__}: {e}"
+        label = scanner_cls.__name__.removesuffix("Scanner")
+        return [], f"⚠️  {label}: {e}"
     except Exception:
         return [], None
     finally:
