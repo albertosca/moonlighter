@@ -1,4 +1,4 @@
-# Example configuration. Copy to ~/.gauntler/config.yaml (or set GAUNTLER_HOME)
+# Example configuration. Copy to ~/.moonlighter/config.yaml (or set MOONLIGHTER_HOME)
 # and adjust. All values here are generic placeholders.
 
 # Browser executable path (Chrome/Chromium/Brave). Required for the LinkedIn scan and
@@ -38,7 +38,7 @@ work_authorization:
   authorized_answer: "Yes"
   not_authorized_answer: "No"
 
-# CV per company (paths relative to GAUNTLER_HOME). 'default' is used when a
+# CV per company (paths relative to MOONLIGHTER_HOME). 'default' is used when a
 # company has no entry. by_company matches the company name case-insensitively.
 cv:
   default: "cv.pdf"
@@ -48,9 +48,9 @@ cv:
 # Email monitoring (Gmail OAuth). Optional — only if you want to track replies.
 email:
   address: "your-email@gmail.com"
-  credentials_path: "~/.gauntler/gmail-client.json"
-  token_path: "~/.gauntler/gmail-token.json"
-  processed_label: "gauntler/processed"
+  credentials_path: "~/.moonlighter/gmail-client.json"
+  token_path: "~/.moonlighter/gmail-token.json"
+  processed_label: "moonlighter/processed"
   # false (default) = sync is read-only; dedup is done in a local table.
   mark_processed: false
   interview_stages:
