@@ -1,6 +1,10 @@
 from datetime import datetime
 
-from moonlighter.discovery.sources.base import RawJob, normalize_remote_type
+from moonlighter.discovery.sources.base import (
+    RawJob,
+    ScannerSessionExpiredError,
+    normalize_remote_type,
+)
 
 
 def test_rawjob_defaults():
@@ -77,3 +81,9 @@ def test_rawjob_posted_at_is_datetime():
     now = datetime.now()
     job = RawJob(source="greenhouse", company="Co", title="Eng", url="https://x.com", posted_at=now)
     assert isinstance(job.posted_at, datetime)
+
+
+def test_scanner_session_expired_error_is_an_exception():
+    err = ScannerSessionExpiredError("session expired")
+    assert isinstance(err, Exception)
+    assert str(err) == "session expired"

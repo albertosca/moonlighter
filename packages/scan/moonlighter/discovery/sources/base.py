@@ -4,6 +4,15 @@ from datetime import datetime
 from typing import Any
 
 
+class ScannerSessionExpiredError(Exception):
+    """Raised by a browser-based scanner (see BaseScanner) when the page it's
+    driving redirects to a login/checkpoint wall instead of showing results --
+    the operator's session needs re-authentication. The generic dispatcher in
+    discovery/service.py catches this by base type, so any scanner (public or a
+    privately-registered plugin) can signal it without the dispatcher needing to
+    import that scanner's own exception type."""
+
+
 @dataclass
 class RawJob:
     source: str

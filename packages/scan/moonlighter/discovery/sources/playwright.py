@@ -2,7 +2,12 @@ import asyncio
 from typing import Any
 
 from moonlighter.core.log import get_logger
-from moonlighter.discovery.sources.base import BaseScanner, RawJob, normalize_remote_type
+from moonlighter.discovery.sources.base import (
+    BaseScanner,
+    RawJob,
+    ScannerSessionExpiredError,
+    normalize_remote_type,
+)
 from playwright.async_api import Page
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
@@ -12,7 +17,7 @@ _DESCRIPTION_SELECTORS = ".jobs-description-content__text, .show-more-less-html_
 _LOGIN_REDIRECTS = ("/login", "/checkpoint", "/authwall")
 
 
-class LinkedInSessionExpiredError(Exception):
+class LinkedInSessionExpiredError(ScannerSessionExpiredError):
     """Raised when LinkedIn redirects to login after goto()."""
 
     pass
