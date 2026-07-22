@@ -1,7 +1,8 @@
-# Example company list. Copy to ~/.gauntler/company_list.yaml and adjust.
-# Organized by ATS (greenhouse / lever / ashby) and by phase. The slug is the
-# company identifier in that ATS's job board URL, e.g. for
-# https://boards.greenhouse.io/acme the slug is "acme".
+# Example company list. Copy to ~/.moonlighter/company_list.yaml and adjust.
+# Organized by ATS (greenhouse / lever / ashby / workable / recruitee /
+# smartrecruiters) and by phase. The slug is the company identifier in that
+# ATS's job board URL, e.g. for https://boards.greenhouse.io/acme the slug is
+# "acme".
 #
 # A scan can target a single phase or all phases at once.
 
@@ -19,3 +20,15 @@ lever:
 ashby:
   phase1:
     - hooli
+
+# workable:
+#   phase1:
+#     - acme
+
+# recruitee:
+#   phase1:
+#     - acme
+
+# smartrecruiters:
+#   phase1:
+#     - acme

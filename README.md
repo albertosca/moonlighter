@@ -1,12 +1,12 @@
 > **[Leia em Português](README.pt.md)**
 
-# gauntler
+# moonlighter
 
 AI-powered job application pipeline. Scans job boards, scores candidate fit via LLM, and automates browser-based applications — all driven from Claude through a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server.
 
 ## How it works
 
-1. **Scan** — fetches job listings from Greenhouse, Lever, Ashby, and LinkedIn for a company list you configure.
+1. **Scan** — fetches job listings from Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters, and LinkedIn for a company list you configure, plus optional remote-first boards (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring) and Gupy, both config-gated off by default.
 2. **Evaluate** — scores each job against your profile using an LLM; jobs below the threshold are archived automatically.
 3. **Apply** — fills and submits application forms in a real browser (Playwright), using LLM-generated answers tailored to each posting.
 4. **Track** — monitors your Gmail inbox for interview invitations and updates the pipeline status.
@@ -15,15 +15,15 @@ All steps are exposed as MCP tools and orchestrated by Claude in a conversation.
 
 ## Architecture
 
-A [uv workspace](https://docs.astral.sh/uv/concepts/workspaces/) of 5 namespace packages (`gauntler.*`), feature-sliced:
+A [uv workspace](https://docs.astral.sh/uv/concepts/workspaces/) of 5 namespace packages (`moonlighter.*`), feature-sliced:
 
 | Package | Namespace | Purpose |
 |---------|-----------|---------|
-| `gauntler-core` | `gauntler.core` | DB (Peewee/SQLite), config, browser driver, LLM client |
-| `gauntler-scan` | `gauntler.discovery` | ATS scrapers and LLM-based job scoring |
-| `gauntler-apply` | `gauntler.application` | Form filler, answer generator, work-auth resolver |
-| `gauntler-email` | `gauntler.tracking` | Gmail sync and interview stage classification |
-| `gauntler-full` | `gauntler.server` | FastMCP server — wires all packages together |
+| `moonlighter-core` | `moonlighter.core` | DB (Peewee/SQLite), config, browser driver, LLM client |
+| `moonlighter-scan` | `moonlighter.discovery` | ATS scrapers and LLM-based job scoring |
+| `moonlighter-apply` | `moonlighter.application` | Form filler, answer generator, work-auth resolver |
+| `moonlighter-email` | `moonlighter.tracking` | Gmail sync and interview stage classification |
+| `moonlighter-full` | `moonlighter.server` | FastMCP server — wires all packages together |
 
 ## Requirements
 
@@ -38,20 +38,20 @@ A [uv workspace](https://docs.astral.sh/uv/concepts/workspaces/) of 5 namespace 
 ### 1. Install
 
 ```bash
-git clone https://github.com/albertosca/gauntler
-cd gauntler
+git clone https://github.com/albertosca/moonlighter
+cd moonlighter
 uv sync --all-packages
 ```
 
 ### 2. Configure
 
-Copy the example files to your `GAUNTLER_HOME` (defaults to `~/.gauntler/`) and edit:
+Copy the example files to your `MOONLIGHTER_HOME` (defaults to `~/.moonlighter/`) and edit:
 
 ```bash
-mkdir -p ~/.gauntler
-cp config.example.yaml ~/.gauntler/config.yaml
-cp profile.example.yaml ~/.gauntler/profile.yaml
-cp company_list.example.yaml ~/.gauntler/company_list.yaml
+mkdir -p ~/.moonlighter
+cp config.example.yaml ~/.moonlighter/config.yaml
+cp profile.example.yaml ~/.moonlighter/profile.yaml
+cp company_list.example.yaml ~/.moonlighter/company_list.yaml
 ```
 
 Key fields in `config.yaml`:
@@ -70,7 +70,7 @@ Edit `company_list.yaml` to add the companies and ATS platform you want to scan.
 ### 3. Gmail tracking (optional)
 
 1. Create a project in [Google Cloud Console](https://console.cloud.google.com), enable the Gmail API, and download OAuth credentials as `client.json`.
-2. Place the file at `~/.gauntler/gmail-client.json`.
+2. Place the file at `~/.moonlighter/gmail-client.json`.
 3. The first call to `setup_email` opens a browser for authorization and saves the token.
 
 ### 4. Register as an MCP server
@@ -80,9 +80,9 @@ Add to `~/.claude/settings.json` (or your project `settings.json`):
 ```json
 {
   "mcpServers": {
-    "gauntler": {
-      "command": "/path/to/gauntler/.venv/bin/python",
-      "args": ["-m", "gauntler.server"]
+    "moonlighter": {
+      "command": "/path/to/moonlighter/.venv/bin/python",
+      "args": ["-m", "moonlighter.server"]
     }
   }
 }
@@ -113,3 +113,4 @@ Restart Claude Code — the tools below will appear automatically.
 
 AGPL-3.0 — see [LICENSE](LICENSE).  
 See [DISCLAIMER.md](DISCLAIMER.md) for important notes on ToS, automation, and LLM backend usage.
+See [PRIVACY.md](PRIVACY.md) for what data this tool stores and where it goes.
