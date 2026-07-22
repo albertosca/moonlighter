@@ -10,6 +10,7 @@ from moonlighter.application import service as apply_service
 from moonlighter.application.answers.cv import CVNotFoundError
 from moonlighter.application.appliers.base import ApplicationDraft
 from moonlighter.application.appliers.greenhouse import GreenhouseApplier
+from moonlighter.application.appliers.linkedin import LinkedInApplier
 from moonlighter.application.appliers.recruitee import RecruiteeApplier
 from moonlighter.application.appliers.smartrecruiters import SmartRecruitersApplier
 from moonlighter.application.appliers.workable import WorkableApplier
@@ -95,6 +96,14 @@ async def test_detect_applier_matches_workable(tmp_db):
         _page("https://apply.workable.com/acme/j/ABCDEF1234/apply/"), CONFIG, PROFILE
     )
     assert isinstance(applier, WorkableApplier)
+
+
+async def test_detect_applier_matches_linkedin_via_plugin_registration(tmp_db):
+    init_db()
+    applier = await apply_service.detect_applier(
+        _page("https://www.linkedin.com/jobs/view/12345"), CONFIG, PROFILE
+    )
+    assert isinstance(applier, LinkedInApplier)
 
 
 async def test_detect_applier_matches_smartrecruiters(tmp_db):

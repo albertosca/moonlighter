@@ -23,3 +23,6 @@ packages = ["moonlighter"]
 
 [tool.uv.sources]
 moonlighter-core = { workspace = true }
+
+[project.entry-points."moonlighter.appliers"]
+linkedin = "moonlighter.application.appliers.linkedin:LinkedInApplier"

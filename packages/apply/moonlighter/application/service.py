@@ -15,7 +15,7 @@ from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.application.answers.email_alias import build_email_alias, inject_email_alias
@@ -32,6 +32,7 @@ from moonlighter.core.config import NEEDS_REVIEW_SENTINEL
 from moonlighter.core.db import Application, Job
 from moonlighter.core.llm import LLMCaller
 from moonlighter.core.log import get_logger
+from moonlighter.core.plugins import discover_entry_points
 from playwright.async_api import Page
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
@@ -68,14 +69,14 @@ def _anomaly_reasons(
     return reasons
 
 
-_APPLIER_CLASSES = [
-    LinkedInApplier,
+_APPLIER_CLASSES: list[type[BaseApplier]] = [
     GreenhouseApplier,
     LeverApplier,
     AshbyApplier,
     RecruiteeApplier,
     SmartRecruitersApplier,
     WorkableApplier,
+    *cast("list[type[BaseApplier]]", discover_entry_points("moonlighter.appliers")),
 ]
 
 
@@ -122,9 +123,9 @@ async def detect_applier(
     if source is not None:
         for cls in _APPLIER_CLASSES:
             if source == cls.SOURCE:
-                return cls(page, config, profile)  # type: ignore[abstract]
+                return cls(page, config, profile)
     for cls in _APPLIER_CLASSES:
-        applier = cls(page, config, profile)  # type: ignore[abstract]
+        applier = cls(page, config, profile)
         if await applier.detect():
             return applier
     return None
