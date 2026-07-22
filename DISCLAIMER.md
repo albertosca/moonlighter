@@ -1,6 +1,6 @@
 # Disclaimer
 
-## Terms of Service
+## Third-Party Terms of Service
 
 This tool interacts with job boards and applicant tracking systems (LinkedIn, Greenhouse, Lever,
 Ashby, Workable, SmartRecruiters, Recruitee, and optionally Gupy) by driving a real browser or
@@ -15,8 +15,33 @@ over time.
 **LinkedIn** — the User Agreement (§8.2) broadly and explicitly prohibits scraping and "bots or
 other unauthorized automated methods," with no stated carve-out for personal, single-account,
 non-commercial automation. This is the platform with the clearest, most direct prohibition of the
-eight. Publicly reported enforcement ranges from rate-limiting/CAPTCHA challenges to account
-restriction or suspension.
+eight, and it deserves a sharper distinction between two different kinds of risk (researched
+2026-07-22, see `docs/superpowers/specs/2026-07-22-linkedin-legal-risk-review.md` for the full
+non-lawyer analysis and citations — not legal advice):
+
+- **Litigation/criminal risk (e.g., under the U.S. Computer Fraud and Abuse Act) appears low** for a
+  single individual automating their own, already-authenticated account. *Van Buren v. United
+  States* (2021) narrowed the CFAA to accessing areas a user's own credentials are not entitled to
+  reach at all — using otherwise-accessible features for a disfavored purpose is not, by itself, a
+  CFAA violation. *hiQ Labs v. LinkedIn*, the case most often cited here, actually concerned
+  logged-out scraping of public data (a different fact pattern) — and even hiQ still lost on
+  LinkedIn's breach-of-contract claim. No reported case targets an individual for personal-use
+  browser automation of their own account.
+- **Contractual/practical risk (account restriction or suspension) is real and likely if detected**
+  — LinkedIn's own Help Center documents this as the standard enforcement path, and it is
+  self-executed by LinkedIn under the User Agreement, not a lawsuit.
+- A dedicated technical alternative was researched and not found: LinkedIn's Talent/Jobs API
+  program is not realistically obtainable by an individual developer, and the most visible
+  third-party "licensed" LinkedIn job-data provider (Proxycurl) was sued by LinkedIn and shut down
+  in 2025.
+- One mitigation already built into the tool's architecture, worth naming explicitly: applying is
+  always two explicit, separate steps — `fill_application` fills the form and produces a screenshot
+  for your own review, and `submit_application` is a distinct, separately-invoked action. This is
+  human-supervised, assisted form-filling, not unattended bulk auto-apply — true for every ATS this
+  tool talks to, including LinkedIn.
+
+By using this tool against LinkedIn, you are choosing to accept that contractual/account risk
+yourself — this project takes no responsibility for account restrictions LinkedIn may impose.
 
 **Greenhouse, Lever, Ashby, Workable, Recruitee** — none of these publish a candidate-facing Terms
 of Use that explicitly names bots, scraping, or automated form submission. Where a Terms document
@@ -78,3 +103,17 @@ This software is provided "as is", without warranty of any kind, express or impl
 are not liable for any damages, account bans, missed opportunities, or other consequences arising
 from use of this software. See [LICENSE](LICENSE) for the full terms under the GNU Affero General
 Public License v3.
+
+## No Affiliation, and Your Acknowledgment
+
+moonlighter is not affiliated with, endorsed by, or sponsored by LinkedIn, Greenhouse, Lever,
+Ashby, Workable, SmartRecruiters, Recruitee, Gupy, or any other platform it interacts with. Every
+platform name mentioned here refers to that platform's own trademark, used solely to describe
+interoperability.
+
+There is no moonlighter service, server, or company — this is source code that **you** run
+yourself, against **your own** accounts, at your own risk. By downloading, running, or otherwise
+using this software, you acknowledge that automating a third-party platform may violate that
+platform's own terms, that compliance with those terms is entirely your own responsibility, and
+that you accept whatever consequences (up to and including account restriction) that platform may
+impose as a result.
