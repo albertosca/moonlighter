@@ -24,3 +24,6 @@ packages = ["moonlighter"]
 
 [tool.uv.sources]
 moonlighter-core = { workspace = true }
+
+[project.entry-points."moonlighter.scanners"]
+linkedin = "moonlighter.discovery.sources.playwright:LinkedInScanner"

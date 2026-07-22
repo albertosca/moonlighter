@@ -605,9 +605,7 @@ async def _collect(config):
     isolating the Gupy dispatch branch."""
     with (
         patch("moonlighter.discovery.service.build_http_scanners", return_value={}),
-        patch(
-            "moonlighter.discovery.service._scan_linkedin", new=AsyncMock(return_value=([], None))
-        ),
+        patch("moonlighter.discovery.service.discover_entry_points", return_value=[]),
     ):
         return await scan_service._collect_raw_jobs("engineer", config, {})
 

@@ -17,6 +17,7 @@ from moonlighter.core.db import Job, ScanLog
 from moonlighter.core.llm import LLMCaller, is_spend_limit
 from moonlighter.core.log import get_logger
 from moonlighter.core.metrics import record_spend_limit_hit
+from moonlighter.core.plugins import discover_entry_points
 from moonlighter.discovery.archive import _format_archive_result
 from moonlighter.discovery.archive import archive_stale_jobs as archive_stale_jobs
 from moonlighter.discovery.evaluator import (
@@ -103,24 +104,25 @@ def _persist(raw: RawJob, **scoring: Any) -> Job | None:
     )
 
 
-async def _scan_linkedin(keywords: str, config: dict[str, Any]) -> tuple[list[RawJob], str | None]:
-    """LinkedIn scan via Playwright (requires prior login). An expired session becomes
-    a warning; any other failure — including no browser being available — is silent
-    so it doesn't block the HTTP results."""
-    from moonlighter.discovery.sources.playwright import (
-        LinkedInScanner,
-        LinkedInSessionExpiredError,
-    )
+async def _run_browser_scanner(
+    scanner_cls: type[Any], keywords: str, config: dict[str, Any]
+) -> tuple[list[RawJob], str | None]:
+    """Runs one browser-based scanner plugin (requires prior login, same shape as
+    LinkedInScanner). An expired session becomes a warning; any other failure —
+    including no browser being available — is silent so it doesn't block the
+    HTTP results."""
+    from moonlighter.discovery.sources.base import ScannerSessionExpiredError
 
     try:
         page = await browser.new_page(config)
     except Exception:
         return [], None
     try:
-        jobs = await LinkedInScanner(page).scan(keywords=keywords or "software engineer")
+        jobs = await scanner_cls(page).scan(keywords=keywords)
         return jobs, None
-    except LinkedInSessionExpiredError as e:
-        return [], f"⚠️  LinkedIn: {e}"
+    except ScannerSessionExpiredError as e:
+        scanner_name = getattr(scanner_cls, "__name__", None) or str(scanner_cls)
+        return [], f"⚠️  {scanner_name}: {e}"
     except Exception:
         return [], None
     finally:
@@ -130,8 +132,9 @@ async def _scan_linkedin(keywords: str, config: dict[str, Any]) -> tuple[list[Ra
 async def _collect_raw_jobs(
     keywords: str, config: dict[str, Any], companies: dict[str, list[str]]
 ) -> tuple[list[RawJob], str | None]:
-    """Collects jobs from the HTTP sources and LinkedIn. Returns the raw jobs and
-    an optional LinkedIn warning."""
+    """Collects jobs from the HTTP sources and every registered browser-scanner
+    plugin (e.g. LinkedIn, if installed). Returns the raw jobs and any warnings
+    from the browser scanners, joined into one string."""
     scanners = build_http_scanners()
     raw_jobs: list[RawJob] = []
     for source, scanner in scanners.items():
@@ -139,14 +142,19 @@ async def _collect_raw_jobs(
         if slugs:
             raw_jobs.extend(await scanner.scan(slugs))
 
-    li_jobs, li_warning = await _scan_linkedin(keywords, config)
-    raw_jobs.extend(li_jobs)
+    warnings: list[str] = []
+    for scanner_cls in discover_entry_points("moonlighter.scanners"):
+        jobs, warning = await _run_browser_scanner(scanner_cls, keywords, config)
+        raw_jobs.extend(jobs)
+        if warning:
+            warnings.append(warning)
+
     raw_jobs.extend(await _scan_gupy(keywords, config))
     raw_jobs.extend(await _scan_remoteok(config))
     raw_jobs.extend(await _scan_remotive(config))
     raw_jobs.extend(await _scan_wwr(config))
     raw_jobs.extend(await _scan_hn_whoishiring(config))
-    return raw_jobs, li_warning
+    return raw_jobs, ("\n".join(warnings) or None)
 
 
 async def _scan_gupy(keywords: str, config: dict[str, Any]) -> list[RawJob]:
