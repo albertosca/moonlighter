@@ -23,6 +23,7 @@ from moonlighter.core.llm import LLMCaller, make_caller
 from moonlighter.core.log import setup as _setup_logging
 from moonlighter.core.metrics import operation_metrics
 from moonlighter.core.parsing import wrap_untrusted
+from moonlighter.core.plugins import discover_entry_points_by_name
 from moonlighter.discovery import service as scan_service
 from moonlighter.discovery.archive import ArchiveStaleJobsError, _format_archive_result
 from moonlighter.startup import StartupWarning, validate_startup
@@ -203,15 +204,19 @@ async def get_job(id: int, *, ctx: Context[ServerSession, AppContext, Any]) -> s
 
 @mcp.tool()
 @tool_logged
-async def login(platform: str = "linkedin", *, ctx: Context[ServerSession, AppContext, Any]) -> str:
-    """Open the browser for manual login. Session is saved and reused in future scans."""
+async def login(platform: str, *, ctx: Context[ServerSession, AppContext, Any]) -> str:
+    """Open the browser for manual login to a platform that needs a saved session
+    (e.g. LinkedIn, if its plugin package is installed — see PRIVACY.md/DISCLAIMER.md).
+    Session is saved and reused in future scans."""
     app = ctx.request_context.lifespan_context
-    if platform != "linkedin":
-        return f"Platform '{platform}' not supported yet. Supported: linkedin"
+    urls = discover_entry_points_by_name("moonlighter.login_urls")
+    if platform not in urls:
+        supported = ", ".join(sorted(urls)) or "(none installed)"
+        return f"Platform '{platform}' not supported. Supported: {supported}"
     page = await _browser_mod.new_page(app.config)
-    await page.goto("https://www.linkedin.com/login")
+    await page.goto(urls[platform])
     return (
-        "Browser opened at linkedin.com/login. "
+        f"Browser opened at {urls[platform]}. "
         "Log in manually. "
         "The session will be saved automatically to ~/.moonlighter/browser-session/"
     )

@@ -9,19 +9,13 @@ response) is reported in failed_companies, never silently treated as "zero open 
 from dataclasses import dataclass, field
 from typing import Any
 
-from moonlighter.core import browser
 from moonlighter.core.db import Job
 from moonlighter.core.log import get_logger
+from moonlighter.core.plugins import discover_entry_points_by_name
 from moonlighter.discovery.sources.base import BaseScanner
 from moonlighter.discovery.sources.registry import LISTING_SOURCES as _LISTING_SOURCES
-from playwright.async_api import Error as PlaywrightError
 
 logger = get_logger(__name__)
-
-_CLOSED_MARKERS = (
-    "no longer accepting applications",
-    "this job is no longer available",
-)
 
 
 @dataclass
@@ -36,11 +30,24 @@ async def find_stale_jobs(
     config: dict[str, Any],
 ) -> StalenessResult:
     result = StalenessResult()
+    # A browser-based staleness checker for a non-listing source (e.g. LinkedIn) is
+    # optionally provided by a private plugin package -- see
+    # docs/superpowers/specs/2026-07-22-linkedin-plugin-split-design.md. Never
+    # hardcoded here: a source with no registered listing check AND no registered
+    # checker plugin falls through to the "has no listing check" branch below.
+    checkers = discover_entry_points_by_name("moonlighter.staleness_checkers")
     for (source, company), jobs in jobs_by_company.items():
         if source in _LISTING_SOURCES:
             await _check_via_listing(source, company, jobs, scanners, result)
-        elif source == "linkedin":
-            await _check_via_linkedin(company, jobs, config, result)
+        elif source in checkers:
+            # Plugin-provided (untrusted, unlike the first-party listing check above) --
+            # guard the call so one misbehaving checker can't abort the whole run.
+            try:
+                await checkers[source](company, jobs, config, result)
+            except Exception as e:
+                logger.warning("staleness: %s checker failed for %s — %s", source, company, e)
+                if company not in result.failed_companies:
+                    result.failed_companies.append(company)
         else:
             result.failed_companies.append(f"{company} (source {source!r} has no listing check)")
     return result
@@ -66,34 +73,3 @@ async def _check_via_listing(
         return
     open_urls = {r.url for r in raw}
     result.stale.extend(job for job in jobs if job.url not in open_urls)
-
-
-async def _check_via_linkedin(
-    company: str,
-    jobs: list[Job],
-    config: dict[str, Any],
-    result: StalenessResult,
-) -> None:
-    try:
-        page = await browser.new_page(config)
-    except Exception as e:
-        logger.warning("staleness: linkedin browser launch failed — %s", e)
-        result.failed_companies.append(company)
-        return
-    try:
-        for job in jobs:
-            try:
-                response = await page.goto(job.url, timeout=30000)
-                status = response.status if response else None
-                if status is not None and status >= 400:
-                    result.stale.append(job)
-                    continue
-                content = (await page.content()).lower()
-                if any(marker in content for marker in _CLOSED_MARKERS):
-                    result.stale.append(job)
-            except PlaywrightError as e:
-                logger.warning("staleness: linkedin goto failed for %s — %s", job.url, e)
-                if company not in result.failed_companies:
-                    result.failed_companies.append(company)
-    finally:
-        await page.close()

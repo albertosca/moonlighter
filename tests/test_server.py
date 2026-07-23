@@ -1,11 +1,11 @@
 import json
 import logging
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from moonlighter.application.answers.cv import CVNotFoundError
-from moonlighter.application.appliers.base import ApplicationDraft
-from moonlighter.application.appliers.linkedin import LinkedInApplier
+from moonlighter.application.appliers.base import ApplicationDraft, BaseApplier
 from moonlighter.core.db import Application, Job, ScanLog, init_db
 from moonlighter.core.metrics import record_call
 from moonlighter.discovery.evaluator import EvaluationResult
@@ -1372,20 +1372,41 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tmp
 # ── apply_jobs: missing scenarios ─────────────────────────────────────────────
 
 
-async def test_apply_jobs_linkedin_not_easy_apply(tmp_db):
-    """LinkedIn job without Easy Apply → warning with manual application message."""
+class _NotApplicableApplier(BaseApplier):
+    """A minimal applier whose not_applicable_reason() hook opts out of extract_fields()
+    -- LinkedIn is the real-world example (Easy Apply unavailable), provided by the
+    private moonlighter-linkedin plugin, not by this repo. See
+    docs/superpowers/specs/2026-07-22-linkedin-plugin-split-design.md."""
+
+    async def detect(self):
+        return True
+
+    async def not_applicable_reason(self):
+        return "does not have Easy Apply. Manual application required"
+
+    async def extract_fields(self):
+        return ([], frozenset())
+
+    async def fill_form(self, answers, cv_path):
+        return {}
+
+    async def submit(self):
+        return "submitted"
+
+
+async def test_apply_jobs_not_applicable_reason_shows_warning(tmp_db):
+    """An applier's not_applicable_reason() (e.g. LinkedIn without Easy Apply) ->
+    warning with the reason, instead of attempting extract_fields()."""
     init_db()
-    job = create_job(tmp_db, url="https://www.linkedin.com/jobs/view/li1")
-    page = make_mock_page(url="https://www.linkedin.com/jobs/view/li1")
-    # query_selector returns None → is_easy_apply() returns False
-    page.query_selector = AsyncMock(return_value=None)
-    li_applier = LinkedInApplier(page, {}, {})
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/acme/jobs/1")
+    page = make_mock_page(url="https://boards.greenhouse.io/acme/jobs/1")
+    applier = _NotApplicableApplier(page, {}, {})
 
     with (
         patch("moonlighter.application.service.browser") as mock_browser,
         patch(
             "moonlighter.application.service.detect_applier",
-            new=AsyncMock(return_value=li_applier),
+            new=AsyncMock(return_value=applier),
         ),
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
@@ -1624,35 +1645,44 @@ async def test_confirm_apply_unknown_ats(tmp_db, tmp_path):
     assert "ATS" in result and "recognized" in result
 
 
-async def test_confirm_apply_linkedin_calls_extract_fields(tmp_db, tmp_path):
-    """For LinkedIn jobs, extract_fields() is called to open the modal before fill_form."""
+async def test_confirm_apply_prepare_hook_opens_the_modal(tmp_db, tmp_path):
+    """An applier's prepare() override (e.g. LinkedIn opening its Easy Apply modal
+    via extract_fields()) is called before fill_form(). LinkedIn is the real-world
+    example, provided by the private moonlighter-linkedin plugin, not by this repo
+    -- see docs/superpowers/specs/2026-07-22-linkedin-plugin-split-design.md."""
     init_db()
-    job = create_job(tmp_db, url="https://www.linkedin.com/jobs/view/ca100", status="applying")
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/acme/jobs/ca100", status="applying")
     create_application(job)
     cv_path = tmp_path / "cv.pdf"
     cv_path.write_bytes(b"fake pdf")
-    page = make_mock_page(url="https://www.linkedin.com/jobs/view/ca100")
+    page = make_mock_page(url="https://boards.greenhouse.io/acme/jobs/ca100")
 
     extract_calls = []
 
-    class TrackingLinkedInApplier(LinkedInApplier):
+    class TrackingApplier(BaseApplier):
+        async def detect(self):
+            return True
+
+        async def prepare(self):
+            await self.extract_fields()
+
         async def extract_fields(self):
             extract_calls.append(True)
             return ([], frozenset())
 
-        async def fill_form(self, *args, **kwargs):
-            pass
+        async def fill_form(self, answers, cv_path):
+            return {}
 
         async def submit(self):
-            return True
+            return "submitted"
 
-    li_applier = TrackingLinkedInApplier(page, {}, {})
+    applier = TrackingApplier(page, {}, {})
 
     with (
         patch("moonlighter.application.service.browser") as mock_browser,
         patch(
             "moonlighter.application.service.detect_applier",
-            new=AsyncMock(return_value=li_applier),
+            new=AsyncMock(return_value=applier),
         ),
         patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
     ):
@@ -1684,25 +1714,38 @@ async def test_get_job_score_null(tmp_db):
 
 
 async def test_login_unsupported_platform(tmp_db):
-    """login() with unsupported platform returns error message."""
+    """login() with a platform that has no registered moonlighter.login_urls
+    plugin entry returns an error message -- the steady state for the public
+    repo alone, with no login-requiring plugin installed."""
     init_db()
-    from moonlighter.server import login
+    with patch("moonlighter.server.discover_entry_points_by_name", return_value={}):
+        from moonlighter.server import login
 
-    result = await login(platform="github", ctx=make_test_context())
+        result = await login(platform="github", ctx=make_test_context())
     assert "not supported" in result or "suport" in result.lower() or "github" in result.lower()
 
 
-async def test_login_linkedin_returns_instruction(tmp_db):
-    """login('linkedin') opens browser and returns instruction string."""
+async def test_login_registered_platform_opens_browser_and_returns_instruction(tmp_db):
+    """login() for a platform registered via a moonlighter.login_urls plugin entry
+    opens the browser at that URL and returns an instruction string -- see
+    docs/superpowers/specs/2026-07-22-linkedin-plugin-split-design.md (LinkedIn is
+    the real-world example, provided by the private moonlighter-linkedin plugin,
+    not hardcoded here)."""
     init_db()
-    page = make_mock_page(url="https://www.linkedin.com/login")
-    with patch("moonlighter.server._browser_mod") as mock_browser:
+    page = make_mock_page(url="https://example-ats.test/login")
+    with (
+        patch("moonlighter.server._browser_mod") as mock_browser,
+        patch(
+            "moonlighter.server.discover_entry_points_by_name",
+            return_value={"example_ats": "https://example-ats.test/login"},
+        ),
+    ):
         mock_browser.new_page = AsyncMock(return_value=page)
         from moonlighter.server import login
 
-        result = await login(platform="linkedin", ctx=make_test_context())
-    assert "linkedin" in result.lower()
-    page.goto.assert_called_once()
+        result = await login(platform="example_ats", ctx=make_test_context())
+    assert "example-ats.test/login" in result
+    page.goto.assert_called_once_with("https://example-ats.test/login")
 
 
 # ── list_jobs: table formatting ───────────────────────────────────────────────
@@ -1859,13 +1902,27 @@ def test_startup_warning_level_values():
     assert w_warn.level == "warn"
 
 
-# ── LinkedIn session expired warning ──────────────────────────────────────────
+# ── Registered browser-scanner plugin: session expired warning ────────────────
+# LinkedIn is the real-world example of a "moonlighter.scanners" entry_points
+# plugin (see docs/superpowers/specs/2026-07-22-linkedin-plugin-split-design.md),
+# provided by the private moonlighter-linkedin package, not by this repo. These
+# tests prove the generic dispatch/warning mechanism with a fake scanner instead.
 
 
-async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
-    """LinkedInSessionExpiredError → explicit warning in the result (no silence)."""
+class _FakeSessionExpiredSource:
+    def __init__(self, page: Any) -> None:
+        pass
+
+    async def scan(self, **kwargs: Any) -> list[Any]:
+        from moonlighter.discovery.sources.base import ScannerSessionExpiredError
+
+        raise ScannerSessionExpiredError("Session expired.")
+
+
+async def test_scan_registered_scanner_session_expired_shows_warning(tmp_db):
+    """A registered browser-scanner plugin raising ScannerSessionExpiredError ->
+    explicit warning in the result (no silence)."""
     init_db()
-    from moonlighter.discovery.sources.playwright import LinkedInSessionExpiredError
     from moonlighter.server import scan_and_evaluate
 
     with (
@@ -1873,27 +1930,26 @@ async def test_scan_linkedin_session_expired_shows_warning(tmp_db):
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
         patch("moonlighter.discovery.service.browser") as mock_browser,
-        patch("moonlighter.discovery.sources.playwright.LinkedInScanner") as MockLI,
+        patch(
+            "moonlighter.discovery.service.discover_entry_points",
+            return_value=[_FakeSessionExpiredSource],
+        ),
     ):
-        MockLI.__name__ = "LinkedInScanner"
         MockGH.return_value.scan = AsyncMock(return_value=[])
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(return_value=make_mock_page())
-        MockLI.return_value.scan = AsyncMock(
-            side_effect=LinkedInSessionExpiredError("Session expired.")
-        )
         result = await scan_and_evaluate(ctx=make_test_context())
 
-    assert "⚠️  LinkedIn: Session expired." in result
+    assert "⚠️  _FakeSessionExpiredSource: Session expired." in result
     assert "expired" in result or "login" in result.lower()
 
 
-async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db):
-    """LinkedInSessionExpiredError does not prevent HTTP jobs from being returned."""
+async def test_scan_registered_scanner_session_expired_does_not_block_http_results(tmp_db):
+    """A registered browser-scanner plugin's ScannerSessionExpiredError does not
+    prevent HTTP jobs from being returned."""
     init_db()
     from moonlighter.discovery.sources.base import RawJob
-    from moonlighter.discovery.sources.playwright import LinkedInSessionExpiredError
     from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
@@ -1909,7 +1965,10 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
         patch("moonlighter.discovery.service.browser") as mock_browser,
-        patch("moonlighter.discovery.sources.playwright.LinkedInScanner") as MockLI,
+        patch(
+            "moonlighter.discovery.service.discover_entry_points",
+            return_value=[_FakeSessionExpiredSource],
+        ),
         patch(
             "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
@@ -1919,18 +1978,14 @@ async def test_scan_linkedin_session_expired_does_not_block_http_results(tmp_db)
             return_value={"greenhouse": ["stripe"]},
         ),
     ):
-        MockLI.__name__ = "LinkedInScanner"
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(return_value=make_mock_page())
-        MockLI.return_value.scan = AsyncMock(
-            side_effect=LinkedInSessionExpiredError("Session expired.")
-        )
         result = await scan_and_evaluate(ctx=make_test_context())
 
     assert "Stripe" in result  # HTTP job appears
-    assert "LinkedIn" in result  # warning appears too
+    assert "_FakeSessionExpiredSource" in result  # warning appears too
 
 
 # ── email: confirm_apply generates ref and saves ──────────────────────────────

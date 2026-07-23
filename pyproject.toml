@@ -49,7 +49,6 @@ source_pkgs = [
 branch = true
 omit = [
     "*/moonlighter/core/browser.py",
-    "*/moonlighter/discovery/sources/playwright.py",
 ]
 
 [tool.coverage.report]

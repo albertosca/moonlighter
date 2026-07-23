@@ -8,9 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from moonlighter.application import service as apply_service
 from moonlighter.application.answers.cv import CVNotFoundError
-from moonlighter.application.appliers.base import ApplicationDraft
+from moonlighter.application.appliers.base import ApplicationDraft, BaseApplier
 from moonlighter.application.appliers.greenhouse import GreenhouseApplier
-from moonlighter.application.appliers.linkedin import LinkedInApplier
 from moonlighter.application.appliers.recruitee import RecruiteeApplier
 from moonlighter.application.appliers.smartrecruiters import SmartRecruitersApplier
 from moonlighter.application.appliers.workable import WorkableApplier
@@ -98,12 +97,46 @@ async def test_detect_applier_matches_workable(tmp_db):
     assert isinstance(applier, WorkableApplier)
 
 
-async def test_detect_applier_matches_linkedin_via_plugin_registration(tmp_db):
+async def test_detect_applier_returns_none_for_linkedin_when_no_plugin_installed(tmp_db):
+    """Steady state for the public repo alone: nothing is registered under
+    moonlighter.appliers for LinkedIn (it moved to the private moonlighter-linkedin
+    plugin -- see docs/superpowers/specs/2026-07-22-linkedin-plugin-split-design.md),
+    so detect_applier finds no match for a linkedin.com URL."""
     init_db()
     applier = await apply_service.detect_applier(
         _page("https://www.linkedin.com/jobs/view/12345"), CONFIG, PROFILE
     )
-    assert isinstance(applier, LinkedInApplier)
+    assert applier is None
+
+
+class _FakePluginApplier(BaseApplier):
+    async def detect(self):
+        return "example-ats.test" in self.page.url
+
+    async def extract_fields(self):
+        return ([], frozenset())
+
+    async def fill_form(self, answers, cv_path):
+        return {}
+
+    async def submit(self):
+        return "submitted"
+
+
+async def test_detect_applier_matches_a_registered_plugin(tmp_db):
+    """A class discovered via the moonlighter.appliers entry_points group (appended
+    to _APPLIER_CLASSES once at import time -- see service.py) is detected
+    generically -- proves the plugin path itself works, without needing the real
+    LinkedIn plugin installed."""
+    init_db()
+    with patch(
+        "moonlighter.application.service._APPLIER_CLASSES",
+        [*apply_service._APPLIER_CLASSES, _FakePluginApplier],
+    ):
+        applier = await apply_service.detect_applier(
+            _page("https://example-ats.test/jobs/1"), CONFIG, PROFILE
+        )
+    assert isinstance(applier, _FakePluginApplier)
 
 
 async def test_detect_applier_matches_smartrecruiters(tmp_db):

@@ -4,7 +4,6 @@ import pytest
 from moonlighter.application.appliers.ashby import AshbyApplier
 from moonlighter.application.appliers.greenhouse import GreenhouseApplier
 from moonlighter.application.appliers.lever import LeverApplier
-from moonlighter.application.appliers.linkedin import LinkedInApplier
 
 # e2e suite: requires a real browser (launches Brave/Chromium). Outside the default run —
 # run with `pytest -m e2e`. The coverage gate runs over the unit suite.
@@ -114,34 +113,5 @@ async def test_ashby_e2e_submit(browser_page):
     assert result == "submitted"
 
 
-# ── LinkedIn E2E ──────────────────────────────────────────────────────────────
-
-
-async def test_linkedin_e2e_is_easy_apply(browser_page):
-    page, base_url = browser_page
-    await page.goto(f"{base_url}/linkedin_job.html")
-    applier = LinkedInApplier(page, {}, {})
-    result = await applier.is_easy_apply()
-    assert result is True
-
-
-async def test_linkedin_e2e_extract_fields_from_modal(browser_page):
-    page, base_url = browser_page
-    await page.goto(f"{base_url}/linkedin_job.html")
-    applier = LinkedInApplier(page, {}, {})
-    with patch("asyncio.sleep"):
-        fields = await applier.extract_fields()
-    assert "Phone Number" in fields
-    assert "Years of Experience" in fields
-
-
-async def test_linkedin_e2e_fill_form(browser_page):
-    page, base_url = browser_page
-    await page.goto(f"{base_url}/linkedin_job.html")
-    applier = LinkedInApplier(page, {}, {})
-    # extract_fields clicks the Easy Apply button — do it first to open modal
-    with patch("asyncio.sleep"):
-        await applier.extract_fields()
-        await applier.fill_form({"Phone Number": "555-1234"}, cv_path="")
-    value = await page.eval_on_selector("#phone", "el => el.value")
-    assert value == "555-1234"
+# LinkedIn E2E tests moved to the private moonlighter-linkedin repo -- see
+# docs/superpowers/specs/2026-07-22-linkedin-plugin-split-design.md.

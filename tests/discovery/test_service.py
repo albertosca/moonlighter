@@ -6,6 +6,7 @@ config/profile/caller logic, without depending on the global config loaded on im
 """
 
 import asyncio
+from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -217,12 +218,31 @@ def _raw(i, title="Engineer", source="greenhouse"):
     )
 
 
+class _FakeBrowserScanner:
+    """Stands in for a registered moonlighter.scanners plugin (LinkedIn is the
+    real-world example, provided by the private moonlighter-linkedin package --
+    see docs/superpowers/specs/2026-07-22-linkedin-plugin-split-design.md).
+    _run_scan configures its scan() return/raise per test via closure."""
+
+    _exc: Exception | None = None
+    _jobs: ClassVar[list] = []
+
+    def __init__(self, page):
+        pass
+
+    async def scan(self, **kwargs):
+        if self._exc is not None:
+            raise self._exc
+        return self._jobs
+
+
 async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=None, config=None):
     """Runs scan_and_evaluate with mocked HTTP scanners serving `raws`.
 
-    linkedin_exc: the exception LinkedInScanner.scan should raise.
-    linkedin_jobs: the list of RawJob LinkedInScanner.scan should return.
-    If both are None, simulates the absence of a browser (new_page fails).
+    linkedin_exc: the exception the registered browser-scanner plugin's scan()
+    should raise. linkedin_jobs: the list of RawJob it should return instead.
+    If both are None, no browser-scanner plugin is registered at all (the
+    steady state for the public repo alone).
 
     eval_mock: an AsyncMock applied per job within the batch. Can be
     AsyncMock(return_value=EvaluationResult) or AsyncMock(side_effect=exc).
@@ -234,30 +254,41 @@ async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=No
         # Applies eval_mock to each job in the batch; errors propagate to evaluate_chunk.
         return [await _eval_per_job(j.company, model) for j in jobs]
 
+    registered = []
+    if linkedin_exc is not None or linkedin_jobs is not None:
+        _FakeBrowserScanner._exc = linkedin_exc
+        _FakeBrowserScanner._jobs = linkedin_jobs or []
+        registered = [_FakeBrowserScanner]
+
     with (
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
         patch("moonlighter.discovery.service.browser") as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch),
-        patch("moonlighter.discovery.sources.playwright.LinkedInScanner") as MockLI,
+        patch("moonlighter.discovery.service.discover_entry_points", return_value=registered),
         patch(
             "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
-        MockLI.__name__ = "LinkedInScanner"
         MockGH.return_value.scan = AsyncMock(return_value=raws)
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
-        if linkedin_exc is None and linkedin_jobs is None:
-            mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
-        else:
-            mock_browser.new_page = AsyncMock(return_value=AsyncMock())
-            if linkedin_exc is not None:
-                MockLI.return_value.scan = AsyncMock(side_effect=linkedin_exc)
-            else:
-                MockLI.return_value.scan = AsyncMock(return_value=linkedin_jobs)
+        mock_browser.new_page = AsyncMock(return_value=AsyncMock())
         return await scan_service.scan_and_evaluate("", "all", cfg, PROFILE, MagicMock())
+
+
+async def test_run_browser_scanner_browser_launch_failure_is_silent():
+    """If browser.new_page() itself raises (no browser configured, launch error),
+    the browser-scanner plugin is skipped silently -- same as any other failure,
+    it must not block the HTTP results."""
+    with patch("moonlighter.discovery.service.browser") as mock_browser:
+        mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
+        jobs, warning = await scan_service._run_browser_scanner(
+            _FakeBrowserScanner, "engineer", CONFIG
+        )
+    assert jobs == []
+    assert warning is None
 
 
 async def test_scan_linkedin_jobs_are_evaluated(tmp_db):
@@ -284,19 +315,19 @@ async def test_scan_title_filtered_archives_with_score_zero(tmp_db):
     assert "filtered by title" in result.lower()
 
 
-async def test_scan_linkedin_session_expired_adds_warning(tmp_db):
+async def test_scan_registered_scanner_session_expired_adds_warning(tmp_db):
     init_db()
-    from moonlighter.discovery.sources.playwright import LinkedInSessionExpiredError
+    from moonlighter.discovery.sources.base import ScannerSessionExpiredError
 
-    result = await _run_scan([_raw(2)], linkedin_exc=LinkedInSessionExpiredError("session expired"))
-    assert "⚠️  LinkedIn: session expired" in result
+    result = await _run_scan([_raw(2)], linkedin_exc=ScannerSessionExpiredError("session expired"))
+    assert "⚠️  _FakeBrowser: session expired" in result
 
 
-async def test_scan_linkedin_generic_error_is_swallowed(tmp_db):
+async def test_scan_registered_scanner_generic_error_is_swallowed(tmp_db):
     init_db()
     result = await _run_scan([_raw(3)], linkedin_exc=RuntimeError("boom"))
-    # a generic LinkedIn error doesn't become a warning nor block the HTTP results
-    assert "LinkedIn" not in result
+    # a generic scanner error doesn't become a warning nor block the HTTP results
+    assert "_FakeBrowser" not in result
     assert Job.get(Job.url == "https://x.com/scan/3").status == "new"
 
 
