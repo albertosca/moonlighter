@@ -25,6 +25,14 @@ class LinkedInApplier(BaseApplier):
         text = (await btn.inner_text()).strip().lower()
         return "easy apply" in text
 
+    async def not_applicable_reason(self) -> str | None:
+        if await self.is_easy_apply():
+            return None
+        return "does not have Easy Apply. Manual application required"
+
+    async def prepare(self) -> None:
+        await self.extract_fields()  # opens the modal
+
     async def extract_fields(self) -> tuple[list[str], frozenset[str]]:
         # Click Easy Apply button to open the modal
         try:

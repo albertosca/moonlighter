@@ -67,6 +67,33 @@ async def test_is_easy_apply_case_insensitive():
     assert await applier.is_easy_apply() is True
 
 
+# ── not_applicable_reason() / prepare() ──────────────────────────────────────
+
+
+async def test_not_applicable_reason_none_when_easy_apply():
+    applier = make_applier()
+    btn = MagicMock()
+    btn.inner_text = AsyncMock(return_value="Easy Apply")
+    applier.page.query_selector = AsyncMock(return_value=btn)
+    assert await applier.not_applicable_reason() is None
+
+
+async def test_not_applicable_reason_set_when_not_easy_apply():
+    applier = make_applier()
+    applier.page.query_selector = AsyncMock(return_value=None)
+    reason = await applier.not_applicable_reason()
+    assert reason == "does not have Easy Apply. Manual application required"
+
+
+async def test_prepare_opens_the_modal():
+    applier = make_applier()
+    with patch.object(
+        applier, "extract_fields", new=AsyncMock(return_value=([], frozenset()))
+    ) as mock_extract:
+        await applier.prepare()
+    mock_extract.assert_called_once()
+
+
 # ── extract_fields() ──────────────────────────────────────────────────────────
 
 

@@ -29,6 +29,20 @@ def make_applier(url="https://boards.greenhouse.io/stripe/jobs/123"):
     return GreenhouseApplier(page, config, profile)
 
 
+# ── BaseApplier capability-hook defaults (no-op, exercised via a concrete
+# subclass that doesn't override them) ───────────────────────────────────────
+
+
+async def test_not_applicable_reason_defaults_to_none():
+    applier = make_applier()
+    assert await applier.not_applicable_reason() is None
+
+
+async def test_prepare_defaults_to_noop():
+    applier = make_applier()
+    assert await applier.prepare() is None
+
+
 def make_evaluate(tag, combobox=False, selected=""):
     """Stub of field.evaluate robust to call order/count: returns the selected
     value (single-value), the combobox flag, and the tag according to the JS called."""

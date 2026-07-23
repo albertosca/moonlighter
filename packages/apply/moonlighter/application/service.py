@@ -23,7 +23,6 @@ from moonlighter.application.appliers.ashby import AshbyApplier
 from moonlighter.application.appliers.base import BaseApplier, generate_answers
 from moonlighter.application.appliers.greenhouse import GreenhouseApplier
 from moonlighter.application.appliers.lever import LeverApplier
-from moonlighter.application.appliers.linkedin import LinkedInApplier
 from moonlighter.application.appliers.recruitee import RecruiteeApplier
 from moonlighter.application.appliers.smartrecruiters import SmartRecruitersApplier
 from moonlighter.application.appliers.workable import WorkableApplier
@@ -185,11 +184,9 @@ async def _draft_one(
             applier = await detect_applier(page, config, profile, source=job.source)
             if not applier:
                 return f"⚠️  Job #{job_id}: ATS not recognized. URL: {job.url}"
-            if isinstance(applier, LinkedInApplier) and not await applier.is_easy_apply():
-                return (
-                    f"⚠️  Job #{job_id} ({job.company}/{job.title}): does not have Easy Apply. "
-                    f"Manual application required: {job.url}"
-                )
+            reason = await applier.not_applicable_reason()
+            if reason:
+                return f"⚠️  Job #{job_id} ({job.company}/{job.title}): {reason}: {job.url}"
 
             fields, closed_set_fields = await applier.extract_fields()
             await browser.save_screenshot(page, job_id, "02-form", config)
@@ -344,8 +341,7 @@ async def _fill_open_page(
     applier = await detect_applier(page, config, profile, source=job.source)
     if applier is None:
         return None
-    if isinstance(applier, LinkedInApplier):
-        await applier.extract_fields()  # opens the modal
+    await applier.prepare()
     fill_status = await _fill_form(applier, answers, cv_path, job.id)
     await browser.save_screenshot(page, job.id, "03-filled", config)
     return applier, fill_status

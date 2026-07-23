@@ -310,6 +310,18 @@ class BaseApplier(ABC):
         """Submit the form. Return True on success."""
         ...
 
+    async def not_applicable_reason(self) -> str | None:
+        """None (default) if this applier can proceed normally. A short reason
+        string if ATS-specific gating logic determined this posting can't be
+        handled automatically (e.g. LinkedIn without Easy Apply) -- the caller
+        surfaces this to the operator instead of attempting extract_fields()."""
+        return None
+
+    async def prepare(self) -> None:  # noqa: B027 -- intentional no-op default, not abstract
+        """Optional pre-extract step some appliers need before extract_fields()/
+        fill_form() behave correctly on an already-open page (e.g. LinkedIn must
+        open the Easy Apply modal). Default: no-op."""
+
 
 async def generate_answers(
     company: str,
