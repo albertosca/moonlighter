@@ -6,7 +6,7 @@ AI-powered job application pipeline. Scans job boards, scores candidate fit via 
 
 ## How it works
 
-1. **Scan** — fetches job listings from Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters, and LinkedIn for a company list you configure, plus optional remote-first boards (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring) and Gupy, both config-gated off by default.
+1. **Scan** — fetches job listings from Greenhouse, Lever, Ashby, Recruitee, Workable, and SmartRecruiters for a company list you configure, plus optional remote-first boards (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring) and Gupy, both config-gated off by default. LinkedIn scanning/Easy Apply is available as a separate, privately-distributed plugin — see [Extending moonlighter](#extending-moonlighter) below.
 2. **Evaluate** — scores each job against your profile using an LLM; jobs below the threshold are archived automatically.
 3. **Apply** — fills and submits application forms in a real browser (Playwright), using LLM-generated answers tailored to each posting.
 4. **Track** — monitors your Gmail inbox for interview invitations and updates the pipeline status.
@@ -103,11 +103,70 @@ Restart Claude Code — the tools below will appear automatically.
 | `submit_application` | Submit an already-filled application |
 | `confirm_apply` | Fill and submit in one atomic step |
 | `retry_apply` | Retry a failed application |
-| `login` | Open browser and persist session (LinkedIn) |
+| `login` | Open browser and persist session for a platform that needs one (only available if a plugin registers it — see below) |
 | `update_status` | Manually move a job through the pipeline |
 | `setup_email` | Authorize Gmail OAuth |
 | `sync_email_responses` | Pull latest replies and classify interview stages |
 | `get_pipeline` | Full pipeline summary |
+
+## Extending moonlighter
+
+Every ATS integration you see above (Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters, Gupy)
+is a normal part of this repo — but moonlighter also supports **plugins**: separate, independently
+installed Python packages that register a new scanner or applier without forking or modifying this repo
+at all. This is how LinkedIn support is distributed — not because the mechanism is LinkedIn-specific, but
+because LinkedIn's own Terms of Service explicitly and unambiguously prohibit automation (see
+[DISCLAIMER.md](DISCLAIMER.md)), so that one integration ships as an opt-in plugin instead of bundled code
+anyone who clones this repo gets by default.
+
+### How it works
+
+A plugin is a normal Python package that:
+
+1. Depends on the `moonlighter-*` packages it needs (typically `moonlighter-core` plus whichever of
+   `moonlighter-scan`/`moonlighter-apply` it extends), pinned to a released tag of this repo.
+2. Ships its own module(s) implementing a `BaseScanner` subclass (see
+   `packages/scan/moonlighter/discovery/sources/base.py`) and/or a `BaseApplier` subclass (see
+   `packages/apply/moonlighter/application/appliers/base.py`).
+3. Declares itself via `entry_points` in its own `pyproject.toml` — no code in this repo ever imports or
+   names the plugin:
+
+```toml
+[project.entry-points."moonlighter.scanners"]
+my_platform = "my_package.my_module:MyScanner"
+
+[project.entry-points."moonlighter.appliers"]
+my_platform = "my_package.my_module:MyApplier"
+
+# Optional: a platform your applier needs a saved browser login for (the `login` MCP tool)
+[project.entry-points."moonlighter.login_urls"]
+my_platform = "my_package.my_module:MY_PLATFORM_LOGIN_URL"
+
+# Optional: a browser-based staleness check for a source with no listing API
+[project.entry-points."moonlighter.staleness_checkers"]
+my_platform = "my_package.my_module:check_staleness"
+```
+
+4. Gets installed into the **same** Python environment moonlighter runs from (`uv add --editable`/
+   `pip install` your plugin package alongside moonlighter's own dependencies). At runtime,
+   `moonlighter.core.plugins.discover_entry_points`/`discover_entry_points_by_name` enumerate whatever's
+   registered under each group — an environment with no plugins installed behaves identically to today
+   (empty list/dict, nothing breaks).
+
+Because the top-level `moonlighter` package is a [PEP 420 namespace package](https://peps.python.org/pep-0420/)
+(no `__init__.py` at that level), a plugin can even contribute its own top-level subpackage (e.g.
+`moonlighter/my_plugin/`) that coexists with `moonlighter.core`/`moonlighter.discovery`/etc. — just don't
+place files *inside* an existing subpackage like `moonlighter/discovery/sources/` or
+`moonlighter/application/appliers/`, since those are regular (non-namespace) packages owned entirely by
+this repo's own distributions, and a second distribution writing to the same path silently collides at
+install time. Give your plugin its own top-level directory instead.
+
+### Real example
+
+The private `moonlighter-linkedin` plugin (not published, for the reason above) follows exactly this
+pattern — its `LinkedInScanner`/`LinkedInApplier` live in their own `moonlighter/linkedin_ext/` package,
+registered via all four entry_points groups above. If you're building your own plugin, that's the
+reference shape to copy.
 
 ## License
 
