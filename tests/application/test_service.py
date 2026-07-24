@@ -17,6 +17,8 @@ from moonlighter.application.service import _anomaly_reasons, _render_draft
 from moonlighter.core.db import Application, Job, init_db
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
+from tests._context import make_applier_mock
+
 CONFIG = {"screenshots_dir": "/tmp/moonlighter-test-shots", "llm_model": "x", "email": {}}
 PROFILE: dict = {}
 
@@ -225,8 +227,7 @@ async def test_apply_jobs_shows_needs_review_fields(tmp_db):
     ):
         mock_browser.new_page = AsyncMock(return_value=_page(job.url))
         mock_browser.save_screenshot = AsyncMock()
-        applier = AsyncMock()
-        applier.not_applicable_reason = AsyncMock(return_value=None)
+        applier = make_applier_mock()
         applier.extract_fields = AsyncMock(return_value=(["Work auth?", "Name"], frozenset()))
         mock_detect.return_value = applier
         result = await apply_service.apply_jobs([job.id], CONFIG, PROFILE, MagicMock())
@@ -257,8 +258,7 @@ async def test_apply_jobs_survives_networkidle_timeout_on_spa_with_persistent_tr
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
-        applier = AsyncMock()
-        applier.not_applicable_reason = AsyncMock(return_value=None)
+        applier = make_applier_mock()
         applier.extract_fields = AsyncMock(return_value=(["Name"], frozenset()))
         mock_detect.return_value = applier
         result = await apply_service.apply_jobs([job.id], CONFIG, PROFILE, MagicMock())
@@ -474,8 +474,7 @@ async def test_fill_open_page_calls_prepare_hook(tmp_db, tmp_path):
     init_db()
     job = _job(url="https://boards.greenhouse.io/acme/jobs/1")
     page = _page(job.url)
-    applier = MagicMock()
-    applier.prepare = AsyncMock()
+    applier = make_applier_mock(MagicMock())
     applier.extract_fields = AsyncMock(return_value=(["Field"], frozenset()))
     applier.fill_form = AsyncMock(return_value={"Field": "filled"})
 

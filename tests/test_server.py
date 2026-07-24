@@ -10,7 +10,7 @@ from moonlighter.core.db import Application, Job, ScanLog, init_db
 from moonlighter.core.metrics import record_call
 from moonlighter.discovery.evaluator import EvaluationResult
 
-from tests._context import make_test_context
+from tests._context import make_applier_mock, make_test_context
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -537,8 +537,7 @@ async def test_apply_jobs_creates_draft(tmp_db):
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
-        mock_applier = AsyncMock()
-        mock_applier.not_applicable_reason = AsyncMock(return_value=None)
+        mock_applier = make_applier_mock()
         mock_applier.extract_fields = AsyncMock(return_value=(["Q"], frozenset()))
         mock_detect.return_value = mock_applier
         from moonlighter.server import apply_jobs
@@ -588,8 +587,7 @@ async def test_apply_jobs_updates_job_status(tmp_db):
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
-        mock_applier = AsyncMock()
-        mock_applier.not_applicable_reason = AsyncMock(return_value=None)
+        mock_applier = make_applier_mock()
         mock_applier.extract_fields = AsyncMock(return_value=(["Q"], frozenset()))
         mock_detect.return_value = mock_applier
         from moonlighter.server import apply_jobs
@@ -691,8 +689,7 @@ async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
-        mock_applier = MagicMock()
-        mock_applier.prepare = AsyncMock()
+        mock_applier = make_applier_mock(MagicMock())
         mock_applier.fill_form = fake_fill
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
@@ -732,8 +729,7 @@ async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.hide_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
-        mock_applier = MagicMock()
-        mock_applier.prepare = AsyncMock()
+        mock_applier = make_applier_mock(MagicMock())
         mock_applier.fill_form = fake_fill
         mock_applier.submit = AsyncMock(return_value="submitted")
         mock_detect.return_value = mock_applier
@@ -771,8 +767,7 @@ async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
         mock_browser.hide_window = AsyncMock()
         mock_browser.show_window = AsyncMock()
         mock_browser.save_screenshot = AsyncMock()
-        mock_applier = MagicMock()
-        mock_applier.prepare = AsyncMock()
+        mock_applier = make_applier_mock(MagicMock())
         mock_applier.fill_form = AsyncMock(side_effect=Exception("browser crash"))
         mock_detect.return_value = mock_applier
         from moonlighter.server import confirm_apply
@@ -1435,8 +1430,7 @@ async def test_apply_jobs_llm_error_still_creates_draft(tmp_db):
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
-        mock_applier = AsyncMock()
-        mock_applier.not_applicable_reason = AsyncMock(return_value=None)
+        mock_applier = make_applier_mock()
         mock_applier.extract_fields = AsyncMock(return_value=(["Q"], frozenset()))
         mock_detect.return_value = mock_applier
         from moonlighter.server import apply_jobs
@@ -1466,8 +1460,7 @@ async def test_apply_jobs_updates_existing_draft(tmp_db):
     ):
         mock_browser.new_page = AsyncMock(return_value=page)
         mock_browser.save_screenshot = AsyncMock()
-        mock_applier = AsyncMock()
-        mock_applier.not_applicable_reason = AsyncMock(return_value=None)
+        mock_applier = make_applier_mock()
         mock_applier.extract_fields = AsyncMock(return_value=(["NewQ"], frozenset()))
         mock_detect.return_value = mock_applier
         from moonlighter.server import apply_jobs
@@ -1494,8 +1487,7 @@ async def test_apply_jobs_exception_continues_to_next(tmp_db):
         detect_calls[0] += 1
         if detect_calls[0] == 1:
             raise Exception("ATS detection crashed on job 1")
-        mock_applier = AsyncMock()
-        mock_applier.not_applicable_reason = AsyncMock(return_value=None)
+        mock_applier = make_applier_mock()
         mock_applier.extract_fields = AsyncMock(return_value=(["Q"], frozenset()))
         return mock_applier
 
