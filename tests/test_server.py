@@ -556,6 +556,30 @@ async def test_apply_jobs_job_not_found(tmp_db):
     assert "not found" in result
 
 
+async def test_apply_jobs_detects_closed_job_page(tmp_db):
+    """A posting whose page shows a 'no longer accepting applications'-style
+    marker is reported cleanly, short-circuiting before ATS detection/form
+    extraction — instead of a wall of field-fill failures against a page that
+    was never a real application form to begin with."""
+    init_db()
+    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/closed1")
+    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/closed1")
+    page.inner_text = AsyncMock(return_value="This job is no longer accepting applications.")
+    with (
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch("moonlighter.application.service.detect_applier") as mock_detect,
+    ):
+        mock_browser.new_page = AsyncMock(return_value=page)
+        mock_browser.save_screenshot = AsyncMock()
+        from moonlighter.server import apply_jobs
+
+        result = await apply_jobs(ids=[job.id], ctx=make_test_context())
+    assert "closed" in result.lower()
+    mock_detect.assert_not_called()
+    assert Job.get_by_id(job.id).status == "closed"
+    assert Job.get_by_id(job.id).closed_at is not None
+
+
 async def test_apply_jobs_unknown_ats(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://unknownats.com/jobs/1")

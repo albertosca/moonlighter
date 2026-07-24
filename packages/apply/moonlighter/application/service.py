@@ -44,6 +44,27 @@ _URL_RE = re.compile(r"https?://", re.IGNORECASE)
 _EMAIL_RE = re.compile(r"[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,24}")
 _PHONE_RE = re.compile(r"(?:\+?\d[\s\-().]*){9,}")
 
+# A closed posting reads the same across ATS platforms regardless of applier --
+# checked once, generically, before spending an ATS-detection + form-extraction
+# pass on a page that was never a real application form to begin with.
+_CLOSED_JOB_MARKERS = (
+    "no longer accepting applications",
+    "this job is no longer available",
+    "position has been filled",
+    "posting is closed",
+)
+
+
+async def _is_job_closed(page: Page) -> bool:
+    """Best-effort: any error (detached page, unexpected DOM) means "don't
+    know" -- defaults to False, never raises. Same page.inner_text('body')
+    call base.py's _confirm_submitted already uses for the same reason."""
+    try:
+        body = (await page.inner_text("body")).lower()
+    except Exception:
+        return False
+    return any(marker in body for marker in _CLOSED_JOB_MARKERS)
+
 
 def _anomaly_reasons(
     answer: str, other_answers: list[str], is_closed_set: bool = False
@@ -180,6 +201,12 @@ async def _draft_one(
             with contextlib.suppress(PlaywrightTimeout):
                 await page.wait_for_load_state("networkidle", timeout=15000)
             await browser.save_screenshot(page, job_id, "01-job-page", config)
+
+            if await _is_job_closed(page):
+                job.status = "closed"
+                job.closed_at = datetime.now()
+                job.save()
+                return f"⚠️  Job #{job_id} ({job.company}/{job.title}): posting appears closed. URL: {job.url}"
 
             applier = await detect_applier(page, config, profile, source=job.source)
             if not applier:
