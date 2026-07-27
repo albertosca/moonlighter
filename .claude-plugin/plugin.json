@@ -8,11 +8,5 @@
   },
   "homepage": "https://github.com/albertosca/moonlighter",
   "license": "AGPL-3.0-only",
-  "keywords": ["jobs", "job-search", "automation", "ats", "mcp"],
-  "mcpServers": {
-    "moonlighter": {
-      "command": "uvx",
-      "args": ["moonlighter"]
-    }
-  }
+  "keywords": ["jobs", "job-search", "automation", "ats", "mcp"]
 }
