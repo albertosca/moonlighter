@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 *.egg-info/
 .superpowers/
+.claude/
 
 # Personal data — kept on disk locally, out of the repo. Generic templates
 # (.example) get added when preparing the public release.
