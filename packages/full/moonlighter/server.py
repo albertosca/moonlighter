@@ -430,7 +430,14 @@ async def sync_email_responses(*, ctx: Context[ServerSession, AppContext, Any]) 
         return "\n".join(lines)
 
 
-def main() -> None:  # pragma: no cover - entry-point do servidor MCP (boundary)
+def main() -> None:  # pragma: no cover - MCP server entry point (boundary)
+    import sys
+
+    if len(sys.argv) > 1 and sys.argv[1] == "init":
+        from moonlighter.init import main as init_main
+
+        init_main()
+        return
     mcp.run()
 
 

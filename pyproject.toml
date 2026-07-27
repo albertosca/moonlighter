@@ -45,6 +45,7 @@ source_pkgs = [
     "moonlighter.startup",
     "moonlighter.views",
     "moonlighter._tool_logging",
+    "moonlighter.init",
 ]
 branch = true
 omit = [
