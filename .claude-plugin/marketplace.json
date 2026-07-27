@@ -1,0 +1,14 @@
+{
+  "name": "moonlighter",
+  "owner": {
+    "name": "albertosca",
+    "url": "https://github.com/albertosca"
+  },
+  "plugins": [
+    {
+      "name": "moonlighter",
+      "source": "./",
+      "description": "Scan job boards, score fit with an LLM, and fill applications in a real browser -- driven from Claude."
+    }
+  ]
+}
