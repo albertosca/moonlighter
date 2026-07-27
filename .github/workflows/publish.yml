@@ -1,5 +1,26 @@
 name: Publish
 
+# One-time setup required before the first tag push:
+#
+# 1. PyPI trusted publishing must be configured per package, BEFORE the package
+#    exists on PyPI. For each of the five names -- moonlighter-core,
+#    moonlighter-scan, moonlighter-apply, moonlighter-email, moonlighter-full --
+#    create a "pending publisher" at https://pypi.org/manage/account/publishing/
+#    with owner `albertosca`, repository `moonlighter`, workflow `publish.yml`,
+#    and environment `pypi`. Without this, the first run fails with an OIDC
+#    error that does not name the missing configuration.
+#
+# 2. All five packages are versioned in lockstep, and moonlighter-full pins its
+#    four siblings with `==`. A release therefore requires bumping the version in
+#    all five pyproject.toml files AND the four pins in packages/full, together
+#    with the tag. Nothing here enforces that -- a mismatch produces a package
+#    that cannot resolve at install time.
+#
+# Note: PyPI validates dependency *format*, not *existence*, so publishing all
+# five in one run is safe even though moonlighter-full pins siblings that upload
+# moments later. There is a brief window during upload where an install could
+# fail to resolve.
+
 on:
   push:
     tags: ['v*']
