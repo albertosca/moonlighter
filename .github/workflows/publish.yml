@@ -1,0 +1,23 @@
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write        # PyPI trusted publishing -- no API token stored
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.14'
+
+      - name: Build all packages
+        run: uv build --all-packages
+
+      - name: Publish to PyPI
+        run: uv publish
