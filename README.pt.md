@@ -65,6 +65,8 @@ Usa outro cliente MCP? Registre o mesmo comando e argumentos (`uvx` / `["moonlig
 mecanismo de registro do seu próprio cliente — o comando `claude mcp add-json` acima é específico
 da CLI do Claude Code.
 
+### Depois de qualquer uma das opções
+
 O assistente grava o `config.yaml` no `MOONLIGHTER_HOME` (padrão: `~/.moonlighter/`). Dois arquivos
 ainda precisam da sua entrada:
 
@@ -75,7 +77,7 @@ ainda precisam da sua entrada:
 
 Comece a partir de [`profile.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/profile.example.yaml) e [`company_list.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/company_list.example.yaml).
 
-O assistente grava um `config.yaml` mínimo; o [`config.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/config.example.yaml) documenta o resto da superfície de configuração, principalmente o bloco `cv` (obrigatório — o `confirm_apply` aborta sem ele) e o bloco `email`. Os três arquivos ficam em `MOONLIGHTER_HOME` (padrão: `~/.moonlighter/`).
+O assistente grava um `config.yaml` mínimo; o [`config.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/config.example.yaml) documenta o resto da superfície de configuração, principalmente o bloco `cv` (obrigatório — o `confirm_apply` aborta sem ele) e o bloco `email`. `profile.yaml`, `company_list.yaml`, `config.yaml` e `cv.pdf` (seu currículo, enviado junto com as candidaturas) ficam todos em `MOONLIGHTER_HOME` (padrão: `~/.moonlighter/`).
 
 Reinicie o Claude Code, ou inicie uma nova sessão, para que as ferramentas do moonlighter apareçam.
 

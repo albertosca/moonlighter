@@ -48,8 +48,8 @@ review it like any other change.
 
 You also have the option not to. moonlighter discovers scanners and appliers through
 `entry_points`, so you can ship one as a separate package without touching this repo at all, and
-keep it on your own release schedule under whatever license you like. See the "Extending
-moonlighter" section of the [README](README.md).
+keep it on your own release schedule under whatever license you like. See the "Extensions (adding
+a new ATS)" section of the [README](README.md).
 
 Both paths are supported. Pick whichever fits how you want to maintain it.
 
