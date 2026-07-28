@@ -8,9 +8,8 @@ the one legal step required before a pull request can be merged.
 Every pull request requires a signed [CLA](CLA.md). This is automated: open a PR and a bot will
 comment with instructions. Signing is a one-time comment on your first PR.
 
-**Why a CLA and not just the AGPL?** The project is AGPL-3.0 and will stay that way. The CLA
-grants the maintainer the additional right to offer a commercially licensed version. Without it,
-that option would be permanently foreclosed once contributions land.
+**Why a CLA and not just the AGPL?** The public project remains AGPL-3.0. The CLA additionally
+lets the maintainer offer a separately licensed commercial version built on top of contributions.
 
 ## Development setup
 
@@ -27,9 +26,16 @@ Every change must pass all three before review:
 ```bash
 uv run pytest                    # 100% branch coverage is enforced
 uv run ruff check . && uv run ruff format --check .
-uv run mypy --package moonlighter.core --package moonlighter.discovery \
-            --package moonlighter.application --package moonlighter.tracking \
-            --package moonlighter.server
+uv run mypy \
+  --package moonlighter.core \
+  --package moonlighter.discovery \
+  --package moonlighter.application \
+  --package moonlighter.tracking \
+  --package moonlighter.server \
+  --package moonlighter.startup \
+  --package moonlighter.views \
+  --package moonlighter._tool_logging \
+  --package moonlighter.init
 ```
 
 Tests are written first. Coverage is gated at 100% — use `# pragma: no cover` only for
@@ -49,4 +55,4 @@ Both paths are supported. Pick whichever fits how you want to maintain it.
 
 ## Reporting security issues
 
-Do not open a public issue. Email the maintainer directly.
+Do not open a public issue. See [SECURITY.md](SECURITY.md) for how to report a vulnerability.

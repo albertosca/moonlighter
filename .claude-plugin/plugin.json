@@ -8,5 +8,6 @@
   },
   "homepage": "https://github.com/albertosca/moonlighter",
   "license": "AGPL-3.0-only",
-  "keywords": ["jobs", "job-search", "automation", "ats", "mcp"]
+  "keywords": ["jobs", "job-search", "automation", "ats", "mcp"],
+  "mcpServers": "./.claude-plugin/.mcp.json"
 }

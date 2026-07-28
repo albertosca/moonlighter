@@ -8,10 +8,10 @@ resolution-markers = [
 
 [manifest]
 members = [
+    "moonlighter",
     "moonlighter-apply",
     "moonlighter-core",
     "moonlighter-email",
-    "moonlighter-full",
     "moonlighter-scan",
 ]
 
@@ -943,6 +943,27 @@ wheels = [
 ]
 
 [[package]]
+name = "moonlighter"
+version = "0.1.0"
+source = { editable = "packages/full" }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "moonlighter-apply" },
+    { name = "moonlighter-core" },
+    { name = "moonlighter-email" },
+    { name = "moonlighter-scan" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastmcp", specifier = ">=2.0" },
+    { name = "moonlighter-apply", editable = "packages/apply" },
+    { name = "moonlighter-core", editable = "packages/core" },
+    { name = "moonlighter-email", editable = "packages/email" },
+    { name = "moonlighter-scan", editable = "packages/scan" },
+]
+
+[[package]]
 name = "moonlighter-apply"
 version = "0.1.0"
 source = { editable = "packages/apply" }
@@ -991,27 +1012,6 @@ requires-dist = [
     { name = "google-auth-httplib2", specifier = ">=0.2" },
     { name = "google-auth-oauthlib", specifier = ">=1.1" },
     { name = "moonlighter-core", editable = "packages/core" },
-]
-
-[[package]]
-name = "moonlighter-full"
-version = "0.1.0"
-source = { editable = "packages/full" }
-dependencies = [
-    { name = "fastmcp" },
-    { name = "moonlighter-apply" },
-    { name = "moonlighter-core" },
-    { name = "moonlighter-email" },
-    { name = "moonlighter-scan" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastmcp", specifier = ">=2.0" },
-    { name = "moonlighter-apply", editable = "packages/apply" },
-    { name = "moonlighter-core", editable = "packages/core" },
-    { name = "moonlighter-email", editable = "packages/email" },
-    { name = "moonlighter-scan", editable = "packages/scan" },
 ]
 
 [[package]]

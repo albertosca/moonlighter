@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "moonlighter-full"
+name = "moonlighter"
 version = "0.1.0"
 description = "Full moonlighter bundle — MCP server exposing all tools to Claude"
 license = {text = "AGPL-3.0-only"}

@@ -23,7 +23,7 @@ Um [workspace uv](https://docs.astral.sh/uv/concepts/workspaces/) com 5 namespac
 | `moonlighter-scan` | `moonlighter.discovery` | Scrapers de ATS e scoring de vagas via LLM |
 | `moonlighter-apply` | `moonlighter.application` | Preenchedor de formulários, gerador de respostas, work-auth |
 | `moonlighter-email` | `moonlighter.tracking` | Sincronização com Gmail e classificação de estágios de entrevista |
-| `moonlighter-full` | `moonlighter.server` | Servidor FastMCP — conecta todos os pacotes |
+| `moonlighter` | `moonlighter.server` | Servidor FastMCP — conecta todos os pacotes |
 
 ## Requisitos
 
@@ -38,7 +38,10 @@ Um [workspace uv](https://docs.astral.sh/uv/concepts/workspaces/) com 5 namespac
 
 ```
 /plugin marketplace add albertosca/moonlighter
+/plugin install moonlighter@moonlighter
 ```
+
+O primeiro comando registra o marketplace; o segundo instala o plugin a partir dele.
 
 Depois rode o assistente de configuração:
 
@@ -73,7 +76,7 @@ ainda precisam da sua entrada:
 | `profile.yaml` | Sua experiência, skills e `criteria` (os filtros hard e soft que guiam o scoring) |
 | `company_list.yaml` | As empresas a escanear e qual ATS cada uma usa |
 
-Comece a partir de `profile.example.yaml` e `company_list.example.yaml` neste repositório.
+Comece a partir de [`profile.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/profile.example.yaml) e [`company_list.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/company_list.example.yaml).
 
 ### Rastreamento por Gmail (opcional)
 
