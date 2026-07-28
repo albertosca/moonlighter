@@ -13,8 +13,9 @@ name: Publish
 # 2. All five packages are versioned in lockstep, and moonlighter pins its
 #    four siblings with `==`. A release therefore requires bumping the version in
 #    all five pyproject.toml files AND the four pins in packages/full, together
-#    with the tag. Nothing here enforces that -- a mismatch produces a package
-#    that cannot resolve at install time.
+#    with the tag. The two verification steps below enforce that and stop the
+#    run before anything is uploaded -- a mismatch would otherwise produce a
+#    package that uploads cleanly and cannot resolve at install time.
 #
 # Note: PyPI validates dependency *format*, not *existence*, so publishing all
 # five in one run is safe even though moonlighter pins siblings that upload
@@ -36,6 +37,21 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: '3.14'
+
+      # Both checks run before the build: PyPI uploads are irreversible, and a
+      # version that is wrong is only discovered by the user who tries to
+      # install it.
+      - name: Verify versions and sibling pins agree across the workspace
+        run: uv run pytest tests/test_packaging.py --no-cov -q
+
+      - name: Verify the tag matches the packaged version
+        run: |
+          version=$(uv run python -c \
+            "import tomllib,pathlib;print(tomllib.loads(pathlib.Path('packages/full/pyproject.toml').read_text())['project']['version'])")
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match packaged version $version. Bump the five pyproject.toml files and the four pins, or retag v$version."
+            exit 1
+          fi
 
       - name: Build all packages
         run: uv build --all-packages
