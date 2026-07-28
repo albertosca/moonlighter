@@ -81,6 +81,8 @@ The wizard writes a minimal `config.yaml`; [`config.example.yaml`](https://raw.g
 `confirm_apply` uploads `cv.pdf` from `MOONLIGHTER_HOME`, and aborts if that file is missing) and
 the `email` block. `profile.yaml`, `company_list.yaml`, `config.yaml`, and `cv.pdf` (your resume, uploaded with applications) all belong in `MOONLIGHTER_HOME` (defaults to `~/.moonlighter/`).
 
+Once connected, ask Claude to run `get_pipeline` — besides the application funnel, it reports setup problems such as a missing profile, CV, or browser.
+
 Restart Claude Code, or start a new session, before the moonlighter tools appear.
 
 ### Gmail tracking (optional)

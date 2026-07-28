@@ -924,6 +924,57 @@ async def test_get_pipeline_skips_empty_statuses(tmp_db):
     assert "## Offer" not in result
 
 
+async def test_get_pipeline_shows_warnings_when_setup_incomplete(tmp_db):
+    """An empty profile (the make_test_context default) surfaces a Setup Warnings
+    section with a distinguishable marker, prepended before the pipeline itself."""
+    init_db()
+    from moonlighter.server import get_pipeline
+
+    result = await get_pipeline(ctx=make_test_context(profile={}))
+    assert "# Setup Warnings" in result
+    assert "[WARN]" in result or "[ERROR]" in result
+    assert result.index("# Setup Warnings") < result.index("# Application Pipeline")
+
+
+async def test_get_pipeline_no_warnings_section_when_setup_is_clean(tmp_db, tmp_path):
+    """A fully-configured setup (real profile, real cv.pdf, cli backend, existing
+    browser) produces zero warnings -> no Setup Warnings section at all, and the
+    pipeline output is unchanged from the pre-existing behavior."""
+    init_db()
+    from moonlighter.server import get_pipeline
+
+    cv = tmp_path / "cv.pdf"
+    cv.write_text("fake cv")
+    browser = tmp_path / "browser"
+    browser.write_text("fake browser")
+    config = {"llm_backend": "cli", "browser_path": str(browser)}
+    profile = {"skills": ["python"]}
+
+    with patch("moonlighter.startup.moonlighter_home", return_value=tmp_path):
+        result = await get_pipeline(ctx=make_test_context(config=config, profile=profile))
+    assert "# Setup Warnings" not in result
+    assert result.startswith("# Application Pipeline")
+
+
+async def test_get_pipeline_warnings_distinguish_error_and_warn_levels(tmp_db, tmp_path):
+    """No ANTHROPIC_API_KEY + api backend -> an 'error'-level warning; missing cv.pdf
+    -> a 'warn'-level warning. Both render with their own marker in the same call."""
+    init_db()
+    from moonlighter.server import get_pipeline
+
+    with (
+        patch("moonlighter.startup.moonlighter_home", return_value=tmp_path),
+        patch.dict("os.environ", {}, clear=False),
+    ):
+        import os as _os
+
+        _os.environ.pop("ANTHROPIC_API_KEY", None)
+        config = {"llm_backend": "api"}
+        result = await get_pipeline(ctx=make_test_context(config=config, profile={"skills": []}))
+    assert "[ERROR]" in result
+    assert "[WARN]" in result
+
+
 # ── update_status ─────────────────────────────────────────────────────────────
 
 

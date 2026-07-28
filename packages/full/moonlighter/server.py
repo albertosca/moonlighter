@@ -294,6 +294,8 @@ async def retry_apply(job_id: int, *, ctx: Context[ServerSession, AppContext, An
 @tool_logged
 async def get_pipeline(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
     """Show full application funnel: counts and list by status."""
+    app = ctx.request_context.lifespan_context
+    warnings = validate_startup(app.config, app.profile)
     statuses = [
         "draft",
         "needs_review",
@@ -303,7 +305,14 @@ async def get_pipeline(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
         "offer",
         "rejected",
     ]
-    lines = ["# Application Pipeline\n"]
+    lines: list[str] = []
+    if warnings:
+        lines.append("# Setup Warnings\n")
+        for w in warnings:
+            marker = "ERROR" if w.level == "error" else "WARN"
+            lines.append(f"- [{marker}] {w.message}")
+        lines.append("")
+    lines.append("# Application Pipeline\n")
     for status in statuses:
         apps = list(
             Application.select(Application, Job)

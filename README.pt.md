@@ -81,6 +81,8 @@ O assistente grava um `config.yaml` mínimo; o [`config.example.yaml`](https://r
 padrão o `confirm_apply` envia o `cv.pdf` do `MOONLIGHTER_HOME`, e aborta se esse arquivo não
 existir) e o bloco `email`. `profile.yaml`, `company_list.yaml`, `config.yaml` e `cv.pdf` (seu currículo, enviado junto com as candidaturas) ficam todos em `MOONLIGHTER_HOME` (padrão: `~/.moonlighter/`).
 
+Depois de conectado, peça ao Claude para rodar `get_pipeline` — além do funil de candidaturas, ele reporta problemas de configuração como perfil, currículo ou navegador ausentes.
+
 Reinicie o Claude Code, ou inicie uma nova sessão, para que as ferramentas do moonlighter apareçam.
 
 ### Rastreamento por Gmail (opcional)

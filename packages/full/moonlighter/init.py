@@ -92,3 +92,4 @@ def main() -> None:  # pragma: no cover - interactive I/O boundary
         '  claude mcp add-json --scope user moonlighter \'{"command":"uvx","args":["moonlighter"]}\''
     )
     print('\nUsing a different MCP client? Register uvx / ["moonlighter"] with its own mechanism.')
+    print("\nOnce connected, ask Claude to run get_pipeline to check your setup for problems.")
