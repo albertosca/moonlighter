@@ -6,7 +6,7 @@ Pipeline de candidatura a vagas com IA. Escaneia portais de emprego, avalia o fi
 
 ## Como funciona
 
-1. **Scan** — busca vagas no Greenhouse, Lever, Ashby, Recruitee, Workable e SmartRecruiters para a lista de empresas que você configura, além de portais remote-first opcionais (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring) e Gupy, ambos desativados por padrão (config-gated). O scan/Easy Apply do LinkedIn está disponível como um plugin separado, distribuído de forma privada — veja [Estendendo o moonlighter](#estendendo-o-moonlighter) abaixo.
+1. **Scan** — busca vagas no Greenhouse, Lever, Ashby, Recruitee, Workable e SmartRecruiters para a lista de empresas que você configura, além de portais remote-first opcionais (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring) e Gupy, ambos desativados por padrão (config-gated). O scan/Easy Apply do LinkedIn está disponível como uma extensão separada, distribuída de forma privada — veja [Extensões (adicionando um novo ATS)](#extensões-adicionando-um-novo-ats) abaixo.
 2. **Avaliação** — pontua cada vaga em relação ao seu perfil via LLM; vagas abaixo do limiar são arquivadas automaticamente.
 3. **Candidatura** — preenche e envia formulários de candidatura num browser real (Playwright), com respostas geradas pelo LLM sob medida para cada vaga.
 4. **Monitoramento** — monitora sua caixa do Gmail em busca de convites para entrevista e atualiza o status do pipeline.
@@ -27,68 +27,64 @@ Um [workspace uv](https://docs.astral.sh/uv/concepts/workspaces/) com 5 namespac
 
 ## Requisitos
 
-- Python 3.14+
-- [uv](https://docs.astral.sh/uv/)
-- Chrome, Chromium ou Brave (para automação de browser)
+- [uv](https://docs.astral.sh/uv/) — baixa o Python 3.14 pra você; não precisa instalar separado
+- Chrome, Chromium ou Brave (o moonlighter dirige um browser de verdade pra suas sessões logadas funcionarem)
 - [Claude Code CLI](https://claude.ai/code) — ou `ANTHROPIC_API_KEY` para `llm_backend: api`
 - Credenciais OAuth do Gmail (opcional — só para rastreamento de e-mails)
 
 ## Instalação
 
-### 1. Instalar
+### Opção A — plugin do Claude Code (recomendado)
 
-```bash
-git clone https://github.com/albertosca/moonlighter
-cd moonlighter
-uv sync --all-packages
+```
+/plugin marketplace add albertosca/moonlighter
 ```
 
-### 2. Configurar
-
-Copie os arquivos de exemplo para o `MOONLIGHTER_HOME` (padrão: `~/.moonlighter/`) e edite:
+Depois rode o assistente de configuração:
 
 ```bash
-mkdir -p ~/.moonlighter
-cp config.example.yaml ~/.moonlighter/config.yaml
-cp profile.example.yaml ~/.moonlighter/profile.yaml
-cp company_list.example.yaml ~/.moonlighter/company_list.yaml
+uvx moonlighter init
 ```
 
-Campos principais do `config.yaml`:
+### Opção B — qualquer cliente MCP
 
-| Campo | Descrição |
-|-------|-----------|
-| `browser_path` | Caminho para o executável do Chrome/Chromium/Brave |
-| `llm_backend` | `"cli"` (sessão do Claude Code) ou `"api"` (API key da Anthropic) |
-| `score_threshold` | Vagas abaixo desta pontuação (0–10) são arquivadas |
-| `work_authorization` | Seu país de cidadania e as strings de resposta para os formulários ATS |
+```bash
+uvx moonlighter init
+```
 
-Preencha `profile.yaml` com sua experiência real, skills e `criteria` (os filtros hard/soft guiam o scoring).
-
-Edite `company_list.yaml` para adicionar as empresas e plataformas ATS que quer escanear.
-
-### 3. Rastreamento por Gmail (opcional)
-
-1. Crie um projeto no [Google Cloud Console](https://console.cloud.google.com), ative a API do Gmail e baixe as credenciais OAuth como `client.json`.
-2. Coloque o arquivo em `~/.moonlighter/gmail-client.json`.
-3. Na primeira chamada a `setup_email`, um browser abrirá para autorização e o token será salvo.
-
-### 4. Registrar como servidor MCP
-
-Adicione ao `~/.claude/settings.json` (ou ao `settings.json` do projeto):
+Depois adicione ao `~/.claude/settings.json` (ou ao equivalente do seu cliente):
 
 ```json
 {
   "mcpServers": {
     "moonlighter": {
-      "command": "/caminho/para/moonlighter/.venv/bin/python",
-      "args": ["-m", "moonlighter.server"]
+      "command": "uvx",
+      "args": ["moonlighter"]
     }
   }
 }
 ```
 
-Reinicie o Claude Code — as ferramentas abaixo aparecem automaticamente.
+O assistente grava o `config.yaml` no `MOONLIGHTER_HOME` (padrão: `~/.moonlighter/`). Dois arquivos
+ainda precisam da sua entrada:
+
+| Arquivo | O que colocar |
+|---------|----------------|
+| `profile.yaml` | Sua experiência, skills e `criteria` (os filtros hard e soft que guiam o scoring) |
+| `company_list.yaml` | As empresas a escanear e qual ATS cada uma usa |
+
+Comece a partir de `profile.example.yaml` e `company_list.example.yaml` neste repositório.
+
+### Rastreamento por Gmail (opcional)
+
+1. Crie um projeto no [Google Cloud Console](https://console.cloud.google.com), ative a API do
+   Gmail e baixe as credenciais OAuth como `client.json`.
+2. Coloque o arquivo em `~/.moonlighter/gmail-client.json`.
+3. Na primeira chamada a `setup_email`, um browser abrirá para autorização e o token será salvo.
+
+### Desenvolvendo no moonlighter
+
+Pra trabalhar no código em vez de só usar a ferramenta, veja [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Ferramentas MCP
 
@@ -103,26 +99,26 @@ Reinicie o Claude Code — as ferramentas abaixo aparecem automaticamente.
 | `submit_application` | Envia uma candidatura já preenchida |
 | `confirm_apply` | Preenche e envia em uma única etapa atômica |
 | `retry_apply` | Retenta uma candidatura com falha |
-| `login` | Abre o browser e persiste a sessão pra uma plataforma que precisa disso (só disponível se algum plugin a registrar — veja abaixo) |
+| `login` | Abre o browser e persiste a sessão pra uma plataforma que precisa disso (só disponível se alguma extensão a registrar — veja abaixo) |
 | `update_status` | Move uma vaga manualmente pelo pipeline |
 | `setup_email` | Autoriza OAuth do Gmail |
 | `sync_email_responses` | Busca respostas recentes e classifica estágios de entrevista |
 | `get_pipeline` | Resumo completo do pipeline |
 
-## Estendendo o moonlighter
+## Extensões (adicionando um novo ATS)
 
 Toda integração de ATS que você vê acima (Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters,
-Gupy) é parte normal deste repositório — mas o moonlighter também suporta **plugins**: pacotes Python
+Gupy) é parte normal deste repositório — mas o moonlighter também suporta **extensões**: pacotes Python
 separados, instalados de forma independente, que registram um novo scanner ou applier sem precisar dar
 fork ou modificar este repositório de jeito nenhum. É assim que o suporte ao LinkedIn é distribuído — não
 porque o mecanismo seja específico do LinkedIn, mas porque os próprios Termos de Uso do LinkedIn proíbem
 automação de forma explícita e inequívoca (veja [DISCLAIMER.md](DISCLAIMER.md)), então essa integração
-específica é distribuída como um plugin opcional em vez de código embutido que qualquer um que clonar este
-repo já ganha por padrão.
+específica é distribuída como uma extensão opcional em vez de código embutido que qualquer um que clonar
+este repo já ganha por padrão.
 
 ### Como funciona
 
-Um plugin é um pacote Python normal que:
+Uma extensão é um pacote Python normal que:
 
 1. Depende dos pacotes `moonlighter-*` que precisar (tipicamente `moonlighter-core` mais qualquer um de
    `moonlighter-scan`/`moonlighter-apply` que ele estenda), fixado numa tag lançada deste repositório.
@@ -130,7 +126,7 @@ Um plugin é um pacote Python normal que:
    `packages/scan/moonlighter/discovery/sources/base.py`) e/ou de `BaseApplier` (veja
    `packages/apply/moonlighter/application/appliers/base.py`).
 3. Se declara via `entry_points` no próprio `pyproject.toml` — nenhum código deste repositório importa ou
-   cita o plugin em nenhum momento:
+   cita a extensão em nenhum momento:
 
 ```toml
 [project.entry-points."moonlighter.scanners"]
@@ -149,24 +145,24 @@ minha_plataforma = "meu_pacote.meu_modulo:check_staleness"
 ```
 
 4. É instalado no **mesmo** ambiente Python de onde o moonlighter roda (`uv add --editable`/`pip install`
-   o pacote do seu plugin junto com as próprias dependências do moonlighter). Em tempo de execução,
+   o pacote da sua extensão junto com as próprias dependências do moonlighter). Em tempo de execução,
    `moonlighter.core.plugins.discover_entry_points`/`discover_entry_points_by_name` enumeram o que estiver
-   registrado em cada grupo — um ambiente sem nenhum plugin instalado se comporta exatamente como hoje
+   registrado em cada grupo — um ambiente sem nenhuma extensão instalada se comporta exatamente como hoje
    (lista/dict vazio, nada quebra).
 
 Como o pacote de nível raiz `moonlighter` é um [namespace package PEP 420](https://peps.python.org/pep-0420/)
-(sem `__init__.py` nesse nível), um plugin pode até trazer seu próprio subpacote de nível raiz (ex:
-`moonlighter/meu_plugin/`) que coexiste com `moonlighter.core`/`moonlighter.discovery`/etc. — só não
+(sem `__init__.py` nesse nível), uma extensão pode até trazer seu próprio subpacote de nível raiz (ex:
+`moonlighter/minha_extensao/`) que coexiste com `moonlighter.core`/`moonlighter.discovery`/etc. — só não
 coloque arquivos *dentro* de um subpacote já existente como `moonlighter/discovery/sources/` ou
 `moonlighter/application/appliers/`, já que esses são pacotes regulares (não-namespace) pertencentes
 inteiramente às distribuições deste repositório, e uma segunda distribuição escrevendo no mesmo caminho
-colide silenciosamente na instalação. Dê ao seu plugin o próprio diretório de nível raiz.
+colide silenciosamente na instalação. Dê à sua extensão o próprio diretório de nível raiz.
 
 ### Exemplo real
 
-O plugin privado `moonlighter-linkedin` (não publicado, pelo motivo acima) segue exatamente esse padrão —
-o `LinkedInScanner`/`LinkedInApplier` dele vivem no próprio pacote `moonlighter/linkedin_ext/`, registrados
-via os quatro grupos de entry_points acima. Se você for construir seu próprio plugin, essa é a forma de
+A extensão privada `moonlighter-linkedin` (não publicada, pelo motivo acima) segue exatamente esse padrão —
+o `LinkedInScanner`/`LinkedInApplier` dela vivem no próprio pacote `moonlighter/linkedin_ext/`, registrados
+via os quatro grupos de entry_points acima. Se você for construir sua própria extensão, essa é a forma de
 referência a copiar.
 
 ## Licença
