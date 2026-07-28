@@ -87,10 +87,8 @@ def main() -> None:  # pragma: no cover - interactive I/O boundary
     print(f"\nWrote {config_path}")
     print(f"\nNext: add your profile at {home / 'profile.yaml'} and the companies to scan")
     print(f"at {home / 'company_list.yaml'}.\n")
-    print("Then register the MCP server -- add this to ~/.claude/settings.json:\n")
-    print('  "mcpServers": {')
-    print('    "moonlighter": {')
-    print('      "command": "uvx",')
-    print('      "args": ["moonlighter"]')
-    print("    }")
-    print("  }")
+    print("Then register the MCP server:\n")
+    print(
+        '  claude mcp add-json --scope user moonlighter \'{"command":"uvx","args":["moonlighter"]}\''
+    )
+    print('\nUsing a different MCP client? Register uvx / ["moonlighter"] with its own mechanism.')

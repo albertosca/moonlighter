@@ -55,18 +55,15 @@ uvx moonlighter init
 uvx moonlighter init
 ```
 
-Then add to `~/.claude/settings.json` (or your client's equivalent):
+Then register the MCP server:
 
-```json
-{
-  "mcpServers": {
-    "moonlighter": {
-      "command": "uvx",
-      "args": ["moonlighter"]
-    }
-  }
-}
+```bash
+claude mcp add-json --scope user moonlighter '{"command":"uvx","args":["moonlighter"]}'
 ```
+
+Using a different MCP client? Register the same command and args (`uvx` / `["moonlighter"]`) with
+your client's own registration mechanism — the `claude mcp add-json` command above is specific to
+the Claude Code CLI.
 
 The wizard writes `config.yaml` into `MOONLIGHTER_HOME` (defaults to `~/.moonlighter/`). Two
 files still need your input:
@@ -146,8 +143,13 @@ my_platform = "my_package.my_module:MY_PLATFORM_LOGIN_URL"
 my_platform = "my_package.my_module:check_staleness"
 ```
 
-4. Gets installed into the **same** Python environment moonlighter runs from (`uv add --editable`/
-   `pip install` your extension package alongside moonlighter's own dependencies). At runtime,
+4. Must be present in the **same** Python environment moonlighter runs from, so its entry points are
+   discoverable at runtime. If you installed moonlighter via `uvx moonlighter`, there's no persistent
+   environment to add a package to — use one of:
+   - `uvx --with my-extension-package moonlighter` — ephemeral, per invocation
+   - `uv tool install moonlighter --with my-extension-package` — persistent tool install
+   If you're developing on this repo directly, `uv add --editable`/`pip install` your extension package
+   into the same environment works as before. At runtime,
    `moonlighter.core.plugins.discover_entry_points`/`discover_entry_points_by_name` enumerate whatever's
    registered under each group — an environment with no extensions installed behaves identically to today
    (empty list/dict, nothing breaks).

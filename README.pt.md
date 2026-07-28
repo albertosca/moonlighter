@@ -55,18 +55,15 @@ uvx moonlighter init
 uvx moonlighter init
 ```
 
-Depois adicione ao `~/.claude/settings.json` (ou ao equivalente do seu cliente):
+Depois registre o servidor MCP:
 
-```json
-{
-  "mcpServers": {
-    "moonlighter": {
-      "command": "uvx",
-      "args": ["moonlighter"]
-    }
-  }
-}
+```bash
+claude mcp add-json --scope user moonlighter '{"command":"uvx","args":["moonlighter"]}'
 ```
+
+Usa outro cliente MCP? Registre o mesmo comando e argumentos (`uvx` / `["moonlighter"]`) com o
+mecanismo de registro do seu próprio cliente — o comando `claude mcp add-json` acima é específico
+da CLI do Claude Code.
 
 O assistente grava o `config.yaml` no `MOONLIGHTER_HOME` (padrão: `~/.moonlighter/`). Dois arquivos
 ainda precisam da sua entrada:
@@ -147,8 +144,13 @@ minha_plataforma = "meu_pacote.meu_modulo:URL_LOGIN_MINHA_PLATAFORMA"
 minha_plataforma = "meu_pacote.meu_modulo:check_staleness"
 ```
 
-4. É instalado no **mesmo** ambiente Python de onde o moonlighter roda (`uv add --editable`/`pip install`
-   o pacote da sua extensão junto com as próprias dependências do moonlighter). Em tempo de execução,
+4. Precisa estar presente no **mesmo** ambiente Python de onde o moonlighter roda, pra que seus entry
+   points sejam descobertos em tempo de execução. Se você instalou o moonlighter via `uvx moonlighter`,
+   não existe um ambiente persistente pra adicionar um pacote — use uma das opções:
+   - `uvx --with meu-pacote-de-extensao moonlighter` — efêmero, por invocação
+   - `uv tool install moonlighter --with meu-pacote-de-extensao` — instalação persistente da ferramenta
+   Se você está desenvolvendo direto neste repositório, `uv add --editable`/`pip install` o pacote da
+   sua extensão no mesmo ambiente continua funcionando como antes. Em tempo de execução,
    `moonlighter.core.plugins.discover_entry_points`/`discover_entry_points_by_name` enumeram o que estiver
    registrado em cada grupo — um ambiente sem nenhuma extensão instalada se comporta exatamente como hoje
    (lista/dict vazio, nada quebra).
