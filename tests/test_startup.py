@@ -48,6 +48,15 @@ def test_validate_startup_missing_cv_produces_warn(tmp_path):
     assert any(w.level == "warn" and "cv" in w.message.lower() for w in warnings)
 
 
+def test_validate_startup_default_cv_path_resolves_under_moonlighter_home(monkeypatch, tmp_path):
+    """When cv_path is omitted, the default is <MOONLIGHTER_HOME>/cv.pdf, not a path
+    relative to the installed package (which is an ephemeral cache dir under uvx)."""
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    warnings = validate_startup(config={}, profile={"skills": []})
+    cv_warning = next(w for w in warnings if "cv" in w.message.lower())
+    assert str(tmp_path / "cv.pdf") in cv_warning.message
+
+
 def test_validate_startup_cv_present_no_cv_warning(tmp_path):
     cv = tmp_path / "cv.pdf"
     cv.touch()

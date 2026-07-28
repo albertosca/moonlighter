@@ -14,7 +14,6 @@ docs/
 specs/
 company_list.yaml
 blocklist_learned.yaml
-/.mcp.json
 TODO.md
 *.db
 

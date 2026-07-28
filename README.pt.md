@@ -75,6 +75,10 @@ ainda precisam da sua entrada:
 
 Comece a partir de [`profile.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/profile.example.yaml) e [`company_list.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/company_list.example.yaml).
 
+O assistente grava um `config.yaml` mínimo; o [`config.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/config.example.yaml) documenta o resto da superfície de configuração, principalmente o bloco `cv` (obrigatório — o `confirm_apply` aborta sem ele) e o bloco `email`. Os três arquivos ficam em `MOONLIGHTER_HOME` (padrão: `~/.moonlighter/`).
+
+Reinicie o Claude Code, ou inicie uma nova sessão, para que as ferramentas do moonlighter apareçam.
+
 ### Rastreamento por Gmail (opcional)
 
 1. Crie um projeto no [Google Cloud Console](https://console.cloud.google.com), ative a API do

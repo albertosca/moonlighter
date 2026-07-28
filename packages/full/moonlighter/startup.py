@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from moonlighter.core.config import browser_executable
+from moonlighter.core.config import browser_executable, moonlighter_home
 
 
 @dataclass
@@ -19,8 +19,8 @@ def validate_startup(
 ) -> list[StartupWarning]:
     """Inspects the environment and returns configuration warnings/errors. Empty list =
     everything ok. 'error' = critical functionality unavailable.
-    cv_path: if None, looks in <project_root>/profile/cv.pdf."""
-    cv = cv_path or str(Path(__file__).parent.parent / "profile" / "cv.pdf")
+    cv_path: if None, looks in <MOONLIGHTER_HOME>/cv.pdf."""
+    cv = cv_path or str(moonlighter_home() / "cv.pdf")
     checks = [
         _check_profile(profile),
         _check_api_key(config),
@@ -36,7 +36,7 @@ def _check_profile(profile: dict[str, Any]) -> StartupWarning | None:
         return None
     return StartupWarning(
         "warn",
-        "profile/profile.yaml is empty. "
+        f"{moonlighter_home() / 'profile.yaml'} is empty. "
         "Fill in skills, experience, and criteria for useful LLM evaluations.",
     )
 
@@ -59,7 +59,8 @@ def _check_cv(cv_path: str) -> StartupWarning | None:
         return None
     return StartupWarning(
         "warn",
-        "cv.pdf file not found. confirm_apply will fail. Add your resume to the correct directory.",
+        f"CV file not found at {cv_path}. confirm_apply will fail. "
+        "Add your resume there, or set cv.default in config.yaml to a different path.",
     )
 
 
