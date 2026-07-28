@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from moonlighter.application.answers.cv import configured_cv_path
 from moonlighter.core.config import browser_executable, moonlighter_home
 
 
@@ -19,8 +20,10 @@ def validate_startup(
 ) -> list[StartupWarning]:
     """Inspects the environment and returns configuration warnings/errors. Empty list =
     everything ok. 'error' = critical functionality unavailable.
-    cv_path: if None, looks in <MOONLIGHTER_HOME>/cv.pdf."""
-    cv = cv_path or str(moonlighter_home() / "cv.pdf")
+    cv_path: if None, resolves the CV through config exactly as the applier does,
+    falling back to <MOONLIGHTER_HOME>/cv.pdf when config maps nothing."""
+    configured = configured_cv_path(config)
+    cv = cv_path or str(configured or moonlighter_home() / "cv.pdf")
     checks = [
         _check_profile(profile),
         _check_api_key(config),

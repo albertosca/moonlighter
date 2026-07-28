@@ -57,6 +57,45 @@ def test_validate_startup_default_cv_path_resolves_under_moonlighter_home(monkey
     assert str(tmp_path / "cv.pdf") in cv_warning.message
 
 
+def test_validate_startup_honours_a_configured_cv_default(tmp_path):
+    """A user who points cv.default somewhere else must not be told their CV is
+    missing -- confirm_apply resolves through config, so the warning must too."""
+    cv = tmp_path / "resumes" / "senior.pdf"
+    cv.parent.mkdir()
+    cv.touch()
+    warnings = validate_startup(
+        config={"cv": {"default": str(cv)}},
+        profile={"skills": []},
+    )
+    assert not any("cv" in w.message.lower() for w in warnings)
+
+
+def test_validate_startup_names_the_configured_cv_when_it_is_missing(tmp_path):
+    """And when it really is missing, the warning names the configured path --
+    not MOONLIGHTER_HOME/cv.pdf, which the applier would never have looked at."""
+    configured = tmp_path / "resumes" / "senior.pdf"
+    warnings = validate_startup(
+        config={"cv": {"default": str(configured)}},
+        profile={"skills": []},
+    )
+    cv_warning = next(w for w in warnings if "cv" in w.message.lower())
+    assert str(configured) in cv_warning.message
+
+
+def test_validate_startup_resolves_a_relative_cv_default_from_moonlighter_home(
+    monkeypatch, tmp_path
+):
+    """Relative cv.default resolves from MOONLIGHTER_HOME, matching resolve_cv_path."""
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    cv = tmp_path / "my-cv.pdf"
+    cv.touch()
+    warnings = validate_startup(
+        config={"cv": {"default": "my-cv.pdf"}},
+        profile={"skills": []},
+    )
+    assert not any("cv" in w.message.lower() for w in warnings)
+
+
 def test_validate_startup_cv_present_no_cv_warning(tmp_path):
     cv = tmp_path / "cv.pdf"
     cv.touch()
