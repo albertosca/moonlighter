@@ -77,7 +77,9 @@ ainda precisam da sua entrada:
 
 Comece a partir de [`profile.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/profile.example.yaml) e [`company_list.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/company_list.example.yaml).
 
-O assistente grava um `config.yaml` mínimo; o [`config.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/config.example.yaml) documenta o resto da superfície de configuração, principalmente o bloco `cv` (obrigatório — o `confirm_apply` aborta sem ele) e o bloco `email`. `profile.yaml`, `company_list.yaml`, `config.yaml` e `cv.pdf` (seu currículo, enviado junto com as candidaturas) ficam todos em `MOONLIGHTER_HOME` (padrão: `~/.moonlighter/`).
+O assistente grava um `config.yaml` mínimo; o [`config.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/config.example.yaml) documenta o resto da superfície de configuração, principalmente o bloco `cv` (só é necessário para usar um currículo diferente por empresa — por
+padrão o `confirm_apply` envia o `cv.pdf` do `MOONLIGHTER_HOME`, e aborta se esse arquivo não
+existir) e o bloco `email`. `profile.yaml`, `company_list.yaml`, `config.yaml` e `cv.pdf` (seu currículo, enviado junto com as candidaturas) ficam todos em `MOONLIGHTER_HOME` (padrão: `~/.moonlighter/`).
 
 Reinicie o Claude Code, ou inicie uma nova sessão, para que as ferramentas do moonlighter apareçam.
 

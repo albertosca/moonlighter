@@ -77,7 +77,9 @@ files still need your input:
 
 Start from [`profile.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/profile.example.yaml) and [`company_list.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/company_list.example.yaml).
 
-The wizard writes a minimal `config.yaml`; [`config.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/config.example.yaml) documents the rest of the configuration surface, notably the `cv` block (required — `confirm_apply` aborts without it) and the `email` block. `profile.yaml`, `company_list.yaml`, `config.yaml`, and `cv.pdf` (your resume, uploaded with applications) all belong in `MOONLIGHTER_HOME` (defaults to `~/.moonlighter/`).
+The wizard writes a minimal `config.yaml`; [`config.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/config.example.yaml) documents the rest of the configuration surface, notably the `cv` block (only needed to use a different resume per company — by default
+`confirm_apply` uploads `cv.pdf` from `MOONLIGHTER_HOME`, and aborts if that file is missing) and
+the `email` block. `profile.yaml`, `company_list.yaml`, `config.yaml`, and `cv.pdf` (your resume, uploaded with applications) all belong in `MOONLIGHTER_HOME` (defaults to `~/.moonlighter/`).
 
 Restart Claude Code, or start a new session, before the moonlighter tools appear.
 
