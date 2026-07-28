@@ -18,7 +18,7 @@ dev = [
 asyncio_mode = "auto"
 addopts = "--cov --cov-fail-under=100 -m 'not e2e'"
 markers = [
-    "e2e: testes end-to-end que exigem navegador real (rodar com -m e2e)",
+    "e2e: end-to-end tests that require a real browser (run with -m e2e)",
 ]
 
 [tool.ruff]
