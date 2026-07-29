@@ -8,10 +8,11 @@
 #   Linux Chrome: /usr/bin/google-chrome
 browser_path: ""
 
-# LLM backend:
+# LLM backend. This is the default; switch it any time by editing this line.
 #   "cli" -> uses the Claude Code CLI (no API key; uses the claude.ai session).
 #   "api" -> uses the Anthropic SDK (requires ANTHROPIC_API_KEY in the environment).
-llm_backend: api
+# Anything else is rejected at startup rather than silently falling back.
+llm_backend: cli
 
 # Main model (answer generation) and evaluation model (cheaper, for scoring jobs).
 llm_model: claude-sonnet-4-6

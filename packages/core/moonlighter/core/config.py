@@ -35,6 +35,13 @@ DEFAULTS = {
     # Browser executable path (Chrome/Chromium/Brave). Empty by default:
     # set browser_path in config.yaml. Accepts brave_path (legacy) as a fallback.
     "browser_path": "",
+    # Which LLM backend runs evaluations and answer generation.
+    #   "cli" -> the `claude` CLI, using the claude.ai subscription. No API key.
+    #   "api" -> the Anthropic SDK. Requires ANTHROPIC_API_KEY.
+    # Default is "cli" because that is what `moonlighter init`, the README, and
+    # config.example.yaml all lead with -- an installer coming through
+    # `uvx moonlighter` has Claude Code far more often than an API key.
+    "llm_backend": "cli",
     "score_threshold": 6.5,
     "llm_model": "claude-sonnet-4-6",
     "eval_model": "claude-haiku-4-5-20251001",
@@ -135,6 +142,27 @@ def _check_type(key: str, value: Any, types: tuple[type, ...]) -> None:
         )
 
 
+LLM_BACKENDS = ("cli", "api")
+
+
+def llm_backend(config: dict[str, Any]) -> str:
+    """The configured LLM backend, validated.
+
+    Single source of truth for every site that branches on the backend -- the
+    caller factory and the startup checks -- so a warning can never describe a
+    different backend from the one that will actually run. Raises ConfigError
+    on anything outside LLM_BACKENDS: an unrecognized value used to fall
+    through to 'api' in silence, which turned the typo 'CLI' into a demand for
+    an API key the user had no reason to own.
+    """
+    backend: str = config.get("llm_backend", DEFAULTS["llm_backend"])
+    if backend not in LLM_BACKENDS:
+        raise ConfigError(
+            f"config key 'llm_backend' must be one of {', '.join(LLM_BACKENDS)}, got {backend!r}"
+        )
+    return backend
+
+
 def validate_config(config: dict[str, Any]) -> None:
     """Strict, closed-schema validation. Raises ConfigError on the first unknown key or
     wrong-typed value (naming the key). Runs after the DEFAULTS merge, so an omitted key is
@@ -143,6 +171,8 @@ def validate_config(config: dict[str, Any]) -> None:
         if key not in _CONFIG_SCHEMA:
             raise ConfigError(f"unknown config key '{key}'")
         _check_type(key, value, _CONFIG_SCHEMA[key])
+        if key == "llm_backend":
+            llm_backend(config)
         sub_schema = _NESTED_SCHEMAS.get(key)
         if sub_schema is not None:
             for sub_key, sub_value in value.items():

@@ -1,5 +1,6 @@
 import pytest
 import yaml
+from moonlighter.core.config import ConfigError, load_config
 from moonlighter.init import _ask, detect_browser, run_init
 
 
@@ -57,3 +58,31 @@ def test_ask_returns_typed_answer(monkeypatch):
 def test_ask_falls_back_to_default_when_blank(monkeypatch):
     monkeypatch.setattr("builtins.input", lambda _: "   ")
     assert _ask("Question", "fallback") == "fallback"
+
+
+def test_run_init_rejects_an_invalid_llm_backend(tmp_path):
+    """The wizard must not write a config that the next boot refuses to load --
+    the user would be told to fix a file they were just walked through."""
+    with pytest.raises(ConfigError, match="cli, api"):
+        run_init(
+            tmp_path,
+            {"browser_path": "/x", "citizenship_country": "Brazil", "llm_backend": "CLI"},
+        )
+    assert not (tmp_path / "config.yaml").exists()
+
+
+def test_run_init_writes_a_config_that_loads_back(tmp_path, monkeypatch):
+    """End to end: whatever the wizard writes must survive load_config's strict,
+    closed-schema validation."""
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    browser = tmp_path / "chrome"
+    browser.touch()
+    path = run_init(
+        tmp_path,
+        {
+            "browser_path": str(browser),
+            "citizenship_country": "Brazil",
+            "llm_backend": "cli",
+        },
+    )
+    assert load_config(path)["llm_backend"] == "cli"

@@ -1,10 +1,11 @@
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 from moonlighter.application.answers.cv import configured_cv_path
-from moonlighter.core.config import browser_executable, moonlighter_home
+from moonlighter.core.config import browser_executable, llm_backend, moonlighter_home
 
 
 @dataclass
@@ -26,7 +27,7 @@ def validate_startup(
     cv = cv_path or str(configured or moonlighter_home() / "cv.pdf")
     checks = [
         _check_profile(profile),
-        _check_api_key(config),
+        _check_llm_backend(config),
         _check_cv(cv),
         _check_browser(config),
     ]
@@ -44,15 +45,29 @@ def _check_profile(profile: dict[str, Any]) -> StartupWarning | None:
     )
 
 
-def _check_api_key(config: dict[str, Any]) -> StartupWarning | None:
-    """Missing API key → every LLM evaluation returns score=0.0. Only needed for the
-    'api' backend; with llm_backend='cli' the `claude` CLI is used instead."""
-    if config.get("llm_backend") == "cli" or os.environ.get("ANTHROPIC_API_KEY"):
+def _check_llm_backend(config: dict[str, Any]) -> StartupWarning | None:
+    """Whichever backend is configured needs its own credential to exist.
+
+    Both arms are checked, from the same resolved backend: guarding only the
+    api arm left `llm_backend: cli` without an installed `claude` to fail per
+    job, mid-scan, instead of once at startup.
+    """
+    if llm_backend(config) == "api":
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            return None
+        return StartupWarning(
+            "error",
+            "llm_backend is 'api' but ANTHROPIC_API_KEY is not in the environment. "
+            "scan_and_evaluate and apply_jobs will not work. Set the key, or switch to "
+            "llm_backend: cli in config.yaml to use your Claude subscription instead.",
+        )
+    if shutil.which("claude") is not None:
         return None
     return StartupWarning(
         "error",
-        "ANTHROPIC_API_KEY not found in the environment. "
-        "scan_and_evaluate and apply_jobs will not work.",
+        "llm_backend is 'cli' but the `claude` CLI was not found on PATH. "
+        "scan_and_evaluate and apply_jobs will not work. Install Claude Code, or switch to "
+        "llm_backend: api in config.yaml and set ANTHROPIC_API_KEY.",
     )
 
 

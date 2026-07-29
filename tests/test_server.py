@@ -950,7 +950,13 @@ async def test_get_pipeline_no_warnings_section_when_setup_is_clean(tmp_db, tmp_
     config = {"llm_backend": "cli", "browser_path": str(browser)}
     profile = {"skills": ["python"]}
 
-    with patch("moonlighter.startup.moonlighter_home", return_value=tmp_path):
+    # `claude` must be pinned as present: the cli backend now checks for it, and
+    # the dev machine has it while CI does not -- otherwise this passes locally
+    # and fails in CI for a reason that has nothing to do with the assertion.
+    with (
+        patch("moonlighter.startup.moonlighter_home", return_value=tmp_path),
+        patch("moonlighter.startup.shutil.which", return_value="/usr/local/bin/claude"),
+    ):
         result = await get_pipeline(ctx=make_test_context(config=config, profile=profile))
     assert "# Setup Warnings" not in result
     assert result.startswith("# Application Pipeline")

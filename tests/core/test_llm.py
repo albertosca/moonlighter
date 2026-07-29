@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from anthropic.types import TextBlock
+from moonlighter.core.config import ConfigError
 from moonlighter.core.llm import LLMCaller, _call_cli, is_spend_limit, make_api_caller, make_caller
 
 
@@ -34,20 +35,25 @@ def test_make_caller_api_returns_callable():
     assert inspect.iscoroutinefunction(caller)
 
 
-def test_make_caller_defaults_to_api_when_key_missing():
-    """No 'llm_backend' key → falls back to api caller (not _call_cli)."""
-    with patch("moonlighter.core.llm.anthropic"):
-        caller = make_caller({})
-    assert caller is not _call_cli
-    assert callable(caller)
+def test_make_caller_defaults_to_cli_when_backend_omitted():
+    """No 'llm_backend' key → the CLI backend, matching DEFAULTS.
+
+    Deliberate change from the previous 'api' fallback: `moonlighter init`, the
+    README, and config.example.yaml all lead with the CLI, so a hand-written
+    config that omits the key used to demand an API key the user never expected
+    to need.
+    """
+    assert make_caller({}) is _call_cli
 
 
-def test_make_caller_unknown_backend_falls_back_to_api():
-    """Unknown backend string → api caller (safe default)."""
-    with patch("moonlighter.core.llm.anthropic"):
-        caller = make_caller({"llm_backend": "unknown-backend"})
-    assert caller is not _call_cli
-    assert callable(caller)
+def test_make_caller_rejects_an_unknown_backend():
+    """Unknown backend string → ConfigError naming the valid values.
+
+    It used to fall through to the api caller, so a typo like 'CLI' silently
+    demanded an API key instead of using the subscription.
+    """
+    with pytest.raises(ConfigError, match="cli, api"):
+        make_caller({"llm_backend": "CLI"})
 
 
 # ── _call_cli ─────────────────────────────────────────────────────────────────

@@ -29,7 +29,11 @@ Um [workspace uv](https://docs.astral.sh/uv/concepts/workspaces/) com 5 namespac
 
 - [uv](https://docs.astral.sh/uv/) — baixa o Python 3.14 pra você; não precisa instalar separado
 - Chrome, Chromium ou Brave (o moonlighter dirige um browser de verdade pra suas sessões logadas funcionarem)
-- [Claude Code CLI](https://claude.ai/code) — ou `ANTHROPIC_API_KEY` para `llm_backend: api`
+- Um backend de LLM, alternável no `config.yaml` a qualquer momento:
+  - `llm_backend: cli` (padrão) — o [Claude Code CLI](https://claude.ai/code), cobrado na sua
+    assinatura do Claude. Sem API key.
+  - `llm_backend: api` — o SDK da Anthropic, cobrado em créditos de API. Exige `ANTHROPIC_API_KEY`
+    no ambiente.
 - Credenciais OAuth do Gmail (opcional — só para rastreamento de e-mails)
 
 ## Instalação

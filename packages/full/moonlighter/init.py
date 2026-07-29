@@ -7,6 +7,7 @@ single largest source of setup friction for a new user.
 from pathlib import Path
 
 import yaml
+from moonlighter.core.config import llm_backend
 
 # Common install locations, most-preferred first. Chromium-family only -- moonlighter drives a
 # real browser profile so the user's logged-in sessions are reusable.
@@ -34,6 +35,10 @@ def run_init(home: Path, answers: dict[str, str]) -> Path:
     Refuses to overwrite an existing config -- clobbering a user's real
     configuration is not recoverable.
     """
+    # Validate before touching the filesystem: a wizard that writes a config the
+    # next boot rejects sends the user to fix a file it just walked them through.
+    llm_backend({"llm_backend": answers["llm_backend"]})
+
     config_path = home / "config.yaml"
     if config_path.exists():
         raise FileExistsError(

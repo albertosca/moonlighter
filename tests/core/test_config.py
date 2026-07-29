@@ -408,3 +408,51 @@ def test_harden_permissions_warns_on_chmod_failure_without_raising(tmp_path, mon
     assert len(warnings) >= 2
     assert any("profile.yaml" in w or "permiss" in w.lower() for w in warnings)
     assert any("browser-session" in w or "permiss" in w.lower() for w in warnings)
+
+
+# ── llm_backend ───────────────────────────────────────────────────────────────
+
+
+def test_llm_backend_defaults_to_cli_when_omitted():
+    """The subscription path is the default: `uvx moonlighter` users generally
+    have Claude Code and no API key."""
+    from moonlighter.core.config import llm_backend
+
+    assert llm_backend({}) == "cli"
+
+
+def test_llm_backend_returns_the_configured_value():
+    from moonlighter.core.config import llm_backend
+
+    assert llm_backend({"llm_backend": "api"}) == "api"
+    assert llm_backend({"llm_backend": "cli"}) == "cli"
+
+
+@pytest.mark.parametrize("bad", ["CLI", "Api", "clii", "subscription", ""])
+def test_llm_backend_rejects_anything_else_naming_the_valid_values(bad):
+    """These all used to select the api backend in silence -- 'CLI' being the
+    most plausible typo, and the most expensive, since it demands an API key."""
+    from moonlighter.core.config import llm_backend
+
+    with pytest.raises(ConfigError, match="cli, api"):
+        llm_backend({"llm_backend": bad})
+
+
+def test_validate_config_rejects_an_unknown_llm_backend():
+    with pytest.raises(ConfigError, match="cli, api"):
+        validate_config({"llm_backend": "CLI"})
+
+
+def test_validate_config_accepts_both_backends():
+    validate_config({"llm_backend": "cli"})
+    validate_config({"llm_backend": "api"})
+
+
+def test_load_config_fills_llm_backend_from_defaults(tmp_path, monkeypatch):
+    """The default has to arrive through DEFAULTS, not through a `.get()`
+    fallback at each call site -- that divergence is what made the wizard, the
+    README, and the factory disagree about which backend an omitted key means."""
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "config.yaml").write_text("score_threshold: 7.0\n")
+
+    assert load_config(tmp_path / "config.yaml")["llm_backend"] == "cli"

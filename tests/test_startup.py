@@ -1,4 +1,17 @@
+from unittest.mock import patch
+
+import pytest
 from moonlighter.startup import StartupWarning, validate_startup
+
+
+@pytest.fixture(autouse=True)
+def _fake_claude_on_path():
+    """`claude` is installed on the dev machine and never in CI. Without a fixed
+    resolution the cli-backend check would make this module pass locally and
+    fail in CI. Tests that need it absent patch `which` themselves."""
+    with patch("moonlighter.startup.shutil.which", return_value="/usr/local/bin/claude"):
+        yield
+
 
 # ── profile ───────────────────────────────────────────────────────────────────
 
@@ -16,15 +29,39 @@ def test_validate_startup_non_empty_profile_no_profile_warning():
 # ── ANTHROPIC_API_KEY ─────────────────────────────────────────────────────────
 
 
+def test_validate_startup_cli_backend_without_the_claude_binary_produces_error(monkeypatch):
+    """The symmetric hole to the API-key check: the api path was guarded and the
+    cli path was not, so a user who picked 'cli' without Claude Code installed
+    learned about it mid-scan, once per job, instead of at startup."""
+    monkeypatch.setattr("moonlighter.startup.shutil.which", lambda _: None)
+    warnings = validate_startup(config={"llm_backend": "cli"}, profile={"skills": []})
+    assert any(w.level == "error" and "claude" in w.message.lower() for w in warnings)
+
+
+def test_validate_startup_cli_backend_with_the_claude_binary_is_quiet(monkeypatch):
+    monkeypatch.setattr("moonlighter.startup.shutil.which", lambda _: "/usr/local/bin/claude")
+    warnings = validate_startup(config={"llm_backend": "cli"}, profile={"skills": []})
+    assert not any("claude" in w.message.lower() for w in warnings)
+
+
+def test_validate_startup_omitted_backend_does_not_demand_an_api_key(monkeypatch):
+    """An omitted llm_backend now means 'cli', so the API-key error must not
+    fire -- otherwise the default and the check disagree about the same key."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr("moonlighter.startup.shutil.which", lambda _: "/usr/local/bin/claude")
+    warnings = validate_startup(config={}, profile={"skills": []})
+    assert not any("ANTHROPIC_API_KEY" in w.message for w in warnings)
+
+
 def test_validate_startup_missing_api_key_produces_error(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    warnings = validate_startup(config={}, profile={"skills": []})
+    warnings = validate_startup(config={"llm_backend": "api"}, profile={"skills": []})
     assert any(w.level == "error" and "ANTHROPIC_API_KEY" in w.message for w in warnings)
 
 
 def test_validate_startup_api_key_present_no_api_error(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    warnings = validate_startup(config={}, profile={"skills": []})
+    warnings = validate_startup(config={"llm_backend": "api"}, profile={"skills": []})
     assert not any("ANTHROPIC_API_KEY" in w.message for w in warnings)
 
 
