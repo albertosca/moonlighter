@@ -140,7 +140,10 @@ async def save_screenshot(page: Page, job_id: int, step: str, config: dict[str, 
                 {"windowId": window_id, "bounds": {"windowState": "normal"}},
             )
     try:
-        await page.screenshot(path=path)
+        # full_page, because this is a review artifact: the viewport is ~750 CSS
+        # px and a real application form runs to ~4500, so a viewport capture
+        # showed 17% of it — asking a human to approve what they cannot see.
+        await page.screenshot(path=path, full_page=True)
     finally:
         if cdp is not None and window_id is not None:
             with contextlib.suppress(Exception):

@@ -239,12 +239,16 @@ async def test_new_page_returns_page_from_context(tmp_path):
 # ── save_screenshot ───────────────────────────────────────────────────────────
 
 
-async def test_save_screenshot_calls_page_screenshot(tmp_path):
+async def test_save_screenshot_captures_the_whole_page(tmp_path):
+    """The viewport is ~750 CSS px; a real application form is ~4500. A
+    viewport-only capture showed 17% of the form, so the human-review gate was
+    asking someone to approve what they could not see. full_page is what makes
+    03-filled a review artifact rather than a thumbnail."""
     config = {**_CONFIG, "screenshots_dir": str(tmp_path)}
     mock_page = MagicMock()
     mock_page.screenshot = AsyncMock()
     path = await browser_mod.save_screenshot(mock_page, job_id=42, step="fill", config=config)
-    mock_page.screenshot.assert_called_once_with(path=path)
+    mock_page.screenshot.assert_called_once_with(path=path, full_page=True)
     assert "42" in path
     assert "fill" in path
 
@@ -312,7 +316,7 @@ async def test_save_screenshot_still_captures_when_window_state_is_unavailable(t
 
     path = await browser_mod.save_screenshot(mock_page, job_id=3, step="03-filled", config=config)
 
-    mock_page.screenshot.assert_awaited_once_with(path=path)
+    mock_page.screenshot.assert_awaited_once_with(path=path, full_page=True)
 
 
 # ── hide_window / show_window ──────────────────────────────────────────────
