@@ -37,6 +37,28 @@ def test_preferred_name():
     assert r["Preferred First Name"] == "Maria"
 
 
+def test_full_name():
+    """A single "Full name" field is the norm outside the Greenhouse/Lever
+    first+last convention. Without a rule it fell through to the LLM, which
+    answered "full legal name is not present in the profile" -- leaving a
+    required field blank on a real application (holepunch, 2026-08-03)."""
+    r = pre_populate_answers(["Full name"], PROFILE)
+    assert r["Full name"] == "Maria de Souza Pereira"
+
+
+def test_full_name_variants():
+    for label in ["Full Name *", "full name", "Your full name", "Nome completo"]:
+        r = pre_populate_answers([label], PROFILE)
+        assert r.get(label) == "Maria de Souza Pereira", f"{label!r} não preencheu"
+
+
+def test_full_name_does_not_shadow_first_or_last():
+    """The full-name rule must not swallow the first/last labels it sits near."""
+    r = pre_populate_answers(["First Name", "Last Name"], PROFILE)
+    assert r["First Name"] == "Maria"
+    assert r["Last Name"] == "de Souza Pereira"
+
+
 def test_phone():
     r = pre_populate_answers(["Phone"], PROFILE)
     assert r["Phone"] == "11912345678"

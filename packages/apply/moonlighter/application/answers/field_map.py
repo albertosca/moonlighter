@@ -40,6 +40,11 @@ def _salary_expectation(profile: dict[str, Any]) -> str:
 # Patterns are case-insensitive and match by substring.
 _RULES: list[tuple[str, _RuleFn]] = [
     # Contact (EN)
+    # "Full name" as a single field is the norm outside the Greenhouse/Lever
+    # first+last convention; it must precede the first/last rules only in intent,
+    # not in matching (the anchors are disjoint), but it must precede "^nome" in
+    # the PT-BR block below, which would otherwise reduce it to a first name.
+    (r"^(your\s+)?full\s+name", lambda p: p.get("name") or ""),
     (r"^first\s+name", _first_name),
     (r"^last\s+name", _last_name),
     (r"preferred\s+(first\s+)?name", _first_name),
@@ -73,6 +78,7 @@ _RULES: list[tuple[str, _RuleFn]] = [
     # Contact (PT-BR) — "preferência" and "sobrenome" BEFORE "^nome" (order matters)
     (r"nome\s+de\s+prefer|prefer.*nome", _first_name),
     (r"^sobrenome", _last_name),
+    (r"^nome\s+completo", lambda p: p.get("name") or ""),
     (r"^nome", _first_name),
     (r"^(telefone|celular)", lambda p: p.get("phone") or ""),
     # Location
