@@ -257,6 +257,64 @@ async def test_save_screenshot_creates_job_subdir(tmp_path):
     assert (tmp_path / "99").is_dir()
 
 
+async def test_save_screenshot_restores_a_minimized_window_and_re_minimizes_it(tmp_path):
+    """A minimized window produces no compositor frames, so page.screenshot()
+    blocks until it times out -- reproduced on both Greenhouse and Recruitee.
+    fill_application minimizes before filling, which made the 03-filled review
+    artifact impossible to produce. Restore around the capture, then put the
+    window back exactly as it was."""
+    config = {**_CONFIG, "screenshots_dir": str(tmp_path)}
+    mock_page = MagicMock()
+    mock_page.screenshot = AsyncMock()
+    mock_cdp = AsyncMock()
+    mock_cdp.send = AsyncMock(return_value={"windowId": 5, "bounds": {"windowState": "minimized"}})
+    mock_page.context.new_cdp_session = AsyncMock(return_value=mock_cdp)
+
+    await browser_mod.save_screenshot(mock_page, job_id=1, step="03-filled", config=config)
+
+    states = [
+        call.args[1]["bounds"]["windowState"]
+        for call in mock_cdp.send.call_args_list
+        if call.args[0] == "Browser.setWindowBounds"
+    ]
+    assert states == ["normal", "minimized"], (
+        f"expected restore-then-re-minimize around the capture, got {states}"
+    )
+    mock_page.screenshot.assert_awaited_once()
+
+
+async def test_save_screenshot_leaves_an_already_visible_window_alone(tmp_path):
+    """01-job-page and 02-form are taken with the window visible. Blindly
+    re-minimizing after every capture would hide a window the flow means to
+    keep on screen."""
+    config = {**_CONFIG, "screenshots_dir": str(tmp_path)}
+    mock_page = MagicMock()
+    mock_page.screenshot = AsyncMock()
+    mock_cdp = AsyncMock()
+    mock_cdp.send = AsyncMock(return_value={"windowId": 5, "bounds": {"windowState": "normal"}})
+    mock_page.context.new_cdp_session = AsyncMock(return_value=mock_cdp)
+
+    await browser_mod.save_screenshot(mock_page, job_id=2, step="01-job-page", config=config)
+
+    assert not [
+        c for c in mock_cdp.send.call_args_list if c.args[0] == "Browser.setWindowBounds"
+    ], "a visible window must not have its state touched"
+    mock_page.screenshot.assert_awaited_once()
+
+
+async def test_save_screenshot_still_captures_when_window_state_is_unavailable(tmp_path):
+    """CDP window-state calls are best-effort everywhere else in this module
+    (96decbc); a failure here must not cost us the screenshot itself."""
+    config = {**_CONFIG, "screenshots_dir": str(tmp_path)}
+    mock_page = MagicMock()
+    mock_page.screenshot = AsyncMock()
+    mock_page.context.new_cdp_session = AsyncMock(side_effect=RuntimeError("no CDP"))
+
+    path = await browser_mod.save_screenshot(mock_page, job_id=3, step="03-filled", config=config)
+
+    mock_page.screenshot.assert_awaited_once_with(path=path)
+
+
 # ── hide_window / show_window ──────────────────────────────────────────────
 
 
