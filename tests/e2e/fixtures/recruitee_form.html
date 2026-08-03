@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Recruitee-shaped application form</title>
+<!--
+  Mirrors the DOM of a real Recruitee posting, captured 2026-08-03. The detail
+  that matters is the NESTING: the radio group's own fieldset (whose <legend>
+  carries the question) sits inside a generic "Questions" fieldset. A discovery
+  that scopes its selectors incorrectly finds both, or neither.
+  The non-breaking space before each * is also verbatim -- label keys are matched
+  exactly, and a normal space silently fails to match.
+-->
+<form>
+  <fieldset>
+    <legend>My information</legend>
+    <label for="full-name">Full name&nbsp;*</label>
+    <input id="full-name" type="text" required>
+
+    <label for="cv">CV or resume&nbsp;*</label>
+    <input id="cv" type="file" required>
+  </fieldset>
+
+  <fieldset>
+    <legend>Questions</legend>
+
+    <fieldset>
+      <legend>How do you rate your own skills with Node.js?&nbsp;*</legend>
+      <input id="skill-0" type="radio" name="skill" value="Beginner" required>
+      <label for="skill-0">Beginner</label>
+      <input id="skill-1" type="radio" name="skill" value="Intermediate" required>
+      <label for="skill-1">Intermediate</label>
+      <input id="skill-2" type="radio" name="skill" value="Advanced" required>
+      <label for="skill-2">Advanced</label>
+    </fieldset>
+
+    <label for="salary">What is your expected salary? (annual USD)&nbsp;*</label>
+    <input id="salary" type="number" required>
+  </fieldset>
+</form>

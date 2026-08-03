@@ -43,8 +43,13 @@ _RADIO_GROUPS_JS = """() => {
   document.querySelectorAll('fieldset').forEach(fs => {
     const radios = [...fs.querySelectorAll('input[type=radio]')];
     if (!radios.length) return;
-    if (fs.querySelector('fieldset input[type=radio]')) return;  // not innermost
-    const legend = fs.querySelector('legend')?.innerText?.trim();
+    // `:scope` is load-bearing on both selectors. Without it, element.querySelector
+    // matches the ancestor part of the selector anywhere in the document, so
+    // 'fieldset input[type=radio]' was satisfied by the group's OWN radios and every
+    // group looked non-innermost -- the discovery returned nothing on the real page
+    // while the mocked unit test still passed.
+    if (fs.querySelector(':scope fieldset input[type=radio]')) return;  // not innermost
+    const legend = fs.querySelector(':scope > legend')?.innerText?.trim();
     if (!legend) return;
     groups.push({
       question: legend,
