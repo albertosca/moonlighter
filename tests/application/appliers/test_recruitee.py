@@ -628,3 +628,62 @@ async def test_recruitee_submit_logs_outcome(caplog):
 
     assert "submit" in caplog.text
     assert outcome in ("submitted", "unverified")
+
+
+async def test_fill_form_does_not_try_to_fill_a_file_input():
+    """The CV field is owned by _upload_cv. The generic loop used to call
+    fill() on it, which Playwright rejects ('Input of type "file" cannot be
+    filled'), so a successful application reported a scary
+    `failed: CV or resume` right next to the log line saying the CV had been
+    attached. Observed live on holepunch #3200 (2026-08-03)."""
+    applier = make_applier()
+
+    field = MagicMock()
+    field.evaluate = make_evaluate("input")
+    field.get_attribute = AsyncMock(return_value="file")
+    field.fill = AsyncMock()
+    applier.page.get_by_label = MagicMock(return_value=make_label_locator(field))
+
+    with patch("asyncio.sleep", new=AsyncMock()):
+        status = await applier.fill_form(
+            {"CV or resume *": "[FILE UPLOAD — attach current CV/resume PDF]"}, cv_path=""
+        )
+
+    field.fill.assert_not_called()
+    assert status["CV or resume *"] == "skipped"
+
+
+async def test_fill_form_reports_a_useful_reason_for_a_number_field():
+    """holepunch's salary field is input[type=number]; Playwright answers
+    'Cannot type text into input[type=number]' and the status became a bare
+    `failed:Error`, which tells the reviewer nothing. The value is NOT coerced:
+    pulling a number out of free text is a guess, and a guessed salary is the
+    one this project must never send."""
+    applier = make_applier()
+
+    field = MagicMock()
+    field.evaluate = make_evaluate("input")
+    field.get_attribute = AsyncMock(return_value="number")
+    field.fill = AsyncMock(side_effect=Exception("Cannot type text into input[type=number]"))
+    applier.page.get_by_label = MagicMock(return_value=make_label_locator(field))
+
+    with patch("asyncio.sleep", new=AsyncMock()):
+        status = await applier.fill_form({"Expected salary": "USD 110,000 per year"}, cv_path="")
+
+    assert status["Expected salary"] == "failed:number_field_needs_digits_only"
+
+
+async def test_fill_form_fills_a_number_field_when_the_answer_is_numeric():
+    applier = make_applier()
+
+    field = MagicMock()
+    field.evaluate = make_evaluate("input")
+    field.get_attribute = AsyncMock(return_value="number")
+    field.fill = AsyncMock()
+    applier.page.get_by_label = MagicMock(return_value=make_label_locator(field))
+
+    with patch("asyncio.sleep", new=AsyncMock()):
+        status = await applier.fill_form({"Expected salary": "110000"}, cv_path="")
+
+    field.fill.assert_called_once_with("110000")
+    assert status["Expected salary"] == "filled"

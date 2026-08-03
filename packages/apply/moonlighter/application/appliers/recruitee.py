@@ -1,4 +1,5 @@
 import asyncio
+import re
 from typing import Any, ClassVar
 
 from moonlighter.application.appliers.base import (
@@ -28,6 +29,17 @@ _UPLOAD_LABELS = {
     "attach",
     "anexar",
 }
+
+
+def _is_plain_number(answer: str) -> bool:
+    """True when the answer is digits only (one optional decimal point).
+
+    Deliberately strict: "110,000" and "USD 110,000 per year" are rejected
+    rather than stripped down to a figure. Salary is the field where inferring
+    what the human meant is most expensive, so the answer either already fits a
+    number input or the human is told exactly why it does not.
+    """
+    return bool(re.fullmatch(r"\d+(\.\d+)?", answer.strip()))
 
 
 def _log_fill_stats(status: dict[str, str]) -> None:
@@ -147,6 +159,22 @@ class RecruiteeApplier(BaseApplier):
                 return "filled" if ok else "failed:custom_dropdown"
 
             tag = await field.evaluate("el => el.tagName.toLowerCase()")
+            # File inputs belong to _upload_cv, which attaches the real CV right
+            # after this loop. Playwright refuses fill() on them, so trying meant
+            # a successful application still reported `failed: CV or resume` —
+            # alarming, and next to the log line saying the CV was attached.
+            # Structural check rather than the label denylist Greenhouse and
+            # Workable use: labels vary per board, the input type does not.
+            input_type = await field.get_attribute("type") if tag == "input" else None
+            if input_type == "file":
+                return "skipped"
+            # A number input rejects anything but digits, and Playwright's error
+            # ("Cannot type text into input[type=number]") arrived as a bare
+            # `failed:Error`. Say what is actually wrong instead. The value is
+            # deliberately NOT coerced: extracting a figure from free text is a
+            # guess, and salary is the field where a guess costs real money.
+            if input_type == "number" and not _is_plain_number(answer):
+                return "failed:number_field_needs_digits_only"
             if tag in ("input", "textarea", "select"):
                 await fill_field(field, answer)
                 await asyncio.sleep(0.2)
