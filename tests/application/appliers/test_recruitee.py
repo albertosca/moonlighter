@@ -687,3 +687,107 @@ async def test_fill_form_fills_a_number_field_when_the_answer_is_numeric():
 
     field.fill.assert_called_once_with("110000")
     assert status["Expected salary"] == "filled"
+
+
+# ── radio groups ──────────────────────────────────────────────────────────────
+
+_RADIO_DOM = [
+    {
+        "question": "How do you rate your own skills with Node.js? *",
+        "options": ["Beginner", "Intermediate", "Advanced"],
+    }
+]
+
+
+def make_radio_applier(dom=None):
+    applier = make_applier()
+    applier.page.evaluate = AsyncMock(return_value=dom if dom is not None else _RADIO_DOM)
+    return applier
+
+
+async def test_extract_fields_returns_the_question_not_the_options():
+    """A radio group is ONE field whose answer is one of the options. The DOM
+    exposes each option as its own <label>, and the question only as the
+    <legend> of the innermost fieldset -- so extract_fields used to return
+    "Beginner"/"Intermediate"/"Advanced" as three separate text questions and
+    drop the actual question entirely."""
+    applier = make_radio_applier()
+
+    # The real page exposes each option as its own <label>, alongside the
+    # ordinary text fields — that is what has to be filtered out.
+    def label(text):
+        m = MagicMock()
+        m.inner_text = AsyncMock(return_value=text)
+        m.evaluate = AsyncMock(return_value=False)
+        return m
+
+    applier.page.query_selector_all = AsyncMock(
+        return_value=[
+            label("Full name"),
+            label("Beginner"),
+            label("Intermediate"),
+            label("Advanced"),
+        ]
+    )
+
+    fields, closed = await applier.extract_fields()
+
+    assert "Full name" in fields
+
+    assert "How do you rate your own skills with Node.js? *" in fields
+    for option in ("Beginner", "Intermediate", "Advanced"):
+        assert option not in fields
+    assert "How do you rate your own skills with Node.js? *" in closed
+
+
+async def test_fill_form_checks_the_radio_matching_the_answer():
+    applier = make_radio_applier()
+    radio = MagicMock()
+    radio.check = AsyncMock()
+    scoped = MagicMock()
+    scoped.first = radio
+    group = MagicMock()
+    group.get_by_role = MagicMock(return_value=scoped)
+    applier.page.locator = MagicMock(return_value=MagicMock(filter=MagicMock(return_value=group)))
+
+    status = await applier.fill_form(
+        {"How do you rate your own skills with Node.js? *": "Advanced"}, cv_path=""
+    )
+
+    radio.check.assert_awaited_once()
+    assert status["How do you rate your own skills with Node.js? *"] == "filled"
+
+
+async def test_fill_form_matches_a_verbose_answer_to_an_option():
+    """The LLM answers in prose; match_option_locally maps it onto the option."""
+    applier = make_radio_applier()
+    radio = MagicMock()
+    radio.check = AsyncMock()
+    scoped = MagicMock()
+    scoped.first = radio
+    group = MagicMock()
+    group.get_by_role = MagicMock(return_value=scoped)
+    applier.page.locator = MagicMock(return_value=MagicMock(filter=MagicMock(return_value=group)))
+
+    status = await applier.fill_form(
+        {"How do you rate your own skills with Node.js? *": "Advanced — 9 years of Node.js"},
+        cv_path="",
+    )
+
+    group.get_by_role.assert_called_once()
+    assert group.get_by_role.call_args.kwargs["name"] == "Advanced"
+    assert status["How do you rate your own skills with Node.js? *"] == "filled"
+
+
+async def test_fill_form_reports_failure_when_no_option_matches():
+    """The status must never claim success for a required field left blank --
+    that is exactly what made a live application look complete when its
+    required radio was untouched."""
+    applier = make_radio_applier()
+    applier.page.locator = MagicMock()
+
+    status = await applier.fill_form(
+        {"How do you rate your own skills with Node.js? *": "Fluent in Portuguese"}, cv_path=""
+    )
+
+    assert status["How do you rate your own skills with Node.js? *"] == "failed:no_matching_option"

@@ -2,6 +2,7 @@ import asyncio
 import re
 from typing import Any, ClassVar
 
+from moonlighter.application.answers.option_matcher import match_option_locally
 from moonlighter.application.appliers.base import (
     BaseApplier,
     _detect_closed_set,
@@ -29,6 +30,29 @@ _UPLOAD_LABELS = {
     "attach",
     "anexar",
 }
+
+
+# A radio group is ONE question with a closed set of answers, but the DOM only
+# labels the individual options — the question lives in the <legend> of the
+# innermost fieldset wrapping them. Verified against a live Recruitee posting
+# (2026-08-03): the radios share a `name`, sit in a fieldset whose legend is the
+# question, and that fieldset is itself nested inside a generic "Questions" one,
+# hence "innermost".
+_RADIO_GROUPS_JS = """() => {
+  const groups = [];
+  document.querySelectorAll('fieldset').forEach(fs => {
+    const radios = [...fs.querySelectorAll('input[type=radio]')];
+    if (!radios.length) return;
+    if (fs.querySelector('fieldset input[type=radio]')) return;  // not innermost
+    const legend = fs.querySelector('legend')?.innerText?.trim();
+    if (!legend) return;
+    groups.push({
+      question: legend,
+      options: radios.map(r => r.labels?.[0]?.innerText?.trim() || r.value).filter(Boolean),
+    });
+  });
+  return groups;
+}"""
 
 
 def _is_plain_number(answer: str) -> bool:
@@ -97,16 +121,34 @@ class RecruiteeApplier(BaseApplier):
             self.page,
             ["label", "[data-testid*='question'] label", "[class*='question'] label"],
         )
+        radio_groups = await self._radio_groups()
+        option_texts = {opt.lower() for g in radio_groups.values() for opt in g}
+
         labels = []
         closed_set: set[str] = set()
         for el in label_els:
             text = (await el.inner_text()).strip()
-            if text and text.lower() not in _UPLOAD_LABELS:
-                labels.append(text)
-                if await _detect_closed_set(el):
-                    closed_set.add(text)
+            if not text or text.lower() in _UPLOAD_LABELS:
+                continue
+            # Each radio option carries its own <label>. Left in, they become
+            # three bogus free-text questions and the real question disappears.
+            if text.lower() in option_texts:
+                continue
+            labels.append(text)
+            if await _detect_closed_set(el):
+                closed_set.add(text)
+
+        for question in radio_groups:
+            labels.append(question)
+            closed_set.add(question)
+
         logger.debug("extract_fields: %d fields", len(labels))
         return labels, frozenset(closed_set)
+
+    async def _radio_groups(self) -> dict[str, list[str]]:
+        """{question: [option, ...]} for every radio group on the page."""
+        found = await self.page.evaluate(_RADIO_GROUPS_JS)
+        return {g["question"]: g["options"] for g in (found or [])}
 
     async def _open_application(self) -> None:
         """Clicks the 'Apply' button when the form is not yet open.
@@ -143,6 +185,9 @@ class RecruiteeApplier(BaseApplier):
         if is_skip(answer):
             return "skipped"
         try:
+            radio_options = (await self._radio_groups()).get(label_text)
+            if radio_options is not None:
+                return await self._check_radio(label_text, answer, radio_options)
             field = await self._find_field(label_text)
             if field is None:
                 logger.debug("fill_form: field not found — '%s'", label_text)
@@ -185,6 +230,24 @@ class RecruiteeApplier(BaseApplier):
         except Exception as e:
             logger.debug("fill_form: exception in '%s': %s", label_text, e)
             return f"failed:{type(e).__name__}"
+
+    async def _check_radio(self, question: str, answer: str, options: list[str]) -> str:
+        """Selects the option matching the answer, scoped to this question's group.
+
+        Returns failed:no_matching_option rather than "filled" when nothing
+        matches: a required radio left untouched while the report claimed
+        success is what let a live application look complete when it was not.
+        """
+        chosen = match_option_locally(answer, options)
+        if chosen is None:
+            logger.warning(
+                "fill_form: no option of %s matches %r — '%s'", options, answer[:60], question
+            )
+            return "failed:no_matching_option"
+        group = self.page.locator("fieldset").filter(has_text=question)
+        await group.get_by_role("radio", name=chosen, exact=True).first.check()
+        logger.debug("fill_form: radio '%s' → %r", question, chosen)
+        return "filled"
 
     async def _find_field(self, label_text: str) -> Any:
         """Locates the input associated with a label, in cascade. Returns the
