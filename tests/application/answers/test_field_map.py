@@ -42,7 +42,7 @@ def test_full_name():
     """A single "Full name" field is the norm outside the Greenhouse/Lever
     first+last convention. Without a rule it fell through to the LLM, which
     answered "full legal name is not present in the profile" -- leaving a
-    required field blank on a real application (holepunch, 2026-08-03)."""
+    required field blank on a real application (live Recruitee, 2026-08-03)."""
     r = pre_populate_answers(["Full name"], PROFILE)
     assert r["Full name"] == "Maria de Souza Pereira"
 
@@ -448,7 +448,7 @@ def test_salary_refuses_when_the_label_asks_for_a_foreign_currency():
     """The stored figure is BRL *per month*. Dropped into a field asking for
     annual USD it reads as $35,000/year -- wrong currency and ~2.4x under the
     intended number, in the one field where a wrong value is a concrete loss.
-    Probed live on holepunch #3200 (2026-08-03)."""
+    Probed on a live Recruitee posting (2026-08-03)."""
     out = pre_populate_answers(["Expected salary (annual USD)"], _SALARY_PROFILE)
     assert out["Expected salary (annual USD)"] == NEEDS_REVIEW_SENTINEL
 

@@ -635,7 +635,7 @@ async def test_fill_form_does_not_try_to_fill_a_file_input():
     fill() on it, which Playwright rejects ('Input of type "file" cannot be
     filled'), so a successful application reported a scary
     `failed: CV or resume` right next to the log line saying the CV had been
-    attached. Observed live on holepunch #3200 (2026-08-03)."""
+    attached. Observed on a live Recruitee application (2026-08-03)."""
     applier = make_applier()
 
     field = MagicMock()
@@ -654,7 +654,7 @@ async def test_fill_form_does_not_try_to_fill_a_file_input():
 
 
 async def test_fill_form_reports_a_useful_reason_for_a_number_field():
-    """holepunch's salary field is input[type=number]; Playwright answers
+    """The live posting's salary field is input[type=number]; Playwright answers
     'Cannot type text into input[type=number]' and the status became a bare
     `failed:Error`, which tells the reviewer nothing. The value is NOT coerced:
     pulling a number out of free text is a guess, and a guessed salary is the

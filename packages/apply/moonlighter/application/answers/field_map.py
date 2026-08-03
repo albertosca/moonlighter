@@ -37,7 +37,7 @@ def _city(profile: dict[str, Any]) -> str:
 # asks for anything else (annual USD is the common case on remote-worldwide
 # postings) would receive that number unconverted: "35000" read as $35,000/year
 # instead of R$35.000/month is the wrong currency AND ~2.4x under the intended
-# figure. Observed on holepunch #3200 (2026-08-03), which escaped only because
+# figure. Observed on a live Recruitee posting (2026-08-03), which escaped only because
 # its label happens to start with "What is your", which the anchor rejects.
 _FOREIGN_CURRENCY = re.compile(r"\b(usd|us\$|u\$|dollars?|eur|euros?|gbp|pounds?)\b|[€£]", re.I)
 _OTHER_PERIOD = re.compile(r"\b(annual(ly)?|year(ly)?|per\s+year|p\.?a\.?|anual|ano)\b", re.I)
