@@ -14,6 +14,8 @@ import re
 from collections.abc import Callable
 from typing import Any
 
+from moonlighter.core.config import NEEDS_REVIEW_SENTINEL
+
 _RuleFn = Callable[[dict[str, Any]], str | None]
 
 
@@ -31,9 +33,32 @@ def _city(profile: dict[str, Any]) -> str:
     return loc.split(",")[0].strip()
 
 
-def _salary_expectation(profile: dict[str, Any]) -> str:
+# The stored figure is BRL per month — the preference key says so. A label that
+# asks for anything else (annual USD is the common case on remote-worldwide
+# postings) would receive that number unconverted: "35000" read as $35,000/year
+# instead of R$35.000/month is the wrong currency AND ~2.4x under the intended
+# figure. Observed on holepunch #3200 (2026-08-03), which escaped only because
+# its label happens to start with "What is your", which the anchor rejects.
+_FOREIGN_CURRENCY = re.compile(r"\b(usd|us\$|u\$|dollars?|eur|euros?|gbp|pounds?)\b|[€£]", re.I)
+_OTHER_PERIOD = re.compile(r"\b(annual(ly)?|year(ly)?|per\s+year|p\.?a\.?|anual|ano)\b", re.I)
+
+
+def _salary_expectation(profile: dict[str, Any], label: str = "") -> str:
+    """The configured salary target, or NEEDS_REVIEW when the units disagree.
+
+    Never returns None: the salary field must not fall through to the LLM (E2 —
+    the figure must never reach the prompt). The sentinel keeps that property
+    while refusing to state a number in units nobody verified — `is_skip` treats
+    it as skip, so nothing is typed, and the service already reports sentinel
+    fields as pending for the human. Converting instead would need an FX rate
+    and would bake an unstated assumption into a salary negotiation.
+    """
     target = (profile.get("preferences") or {}).get("salary_target_brl_monthly")
-    return str(target) if target is not None else ""
+    if target is None:
+        return ""
+    if _FOREIGN_CURRENCY.search(label) or _OTHER_PERIOD.search(label):
+        return NEEDS_REVIEW_SENTINEL
+    return str(target)
 
 
 # Each entry: (regex pattern on the label, callable(profile) -> str)
@@ -122,7 +147,9 @@ def _static_answer(label: str, profile: dict[str, Any]) -> str | None:
     for pattern, fn in _COMPILED:
         if pattern.search(label):
             if fn is _salary_expectation:
-                return fn(profile)
+                # Called directly, not through `fn`: this is the one rule that
+                # needs the label, to check the currency/period it asks for.
+                return _salary_expectation(profile, label)
             return fn(profile) or None
     return None
 
