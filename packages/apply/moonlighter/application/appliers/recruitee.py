@@ -250,7 +250,20 @@ class RecruiteeApplier(BaseApplier):
             )
             return "failed:no_matching_option"
         group = self.page.locator("fieldset").filter(has_text=question)
-        await group.get_by_role("radio", name=chosen, exact=True).first.check()
+        radio = group.get_by_role("radio", name=chosen, exact=True).first
+        # Click the LABEL, not the input. Recruitee paints a decorative box over a
+        # transparent radio, so check() resolves the right element and then spends
+        # its whole timeout on "<div> intercepts pointer events". The label is what
+        # a human clicks and what the browser forwards to the input.
+        radio_id = await radio.get_attribute("id")
+        label = self.page.locator(f'label[for="{radio_id}"]') if radio_id else None
+        if label is not None and await label.count():
+            await label.first.click()
+        else:
+            # No associated label (or no id): fall back to forcing the click past
+            # whatever is covering the input, which still beats leaving a required
+            # field blank.
+            await radio.check(force=True)
         logger.debug("fill_form: radio '%s' → %r", question, chosen)
         return "filled"
 

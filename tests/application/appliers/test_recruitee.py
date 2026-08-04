@@ -740,41 +740,70 @@ async def test_extract_fields_returns_the_question_not_the_options():
     assert "How do you rate your own skills with Node.js? *" in closed
 
 
-async def test_fill_form_checks_the_radio_matching_the_answer():
-    applier = make_radio_applier()
+def wire_radio(applier, radio_id="skill-2", label_count=1):
+    """Mocks the locator chain _check_radio walks: group -> radio -> label[for=id]."""
     radio = MagicMock()
+    radio.get_attribute = AsyncMock(return_value=radio_id)
     radio.check = AsyncMock()
-    scoped = MagicMock()
-    scoped.first = radio
+    scoped = MagicMock(first=radio)
     group = MagicMock()
     group.get_by_role = MagicMock(return_value=scoped)
-    applier.page.locator = MagicMock(return_value=MagicMock(filter=MagicMock(return_value=group)))
+
+    label_first = MagicMock()
+    label_first.click = AsyncMock()
+    label = MagicMock(first=label_first)
+    label.count = AsyncMock(return_value=label_count)
+
+    def locator(sel):
+        if sel == "fieldset":
+            return MagicMock(filter=MagicMock(return_value=group))
+        return label
+
+    applier.page.locator = MagicMock(side_effect=locator)
+    return group, radio, label_first
+
+
+async def test_fill_form_clicks_the_label_not_the_input():
+    """Recruitee paints a decorative box over a transparent radio, so clicking the
+    input spends the whole timeout on '<div> intercepts pointer events'. The label
+    is what a human clicks and what the browser forwards to the input."""
+    applier = make_radio_applier()
+    _group, radio, label = wire_radio(applier)
 
     status = await applier.fill_form(
         {"How do you rate your own skills with Node.js? *": "Advanced"}, cv_path=""
     )
 
-    radio.check.assert_awaited_once()
+    label.click.assert_awaited_once()
+    radio.check.assert_not_called()
+    assert status["How do you rate your own skills with Node.js? *"] == "filled"
+
+
+async def test_fill_form_forces_the_click_when_there_is_no_label():
+    """No label to click (or no id): forcing past the overlay still beats leaving a
+    required field blank."""
+    applier = make_radio_applier()
+    _group, radio, label = wire_radio(applier, label_count=0)
+
+    status = await applier.fill_form(
+        {"How do you rate your own skills with Node.js? *": "Advanced"}, cv_path=""
+    )
+
+    radio.check.assert_awaited_once_with(force=True)
+    label.click.assert_not_called()
     assert status["How do you rate your own skills with Node.js? *"] == "filled"
 
 
 async def test_fill_form_matches_a_verbose_answer_to_an_option():
     """The LLM answers in prose; match_option_locally maps it onto the option."""
     applier = make_radio_applier()
-    radio = MagicMock()
-    radio.check = AsyncMock()
-    scoped = MagicMock()
-    scoped.first = radio
-    group = MagicMock()
-    group.get_by_role = MagicMock(return_value=scoped)
-    applier.page.locator = MagicMock(return_value=MagicMock(filter=MagicMock(return_value=group)))
+    group, _radio, _label = wire_radio(applier)
 
     status = await applier.fill_form(
-        {"How do you rate your own skills with Node.js? *": "Advanced — 9 years of Node.js"},
+        {"How do you rate your own skills with Node.js? *": "Advanced \u2014 9 years of Node.js"},
         cv_path="",
     )
 
-    group.get_by_role.assert_called_once()
     assert group.get_by_role.call_args.kwargs["name"] == "Advanced"
     assert status["How do you rate your own skills with Node.js? *"] == "filled"
 
