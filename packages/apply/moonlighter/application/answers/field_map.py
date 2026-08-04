@@ -154,6 +154,28 @@ def _static_answer(label: str, profile: dict[str, Any]) -> str | None:
     return None
 
 
+def _clean_label(field_label: str) -> str:
+    """The label a rule should match, with the form's decoration removed.
+
+    Every rule here is ^-anchored, and forms decorate labels in ways that break
+    that anchor. Workable puts the required marker on a line of its OWN, BEFORE
+    the text ("*\nFirst name"), and appends the dial code after it
+    ("*\nPhone\n+55"). Observed on a live posting 2026-08-04: nothing matched,
+    so name, phone and the tracking email were all left for the LLM to invent.
+
+    Only lines that are pure decoration are dropped — a marker, or a dial code.
+    A label whose first line is real text keeps every line, since collapsing it
+    would let unrelated rules match.
+    """
+    lines = [ln.strip() for ln in field_label.strip().splitlines()]
+    kept = [ln for ln in lines if ln and not _DECORATION.fullmatch(ln)]
+    return (kept[0] if kept else "").rstrip("*").strip()
+
+
+# A line that carries no question: a required marker, or a dial code.
+_DECORATION = re.compile(r"[*†‡]+|\+\d{1,4}")
+
+
 def pre_populate_answers(
     fields: list[str],
     profile: dict[str, Any],
@@ -174,7 +196,7 @@ def pre_populate_answers(
 
     result: dict[str, str] = {}
     for field_label in fields:
-        clean = field_label.strip().rstrip("*").strip()
+        clean = _clean_label(field_label)
         # Work authorization is country-dependent (conservative); the rest comes
         # from the static rules. Fields with no match are left for the LLM to answer.
         answer = resolve_work_auth(clean, country, cfg)

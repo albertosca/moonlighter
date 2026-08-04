@@ -482,3 +482,35 @@ def test_salary_refusal_never_sends_the_field_to_the_llm():
     pending), never None -- None would let the LLM answer the salary question."""
     out = pre_populate_answers(["Expected salary (annual USD)"], _SALARY_PROFILE)
     assert "Expected salary (annual USD)" in out
+
+
+# ── label normalisation ───────────────────────────────────────────────────────
+
+
+def test_required_marker_on_its_own_line_does_not_break_matching():
+    """Workable renders the required marker as a line BEFORE the label, so the
+    scraped string is '*\\nFirst name'. Every rule here is ^-anchored, so nothing
+    matched and the name, phone and email were left for the LLM to guess —
+    including the tracking alias field, which must never be guessed. Observed on
+    a live Workable posting, 2026-08-04."""
+    r = pre_populate_answers(["*\nFirst name", "*\nLast name"], PROFILE)
+    assert r["*\nFirst name"] == "Maria"
+    assert r["*\nLast name"] == "de Souza Pereira"
+
+
+def test_trailing_country_code_line_does_not_break_matching():
+    """'*\\nPhone\\n+55' — the country code is appended on its own line."""
+    r = pre_populate_answers(["*\nPhone\n+55"], PROFILE)
+    assert r["*\nPhone\n+55"] == "11912345678"
+
+
+def test_email_label_with_a_leading_marker_is_still_deterministic():
+    r = pre_populate_answers(["*\nEmail"], PROFILE)
+    assert r["*\nEmail"] == "maria.pereira@example.com"
+
+
+def test_normalisation_does_not_swallow_a_real_multi_line_question():
+    """Only a bare marker line is dropped. A label whose first line is real text
+    keeps it — collapsing everything would let unrelated rules match."""
+    label = "Why do you want to work here?\nPlease be specific."
+    assert label not in pre_populate_answers([label], PROFILE)
