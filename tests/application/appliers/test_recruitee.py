@@ -699,6 +699,7 @@ _RADIO_DOM = [
     {
         "question": "How do you rate your own skills with Node.js? *",
         "options": ["Beginner", "Intermediate", "Advanced"],
+        "name": "skill",
     }
 ]
 
@@ -744,72 +745,57 @@ async def test_extract_fields_returns_the_question_not_the_options():
     assert "How do you rate your own skills with Node.js? *" in closed
 
 
-def wire_radio(applier, radio_id="skill-2", label_count=1):
-    """Mocks the locator chain _check_radio walks: group -> radio -> label[for=id]."""
-    radio = MagicMock()
-    radio.get_attribute = AsyncMock(return_value=radio_id)
-    radio.check = AsyncMock()
-    scoped = MagicMock(first=radio)
-    group = MagicMock()
-    group.get_by_role = MagicMock(return_value=scoped)
-
-    label_first = MagicMock()
-    label_first.click = AsyncMock()
-    label = MagicMock(first=label_first)
-    label.count = AsyncMock(return_value=label_count)
-
-    def locator(sel):
-        if sel == "fieldset":
-            return MagicMock(filter=MagicMock(return_value=group))
-        return label
-
-    applier.page.locator = MagicMock(side_effect=locator)
-    return group, radio, label_first
-
-
-async def test_fill_form_clicks_the_label_not_the_input():
-    """Recruitee paints a decorative box over a transparent radio, so clicking the
-    input spends the whole timeout on '<div> intercepts pointer events'. The label
-    is what a human clicks and what the browser forwards to the input."""
+async def test_fill_form_delegates_the_click_to_the_shared_helper():
+    """Clicking is shared across ATS now — the applier's job is to pick the right
+    option and turn the outcome into an honest status."""
     applier = make_radio_applier()
-    _group, radio, label = wire_radio(applier)
 
-    status = await applier.fill_form(
-        {"How do you rate your own skills with Node.js? *": "Advanced"}, cv_path=""
-    )
+    with patch(
+        "moonlighter.application.appliers.recruitee.select_radio_option",
+        new=AsyncMock(return_value=True),
+    ) as sel:
+        status = await applier.fill_form(
+            {"How do you rate your own skills with Node.js? *": "Advanced"}, cv_path=""
+        )
 
-    label.click.assert_awaited_once()
-    radio.check.assert_not_called()
-    assert status["How do you rate your own skills with Node.js? *"] == "filled"
-
-
-async def test_fill_form_forces_the_click_when_there_is_no_label():
-    """No label to click (or no id): forcing past the overlay still beats leaving a
-    required field blank."""
-    applier = make_radio_applier()
-    _group, radio, label = wire_radio(applier, label_count=0)
-
-    status = await applier.fill_form(
-        {"How do you rate your own skills with Node.js? *": "Advanced"}, cv_path=""
-    )
-
-    radio.check.assert_awaited_once_with(force=True)
-    label.click.assert_not_called()
+    sel.assert_awaited_once()
+    assert sel.await_args.args[1:] == ("skill", "Advanced")
     assert status["How do you rate your own skills with Node.js? *"] == "filled"
 
 
 async def test_fill_form_matches_a_verbose_answer_to_an_option():
     """The LLM answers in prose; match_option_locally maps it onto the option."""
     applier = make_radio_applier()
-    group, _radio, _label = wire_radio(applier)
 
-    status = await applier.fill_form(
-        {"How do you rate your own skills with Node.js? *": "Advanced \u2014 9 years of Node.js"},
-        cv_path="",
-    )
+    with patch(
+        "moonlighter.application.appliers.recruitee.select_radio_option",
+        new=AsyncMock(return_value=True),
+    ) as sel:
+        status = await applier.fill_form(
+            {"How do you rate your own skills with Node.js? *": "Advanced, 9 years of Node.js"},
+            cv_path="",
+        )
 
-    assert group.get_by_role.call_args.kwargs["name"] == "Advanced"
+    assert sel.await_args.args[2] == "Advanced"
     assert status["How do you rate your own skills with Node.js? *"] == "filled"
+
+
+async def test_fill_form_reports_when_the_option_cannot_be_clicked():
+    """A required radio left untouched must never read as success."""
+    applier = make_radio_applier()
+
+    with patch(
+        "moonlighter.application.appliers.recruitee.select_radio_option",
+        new=AsyncMock(return_value=False),
+    ):
+        status = await applier.fill_form(
+            {"How do you rate your own skills with Node.js? *": "Advanced"}, cv_path=""
+        )
+
+    assert (
+        status["How do you rate your own skills with Node.js? *"]
+        == "failed:radio_option_not_clickable"
+    )
 
 
 async def test_fill_form_reports_failure_when_no_option_matches():

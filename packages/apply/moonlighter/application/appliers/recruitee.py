@@ -7,9 +7,11 @@ from moonlighter.application.appliers.base import (
     BaseApplier,
     _detect_closed_set,
     classify_submit_outcome,
+    discover_radio_groups,
     fill_field,
     is_skip,
     query_labels_with_fallback,
+    select_radio_option,
     wait_for_submit_to_settle,
 )
 from moonlighter.application.appliers.custom_dropdown import CustomDropdownFiller
@@ -31,34 +33,6 @@ _UPLOAD_LABELS = {
     "attach",
     "anexar",
 }
-
-
-# A radio group is ONE question with a closed set of answers, but the DOM only
-# labels the individual options — the question lives in the <legend> of the
-# innermost fieldset wrapping them. Verified against a live Recruitee posting
-# (2026-08-03): the radios share a `name`, sit in a fieldset whose legend is the
-# question, and that fieldset is itself nested inside a generic "Questions" one,
-# hence "innermost".
-_RADIO_GROUPS_JS = """() => {
-  const groups = [];
-  document.querySelectorAll('fieldset').forEach(fs => {
-    const radios = [...fs.querySelectorAll('input[type=radio]')];
-    if (!radios.length) return;
-    // `:scope` is load-bearing on both selectors. Without it, element.querySelector
-    // matches the ancestor part of the selector anywhere in the document, so
-    // 'fieldset input[type=radio]' was satisfied by the group's OWN radios and every
-    // group looked non-innermost -- the discovery returned nothing on the real page
-    // while the mocked unit test still passed.
-    if (fs.querySelector(':scope fieldset input[type=radio]')) return;  // not innermost
-    const legend = fs.querySelector(':scope > legend')?.innerText?.trim();
-    if (!legend) return;
-    groups.push({
-      question: legend,
-      options: radios.map(r => r.labels?.[0]?.innerText?.trim() || r.value).filter(Boolean),
-    });
-  });
-  return groups;
-}"""
 
 
 def _is_plain_number(answer: str) -> bool:
@@ -128,7 +102,7 @@ class RecruiteeApplier(BaseApplier):
             ["label", "[data-testid*='question'] label", "[class*='question'] label"],
         )
         radio_groups = await self._radio_groups()
-        option_texts = {opt.lower() for g in radio_groups.values() for opt in g}
+        option_texts = {o.lower() for g in radio_groups.values() for o in g["options"]}
 
         labels = []
         closed_set: set[str] = set()
@@ -151,10 +125,13 @@ class RecruiteeApplier(BaseApplier):
         logger.debug("extract_fields: %d fields", len(labels))
         return labels, frozenset(closed_set)
 
-    async def _radio_groups(self) -> dict[str, list[str]]:
-        """{question: [option, ...]} for every radio group on the page."""
-        found = await self.page.evaluate(_RADIO_GROUPS_JS)
-        return {g["question"]: g["options"] for g in (found or [])}
+    async def _radio_groups(self) -> dict[str, dict[str, Any]]:
+        """{question: {options, name}} for every radio group on the page.
+
+        Shared with the other appliers: the shape of the DOM differs per ATS, the
+        problem does not.
+        """
+        return {g["question"]: g for g in await discover_radio_groups(self.page)}
 
     async def _open_application(self) -> None:
         """Clicks the 'Apply' button when the form is not yet open.
@@ -193,9 +170,9 @@ class RecruiteeApplier(BaseApplier):
         try:
             if label_text.strip().lower().startswith("cover letter"):
                 return await self._write_cover_letter(answer)
-            radio_options = (await self._radio_groups()).get(label_text)
-            if radio_options is not None:
-                return await self._check_radio(label_text, answer, radio_options)
+            group = (await self._radio_groups()).get(label_text)
+            if group is not None:
+                return await self._check_radio(label_text, answer, group)
             field = await self._find_field(label_text)
             if field is None:
                 logger.debug("fill_form: field not found — '%s'", label_text)
@@ -260,34 +237,22 @@ class RecruiteeApplier(BaseApplier):
         logger.debug("fill_form: cover letter written (%d chars)", len(text))
         return "filled"
 
-    async def _check_radio(self, question: str, answer: str, options: list[str]) -> str:
-        """Selects the option matching the answer, scoped to this question's group.
+    async def _check_radio(self, question: str, answer: str, group: dict[str, Any]) -> str:
+        """Selects the option matching the answer, scoped by the group's `name`.
 
         Returns failed:no_matching_option rather than "filled" when nothing
         matches: a required radio left untouched while the report claimed
         success is what let a live application look complete when it was not.
         """
+        options = group["options"]
         chosen = match_option_locally(answer, options)
         if chosen is None:
             logger.warning(
                 "fill_form: no option of %s matches %r — '%s'", options, answer[:60], question
             )
             return "failed:no_matching_option"
-        group = self.page.locator("fieldset").filter(has_text=question)
-        radio = group.get_by_role("radio", name=chosen, exact=True).first
-        # Click the LABEL, not the input. Recruitee paints a decorative box over a
-        # transparent radio, so check() resolves the right element and then spends
-        # its whole timeout on "<div> intercepts pointer events". The label is what
-        # a human clicks and what the browser forwards to the input.
-        radio_id = await radio.get_attribute("id")
-        label = self.page.locator(f'label[for="{radio_id}"]') if radio_id else None
-        if label is not None and await label.count():
-            await label.first.click()
-        else:
-            # No associated label (or no id): fall back to forcing the click past
-            # whatever is covering the input, which still beats leaving a required
-            # field blank.
-            await radio.check(force=True)
+        if not await select_radio_option(self.page, group["name"], chosen):
+            return "failed:radio_option_not_clickable"
         logger.debug("fill_form: radio '%s' → %r", question, chosen)
         return "filled"
 

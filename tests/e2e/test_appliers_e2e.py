@@ -133,11 +133,10 @@ async def test_recruitee_e2e_radio_group_is_one_question(browser_page):
     groups = await applier._radio_groups()
 
     assert list(groups) == ["How do you rate your own skills with Node.js? *"]
-    assert groups["How do you rate your own skills with Node.js? *"] == [
-        "Beginner",
-        "Intermediate",
-        "Advanced",
-    ]
+    # The key carries a non-breaking space before the asterisk — never retype it.
+    group = groups[next(iter(groups))]
+    assert group["options"] == ["Beginner", "Intermediate", "Advanced"]
+    assert group["name"] == "skill", "o grupo carrega o `name` que o identifica no DOM"
 
 
 async def test_recruitee_e2e_extract_fields_drops_the_options(browser_page):
@@ -201,3 +200,41 @@ async def test_recruitee_e2e_reports_no_captcha_on_a_plain_form(browser_page):
     await page.goto(f"{base_url}/recruitee_form.html")
 
     assert await detect_captcha(page) is None
+
+
+# ── Workable E2E ──────────────────────────────────────────────────────────────
+
+
+async def test_workable_e2e_each_screening_question_is_its_own_field(browser_page):
+    """Four screening questions all labelled YES/NO collapsed into two dict keys
+    and vanished from the draft. Keyed by the radio group's `name`, they survive."""
+    from moonlighter.application.appliers.workable import WorkableApplier
+
+    page, base_url = browser_page
+    await page.goto(f"{base_url}/workable_form.html")
+    applier = WorkableApplier(page, {}, {})
+
+    fields, closed = await applier.extract_fields()
+
+    questions = [f for f in fields if f.startswith(("Do you have", "Expertise"))]
+    assert len(questions) == 2, f"esperava 2 perguntas distintas, veio {questions}"
+    assert "YES" not in fields and "NO" not in fields
+    assert all(q in closed for q in questions)
+
+
+async def test_workable_e2e_answers_the_right_question(browser_page):
+    """YES exists under both questions, so the wrong scoping silently answers the
+    wrong one — which nothing downstream would catch."""
+    from moonlighter.application.appliers.workable import WorkableApplier
+
+    page, base_url = browser_page
+    await page.goto(f"{base_url}/workable_form.html")
+    applier = WorkableApplier(page, {}, {})
+
+    status = await applier.fill_form(
+        {"Expertise in building large React applications with TypeScript": "Yes"}, cv_path=""
+    )
+
+    assert status["Expertise in building large React applications with TypeScript"] == "filled"
+    assert await page.locator("#q2y").is_checked()
+    assert not await page.locator("#q1y").is_checked(), "respondeu a pergunta errada"

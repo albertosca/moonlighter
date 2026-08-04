@@ -1286,3 +1286,99 @@ async def test_normalisation_does_not_touch_accented_names():
         _caller=caller,
     )
     assert draft.answers["Full name"] == "Alberto de Sá Cavalcanti"
+
+
+# ── radio groups (shared across ATS) ─────────────────────────────────────────
+
+_GROUPS = [
+    {
+        "question": "How do you rate your Node.js?",
+        "options": ["Beginner", "Advanced"],
+        "name": "q1",
+    },
+    {"question": "Do you have 8 years of experience?", "options": ["YES", "NO"], "name": "QA_1"},
+]
+
+
+async def test_discover_radio_groups_returns_question_options_and_name():
+    """One question, its closed set, and the shared `name` that identifies the
+    group in the DOM. Recruitee puts the question in a <legend>; Workable in a
+    <span> four levels up and repeats YES/NO across four different questions —
+    which is why the group is keyed by `name`, not by its option labels."""
+    page = MagicMock()
+    page.evaluate = AsyncMock(return_value=_GROUPS)
+
+    assert await base.discover_radio_groups(page) == _GROUPS
+
+
+async def test_discover_radio_groups_never_raises():
+    page = MagicMock()
+    page.evaluate = AsyncMock(side_effect=RuntimeError("no context"))
+
+    assert await base.discover_radio_groups(page) == []
+
+
+async def test_discover_radio_groups_tolerates_a_null_result():
+    page = MagicMock()
+    page.evaluate = AsyncMock(return_value=None)
+
+    assert await base.discover_radio_groups(page) == []
+
+
+async def test_select_radio_option_clicks_the_label_not_the_input():
+    """The input is routinely painted over — Recruitee stacks a decorative div on
+    top, and check() then burns its timeout on "intercepts pointer events"."""
+    page = MagicMock()
+    page.evaluate = AsyncMock(return_value="opt-2")
+    label = MagicMock()
+    label.count = AsyncMock(return_value=1)
+    label.first = MagicMock(click=AsyncMock())
+    page.locator = MagicMock(return_value=label)
+
+    assert await base.select_radio_option(page, "q1", "Advanced") is True
+    label.first.click.assert_awaited_once()
+
+
+async def test_select_radio_option_matches_on_the_label_not_the_value():
+    """Recruitee uses value="Advanced"; Workable uses value="true" under a label
+    reading YES. Matching on value would silently pick nothing on Workable."""
+    page = MagicMock()
+    page.evaluate = AsyncMock(return_value="opt-yes")
+    label = MagicMock()
+    label.count = AsyncMock(return_value=1)
+    label.first = MagicMock(click=AsyncMock())
+    page.locator = MagicMock(return_value=label)
+
+    await base.select_radio_option(page, "QA_1", "YES")
+
+    assert page.evaluate.call_args.args[1] == ["QA_1", "YES"]
+
+
+async def test_select_radio_option_forces_the_click_when_the_label_is_missing():
+    page = MagicMock()
+    page.evaluate = AsyncMock(return_value="opt-2")
+    target = MagicMock()
+    target.count = AsyncMock(return_value=0)
+    target.check = AsyncMock()
+    page.locator = MagicMock(return_value=target)
+
+    assert await base.select_radio_option(page, "q1", "Advanced") is True
+    target.check.assert_awaited_once_with(force=True)
+
+
+async def test_select_radio_option_forces_the_click_when_the_input_has_no_id():
+    page = MagicMock()
+    page.evaluate = AsyncMock(return_value=None)
+    target = MagicMock()
+    target.first = MagicMock(check=AsyncMock())
+    page.locator = MagicMock(return_value=target)
+
+    assert await base.select_radio_option(page, "q1", "Advanced") is True
+    target.first.check.assert_awaited_once_with(force=True)
+
+
+async def test_select_radio_option_reports_when_the_option_is_not_there():
+    page = MagicMock()
+    page.evaluate = AsyncMock(return_value=False)
+
+    assert await base.select_radio_option(page, "q1", "Nope") is False

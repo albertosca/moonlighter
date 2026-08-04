@@ -395,3 +395,95 @@ async def test_upload_cv_exception_returns_failed():
 
     result = await applier._upload_cv("/path/cv.pdf")
     assert result == "failed:Exception"
+
+
+# ── radio groups ──────────────────────────────────────────────────────────────
+
+_WK_GROUPS = [
+    {
+        "question": "Do you have at least 8 years of experience?",
+        "options": ["YES", "NO"],
+        "name": "QA_1",
+    },
+    {
+        "question": "Expertise in large React applications with TypeScript",
+        "options": ["YES", "NO"],
+        "name": "QA_2",
+    },
+]
+
+
+def make_radio_applier(dom=None):
+    applier = make_applier()
+    applier.page.evaluate = AsyncMock(return_value=dom if dom is not None else _WK_GROUPS)
+    return applier
+
+
+async def test_extract_fields_returns_each_screening_question_once():
+    """Every screening question here is labelled YES/NO, so scanning <label>
+    collapsed four distinct required questions into two dict keys and lost all
+    four. Observed on a live Workable posting, 2026-08-04."""
+    applier = make_radio_applier()
+
+    def label(text):
+        m = MagicMock()
+        m.inner_text = AsyncMock(return_value=text)
+        m.evaluate = AsyncMock(return_value=False)
+        return m
+
+    applier.page.query_selector_all = AsyncMock(
+        return_value=[label("*\nFirst name"), label("YES"), label("NO")]
+    )
+
+    fields, _closed = await applier.extract_fields()
+
+    assert "Do you have at least 8 years of experience?" in fields
+    assert "Expertise in large React applications with TypeScript" in fields
+    assert "YES" not in fields and "NO" not in fields
+    assert "*\nFirst name" in fields
+    assert len([f for f in fields if f.startswith("Do you have")]) == 1
+
+
+async def test_fill_form_answers_a_screening_question_by_group_name():
+    """YES appears under every question, so the group has to be addressed by its
+    `name` — matching on the option label alone would hit the wrong question."""
+    applier = make_radio_applier()
+
+    with patch(
+        "moonlighter.application.appliers.workable.select_radio_option",
+        new=AsyncMock(return_value=True),
+    ) as sel:
+        status = await applier.fill_form(
+            {"Expertise in large React applications with TypeScript": "Yes"}, cv_path=""
+        )
+
+    assert sel.await_args.args[1:] == ("QA_2", "YES")
+    assert status["Expertise in large React applications with TypeScript"] == "filled"
+
+
+async def test_fill_form_reports_an_unmatched_screening_answer():
+    applier = make_radio_applier()
+
+    status = await applier.fill_form(
+        {"Do you have at least 8 years of experience?": "Maybe someday"}, cv_path=""
+    )
+
+    assert status["Do you have at least 8 years of experience?"] == "failed:no_matching_option"
+
+
+async def test_fill_form_reports_a_screening_radio_that_cannot_be_clicked():
+    """Same guarantee as everywhere else: a required question left unanswered
+    never reads as success."""
+    applier = make_radio_applier()
+
+    with patch(
+        "moonlighter.application.appliers.workable.select_radio_option",
+        new=AsyncMock(return_value=False),
+    ):
+        status = await applier.fill_form(
+            {"Do you have at least 8 years of experience?": "Yes"}, cv_path=""
+        )
+
+    assert (
+        status["Do you have at least 8 years of experience?"] == "failed:radio_option_not_clickable"
+    )

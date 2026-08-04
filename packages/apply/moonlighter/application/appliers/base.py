@@ -129,6 +129,93 @@ _ERROR_MESSAGES_JS = """() => {
 }"""
 
 
+# A radio group is ONE question with a closed set of answers, but the DOM labels
+# only the options. Where the question lives varies by ATS: Recruitee puts it in
+# the <legend> of the innermost fieldset; Workable puts it in a <span> four levels
+# above the input, and repeats YES/NO across four different questions — which is
+# why a group is keyed by the shared `name` attribute rather than by its options.
+# Both shapes verified against live postings, 2026-08-03/04.
+_RADIO_GROUPS_JS = """() => {
+  const clean = s => (s||'').split('\\n').map(x=>x.trim())
+      .filter(x => x && !/^[*\u2020\u2021]+$/.test(x) && !/^\\+\\d{1,4}$/.test(x)).join(' ').trim();
+  const groups = [], seen = new Set();
+  document.querySelectorAll('input[type=radio]').forEach(r => {
+    const key = r.name || r.id;
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    const peers = r.name
+      ? [...document.querySelectorAll(`input[type=radio][name="${CSS.escape(r.name)}"]`)]
+      : [r];
+    const opts = peers.map(p => clean(p.labels?.[0]?.innerText) || p.value).filter(Boolean);
+    const optSet = new Set(opts.map(o => o.toLowerCase()));
+    // Walk up until an ancestor carries text beyond the option labels themselves.
+    let box = r.parentElement, q = '', depth = 0;
+    while (box && depth < 8) {
+      const lg = clean(box.querySelector(':scope > legend')?.innerText);
+      if (lg && !optSet.has(lg.toLowerCase())) { q = lg; break; }
+      let rest = clean(box.innerText);
+      for (const o of opts) rest = rest.split(o).join(' ');
+      rest = rest.replace(/\\s+/g, ' ').trim();
+      if (rest.length > 3) { q = rest; break; }
+      box = box.parentElement; depth++;
+    }
+    if (q) groups.push({question: q, options: opts, name: r.name || ''});
+  });
+  return groups;
+}"""
+
+
+async def discover_radio_groups(page: Page) -> list[dict[str, Any]]:
+    """Every radio group on the page as {question, options, name}. Never raises.
+
+    Without this, scanning <label> returns each OPTION as its own free-text
+    question and loses the question itself — three bogus fields on Recruitee, and
+    on Workable four required screening questions collapsing into two dict keys
+    because every one of them is labelled YES/NO.
+    """
+    try:
+        groups: list[dict[str, Any]] | None = await page.evaluate(_RADIO_GROUPS_JS)
+    except Exception:
+        return []
+    return groups or []
+
+
+_RADIO_OPTIONS_JS = """([name, wanted]) => {
+    const clean = s => (s||'').split('\\n').map(x=>x.trim()).filter(Boolean).join(' ').trim();
+    for (const r of document.querySelectorAll(`input[type=radio][name="${CSS.escape(name)}"]`)) {
+        const text = clean(r.labels?.[0]?.innerText) || r.value;
+        if (text.toLowerCase() === wanted.toLowerCase()) return r.id || null;
+    }
+    return false;   // group/option not found, distinct from "found but has no id"
+}"""
+
+
+async def select_radio_option(page: Page, group_name: str, option_label: str) -> bool:
+    """Select one option of a radio group, scoped by the group's `name`.
+
+    Matching is on the option's LABEL text, not its `value`: Recruitee uses
+    value="Advanced" while Workable uses value="true" under a label reading YES.
+
+    Clicks the label rather than the input, because the input is routinely
+    painted over — Recruitee stacks a decorative div on it and check() then
+    spends its whole timeout on "intercepts pointer events". Falls back to
+    forcing the click when the input has no label to click.
+    """
+    radio_id = await page.evaluate(_RADIO_OPTIONS_JS, [group_name, option_label])
+    if radio_id is False:
+        logger.warning("radio: no option %r in group %r", option_label, group_name)
+        return False
+    if radio_id:
+        label = page.locator(f'label[for="{radio_id}"]')
+        if await label.count():
+            await label.first.click()
+            return True
+        await page.locator(f'[id="{radio_id}"]').check(force=True)
+        return True
+    await page.locator(f'input[type=radio][name="{group_name}"]').first.check(force=True)
+    return True
+
+
 # Captcha widgets, by the host they load from and the containers they render.
 # Recruitee proxies hCaptcha through its own CDN (captcha-assets.recruiteecdn.com),
 # so matching on "hcaptcha.com" alone misses it.

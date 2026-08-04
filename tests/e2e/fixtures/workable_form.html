@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Workable-shaped application form</title>
+<!--
+  Mirrors a live Workable posting captured 2026-08-04. Two details matter and
+  neither is guessable from the Recruitee shape:
+   1. The required marker is a line of its OWN, BEFORE the label ("*\nFirst name"),
+      and the phone field appends the dial code on another line.
+   2. Every screening question is a YES/NO radio pair whose question lives in a
+      <span> four levels above the input — not in a <legend>. Four distinct
+      questions therefore share the same two option labels.
+-->
+<form>
+  <label for="fn"><span>*</span><br>First name</label>
+  <input id="fn" type="text" required>
+
+  <label for="ph"><span>*</span><br>Phone<br>+55</label>
+  <input id="ph" type="tel" required>
+
+  <fieldset role="radiogroup">
+    <div><div><div>
+      <span>*<br>Do you have at least 8 years of professional experience in software development?</span>
+      <div>
+        <input id="q1y" type="radio" name="QA_12088154" value="true" required>
+        <label for="q1y">YES</label>
+        <input id="q1n" type="radio" name="QA_12088154" value="false" required>
+        <label for="q1n">NO</label>
+      </div>
+    </div></div></div>
+  </fieldset>
+
+  <fieldset role="radiogroup">
+    <div><div><div>
+      <span>*<br>Expertise in building large React applications with TypeScript</span>
+      <div>
+        <input id="q2y" type="radio" name="QA_12088155" value="true" required>
+        <label for="q2y">YES</label>
+        <input id="q2n" type="radio" name="QA_12088155" value="false" required>
+        <label for="q2n">NO</label>
+      </div>
+    </div></div></div>
+  </fieldset>
+</form>

@@ -1,13 +1,16 @@
 import asyncio
 from typing import Any
 
+from moonlighter.application.answers.option_matcher import match_option_locally
 from moonlighter.application.appliers.base import (
     BaseApplier,
     _detect_closed_set,
     classify_submit_outcome,
+    discover_radio_groups,
     fill_field,
     is_skip,
     query_labels_with_fallback,
+    select_radio_option,
 )
 from moonlighter.application.appliers.custom_dropdown import CustomDropdownFiller
 from moonlighter.core.log import get_logger
@@ -70,16 +73,34 @@ class WorkableApplier(BaseApplier):
             self.page,
             ["label", "[data-ui='field'] label", "[class*='field'] label"],
         )
+        radio_groups = await self._radio_groups()
+        option_texts = {o.lower() for g in radio_groups.values() for o in g["options"]}
+
         labels = []
         closed_set: set[str] = set()
         for el in label_els:
             text = (await el.inner_text()).strip()
-            if text and text.lower() not in _UPLOAD_LABELS:
-                labels.append(text)
-                if await _detect_closed_set(el):
-                    closed_set.add(text)
+            if not text or text.lower() in _UPLOAD_LABELS:
+                continue
+            # Every screening question here is labelled YES/NO. Left in, four
+            # distinct required questions collapse into two dict keys and the
+            # questions themselves are lost.
+            if text.lower() in option_texts:
+                continue
+            labels.append(text)
+            if await _detect_closed_set(el):
+                closed_set.add(text)
+
+        for question in radio_groups:
+            labels.append(question)
+            closed_set.add(question)
+
         logger.debug("extract_fields: %d fields", len(labels))
         return labels, frozenset(closed_set)
+
+    async def _radio_groups(self) -> dict[str, dict[str, Any]]:
+        """{question: {options, name}} for every radio group on the page."""
+        return {g["question"]: g for g in await discover_radio_groups(self.page)}
 
     async def fill_form(self, answers: dict[str, str], cv_path: str) -> dict[str, str]:
         """Fills the form. Returns {label: "filled"|"skipped"|"failed:<reason>"}.
@@ -93,6 +114,21 @@ class WorkableApplier(BaseApplier):
     async def _fill_one(self, label_text: str, answer: str) -> str:
         if is_skip(answer):
             return "skipped"
+        group = (await self._radio_groups()).get(label_text)
+        if group is not None:
+            chosen = match_option_locally(answer, group["options"])
+            if chosen is None:
+                logger.warning(
+                    "fill_form: no option of %s matches %r — '%s'",
+                    group["options"],
+                    answer[:60],
+                    label_text,
+                )
+                return "failed:no_matching_option"
+            if not await select_radio_option(self.page, group["name"], chosen):
+                return "failed:radio_option_not_clickable"
+            logger.debug("fill_form: radio '%s' → %r", label_text, chosen)
+            return "filled"
         try:
             field = await self._find_field(label_text)
             if field is None:
