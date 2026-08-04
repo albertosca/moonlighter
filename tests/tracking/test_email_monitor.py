@@ -774,7 +774,90 @@ class TestParseMessage:
 # ── fetch_unread_messages ─────────────────────────────────────────────────────
 
 
+class TestTokenScopes:
+    def test_reads_the_scope_string_format(self, tmp_path):
+        """The token may be maintained by another project that writes google's
+        wire format: a single space-separated `scope` string, not a `scopes` list."""
+        from moonlighter.tracking.gmail_client import _token_scopes
+
+        f = tmp_path / "t.json"
+        f.write_text('{"scope": "https://a/gmail.modify https://a/calendar"}')
+        assert _token_scopes(f) == ["https://a/gmail.modify", "https://a/calendar"]
+
+    def test_reads_the_scopes_list_format(self, tmp_path):
+        from moonlighter.tracking.gmail_client import _token_scopes
+
+        f = tmp_path / "t.json"
+        f.write_text('{"scopes": ["https://a/gmail.readonly"]}')
+        assert _token_scopes(f) == ["https://a/gmail.readonly"]
+
+    def test_returns_none_when_the_file_declares_nothing(self, tmp_path):
+        from moonlighter.tracking.gmail_client import _token_scopes
+
+        f = tmp_path / "t.json"
+        f.write_text('{"refresh_token": "r"}')
+        assert _token_scopes(f) is None
+
+    def test_returns_none_on_unreadable_json(self, tmp_path):
+        from moonlighter.tracking.gmail_client import _token_scopes
+
+        f = tmp_path / "t.json"
+        f.write_text("nao e json")
+        assert _token_scopes(f) is None
+
+    def test_setup_requests_the_granted_scopes_not_the_narrower_one(self, tmp_path, monkeypatch):
+        """Refreshing with a scope the grant does not literally contain fails with
+        invalid_scope: gmail.modify does not include the string gmail.readonly.
+        The token's own scopes are what must be sent; breadth is only warned about."""
+        from moonlighter.tracking.gmail_client import setup_gmail_service
+
+        monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+        token = tmp_path / "gmail-token.json"
+        token.write_text('{"scope": "https://www.googleapis.com/auth/gmail.modify"}')
+        config = {"email": {"token_path": str(token)}}
+
+        with (
+            patch("moonlighter.tracking.gmail_client.Credentials") as MockCreds,
+            patch("moonlighter.tracking.gmail_client.build"),
+        ):
+            MockCreds.from_authorized_user_file.return_value = MagicMock(valid=True, expired=False)
+            setup_gmail_service(config)
+
+        scopes = MockCreds.from_authorized_user_file.call_args.args[1]
+        assert scopes == ["https://www.googleapis.com/auth/gmail.modify"]
+
+
+class TestIsOurs:
+    def test_unresolvable_path_is_not_ours(self, monkeypatch):
+        """A path that cannot be resolved must never be treated as ours — the
+        consequence of guessing wrong is overwriting another project's token."""
+        from moonlighter.tracking import gmail_client
+
+        monkeypatch.setattr(
+            gmail_client, "moonlighter_home", MagicMock(side_effect=OSError("no home"))
+        )
+        assert gmail_client._is_ours(Path("/tmp/qualquer/token.json")) is False
+
+
 class TestFetchUnreadMessages:
+    def test_searches_spam_as_well_as_the_inbox(self):
+        """ATS confirmations sent to a plus-alias land in spam regularly — one did,
+        for the holepunch application on 2026-08-04, and the monitor could not see
+        it: SPAM is a separate label from INBOX, so labelIds=[INBOX, UNREAD] hid it
+        entirely. "We received your application" is the reply least worth missing."""
+        from moonlighter.tracking.gmail_client import fetch_unread_messages
+
+        service = MagicMock()
+        listing = service.users.return_value.messages.return_value.list
+        listing.return_value.execute.return_value = {"messages": []}
+
+        fetch_unread_messages(service)
+
+        kwargs = listing.call_args.kwargs
+        assert "in:anywhere" in kwargs.get("q", "")
+        assert "is:unread" in kwargs["q"]
+        assert "labelIds" not in kwargs, "labelIds=[INBOX] exclui o spam"
+
     def test_returns_list_of_id_and_thread_id(self):
         from moonlighter.tracking.gmail_client import fetch_unread_messages
 
@@ -874,6 +957,55 @@ class TestSetupGmailService:
         assert service is not None
         mock_build.assert_called_once_with("gmail", "v1", credentials=mock_creds)
 
+    def test_refreshed_token_is_persisted_when_the_file_is_ours(self, tmp_path, monkeypatch):
+        from moonlighter.tracking.gmail_client import setup_gmail_service
+
+        monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+        token_path = tmp_path / "gmail-token.json"
+        token_path.write_text("{}")
+
+        mock_creds = MagicMock(valid=False, expired=True, refresh_token="r")
+        mock_creds.to_json.return_value = '{"token": "novo"}'
+        config = {"email": {"token_path": str(token_path)}}
+
+        with (
+            patch("moonlighter.tracking.gmail_client.Credentials") as MockCreds,
+            patch("moonlighter.tracking.gmail_client.build"),
+            patch("moonlighter.tracking.gmail_client.Request"),
+        ):
+            MockCreds.from_authorized_user_file.return_value = mock_creds
+            setup_gmail_service(config)
+
+        assert token_path.read_text() == '{"token": "novo"}'
+
+    def test_refreshed_token_is_not_written_back_to_a_foreign_file(self, tmp_path, monkeypatch):
+        """The token may be shared with another project that owns and refreshes
+        it. Writing google-auth's serialisation over it rewrites its shape (a
+        `scopes` list where the owner keeps a `scope` string, plus expiry and
+        universe_domain) and can break the owner. Refresh in memory instead."""
+        monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
+        from moonlighter.tracking.gmail_client import setup_gmail_service
+
+        foreign = tmp_path / "outro-projeto" / "token.json"
+        foreign.parent.mkdir(parents=True)
+        original = '{"account": "x", "scope": "a b", "refresh_token": "r"}'
+        foreign.write_text(original)
+
+        mock_creds = MagicMock(valid=False, expired=True, refresh_token="r")
+        mock_creds.to_json.return_value = '{"token": "sobrescrito"}'
+        config = {"email": {"token_path": str(foreign)}}
+
+        with (
+            patch("moonlighter.tracking.gmail_client.Credentials") as MockCreds,
+            patch("moonlighter.tracking.gmail_client.build"),
+            patch("moonlighter.tracking.gmail_client.Request"),
+        ):
+            MockCreds.from_authorized_user_file.return_value = mock_creds
+            setup_gmail_service(config)
+
+        mock_creds.refresh.assert_called_once()
+        assert foreign.read_text() == original, "arquivo de outro projeto foi alterado"
+
     def test_raises_gmail_auth_error_when_token_missing(self, tmp_path):
         from moonlighter.tracking.gmail_client import GmailAuthError, setup_gmail_service
 
@@ -907,9 +1039,12 @@ class TestSetupGmailService:
         assert written.read_text() == '{"token": "abc"}'
         assert written.stat().st_mode & 0o777 == 0o600
 
-    def test_refreshes_expired_token(self, tmp_path):
+    def test_refreshes_expired_token(self, tmp_path, monkeypatch):
         from moonlighter.tracking.gmail_client import setup_gmail_service
 
+        # Persistence now only happens for a token file we own, so the fixture
+        # has to put it inside MOONLIGHTER_HOME.
+        monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
         token_path = str(tmp_path / "gmail-token.json")
         config = {
             "email": {

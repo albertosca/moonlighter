@@ -3,9 +3,12 @@ Gmail API surface: authentication, message fetch/parse, label management.
 """
 
 import base64
+import json
 import logging
 from pathlib import Path
 from typing import Any
+
+from moonlighter.core.config import moonlighter_home
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +64,36 @@ def _warn_if_scope_mismatch(creds: Any, required_scope: str) -> None:
         )
 
 
+def _token_scopes(token_path: Path) -> list[str] | None:
+    """The scopes the token file itself declares, or None if it declares none.
+
+    Accepts both shapes: google-auth writes a `scopes` list, while google's own
+    token endpoint (and other clients) write a space-separated `scope` string.
+    Reading them matters because a refresh must request the scopes actually
+    granted — asking for gmail.readonly against a grant of gmail.modify fails
+    with invalid_scope, since one does not literally contain the other.
+    """
+    try:
+        data = json.loads(token_path.read_text())
+    except OSError, ValueError:
+        return None
+    scopes = data.get("scopes")
+    if isinstance(scopes, list) and scopes:
+        return [str(s) for s in scopes]
+    scope = data.get("scope")
+    if isinstance(scope, str) and scope.strip():
+        return scope.split()
+    return None
+
+
+def _is_ours(token_path: Path) -> bool:
+    """True when the token file lives inside MOONLIGHTER_HOME, i.e. we own it."""
+    try:
+        return token_path.resolve().is_relative_to(moonlighter_home().resolve())
+    except OSError, ValueError:
+        return False
+
+
 def setup_gmail_service(config: dict[str, Any]) -> Any:
     """Loads credentials + OAuth2 token and returns the Gmail API resource.
     Raises GmailAuthError with a clear message if the token doesn't exist; refreshes
@@ -77,21 +110,41 @@ def setup_gmail_service(config: dict[str, Any]) -> Any:
         raise GmailAuthError("Gmail token not found. Run setup_email() first to authorize access.")
 
     required_scope = _required_scope(config)
-    creds = Credentials.from_authorized_user_file(str(token_path), [required_scope])  # type: ignore[no-untyped-call]
+    # Send the scopes the grant actually carries; _warn_if_scope_mismatch is what
+    # flags a token broader than we need. Narrowing here is not a privilege
+    # reduction — it just makes the refresh fail.
+    scopes = _token_scopes(token_path) or [required_scope]
+    creds = Credentials.from_authorized_user_file(str(token_path), scopes)  # type: ignore[no-untyped-call]
     if not creds.valid and creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        token_path.write_text(creds.to_json())
+        # Persist only a token file we own. `token_path` may point at another
+        # project's file — that is a supported setup, and how this account's
+        # credential is kept alive today. google-auth's serialisation would
+        # rewrite that file's shape (a `scopes` list where the owner keeps a
+        # `scope` string, plus expiry and universe_domain) and can break the
+        # owner. Refreshing in memory costs one request per sync.
+        if _is_ours(token_path):
+            token_path.write_text(creds.to_json())
+        else:
+            logger.debug("token at %s belongs to another project — not writing back", token_path)
 
     _warn_if_scope_mismatch(creds, required_scope)
     return build("gmail", "v1", credentials=creds)
 
 
 def fetch_unread_messages(service: Any, max_results: int = 50) -> list[dict[str, Any]]:
-    """Fetches unread emails in the inbox. Returns a list of {id, threadId}."""
+    """Fetches unread emails, spam included. Returns a list of {id, threadId}.
+
+    `in:anywhere` rather than labelIds=[INBOX, UNREAD]: SPAM is a separate label
+    from INBOX, so the label filter hid every message Gmail had flagged. ATS
+    confirmations sent to a plus-alias land there routinely — one did, for the
+    holepunch application on 2026-08-04 — and "we received your application" is
+    the single reply least worth missing.
+    """
     response = (
         service.users()
         .messages()
-        .list(userId="me", labelIds=["INBOX", "UNREAD"], maxResults=max_results)
+        .list(userId="me", q="is:unread in:anywhere", maxResults=max_results)
         .execute()
     )
     messages: list[dict[str, Any]] = response.get("messages", [])

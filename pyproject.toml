@@ -33,7 +33,7 @@ ignore = ["RUF001", "RUF002", "RUF003", "E501"]
 "scripts/*" = ["E402"]
 # S101 assert: pytest's normal idiom. S108 /tmp paths: test fixtures, not runtime.
 # S105 hardcoded password: false positive on a mock dict key named "refresh_token".
-"tests/*" = ["S101", "S105", "S108"]
+"tests/*" = ["S101", "S105", "S106", "S108"]
 
 [tool.coverage.run]
 source_pkgs = [
