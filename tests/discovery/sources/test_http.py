@@ -326,138 +326,6 @@ async def test_lever_empty_array_response():
 
 # --- AshbyScanner tests ---
 
-ASHBY_RESPONSE = {
-    "data": {
-        "jobPostings": [
-            {
-                "id": "1",
-                "title": "ML Engineer",
-                "locationName": "Remote",
-                "isRemote": True,
-                "publishedDate": "2026-05-01",
-                "descriptionPlain": "Train and serve large language models.",
-                "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/openai/1",
-            }
-        ]
-    }
-}
-
-
-async def test_ashby_scan_success():
-    mock_client = _make_mock_client(ASHBY_RESPONSE)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        jobs = await AshbyScanner().scan(["openai"])
-    assert len(jobs) == 1
-    assert jobs[0].company == "openai"
-    assert jobs[0].title == "ML Engineer"
-    assert jobs[0].source == "ashby"
-    assert "language models" in jobs[0].description  # QUALITY-01: description extracted
-
-
-async def test_ashby_is_remote_flag_true():
-    mock_client = _make_mock_client(ASHBY_RESPONSE)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        jobs = await AshbyScanner().scan(["openai"])
-    assert jobs[0].remote_type == "remote"
-
-
-async def test_ashby_is_remote_flag_false_uses_location():
-    response = {
-        "data": {
-            "jobPostings": [
-                {
-                    "id": "2",
-                    "title": "Eng",
-                    "locationName": "São Paulo, Brazil",
-                    "isRemote": False,
-                    "publishedDate": "2026-05-01",
-                    "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/co/2",
-                }
-            ]
-        }
-    }
-    mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        jobs = await AshbyScanner().scan(["co"])
-    assert jobs[0].remote_type == "onsite"
-
-
-async def test_ashby_500_response_skips_company():
-    mock_client = _make_mock_client({}, status_code=500)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        jobs = await AshbyScanner().scan(["co"])
-    assert jobs == []
-
-
-async def test_ashby_network_exception_skips_company():
-    mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        jobs = await AshbyScanner().scan(["co"])
-    assert jobs == []
-
-
-async def test_ashby_graphql_error_returns_empty():
-    """API returns {"errors": [...]} → no data key → returns []."""
-    response = {"errors": [{"message": "Unauthorized"}]}
-    mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        jobs = await AshbyScanner().scan(["co"])
-    assert jobs == []
-
-
-async def test_ashby_missing_published_date_returns_none():
-    """publishedDate absent from response → posted_at is None."""
-    response = {
-        "data": {
-            "jobPostings": [
-                {
-                    "id": "5",
-                    "title": "Eng",
-                    "locationName": "NYC",
-                    "isRemote": False,
-                    "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/co/5",
-                }
-            ]
-        }
-    }
-    mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        jobs = await AshbyScanner().scan(["co"])
-    assert len(jobs) == 1
-    assert jobs[0].posted_at is None
-
-
-async def test_ashby_published_date_parsed_as_datetime():
-    """publishedDate '2026-05-01' is parsed into a datetime object."""
-    response = {
-        "data": {
-            "jobPostings": [
-                {
-                    "id": "6",
-                    "title": "Eng",
-                    "locationName": "Remote",
-                    "isRemote": True,
-                    "publishedDate": "2026-05-01",
-                    "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/co/6",
-                }
-            ]
-        }
-    }
-    mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        jobs = await AshbyScanner().scan(["co"])
-    assert jobs[0].posted_at is not None
-    assert isinstance(jobs[0].posted_at, datetime)
-
-
-async def test_ashby_empty_job_postings_returns_empty():
-    """jobPostings: [] → scan returns []."""
-    response = {"data": {"jobPostings": []}}
-    mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        jobs = await AshbyScanner().scan(["co"])
-    assert jobs == []
-
 
 async def test_greenhouse_partial_failure_continues():
     """1 of 3 companies returns 500; the other 2 succeed → jobs from 2 companies returned."""
@@ -582,48 +450,6 @@ async def test_lever_non_list_response_returns_empty():
 # ── Ashby: schema validation ─────────────────────────────────────────────────
 
 
-async def test_ashby_missing_title_skips_job():
-    """Item with no 'title' is skipped."""
-    response = {
-        "data": {
-            "jobPostings": [
-                {
-                    "id": "1",
-                    "locationName": "Remote",
-                    "isRemote": True,
-                    "jobPostingAbsoluteUrl": "https://jobs.ashbyhq.com/co/1",
-                }
-            ]
-        }
-    }
-    mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        jobs = await AshbyScanner().scan(["co"])
-    assert jobs == []
-
-
-async def test_ashby_missing_url_skips_job():
-    """Item with no 'jobPostingAbsoluteUrl' is skipped."""
-    response = {
-        "data": {
-            "jobPostings": [{"id": "1", "title": "Eng", "locationName": "Remote", "isRemote": True}]
-        }
-    }
-    mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        jobs = await AshbyScanner().scan(["co"])
-    assert jobs == []
-
-
-async def test_ashby_null_job_postings_returns_empty():
-    """data.jobPostings is null → returns [] without crashing."""
-    response = {"data": {"jobPostings": None}}
-    mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        jobs = await AshbyScanner().scan(["co"])
-    assert jobs == []
-
-
 # --- logging tests ---
 
 
@@ -671,15 +497,6 @@ async def test_lever_logs_scan_fetched(caplog):
         await scanner.scan(["co"])
     assert "lever" in caplog.text
     assert "fetched" in caplog.text
-
-
-async def test_ashby_jobpostings_not_a_list_returns_empty():
-    """jobPostings with an unexpected shape (not a list, but truthy) → [] (http_sources.py:171)."""
-    response = {"data": {"jobPostings": {"unexpected": "shape"}}}
-    mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        jobs = await AshbyScanner().scan(["co"])
-    assert jobs == []
 
 
 @pytest.mark.parametrize(
@@ -2166,3 +1983,151 @@ async def test_hn_parse_title_falls_through_when_separator_leads_with_empty_comp
     assert len(jobs) == 1
     assert jobs[0].company == "HN Who's Hiring"
     assert jobs[0].title == text
+
+
+# --- AshbyScanner ---
+# The GraphQL board API these tests used to target was retired: it answers HTTP 200
+# with {"errors":[{"message":'Cannot query field "jobPostings" on type "Query"'}]},
+# which the scanner turned into [] — so every Ashby company reported zero openings
+# and nothing was logged. Field shapes below are copied from a live response of the
+# current endpoint (api.ashbyhq.com/posting-api/job-board/<slug>), 2026-08-03.
+
+
+def _ashby_response(*jobs):
+    return {"jobs": list(jobs), "apiVersion": "v1"}
+
+
+ASHBY_JOB = {
+    "id": "d3bc1ced",
+    "title": "ML Engineer",
+    "location": "Remote",
+    "isRemote": True,
+    "isListed": True,
+    "publishedAt": "2026-05-01T20:13:45.158+00:00",
+    "descriptionPlain": "Train and serve large language models.",
+    "jobUrl": "https://jobs.ashbyhq.com/openai/d3bc1ced",
+}
+
+
+async def test_ashby_scan_success():
+    mock_client = _make_mock_client(_ashby_response(ASHBY_JOB))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["openai"])
+    assert len(jobs) == 1
+    assert jobs[0].company == "openai"
+    assert jobs[0].title == "ML Engineer"
+    assert jobs[0].source == "ashby"
+    assert jobs[0].url == "https://jobs.ashbyhq.com/openai/d3bc1ced"
+    assert "language models" in jobs[0].description
+
+
+async def test_ashby_uses_the_rest_board_endpoint():
+    """Guards the regression directly: a POST to the retired GraphQL endpoint is
+    what made every company look empty."""
+    mock_client = _make_mock_client(_ashby_response(ASHBY_JOB))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        await AshbyScanner().scan(["openai"])
+    mock_client.post.assert_not_called()
+    url = mock_client.get.call_args.args[0]
+    assert url == "https://api.ashbyhq.com/posting-api/job-board/openai"
+
+
+async def test_ashby_is_remote_flag_true():
+    mock_client = _make_mock_client(_ashby_response(ASHBY_JOB))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["openai"])
+    assert jobs[0].remote_type == "remote"
+
+
+async def test_ashby_is_remote_flag_false_uses_location():
+    job = {**ASHBY_JOB, "location": "São Paulo, Brazil", "isRemote": False}
+    mock_client = _make_mock_client(_ashby_response(job))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs[0].remote_type == "onsite"
+
+
+async def test_ashby_unlisted_job_is_skipped():
+    """isListed=False means the posting is not public — surfacing it would send the
+    candidate to a page that is not accepting applications."""
+    job = {**ASHBY_JOB, "isListed": False}
+    mock_client = _make_mock_client(_ashby_response(job))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs == []
+
+
+async def test_ashby_500_response_skips_company():
+    mock_client = _make_mock_client({}, status_code=500)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs == []
+
+
+async def test_ashby_network_exception_skips_company():
+    mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs == []
+
+
+async def test_ashby_missing_published_at_returns_none():
+    job = {k: v for k, v in ASHBY_JOB.items() if k != "publishedAt"}
+    mock_client = _make_mock_client(_ashby_response(job))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert len(jobs) == 1
+    assert jobs[0].posted_at is None
+
+
+async def test_ashby_published_at_parsed_as_datetime():
+    """The live API returns a timezone-aware ISO timestamp, not a bare date."""
+    mock_client = _make_mock_client(_ashby_response(ASHBY_JOB))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["openai"])
+    assert isinstance(jobs[0].posted_at, datetime)
+
+
+async def test_ashby_unparseable_published_at_returns_none():
+    job = {**ASHBY_JOB, "publishedAt": "not-a-date"}
+    mock_client = _make_mock_client(_ashby_response(job))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs[0].posted_at is None
+
+
+async def test_ashby_empty_jobs_returns_empty():
+    mock_client = _make_mock_client(_ashby_response())
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs == []
+
+
+async def test_ashby_missing_title_skips_job():
+    job = {k: v for k, v in ASHBY_JOB.items() if k != "title"}
+    mock_client = _make_mock_client(_ashby_response(job))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs == []
+
+
+async def test_ashby_missing_url_skips_job():
+    job = {k: v for k, v in ASHBY_JOB.items() if k != "jobUrl"}
+    mock_client = _make_mock_client(_ashby_response(job))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs == []
+
+
+async def test_ashby_jobs_not_a_list_returns_empty():
+    mock_client = _make_mock_client({"jobs": {"unexpected": "shape"}})
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs == []
+
+
+async def test_ashby_null_jobs_returns_empty():
+    mock_client = _make_mock_client({"jobs": None})
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs == []

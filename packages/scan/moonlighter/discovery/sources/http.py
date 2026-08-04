@@ -123,68 +123,54 @@ class LeverScanner(BaseScanner):
 
 
 class AshbyScanner(BaseScanner):
-    """Ashby public job board API."""
+    """Ashby public job board API.
 
-    BASE = "https://jobs.ashbyhq.com/api/non-user-graphql"
-    HEADERS: ClassVar[dict[str, str]] = {
-        "User-Agent": "moonlighter/0.1",
-        "Content-Type": "application/json",
-    }
-    QUERY = """
-    query jobPostings($organizationHostedJobsPageName: String!) {
-      jobPostings(organizationHostedJobsPageName: $organizationHostedJobsPageName) {
-        id title locationName isRemote publishedDate
-        jobPostingAbsoluteUrl descriptionPlain
-      }
-    }
+    Uses the REST posting API. The previous implementation posted a `jobPostings`
+    GraphQL query to jobs.ashbyhq.com/api/non-user-graphql; Ashby retired that
+    field, and the endpoint now answers HTTP 200 with an `errors` payload — which
+    this scanner turned into an empty list. Every Ashby company therefore reported
+    zero openings, silently, and indistinguishably from a company that is simply
+    not hiring. Probed 2026-08-03 across 39 slugs (linear, posthog, supabase, …):
+    0 jobs through GraphQL, 2546 through the endpoint below.
     """
+
+    BASE = "https://api.ashbyhq.com/posting-api/job-board/{slug}"
+    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
         return await _gather_jobs("ashby", company_slugs, self._fetch)
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
         try:
-            r = await client.post(
-                self.BASE,
-                headers=self.HEADERS,
-                json={
-                    "operationName": "jobPostings",
-                    "query": self.QUERY,
-                    "variables": {"organizationHostedJobsPageName": slug},
-                },
-            )
+            r = await client.get(self.BASE.format(slug=slug), headers=self.HEADERS)
         except Exception:
             return []
         if r.status_code != 200:
             return []
-        response_data = r.json()
-        if "errors" in response_data:
-            return []
-        job_postings = response_data.get("data", {}).get("jobPostings") or []
-        if not isinstance(job_postings, list):
+        postings = r.json().get("jobs") or []
+        if not isinstance(postings, list):
             return []
         jobs = []
-        for item in job_postings:
+        for item in postings:
             title = item.get("title")
-            url = item.get("jobPostingAbsoluteUrl")
-            if not title or not url:
+            url = item.get("jobUrl")
+            # isListed=False is a posting the company has unpublished: the page is
+            # still reachable but is not accepting applications.
+            if not title or not url or item.get("isListed") is False:
                 continue
-            remote_type = (
-                "remote"
-                if item.get("isRemote")
-                else normalize_remote_type(item.get("locationName"))
-            )
+            location = item.get("location")
+            remote_type = "remote" if item.get("isRemote") else normalize_remote_type(location)
             posted_at = None
-            if item.get("publishedDate"):
+            if item.get("publishedAt"):
                 with contextlib.suppress(ValueError):
-                    posted_at = datetime.fromisoformat(item["publishedDate"])
+                    posted_at = datetime.fromisoformat(item["publishedAt"])
             jobs.append(
                 RawJob(
                     source="ashby",
                     company=slug,
                     title=title,
                     url=url,
-                    location=item.get("locationName"),
+                    location=location,
                     remote_type=remote_type,
                     posted_at=posted_at,
                     description=item.get("descriptionPlain") or None,
