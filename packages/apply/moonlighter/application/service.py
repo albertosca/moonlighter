@@ -20,7 +20,7 @@ from typing import Any, cast
 from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.application.answers.email_alias import build_email_alias, inject_email_alias
 from moonlighter.application.appliers.ashby import AshbyApplier
-from moonlighter.application.appliers.base import BaseApplier, generate_answers
+from moonlighter.application.appliers.base import BaseApplier, detect_captcha, generate_answers
 from moonlighter.application.appliers.greenhouse import GreenhouseApplier
 from moonlighter.application.appliers.lever import LeverApplier
 from moonlighter.application.appliers.recruitee import RecruiteeApplier
@@ -392,6 +392,19 @@ async def _submit_on_page(
             if result is None:
                 return f"⚠️  ATS not recognized for job #{job.id}."
             applier, fill_status = result
+
+            # A captcha means automation cannot finish this: the token minted in a
+            # CDP-controlled tab is rejected server-side. Stop BEFORE clicking,
+            # hand the window over, and genuinely let go of the browser.
+            vendor = await detect_captcha(page)
+            if vendor:
+                await _show_window_safe(page)
+                needs_review = True
+                shot = _screenshot_path(job.id, "03-filled", config)
+                stack.pop_all()  # the page outlives this block — do not close it
+                await browser.detach()
+                return _record_captcha(app, job, answers, ref, vendor, shot)
+
             outcome = await applier.submit()
             await browser.save_screenshot(page, job.id, "04-submitted", config)
             shot = _screenshot_path(job.id, "04-submitted", config)
@@ -443,6 +456,39 @@ def _record_failed(
         f"⚠️  Application #{job_id} was NOT submitted ({outcome}).\n"
         f"Problem fields: {problems}\n"
         f"Check {shot} and run retry_apply({job_id}) after fixing."
+    )
+
+
+def _record_captcha(
+    app: Application, job: Job, answers: dict[str, str], ref: str, vendor: str, shot: str
+) -> str:
+    """Filled, stopped short of submitting, browser handed back to the human.
+
+    Not a failure and not a submission: the form is complete and waiting. Marked
+    needs_review so nothing auto-retries, and the answers are persisted so a
+    later re-fill does not regenerate them.
+    """
+    now = datetime.now()
+    app.status = "needs_review"
+    app.applied_at = None
+    app.form_data = json.dumps(answers)
+    app.email_ref = ref
+    app.updated_at = now
+    note = (
+        f"[{now.strftime('%Y-%m-%d')}] filled but NOT submitted — {vendor} captcha. "
+        f"Browser detached and left open for manual submit."
+    )
+    app.notes = f"{app.notes}\n{note}" if app.notes else note
+    app.save()
+    Job.update(status="needs_review").where(Job.id == job.id).execute()
+    return (
+        f"🧩 Application #{job.id} ({job.company} / {job.title}) is FILLED but NOT submitted: "
+        f"the form is protected by {vendor}.\n"
+        f"A captcha solved in an automated tab is rejected by the server, so I stopped before "
+        f"clicking and released the browser — it is no longer automation-controlled.\n"
+        f"🖥️  The window is open with everything filled in. Solve the captcha and press submit.\n"
+        f"Screenshot of what was filled: {shot}\n"
+        f"→ Once sent: `update_status({job.id}, 'submitted')`"
     )
 
 

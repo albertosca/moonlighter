@@ -400,3 +400,54 @@ async def test_get_context_logs_cdp_connected(caplog, tmp_path):
         await browser_mod.get_context(config)
 
     assert "CDP connected" in caplog.text
+
+
+# ── detach ────────────────────────────────────────────────────────────────────
+
+
+async def test_detach_disconnects_playwright_but_leaves_the_browser_running():
+    """A captcha token minted in a CDP-controlled tab does not validate
+    server-side, so handing the page back means genuinely letting go: stop the
+    Playwright driver, keep the window and its filled form alive for the human.
+    Killing the process would throw away the work."""
+    mock_browser = MagicMock()
+    mock_browser.close = AsyncMock()
+    mock_pw = MagicMock()
+    mock_pw.stop = AsyncMock()
+    mock_proc = MagicMock()
+
+    browser_mod._browser = mock_browser
+    browser_mod._playwright = mock_pw
+    browser_mod._browser_process = mock_proc
+
+    await browser_mod.detach()
+
+    mock_browser.close.assert_awaited_once()
+    mock_pw.stop.assert_awaited_once()
+    mock_proc.terminate.assert_not_called()
+    mock_proc.kill.assert_not_called()
+    assert browser_mod._browser is None
+    assert browser_mod._playwright is None
+    assert browser_mod._browser_process is mock_proc
+
+
+async def test_detach_is_safe_when_nothing_is_connected():
+    browser_mod._browser = None
+    browser_mod._playwright = None
+    await browser_mod.detach()
+
+
+async def test_detach_forgets_the_connection_even_if_closing_fails():
+    """A driver that errors on the way out must not leave a stale handle behind —
+    the next operation would reuse a dead connection."""
+    mock_browser = MagicMock()
+    mock_browser.close = AsyncMock(side_effect=RuntimeError("already gone"))
+    mock_pw = MagicMock()
+    mock_pw.stop = AsyncMock(side_effect=RuntimeError("nope"))
+    browser_mod._browser = mock_browser
+    browser_mod._playwright = mock_pw
+
+    await browser_mod.detach()
+
+    assert browser_mod._browser is None
+    assert browser_mod._playwright is None

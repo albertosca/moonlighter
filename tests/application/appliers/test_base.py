@@ -1202,3 +1202,34 @@ async def test_wait_for_submit_survives_an_evaluate_failure():
     page.wait_for_timeout = AsyncMock()
 
     assert await base.wait_for_submit_to_settle(page, timeout_ms=5000) is True
+
+
+# ── detect_captcha ───────────────────────────────────────────────────────────
+
+
+async def test_detect_captcha_names_the_vendor():
+    """Recruitee guards /candidates with hCaptcha. Clicking Send anyway spends the
+    timeout and then reports failed:validation_errors:[] — the server answers
+    HTTP 422 {"error":{"captchaToken":[...]}} and no field is at fault. The only
+    correct move is to stop before clicking."""
+    page = MagicMock()
+    page.evaluate = AsyncMock(return_value="hcaptcha")
+
+    assert await base.detect_captcha(page) == "hcaptcha"
+
+
+async def test_detect_captcha_returns_none_when_absent():
+    page = MagicMock()
+    page.evaluate = AsyncMock(return_value=None)
+
+    assert await base.detect_captcha(page) is None
+
+
+async def test_detect_captcha_never_raises():
+    """A detection failure must not break the apply flow — but it must not claim
+    'no captcha' either, or we go on to click. Unknown is reported as absent only
+    because the caller still screenshots and shows the window on any failure."""
+    page = MagicMock()
+    page.evaluate = AsyncMock(side_effect=RuntimeError("context destroyed"))
+
+    assert await base.detect_captcha(page) is None

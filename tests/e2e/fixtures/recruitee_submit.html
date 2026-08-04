@@ -8,6 +8,9 @@
   settles reports failed:validation_errors:[] -- an empty error list, because
   there are no errors -- on an action that cannot be undone. Observed 2026-08-04.
 -->
+<!-- Recruitee proxies hCaptcha through its own CDN, so matching on
+     "hcaptcha.com" alone does not see it. This is the real host. -->
+<iframe src="https://captcha-assets.recruiteecdn.com/captcha/v1/abc/static/hcaptcha-enclave.html#frame=enclave" title="captcha"></iframe>
 <form id="f">
   <label for="name">Full name&nbsp;*</label>
   <input id="name" type="text" required>

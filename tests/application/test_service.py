@@ -786,3 +786,74 @@ async def test_submit_application_missing_cv(tmp_db, tmp_path):
     ):
         result = await apply_service.submit_application(job.id, cfg, PROFILE)
     assert "Not submitted" in result
+
+
+async def test_submit_stops_and_detaches_when_a_captcha_guards_the_form(tmp_db, tmp_path):
+    """A captcha token minted in an automated tab is rejected server-side —
+    Recruitee answers HTTP 422 on captchaToken, which the generic classifier
+    reports as failed:validation_errors:[] with no field at fault. Clicking is
+    therefore never right: stop, hand the window over, and let go of the browser
+    so the human's captcha is solved in a page nobody is driving."""
+    init_db()
+    job = _job(url="https://acme.recruitee.com/o/eng/c/new")
+    Application.create(job=job, status="filled", form_data='{"Name": "Alberto"}', email_ref="r1")
+    cv = tmp_path / "cv.pdf"
+    cv.write_text("x")
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    applier = _confirm_mocks(job, fill_status={"Name": "filled"}, submit="submitted")
+
+    with (
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch(
+            "moonlighter.application.service.detect_applier", new=AsyncMock(return_value=applier)
+        ),
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv)),
+        patch(
+            "moonlighter.application.service.detect_captcha",
+            new=AsyncMock(return_value="hcaptcha"),
+        ),
+    ):
+        mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.hide_window = AsyncMock()
+        mock_browser.show_window = AsyncMock()
+        mock_browser.save_screenshot = AsyncMock()
+        mock_browser.detach = AsyncMock()
+        result = await apply_service.submit_application(job.id, cfg, PROFILE)
+
+    applier.submit.assert_not_awaited()
+    mock_browser.detach.assert_awaited_once()
+    mock_browser.show_window.assert_awaited()
+    assert "hcaptcha" in result
+    assert "NOT submitted" in result
+    app = Application.get(Application.job == job)
+    assert app.status == "needs_review"
+    assert app.applied_at is None
+    assert "captcha" in app.notes
+
+
+async def test_submit_proceeds_normally_when_there_is_no_captcha(tmp_db, tmp_path):
+    init_db()
+    job = _job(url="https://boards.greenhouse.io/stripe/jobs/nocap")
+    Application.create(job=job, status="filled", form_data='{"Name": "Alberto"}', email_ref="n1")
+    cv = tmp_path / "cv.pdf"
+    cv.write_text("x")
+    cfg = {"screenshots_dir": str(tmp_path), "llm_model": "x", "email": {}}
+    applier = _confirm_mocks(job, fill_status={"Name": "filled"}, submit="submitted")
+
+    with (
+        patch("moonlighter.application.service.browser") as mock_browser,
+        patch(
+            "moonlighter.application.service.detect_applier", new=AsyncMock(return_value=applier)
+        ),
+        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv)),
+        patch("moonlighter.application.service.detect_captcha", new=AsyncMock(return_value=None)),
+    ):
+        mock_browser.new_page = AsyncMock(return_value=_page(job.url))
+        mock_browser.hide_window = AsyncMock()
+        mock_browser.save_screenshot = AsyncMock()
+        mock_browser.detach = AsyncMock()
+        result = await apply_service.submit_application(job.id, cfg, PROFILE)
+
+    applier.submit.assert_awaited()
+    mock_browser.detach.assert_not_awaited()
+    assert "submitted and confirmed" in result

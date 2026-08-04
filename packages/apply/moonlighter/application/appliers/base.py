@@ -129,6 +129,43 @@ _ERROR_MESSAGES_JS = """() => {
 }"""
 
 
+# Captcha widgets, by the host they load from and the containers they render.
+# Recruitee proxies hCaptcha through its own CDN (captcha-assets.recruiteecdn.com),
+# so matching on "hcaptcha.com" alone misses it.
+_CAPTCHA_JS = """() => {
+    const pats = [
+      ['hcaptcha',   /hcaptcha|h-captcha/i],
+      ['recaptcha',  /recaptcha|g-recaptcha/i],
+      ['turnstile',  /turnstile/i],
+      ['friendly',   /friendly-?challenge/i],
+    ];
+    const hay = [
+      ...[...document.querySelectorAll('iframe')].map(i => i.src || ''),
+      ...[...document.querySelectorAll('script')].map(s => s.src || ''),
+      ...[...document.querySelectorAll('[class],[id]')].map(e => (e.className||'') + ' ' + (e.id||'')),
+    ].join(' ');
+    for (const [name, re] of pats) if (re.test(hay)) return name;
+    return null;
+}"""
+
+
+async def detect_captcha(page: Page) -> str | None:
+    """The captcha vendor guarding this form, or None. Never raises.
+
+    A captcha means the submission cannot be completed by automation: the token
+    minted inside a CDP-controlled tab does not validate server-side. Recruitee
+    answers HTTP 422 {"error":{"captchaToken":[...]}} — no field is at fault, so
+    the generic classifier reports `failed:validation_errors:[]` and the operator
+    is left unable to tell whether an irreversible action happened. Detecting it
+    before the click is what turns that into an honest "your turn".
+    """
+    try:
+        vendor: str | None = await page.evaluate(_CAPTCHA_JS)
+    except Exception:
+        return None
+    return vendor
+
+
 # A submit button that is disabled, aria-busy, or has had its label replaced by a
 # spinner is still working. Recruitee does the third: "Send" becomes a spinner for
 # about a second while the request is in flight.

@@ -181,3 +181,23 @@ async def test_recruitee_e2e_submit_waits_for_the_spinner(browser_page):
 
     assert outcome == "submitted", f"esperava submitted, veio {outcome!r}"
     assert not await page.locator("#done").is_hidden()
+
+
+async def test_recruitee_e2e_detects_the_cdn_proxied_hcaptcha(browser_page):
+    """Recruitee serves hCaptcha from captcha-assets.recruiteecdn.com, so a check
+    for "hcaptcha.com" finds nothing. Matching the widget name is what works."""
+    from moonlighter.application.appliers.base import detect_captcha
+
+    page, base_url = browser_page
+    await page.goto(f"{base_url}/recruitee_submit.html")
+
+    assert await detect_captcha(page) == "hcaptcha"
+
+
+async def test_recruitee_e2e_reports_no_captcha_on_a_plain_form(browser_page):
+    from moonlighter.application.appliers.base import detect_captcha
+
+    page, base_url = browser_page
+    await page.goto(f"{base_url}/recruitee_form.html")
+
+    assert await detect_captcha(page) is None

@@ -173,6 +173,31 @@ async def show_window(page: Page) -> None:
     await _set_window_state(page, "normal")
 
 
+async def detach() -> None:
+    """Let go of the browser completely, leaving it running for the human.
+
+    Unlike close(), the browser PROCESS survives — the window, its tabs and a
+    filled-in form stay exactly as they are. Only the Playwright driver goes
+    away, so the page stops being automation-controlled.
+
+    This exists for captcha: a token minted inside a CDP-controlled tab does not
+    validate server-side (Recruitee answers HTTP 422 on captchaToken), so the
+    only honest handover is to actually stop driving. Errors on the way out are
+    swallowed, but the handles are cleared regardless — a stale connection would
+    be reused by the next call.
+    """
+    global _playwright, _browser
+    if _browser:
+        with contextlib.suppress(Exception):
+            await _browser.close()
+        _browser = None
+    if _playwright:
+        with contextlib.suppress(Exception):
+            await _playwright.stop()
+        _playwright = None
+    logger.info("browser: detached — no longer automation-controlled")
+
+
 async def close() -> None:
     global _playwright, _browser, _browser_process
     if _browser:
