@@ -167,3 +167,17 @@ async def test_recruitee_e2e_fill_form_checks_the_radio(browser_page):
     assert status["How do you rate your own skills with Node.js? *"] == "filled"
     assert await page.locator("#skill-2").is_checked()
     assert not await page.locator("#skill-0").is_checked()
+
+
+async def test_recruitee_e2e_submit_waits_for_the_spinner(browser_page):
+    """The whole point of the wait: without it, classify runs while the button is
+    still spinning and calls a successful submit a validation failure."""
+    page, base_url = browser_page
+    await page.goto(f"{base_url}/recruitee_submit.html")
+    await page.fill("#name", "Alberto")
+    applier = RecruiteeApplier(page, {}, {})
+
+    outcome = await applier.submit()
+
+    assert outcome == "submitted", f"esperava submitted, veio {outcome!r}"
+    assert not await page.locator("#done").is_hidden()

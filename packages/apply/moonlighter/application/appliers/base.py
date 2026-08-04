@@ -129,6 +129,49 @@ _ERROR_MESSAGES_JS = """() => {
 }"""
 
 
+# A submit button that is disabled, aria-busy, or has had its label replaced by a
+# spinner is still working. Recruitee does the third: "Send" becomes a spinner for
+# about a second while the request is in flight.
+_SUBMIT_BUSY_JS = """() => {
+    const btn = document.querySelector('button[type="submit"], input[type="submit"]');
+    if (!btn) return false;                                   // gone: not busy
+    if (btn.disabled) return true;
+    if (btn.getAttribute('aria-busy') === 'true') return true;
+    return (btn.textContent || '').trim() === '';             // label swapped for a spinner
+}"""
+
+
+async def wait_for_submit_to_settle(
+    page: Page, timeout_ms: int = 20000, poll_ms: int = 250
+) -> bool:
+    """Block while the submit button is still working. True if it settled.
+
+    `wait_for_load_state("networkidle")` is not enough on a client-rendered form:
+    it can resolve before the submit request has even left, and the outcome is
+    then classified against a page that has not finished submitting. That is how
+    a live application came back as `failed:validation_errors:[]` — an empty
+    error list, because there were no errors — leaving it unknown whether an
+    irreversible action had happened.
+
+    Returns False on timeout rather than raising: the caller still classifies,
+    it just does so knowing the page never settled.
+    """
+    waited = 0
+    while waited < timeout_ms:
+        try:
+            busy = await page.evaluate(_SUBMIT_BUSY_JS)
+        except Exception:
+            # A navigation destroys the execution context — the page moved on,
+            # which is the opposite of still-busy.
+            return True
+        if not busy:
+            return True
+        await page.wait_for_timeout(poll_ms)
+        waited += poll_ms
+    logger.warning("submit: button still busy after %dms — classifying anyway", timeout_ms)
+    return False
+
+
 async def classify_submit_outcome(
     page: Page, form_visible_js: str = _SUBMIT_VISIBLE_JS, extra_text_markers: tuple[str, ...] = ()
 ) -> str:

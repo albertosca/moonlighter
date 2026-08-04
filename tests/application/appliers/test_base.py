@@ -2,6 +2,7 @@ import json
 import re
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import moonlighter.application.appliers.base as base
 import pytest
 from moonlighter.application.appliers.base import (
     _MAX_LABEL_LEN,
@@ -1151,3 +1152,53 @@ def test_skip_sentinels_membership():
     assert NEEDS_REVIEW_SENTINEL in _SKIP_SENTINELS
     assert "__SKIP__" in _SKIP_SENTINELS
     assert "__MANUAL_UPLOAD_REQUIRED__" in _SKIP_SENTINELS
+
+
+# ── wait_for_submit_to_settle ────────────────────────────────────────────────
+
+
+async def test_wait_for_submit_settles_once_the_button_stops_being_busy():
+    """Recruitee replaces the Send label with a spinner while the request is in
+    flight. classify_submit_outcome ran 1s after the click, saw the form still
+    on screen, and reported failed:validation_errors:[] — an empty error list,
+    because there were no errors: the submission simply had not finished.
+    Judging an irreversible action mid-flight is the bug."""
+    page = MagicMock()
+    page.evaluate = AsyncMock(side_effect=[True, True, False])
+    page.wait_for_timeout = AsyncMock()
+
+    settled = await base.wait_for_submit_to_settle(page, timeout_ms=5000)
+
+    assert settled is True
+    assert page.evaluate.await_count == 3
+
+
+async def test_wait_for_submit_gives_up_after_the_timeout():
+    """A button that never settles must not hang the apply flow forever; the
+    caller still classifies, it just does so knowingly."""
+    page = MagicMock()
+    page.evaluate = AsyncMock(return_value=True)
+    page.wait_for_timeout = AsyncMock()
+
+    settled = await base.wait_for_submit_to_settle(page, timeout_ms=600, poll_ms=200)
+
+    assert settled is False
+
+
+async def test_wait_for_submit_returns_immediately_when_not_busy():
+    page = MagicMock()
+    page.evaluate = AsyncMock(return_value=False)
+    page.wait_for_timeout = AsyncMock()
+
+    assert await base.wait_for_submit_to_settle(page, timeout_ms=5000) is True
+    page.wait_for_timeout.assert_not_called()
+
+
+async def test_wait_for_submit_survives_an_evaluate_failure():
+    """A navigation mid-poll makes evaluate throw; that means the page moved on,
+    which is the opposite of still-busy."""
+    page = MagicMock()
+    page.evaluate = AsyncMock(side_effect=RuntimeError("execution context destroyed"))
+    page.wait_for_timeout = AsyncMock()
+
+    assert await base.wait_for_submit_to_settle(page, timeout_ms=5000) is True

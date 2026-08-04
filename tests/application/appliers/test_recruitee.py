@@ -600,7 +600,10 @@ async def test_submit_detects_form_still_visible_after_click():
 
     applier.page.query_selector = qs_side
 
-    eval_calls = [[], True, []]
+    # [required-fields empty, submit-button busy?, form still visible?, error messages]
+    # The busy check is the new step: judging the outcome while the button is
+    # still spinning is what produced a bogus failed:validation_errors:[].
+    eval_calls = [[], False, True, []]
     eval_n = [0]
 
     async def eval_side(js, *args):
@@ -609,6 +612,7 @@ async def test_submit_detects_form_still_visible_after_click():
         return result
 
     applier.page.evaluate = eval_side
+    applier.page.wait_for_timeout = AsyncMock()
 
     result = await applier.submit()
     assert result.startswith("failed:validation_errors")
@@ -820,3 +824,30 @@ async def test_fill_form_reports_failure_when_no_option_matches():
     )
 
     assert status["How do you rate your own skills with Node.js? *"] == "failed:no_matching_option"
+
+
+async def test_submit_warns_when_the_button_never_stops_spinning(caplog):
+    """If the page never settles, the outcome is still classified — but the log
+    has to say it may be premature, because the human reading it is deciding
+    whether an irreversible action happened."""
+    applier = make_applier()
+    btn = MagicMock()
+    btn.click = AsyncMock()
+    applier.page.wait_for_load_state = AsyncMock()
+    applier.page.wait_for_timeout = AsyncMock()
+    applier.page.inner_text = AsyncMock(return_value="no confirmation here")
+    applier.page.url = "https://acme.recruitee.com/o/backend-engineer"
+    applier.page.query_selector = AsyncMock(return_value=btn)
+    # required-fields check, then "busy" forever
+    applier.page.evaluate = AsyncMock(side_effect=[[], *([True] * 200)])
+
+    with (
+        caplog.at_level(logging.WARNING),
+        patch(
+            "moonlighter.application.appliers.recruitee.wait_for_submit_to_settle",
+            new=AsyncMock(return_value=False),
+        ),
+    ):
+        await applier.submit()
+
+    assert "may be premature" in caplog.text

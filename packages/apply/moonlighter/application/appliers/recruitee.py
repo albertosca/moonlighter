@@ -10,6 +10,7 @@ from moonlighter.application.appliers.base import (
     fill_field,
     is_skip,
     query_labels_with_fallback,
+    wait_for_submit_to_settle,
 )
 from moonlighter.application.appliers.custom_dropdown import CustomDropdownFiller
 from moonlighter.core.log import get_logger
@@ -382,6 +383,10 @@ class RecruiteeApplier(BaseApplier):
                 return "failed"
             await submit_btn.click()
             await self.page.wait_for_load_state("networkidle", timeout=15000)
+            if not await wait_for_submit_to_settle(self.page):
+                logger.warning("submit: page never settled — the outcome below may be premature")
+            # networkidle can resolve before the request has left. Wait for the
+            # button itself to stop working before judging an irreversible action.
 
             outcome = await classify_submit_outcome(self.page)
             if outcome.startswith("failed:validation_errors"):
