@@ -1382,3 +1382,26 @@ async def test_select_radio_option_reports_when_the_option_is_not_there():
     page.evaluate = AsyncMock(return_value=False)
 
     assert await base.select_radio_option(page, "q1", "Nope") is False
+
+
+def test_career_start_reaches_the_answer_prompt():
+    """The experience list starts at the first formal contract, so the model
+    counted from there and wrote "close to 14 years" for someone with 16 — an
+    understatement repeated in every application, including a screening question
+    that asks about years of experience. The whitelist is what decides whether a
+    profile field can influence an answer at all."""
+    profile = {
+        "career_started": 2010,
+        "experience": [{"company": "X", "period": "2012-09 – 2014-07"}],
+        "summary": "s",
+    }
+    assert base.profile_for_answers(profile)["career_started"] == 2010
+
+
+def test_profile_for_answers_still_excludes_contact_details():
+    """The whitelist exists because this output lands on an untrusted page:
+    contact data is placed by the deterministic field map, never written by the
+    model into free text."""
+    profile = {"name": "X", "email": "a@b.c", "phone": "1", "linkedin": "u", "summary": "s"}
+    sent = base.profile_for_answers(profile)
+    assert set(sent) == {"summary"}

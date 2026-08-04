@@ -384,6 +384,11 @@ async def _click_radio(field: Any, answer: str) -> None:
 # profile_for_eval — different key set because the threats differ (the evaluator's output is a
 # clamped number; this path's output is free text on an untrusted page).
 _ANSWER_PROFILE_KEYS = (
+    # The experience list starts at the first formal contract, so counting from it
+    # understates a career that began earlier (internships, early roles). Without
+    # this the model wrote "close to 14 years" for someone with 16 — in a
+    # screening question that asks precisely that.
+    "career_started",
     "headline",
     "summary",
     "skills",
