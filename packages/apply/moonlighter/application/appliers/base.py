@@ -180,13 +180,25 @@ async def discover_radio_groups(page: Page) -> list[dict[str, Any]]:
     return groups or []
 
 
-_RADIO_OPTIONS_JS = """([name, wanted]) => {
+# The element a human actually clicks, marked so Playwright can perform a real
+# click on it. It is never the input: Recruitee paints a decorative div over it,
+# and Workable makes it aria-hidden with a random id and no label[for] — forcing
+# a click there returns "Clicking the checkbox did not change its state".
+_MARK = "data-ml-radio-target"
+_RADIO_TARGET_JS = """([name, wanted, mark]) => {
     const clean = s => (s||'').split('\\n').map(x=>x.trim()).filter(Boolean).join(' ').trim();
     for (const r of document.querySelectorAll(`input[type=radio][name="${CSS.escape(name)}"]`)) {
         const text = clean(r.labels?.[0]?.innerText) || r.value;
-        if (text.toLowerCase() === wanted.toLowerCase()) return r.id || null;
+        if (text.toLowerCase() !== wanted.toLowerCase()) continue;
+        const target = (r.id && document.querySelector(`label[for="${CSS.escape(r.id)}"]`))
+            || r.closest('label') || r.closest('[role=radio]') || r;
+        target.setAttribute(mark, '1');
+        return true;
     }
-    return false;   // group/option not found, distinct from "found but has no id"
+    return false;
+}"""
+_CLEAR_MARK_JS = """(mark) => {
+    document.querySelectorAll(`[${mark}]`).forEach(e => e.removeAttribute(mark));
 }"""
 
 
@@ -196,23 +208,20 @@ async def select_radio_option(page: Page, group_name: str, option_label: str) ->
     Matching is on the option's LABEL text, not its `value`: Recruitee uses
     value="Advanced" while Workable uses value="true" under a label reading YES.
 
-    Clicks the label rather than the input, because the input is routinely
-    painted over — Recruitee stacks a decorative div on it and check() then
-    spends its whole timeout on "intercepts pointer events". Falls back to
-    forcing the click when the input has no label to click.
+    The click lands on whatever a human would click — an associated label, a
+    wrapping label, or the ARIA control — never on the input, which is routinely
+    hidden or covered. The target is marked in the DOM so Playwright performs a
+    real click on it, and the marker is cleared afterwards so a stale one cannot
+    misdirect the next selection.
     """
-    radio_id = await page.evaluate(_RADIO_OPTIONS_JS, [group_name, option_label])
-    if radio_id is False:
+    found = await page.evaluate(_RADIO_TARGET_JS, [group_name, option_label, _MARK])
+    if not found:
         logger.warning("radio: no option %r in group %r", option_label, group_name)
         return False
-    if radio_id:
-        label = page.locator(f'label[for="{radio_id}"]')
-        if await label.count():
-            await label.first.click()
-            return True
-        await page.locator(f'[id="{radio_id}"]').check(force=True)
-        return True
-    await page.locator(f'input[type=radio][name="{group_name}"]').first.check(force=True)
+    try:
+        await page.locator(f"[{_MARK}]").click()
+    finally:
+        await page.evaluate(_CLEAR_MARK_JS, _MARK)
     return True
 
 

@@ -1325,56 +1325,34 @@ async def test_discover_radio_groups_tolerates_a_null_result():
     assert await base.discover_radio_groups(page) == []
 
 
-async def test_select_radio_option_clicks_the_label_not_the_input():
-    """The input is routinely painted over — Recruitee stacks a decorative div on
-    top, and check() then burns its timeout on "intercepts pointer events"."""
+async def test_select_radio_option_clicks_the_marked_target():
+    """The click target varies by ATS and is never the input itself: Recruitee
+    paints a div over it, Workable makes it aria-hidden with a random id and no
+    label[for], so force-clicking it returns "Clicking the checkbox did not
+    change its state". The JS picks whatever a human would click and marks it;
+    Playwright then performs a real click on that mark."""
     page = MagicMock()
-    page.evaluate = AsyncMock(return_value="opt-2")
-    label = MagicMock()
-    label.count = AsyncMock(return_value=1)
-    label.first = MagicMock(click=AsyncMock())
-    page.locator = MagicMock(return_value=label)
+    page.evaluate = AsyncMock(return_value=True)
+    target = MagicMock()
+    target.click = AsyncMock()
+    page.locator = MagicMock(return_value=target)
 
-    assert await base.select_radio_option(page, "q1", "Advanced") is True
-    label.first.click.assert_awaited_once()
+    assert await base.select_radio_option(page, "QA_1", "YES") is True
+
+    target.click.assert_awaited_once()
+    assert page.evaluate.await_args_list[0].args[1][:2] == ["QA_1", "YES"]
 
 
-async def test_select_radio_option_matches_on_the_label_not_the_value():
-    """Recruitee uses value="Advanced"; Workable uses value="true" under a label
-    reading YES. Matching on value would silently pick nothing on Workable."""
+async def test_select_radio_option_cleans_up_its_marker():
+    """The marker must not survive the click — a stale one would make the next
+    selection click the previous target."""
     page = MagicMock()
-    page.evaluate = AsyncMock(return_value="opt-yes")
-    label = MagicMock()
-    label.count = AsyncMock(return_value=1)
-    label.first = MagicMock(click=AsyncMock())
-    page.locator = MagicMock(return_value=label)
+    page.evaluate = AsyncMock(return_value=True)
+    page.locator = MagicMock(return_value=MagicMock(click=AsyncMock()))
 
     await base.select_radio_option(page, "QA_1", "YES")
 
-    assert page.evaluate.call_args.args[1] == ["QA_1", "YES"]
-
-
-async def test_select_radio_option_forces_the_click_when_the_label_is_missing():
-    page = MagicMock()
-    page.evaluate = AsyncMock(return_value="opt-2")
-    target = MagicMock()
-    target.count = AsyncMock(return_value=0)
-    target.check = AsyncMock()
-    page.locator = MagicMock(return_value=target)
-
-    assert await base.select_radio_option(page, "q1", "Advanced") is True
-    target.check.assert_awaited_once_with(force=True)
-
-
-async def test_select_radio_option_forces_the_click_when_the_input_has_no_id():
-    page = MagicMock()
-    page.evaluate = AsyncMock(return_value=None)
-    target = MagicMock()
-    target.first = MagicMock(check=AsyncMock())
-    page.locator = MagicMock(return_value=target)
-
-    assert await base.select_radio_option(page, "q1", "Advanced") is True
-    target.first.check.assert_awaited_once_with(force=True)
+    assert page.evaluate.await_count == 2, "faltou a limpeza do marcador"
 
 
 async def test_select_radio_option_reports_when_the_option_is_not_there():

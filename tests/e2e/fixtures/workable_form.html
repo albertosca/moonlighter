@@ -20,11 +20,25 @@
   <fieldset role="radiogroup">
     <div><div><div>
       <span>*<br>Do you have at least 8 years of professional experience in software development?</span>
+      <!-- `pointer-events: none` is what makes this fixture as hard as the real
+           page: Workable's input is React-controlled, so a direct click reports
+           "Clicking the checkbox did not change its state". Clicking the wrapping
+           label still works, because label activation is not a pointer event on
+           the input. Without this the fixture passes with or without the fix. -->
+      <style>#rXk3, #rQ7z { pointer-events: none; }</style>
+      <!-- Workable hides the real input (aria-hidden, tabindex -1, random id, no
+           label[for]) and wraps it in a <label> inside a div[role=radio]. Forcing
+           a click on the input answers "Clicking the checkbox did not change its
+           state" — the label is what a human clicks. -->
       <div>
-        <input id="q1y" type="radio" name="QA_12088154" value="true" required>
-        <label for="q1y">YES</label>
-        <input id="q1n" type="radio" name="QA_12088154" value="false" required>
-        <label for="q1n">NO</label>
+        <div role="radio">
+          <label><input type="radio" name="QA_12088154" value="true" required
+                        aria-hidden="true" tabindex="-1" id="rXk3">YES</label>
+        </div>
+        <div role="radio">
+          <label><input type="radio" name="QA_12088154" value="false" required
+                        aria-hidden="true" tabindex="-1" id="rQ7z">NO</label>
+        </div>
       </div>
     </div></div></div>
   </fieldset>

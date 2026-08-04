@@ -237,4 +237,22 @@ async def test_workable_e2e_answers_the_right_question(browser_page):
 
     assert status["Expertise in building large React applications with TypeScript"] == "filled"
     assert await page.locator("#q2y").is_checked()
-    assert not await page.locator("#q1y").is_checked(), "respondeu a pergunta errada"
+    assert not await page.locator("#rXk3").is_checked(), "respondeu a pergunta errada"
+
+
+async def test_workable_e2e_answers_an_aria_hidden_radio(browser_page):
+    """Workable's real input is aria-hidden with a random id and no label[for];
+    forcing a click on it answers "Clicking the checkbox did not change its
+    state". The wrapping label is what a human clicks."""
+    from moonlighter.application.appliers.workable import WorkableApplier
+
+    page, base_url = browser_page
+    await page.goto(f"{base_url}/workable_form.html")
+    applier = WorkableApplier(page, {}, {})
+
+    question = "Do you have at least 8 years of professional experience in software development?"
+    status = await applier.fill_form({question: "Yes"}, cv_path="")
+
+    assert status[question] == "filled"
+    assert await page.locator("#rXk3").is_checked()
+    assert not await page.locator("#rQ7z").is_checked()
