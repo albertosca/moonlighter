@@ -403,6 +403,33 @@ class BaseApplier(ABC):
         open the Easy Apply modal). Default: no-op."""
 
 
+# Typography an LLM produces freely and a plain form field does not want. Only
+# punctuation is touched — accented letters are part of names and stay.
+_ASCII_PUNCTUATION = {
+    "\u2014": "-",  # em dash
+    "\u2013": "-",  # en dash
+    "\u2012": "-",  # figure dash
+    "\u2018": "'",  # left single quote
+    "\u2019": "'",  # right single quote / apostrophe
+    "\u201c": '"',  # left double quote
+    "\u201d": '"',  # right double quote
+    "\u2026": "...",  # ellipsis
+    "\u00a0": " ",  # non-breaking space
+}
+
+
+def ascii_punctuation(text: str) -> str:
+    """Replace fancy punctuation with the ASCII a form field handles predictably.
+
+    An em dash reads fine in a browser and turns into a mystery in a CSV export,
+    a plain-text email, or an ATS that transcodes badly. The candidate never sees
+    the difference; whoever reads the application might.
+    """
+    for fancy, plain in _ASCII_PUNCTUATION.items():
+        text = text.replace(fancy, plain)
+    return text
+
+
 async def generate_answers(
     company: str,
     title: str,
@@ -457,6 +484,9 @@ async def generate_answers(
 
     # Pre-populated takes priority over the LLM for contact fields.
     answers = {**unanswered, **llm_answers, **pre_populated}
+    # Normalise once, here, rather than in every applier: the LLM reaches for em
+    # dashes and smart quotes, and a plain form field is the wrong place for them.
+    answers = {k: ascii_punctuation(v) if isinstance(v, str) else v for k, v in answers.items()}
     return ApplicationDraft(
         job_id=job_id,
         answers=answers,

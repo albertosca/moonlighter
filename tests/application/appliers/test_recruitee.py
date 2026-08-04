@@ -851,3 +851,48 @@ async def test_submit_warns_when_the_button_never_stops_spinning(caplog):
         await applier.submit()
 
     assert "may be premature" in caplog.text
+
+
+# ── cover letter ──────────────────────────────────────────────────────────────
+
+
+async def test_fill_form_reveals_the_text_option_and_writes_the_cover_letter():
+    """The cover letter is an upload widget with a "Write it here instead" toggle;
+    the textarea does not exist until it is clicked. Dropping the field as an
+    upload label meant a supplied letter vanished with no status at all."""
+    applier = make_applier()
+    applier.page.evaluate = AsyncMock(return_value=[])
+
+    toggle = MagicMock()
+    toggle.count = AsyncMock(return_value=1)
+    toggle.first = MagicMock(click=AsyncMock())
+    applier.page.get_by_text = MagicMock(return_value=toggle)
+
+    ta = MagicMock()
+    ta.count = AsyncMock(return_value=1)
+    ta.first = MagicMock(fill=AsyncMock())
+    applier.page.locator = MagicMock(return_value=ta)
+
+    status = await applier.fill_form({"Cover letter": "Dear team,"}, cv_path="")
+
+    toggle.first.click.assert_awaited_once()
+    ta.first.fill.assert_awaited_once_with("Dear team,")
+    assert status["Cover letter"] == "filled"
+
+
+async def test_fill_form_reports_when_the_cover_letter_field_cannot_be_opened():
+    """Never silent: if the toggle is absent the operator is told, instead of the
+    letter disappearing."""
+    applier = make_applier()
+    applier.page.evaluate = AsyncMock(return_value=[])
+
+    toggle = MagicMock()
+    toggle.count = AsyncMock(return_value=0)
+    applier.page.get_by_text = MagicMock(return_value=toggle)
+    empty = MagicMock()
+    empty.count = AsyncMock(return_value=0)
+    applier.page.locator = MagicMock(return_value=empty)
+
+    status = await applier.fill_form({"Cover letter": "Dear team,"}, cv_path="")
+
+    assert status["Cover letter"] == "failed:cover_letter_field_not_found"

@@ -1233,3 +1233,56 @@ async def test_detect_captcha_never_raises():
     page.evaluate = AsyncMock(side_effect=RuntimeError("context destroyed"))
 
     assert await base.detect_captcha(page) is None
+
+
+# ── typography ───────────────────────────────────────────────────────────────
+
+
+def test_ascii_punctuation_replaces_the_characters_forms_choke_on():
+    """Em dashes and smart quotes are what an LLM writes and what a plain form
+    field mangles or rejects. The candidate never sees the difference; the
+    employer might."""
+    dirty = "Node.js — nine years – “advanced”, it’s fine…"
+    assert base.ascii_punctuation(dirty) == 'Node.js - nine years - "advanced", it\'s fine...'
+
+
+def test_ascii_punctuation_keeps_accented_letters():
+    """Only punctuation is normalised: a name is not typography."""
+    assert base.ascii_punctuation("Alberto de Sá Cavalcanti") == "Alberto de Sá Cavalcanti"
+
+
+def test_ascii_punctuation_handles_empty_and_plain_text():
+    assert base.ascii_punctuation("") == ""
+    assert base.ascii_punctuation("plain ascii") == "plain ascii"
+
+
+async def test_generated_answers_carry_no_fancy_punctuation():
+    """The LLM writes em dashes and smart quotes by default. Normalising once,
+    where answers are produced, beats remembering it in every applier."""
+    caller = AsyncMock(
+        return_value=json.dumps({"0": "Elixir — nine years, “advanced”, it’s fine…"})
+    )
+    draft = await generate_answers(
+        company="Acme",
+        title="Eng",
+        description="d",
+        fields=["Tell us something"],
+        profile={"name": "Alberto de Sá"},
+        _caller=caller,
+    )
+    answer = draft.answers["Tell us something"]
+    assert "—" not in answer and "“" not in answer and "’" not in answer
+    assert answer == 'Elixir - nine years, "advanced", it\'s fine...'
+
+
+async def test_normalisation_does_not_touch_accented_names():
+    caller = AsyncMock(return_value=json.dumps({"0": "ok"}))
+    draft = await generate_answers(
+        company="Acme",
+        title="Eng",
+        description="d",
+        fields=["Full name"],
+        profile={"name": "Alberto de Sá Cavalcanti"},
+        _caller=caller,
+    )
+    assert draft.answers["Full name"] == "Alberto de Sá Cavalcanti"

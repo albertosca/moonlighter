@@ -191,6 +191,8 @@ class RecruiteeApplier(BaseApplier):
         if is_skip(answer):
             return "skipped"
         try:
+            if label_text.strip().lower().startswith("cover letter"):
+                return await self._write_cover_letter(answer)
             radio_options = (await self._radio_groups()).get(label_text)
             if radio_options is not None:
                 return await self._check_radio(label_text, answer, radio_options)
@@ -236,6 +238,27 @@ class RecruiteeApplier(BaseApplier):
         except Exception as e:
             logger.debug("fill_form: exception in '%s': %s", label_text, e)
             return f"failed:{type(e).__name__}"
+
+    async def _write_cover_letter(self, text: str) -> str:
+        """Writes the cover letter into the text alternative of the upload widget.
+
+        Recruitee offers "Write it here instead" beside the dropzone, and the
+        textarea only exists once that is clicked. The label sits in
+        _UPLOAD_LABELS so extract_fields never surfaces it — correct, since we do
+        not want the LLM inventing one — but a letter supplied by the operator
+        used to vanish with no status at all. It now either lands or says why.
+        """
+        toggle = self.page.get_by_text("Write it here instead", exact=False)
+        if await toggle.count():
+            await toggle.first.click()
+            await asyncio.sleep(0.4)
+        field = self.page.locator("textarea[id*='coverLetter'], textarea[name*='coverLetter']")
+        if not await field.count():
+            logger.warning("fill_form: cover letter field not found after revealing it")
+            return "failed:cover_letter_field_not_found"
+        await field.first.fill(text)
+        logger.debug("fill_form: cover letter written (%d chars)", len(text))
+        return "filled"
 
     async def _check_radio(self, question: str, answer: str, options: list[str]) -> str:
         """Selects the option matching the answer, scoped to this question's group.
