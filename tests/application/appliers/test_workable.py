@@ -483,3 +483,55 @@ async def test_fill_form_reports_a_screening_radio_that_cannot_be_clicked():
     assert (
         status["Do you have at least 8 years of experience?"] == "failed:radio_option_not_clickable"
     )
+
+
+async def test_extract_fields_drops_the_upload_widget_label():
+    """The upload widget's own label ("Choose file", and "Replace file" once a
+    file is attached) is not a question. Left in, the LLM writes a useless answer
+    for it and the fill loop reports failed:not_found for a CV that _upload_cv
+    attached correctly — observed on a live posting."""
+    applier = make_applier()
+    applier.page.evaluate = AsyncMock(return_value=[])
+
+    def label(text):
+        m = MagicMock()
+        m.inner_text = AsyncMock(return_value=text)
+        m.evaluate = AsyncMock(return_value=False)
+        return m
+
+    applier.page.query_selector_all = AsyncMock(
+        return_value=[label("Choose file"), label("Replace file"), label("Headline (Optional)")]
+    )
+
+    fields, _closed = await applier.extract_fields()
+
+    assert "Choose file" not in fields
+    assert "Replace file" not in fields
+    assert "Headline (Optional)" in fields
+
+
+async def test_fill_form_skips_a_file_input_reached_by_label():
+    """Belt and braces: if an upload label does slip through, the loop must not
+    try to type into the file input — that is _upload_cv's field."""
+    applier = make_applier()
+    applier.page.evaluate = AsyncMock(return_value=[])
+    field = MagicMock()
+
+    async def ev(js, *a):
+        if "tagName" in js:
+            return "input"
+        return False  # not a custom combobox, not a closed set
+
+    field.evaluate = ev
+    field.get_attribute = AsyncMock(return_value="file")
+    field.fill = AsyncMock()
+
+    with patch(
+        "moonlighter.application.appliers.workable.find_labeled_input",
+        new=AsyncMock(return_value=field),
+    ):
+        applier.page.get_by_label = MagicMock(return_value=make_label_locator(None))
+        status = await applier.fill_form({"Attach something": "text"}, cv_path="")
+
+    field.fill.assert_not_called()
+    assert status["Attach something"] == "skipped"

@@ -21,12 +21,23 @@ logger = get_logger(__name__)
 
 # Labels of the CV/resume upload area -- the attachment is handled by _upload_cv, so
 # these must not go to the LLM as text fields. Mirrors greenhouse.py's _UPLOAD_LABELS.
+# Labels belonging to the file-upload widget rather than to a question. Matched
+# after normalisation, because the wording moves: Workable shows "Choose file"
+# and then "Replace file" once something is attached, and Recruitee writes
+# "CV or resume" where this list once only had "resume/cv".
 _UPLOAD_LABELS = {
     "resume",
     "resume/cv",
     "cv",
-    "cover letter",
+    "cv or resume",
+    "choose file",
+    "replace file",
+    "upload a file",
 }
+
+
+def _is_upload_label(text: str) -> bool:
+    return text.replace("\u00a0", " ").strip(" *\n\t").lower() in _UPLOAD_LABELS
 
 
 def _log_fill_stats(status: dict[str, str]) -> None:
@@ -81,7 +92,7 @@ class WorkableApplier(BaseApplier):
         closed_set: set[str] = set()
         for el in label_els:
             text = (await el.inner_text()).strip()
-            if not text or text.lower() in _UPLOAD_LABELS:
+            if not text or _is_upload_label(text):
                 continue
             # Every screening question here is labelled YES/NO. Left in, four
             # distinct required questions collapse into two dict keys and the
@@ -141,6 +152,10 @@ class WorkableApplier(BaseApplier):
                 return "filled" if ok else "failed:custom_dropdown"
 
             tag = await field.evaluate("el => el.tagName.toLowerCase()")
+            # The CV field belongs to _upload_cv; typing into a file input raises
+            # and reported a failure for a CV that had in fact been attached.
+            if tag == "input" and (await field.get_attribute("type")) == "file":
+                return "skipped"
             if tag in ("input", "textarea", "select"):
                 await fill_field(field, answer)
                 await asyncio.sleep(0.2)
