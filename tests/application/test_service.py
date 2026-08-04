@@ -915,3 +915,19 @@ def test_render_filled_without_answers_still_renders(tmp_db, tmp_path):
     out = apply_service._render_filled(job, {"Name": "filled"}, {"screenshots_dir": str(tmp_path)})
     assert "What will be sent" not in out
     assert "To submit" in out
+
+
+def test_record_submitted_tells_the_operator_to_check_spam(tmp_db, tmp_path):
+    """ATS confirmations to a plus-alias are flagged as spam routinely — the
+    holepunch one was. Gmail keeps learning from what gets rescued, so the useful
+    moment to look is right after applying, while it is obvious what to look for."""
+    init_db()
+    job = _job(url="https://acme.recruitee.com/o/eng5")
+    app = Application.create(job=job, status="filled", form_data="{}", email_ref="zz")
+
+    out = apply_service._record_submitted(
+        app, job, {}, "zz9900", {"screenshots_dir": str(tmp_path)}
+    )
+
+    assert "spam" in out.lower()
+    assert "zz9900" in out, "o alias tem que aparecer, senão não dá pra procurar"

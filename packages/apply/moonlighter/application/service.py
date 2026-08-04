@@ -348,6 +348,12 @@ def _pending_review_message(job_id: int, answers: dict[str, str]) -> str | None:
     )
 
 
+def _reply_alias(ref: str, config: dict[str, Any]) -> str:
+    """The alias this application will be answered at, for the operator to search."""
+    base_address = config.get("email", {}).get("address")
+    return build_email_alias(base_address, ref) if base_address else f"(alias +{ref})"
+
+
 def _inject_reply_alias(answers: dict[str, str], ref: str, config: dict[str, Any]) -> None:
     """Injects candidaturas+<ref>@gmail.com into the email field BEFORE filling,
     so the company replies to the monitored account (autonomous sync by ref)."""
@@ -538,7 +544,13 @@ def _record_submitted(
     app.save()
     Job.update(status="applied").where(Job.id == job.id).execute()
     archive_screenshots(job.id, config)
-    return f"✓ Application #{job.id} submitted and confirmed: {job.company} / {job.title}"
+    alias = _reply_alias(ref, config)
+    return (
+        f"✓ Application #{job.id} submitted and confirmed: {job.company} / {job.title}\n"
+        f"📧 Tracking alias: {alias}\n"
+        f"   Check spam now and rescue the confirmation if it landed there — ATS mail to a "
+        f"plus-alias is flagged routinely, and Gmail learns from what you rescue."
+    )
 
 
 # ── fill_application: fills and STOPS (does not submit) ─────────────────────
