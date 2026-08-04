@@ -225,6 +225,35 @@ async def select_radio_option(page: Page, group_name: str, option_label: str) ->
     return True
 
 
+_ARIA_LABEL_JS = """(text) => {
+    const norm = s => (s||'').replace(/[*\u00a0\u2020\u2021]+/g, ' ')
+                             .replace(/\\s+/g, ' ').trim().toLowerCase();
+    const target = norm(text);
+    for (const el of document.querySelectorAll('[aria-label]')) {
+        if (norm(el.getAttribute('aria-label')) === target) return el;
+    }
+    return null;
+}"""
+
+
+async def query_by_aria_label(page: Page, label_text: str) -> Any:
+    """Find an element by aria-label, comparing normalised text. None if absent.
+
+    The label is passed as an ARGUMENT, never spliced into a selector. Building
+    `[aria-label='...']` by string interpolation escaped quotes and nothing else,
+    so a label carrying a newline — Workable renders the required marker on its
+    own line — produced `Unsupported token "BADSTRING"` and query_selector
+    RAISED. The applier then reported failed:Error, which reads as a broken
+    field rather than a broken selector; name, email and phone all failed that
+    way on a live posting.
+    """
+    try:
+        handle = await page.evaluate_handle(_ARIA_LABEL_JS, label_text)
+    except Exception:
+        return None
+    return handle.as_element()
+
+
 # Captcha widgets, by the host they load from and the containers they render.
 # Recruitee proxies hCaptcha through its own CDN (captcha-assets.recruiteecdn.com),
 # so matching on "hcaptcha.com" alone misses it.

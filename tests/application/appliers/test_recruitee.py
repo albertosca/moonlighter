@@ -465,41 +465,38 @@ async def test_find_field_js_fallback_uses_for_attribute():
 
 
 async def test_find_field_for_id_missing_falls_to_aria():
+    """A label whose `for` points at nothing still falls through to aria-label."""
     applier = make_applier()
     applier.page.get_by_label = MagicMock(return_value=make_label_locator(None))
-    applier.page.evaluate = AsyncMock(return_value="phone_field")
-    aria_field = MagicMock()
+    applier.page.evaluate = AsyncMock(return_value="no-such-id")
+    applier.page.query_selector = AsyncMock(return_value=None)
+    field = MagicMock()
 
-    async def qs(selector):
-        if selector == "#phone_field":
-            return None
-        if "aria-label" in selector:
-            return aria_field
-        return None
-
-    applier.page.query_selector = qs
-    result = await applier._find_field("Phone")
-    assert result is aria_field
+    with patch(
+        "moonlighter.application.appliers.recruitee.query_by_aria_label",
+        new=AsyncMock(return_value=field),
+    ):
+        assert await applier._find_field("Phone") is field
 
 
 async def test_find_field_aria_label_strategy():
+    """Last resort: match on aria-label. The label is compared normalised inside
+    the page rather than spliced into a CSS selector — a label with a newline
+    made that selector raise BADSTRING, surfacing as failed:Error."""
     applier = make_applier()
     applier.page.get_by_label = MagicMock(return_value=make_label_locator(None))
     applier.page.evaluate = AsyncMock(return_value=None)
+    applier.page.query_selector = AsyncMock(return_value=None)
     field = MagicMock()
 
-    call_count = [0]
+    with patch(
+        "moonlighter.application.appliers.recruitee.query_by_aria_label",
+        new=AsyncMock(return_value=field),
+    ) as q:
+        result = await applier._find_field("*\nPhone Number")
 
-    async def qs_side(selector):
-        call_count[0] += 1
-        if "aria-label" in selector:
-            return field
-        return None
-
-    applier.page.query_selector = qs_side
-
-    result = await applier._find_field("Phone Number")
     assert result is field
+    assert q.await_args.args[1] == "*\nPhone Number"
 
 
 async def test_find_field_returns_none_when_all_fail():

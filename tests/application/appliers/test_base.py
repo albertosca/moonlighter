@@ -1383,3 +1383,34 @@ def test_profile_for_answers_still_excludes_contact_details():
     profile = {"name": "X", "email": "a@b.c", "phone": "1", "linkedin": "u", "summary": "s"}
     sent = base.profile_for_answers(profile)
     assert set(sent) == {"summary"}
+
+
+# ── query_by_aria_label ──────────────────────────────────────────────────────
+
+
+async def test_query_by_aria_label_handles_a_label_with_a_newline():
+    """Labels were interpolated raw into a CSS attribute selector with only
+    quotes escaped. Workable's "*\\nFirst name" then produced
+    'Unsupported token "BADSTRING"' — query_selector RAISED, and the applier
+    reported failed:Error as though the field were broken rather than the
+    selector. Name, email and phone all failed that way on a live posting."""
+    page = MagicMock()
+    page.evaluate_handle = AsyncMock(return_value=MagicMock(as_element=lambda: "el"))
+
+    assert await base.query_by_aria_label(page, "*\nFirst name") == "el"
+    # the label travels as an argument, never spliced into a selector
+    assert page.evaluate_handle.await_args.args[1] == "*\nFirst name"
+
+
+async def test_query_by_aria_label_returns_none_when_absent():
+    page = MagicMock()
+    page.evaluate_handle = AsyncMock(return_value=MagicMock(as_element=lambda: None))
+
+    assert await base.query_by_aria_label(page, "Nope") is None
+
+
+async def test_query_by_aria_label_never_raises():
+    page = MagicMock()
+    page.evaluate_handle = AsyncMock(side_effect=RuntimeError("context destroyed"))
+
+    assert await base.query_by_aria_label(page, "x") is None

@@ -7,6 +7,7 @@ from moonlighter.application.appliers.base import (
     classify_submit_outcome,
     fill_field,
     is_skip,
+    query_by_aria_label,
     query_labels_with_fallback,
 )
 from moonlighter.application.appliers.custom_dropdown import CustomDropdownFiller
@@ -139,8 +140,10 @@ class GreenhouseApplier(BaseApplier):
                 return el
 
         # 3) direct aria-label
-        escaped = label_text.replace("'", "\\'")
-        return await self.page.query_selector(f"[aria-label='{escaped}']")
+        # The label goes as an argument, never spliced into a selector: a label
+        # carrying a newline made query_selector raise BADSTRING, which surfaced
+        # as failed:Error on fields that were perfectly fine.
+        return await query_by_aria_label(self.page, label_text)
 
     async def _upload_cv(self, cv_path: str) -> str:
         """Attaches the CV. Returns "filled", "skipped" or "failed:<reason>". Tries
