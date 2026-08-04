@@ -254,6 +254,47 @@ async def query_by_aria_label(page: Page, label_text: str) -> Any:
     return handle.as_element()
 
 
+_LABELED_INPUT_JS = """(text) => {
+    const norm = s => (s||'').replace(/[*\u00a0\u2020\u2021]+/g, ' ')
+                             .replace(/\\s+/g, ' ').trim().toLowerCase();
+    const target = norm(text);
+    if (!target) return null;
+    const pick = l => {
+        const forId = l.getAttribute('for');
+        if (forId) { const el = document.getElementById(forId); if (el) return el; }
+        return l.querySelector('input, textarea, select');   // label wrapping its input
+    };
+    for (const l of document.querySelectorAll('label')) {
+        if (norm(l.innerText) === target) { const el = pick(l); if (el) return el; }
+    }
+    for (const l of document.querySelectorAll('label')) {     // prefix, for truncated labels
+        if (norm(l.innerText).startsWith(target)) { const el = pick(l); if (el) return el; }
+    }
+    for (const el of document.querySelectorAll('[aria-label]')) {
+        if (norm(el.getAttribute('aria-label')) === target) return el;
+    }
+    return null;
+}"""
+
+
+async def find_labeled_input(page: Page, label_text: str) -> Any:
+    """The input a label refers to, by `for`, by wrapping, or by aria-label.
+
+    All three shapes appear in the wild and only the first two are common: Workable
+    wraps the input inside the label and sets no `for` at all, so a lookup that
+    only reads `for` returns nothing — every text field on a live posting came
+    back not_found while the radios, located by their `name`, filled correctly.
+
+    The label is passed as an argument and compared normalised in the page, so
+    markers, non-breaking spaces and newlines stop mattering. Never raises.
+    """
+    try:
+        handle = await page.evaluate_handle(_LABELED_INPUT_JS, label_text)
+    except Exception:
+        return None
+    return handle.as_element()
+
+
 # Captcha widgets, by the host they load from and the containers they render.
 # Recruitee proxies hCaptcha through its own CDN (captcha-assets.recruiteecdn.com),
 # so matching on "hcaptcha.com" alone misses it.

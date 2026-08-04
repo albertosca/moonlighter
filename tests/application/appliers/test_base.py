@@ -1414,3 +1414,32 @@ async def test_query_by_aria_label_never_raises():
     page.evaluate_handle = AsyncMock(side_effect=RuntimeError("context destroyed"))
 
     assert await base.query_by_aria_label(page, "x") is None
+
+
+# ── find_labeled_input ───────────────────────────────────────────────────────
+
+
+async def test_find_labeled_input_passes_the_label_as_an_argument():
+    """Workable's labels wrap their input and carry no `for`, so neither the
+    aria-label lookup nor the `for` lookup finds anything — every text field came
+    back not_found on a live posting while the radios (found by `name`) filled
+    fine. The label is compared normalised inside the page."""
+    page = MagicMock()
+    page.evaluate_handle = AsyncMock(return_value=MagicMock(as_element=lambda: "input"))
+
+    assert await base.find_labeled_input(page, "*\nFirst name") == "input"
+    assert page.evaluate_handle.await_args.args[1] == "*\nFirst name"
+
+
+async def test_find_labeled_input_returns_none_when_absent():
+    page = MagicMock()
+    page.evaluate_handle = AsyncMock(return_value=MagicMock(as_element=lambda: None))
+
+    assert await base.find_labeled_input(page, "Nope") is None
+
+
+async def test_find_labeled_input_never_raises():
+    page = MagicMock()
+    page.evaluate_handle = AsyncMock(side_effect=RuntimeError("gone"))
+
+    assert await base.find_labeled_input(page, "x") is None

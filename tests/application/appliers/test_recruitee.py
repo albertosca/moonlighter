@@ -464,7 +464,7 @@ async def test_find_field_js_fallback_uses_for_attribute():
     applier.page.query_selector.assert_called_once_with("#phone_field")
 
 
-async def test_find_field_for_id_missing_falls_to_aria():
+async def test_find_field_uses_the_lookup_when_for_points_nowhere():
     """A label whose `for` points at nothing still falls through to aria-label."""
     applier = make_applier()
     applier.page.get_by_label = MagicMock(return_value=make_label_locator(None))
@@ -473,13 +473,13 @@ async def test_find_field_for_id_missing_falls_to_aria():
     field = MagicMock()
 
     with patch(
-        "moonlighter.application.appliers.recruitee.query_by_aria_label",
+        "moonlighter.application.appliers.recruitee.find_labeled_input",
         new=AsyncMock(return_value=field),
     ):
         assert await applier._find_field("Phone") is field
 
 
-async def test_find_field_aria_label_strategy():
+async def test_find_field_falls_back_to_the_labeled_input_lookup():
     """Last resort: match on aria-label. The label is compared normalised inside
     the page rather than spliced into a CSS selector — a label with a newline
     made that selector raise BADSTRING, surfacing as failed:Error."""
@@ -490,7 +490,7 @@ async def test_find_field_aria_label_strategy():
     field = MagicMock()
 
     with patch(
-        "moonlighter.application.appliers.recruitee.query_by_aria_label",
+        "moonlighter.application.appliers.recruitee.find_labeled_input",
         new=AsyncMock(return_value=field),
     ) as q:
         result = await applier._find_field("*\nPhone Number")

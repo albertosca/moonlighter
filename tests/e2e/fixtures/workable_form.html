@@ -11,11 +11,12 @@
       questions therefore share the same two option labels.
 -->
 <form>
-  <label for="fn"><span>*</span><br>First name</label>
-  <input id="fn" type="text" required>
-
-  <label for="ph"><span>*</span><br>Phone<br>+55</label>
-  <input id="ph" type="tel" required>
+  <!-- Workable's labels WRAP their input and carry no `for` at all. A lookup
+       that only reads `for` finds nothing, and get_by_label does not match a
+       label whose text contains newlines — every text field came back
+       not_found on a live posting while the radios filled fine. -->
+  <label><span>*</span><br>First name<input id="fn" type="text" required></label>
+  <label><span>*</span><br>Phone<br>+55<input id="ph" type="tel" required></label>
 
   <fieldset role="radiogroup">
     <div><div><div>

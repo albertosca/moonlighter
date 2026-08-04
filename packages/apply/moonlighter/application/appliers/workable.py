@@ -8,8 +8,8 @@ from moonlighter.application.appliers.base import (
     classify_submit_outcome,
     discover_radio_groups,
     fill_field,
+    find_labeled_input,
     is_skip,
-    query_by_aria_label,
     query_labels_with_fallback,
     select_radio_option,
 )
@@ -176,10 +176,9 @@ class WorkableApplier(BaseApplier):
             if el:
                 return el
 
-        # The label goes as an argument, never spliced into a selector: a label
-        # carrying a newline made query_selector raise BADSTRING, which surfaced
-        # as failed:Error on fields that were perfectly fine.
-        return await query_by_aria_label(self.page, label_text)
+        # One normalised lookup covering `for`, a wrapping label, and aria-label.
+        # The label goes as an argument, never spliced into a selector.
+        return await find_labeled_input(self.page, label_text)
 
     async def _upload_cv(self, cv_path: str) -> str:
         """Attaches the CV. Returns "filled", "skipped" or "failed:<reason>"."""

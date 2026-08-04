@@ -256,3 +256,18 @@ async def test_workable_e2e_answers_an_aria_hidden_radio(browser_page):
     assert status[question] == "filled"
     assert await page.locator("#rXk3").is_checked()
     assert not await page.locator("#rQ7z").is_checked()
+
+
+async def test_workable_e2e_fills_a_field_whose_label_wraps_the_input(browser_page):
+    """No `for`, a newline in the label text, and the required marker on its own
+    line — the combination that made every text field not_found."""
+    from moonlighter.application.appliers.workable import WorkableApplier
+
+    page, base_url = browser_page
+    await page.goto(f"{base_url}/workable_form.html")
+    applier = WorkableApplier(page, {}, {})
+
+    status = await applier.fill_form({"*\nFirst name": "Alberto"}, cv_path="")
+
+    assert status["*\nFirst name"] == "filled", status
+    assert await page.locator("#fn").input_value() == "Alberto"
