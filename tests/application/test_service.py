@@ -857,3 +857,61 @@ async def test_submit_proceeds_normally_when_there_is_no_captcha(tmp_db, tmp_pat
     applier.submit.assert_awaited()
     mock_browser.detach.assert_not_awaited()
     assert "submitted and confirmed" in result
+
+
+def test_render_filled_prints_every_answer_in_full(tmp_db):
+    init_db()
+    """The screenshot shows a scrolled slice of each textarea, so approving from
+    it alone means approving text nobody read. The answers are already persisted;
+    surfacing them is what makes the review real rather than a formality."""
+    job = _job(url="https://acme.recruitee.com/o/eng")
+    longa = "First paragraph.\n\nSecond paragraph that runs well past any textarea. " * 6
+    answers = {
+        "Full name": "Alberto",
+        "Why do you want this?": longa,
+        "CV or resume": "[FILE UPLOAD]",
+    }
+    out = apply_service._render_filled(
+        job,
+        {"Full name": "filled", "Why do you want this?": "filled"},
+        {"screenshots_dir": "/t"},
+        answers,
+    )
+
+    assert longa.strip() in out, "a resposta longa precisa sair inteira, sem corte"
+    assert "Why do you want this?" in out
+    assert "Alberto" in out
+
+
+def test_render_filled_marks_fields_that_failed(tmp_db, tmp_path):
+    init_db()
+    job = _job(url="https://acme.recruitee.com/o/eng2")
+    out = apply_service._render_filled(
+        job,
+        {"Salary": "failed:number_field_needs_digits_only"},
+        {"screenshots_dir": str(tmp_path)},
+        {"Salary": "USD 110,000 per year"},
+    )
+    assert "Salary" in out
+    assert "number_field_needs_digits_only" in out
+
+
+def test_render_filled_hides_skip_sentinels_from_the_dossier(tmp_db, tmp_path):
+    init_db()
+    """__SKIP__ and friends are bookkeeping, not answers — printing them as if
+    they were content makes the dossier harder to read, not more honest."""
+    job = _job(url="https://acme.recruitee.com/o/eng3")
+    out = apply_service._render_filled(
+        job, {"Beginner": "skipped"}, {"screenshots_dir": str(tmp_path)}, {"Beginner": "__SKIP__"}
+    )
+    assert "__SKIP__" not in out
+
+
+def test_render_filled_without_answers_still_renders(tmp_db, tmp_path):
+    """The dossier section is additive: callers that pass no answers get the
+    original message rather than an empty 'What will be sent' block."""
+    init_db()
+    job = _job(url="https://acme.recruitee.com/o/eng4")
+    out = apply_service._render_filled(job, {"Name": "filled"}, {"screenshots_dir": str(tmp_path)})
+    assert "What will be sent" not in out
+    assert "To submit" in out

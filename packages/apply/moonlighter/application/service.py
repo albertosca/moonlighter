@@ -20,7 +20,12 @@ from typing import Any, cast
 from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.application.answers.email_alias import build_email_alias, inject_email_alias
 from moonlighter.application.appliers.ashby import AshbyApplier
-from moonlighter.application.appliers.base import BaseApplier, detect_captcha, generate_answers
+from moonlighter.application.appliers.base import (
+    BaseApplier,
+    detect_captcha,
+    generate_answers,
+    is_skip,
+)
 from moonlighter.application.appliers.greenhouse import GreenhouseApplier
 from moonlighter.application.appliers.lever import LeverApplier
 from moonlighter.application.appliers.recruitee import RecruiteeApplier
@@ -575,7 +580,7 @@ async def fill_application(
             app.email_ref = ref
             app.updated_at = datetime.now()
             app.save()
-            message = _render_filled(job, fill_status, config)
+            message = _render_filled(job, fill_status, config, final_answers)
             if any(s.startswith("failed") for s in fill_status.values()):
                 await _show_window_safe(page)
                 needs_review = True
@@ -593,15 +598,41 @@ async def fill_application(
     raise AssertionError("unreachable")  # pragma: no cover
 
 
-def _render_filled(job: Job, fill_status: dict[str, str], config: dict[str, Any]) -> str:
+def _render_filled(
+    job: Job,
+    fill_status: dict[str, str],
+    config: dict[str, Any],
+    answers: dict[str, str] | None = None,
+) -> str:
+    """The review dossier: the screenshot plus every answer, in full.
+
+    The screenshot only ever shows a scrolled slice of each textarea, so
+    approving from it alone means approving text nobody read. The answers are
+    already persisted — printing them is what turns the review into one.
+    """
     shot = _screenshot_path(job.id, "03-filled", config)
     lines = [
         f"📝 Job #{job.id} ({job.company} / {job.title}) FILLED — not submitted.",
         f"Review the actual form in the screenshot: {shot}",
     ]
-    failed = [field for field, s in fill_status.items() if s.startswith("failed")]
+    failed = {field: s for field, s in fill_status.items() if s.startswith("failed")}
     if failed:
-        lines.append(f"⚠️  Fields that failed to fill: {', '.join(failed)}")
+        lines.append("")
+        lines.append("⚠️  Fields that failed to fill:")
+        lines += [f"  - {field}: {reason}" for field, reason in failed.items()]
+
+    if answers:
+        lines.append("")
+        lines.append("── What will be sent ──────────────────────────────────────────")
+        for field, answer in answers.items():
+            if is_skip(answer):  # bookkeeping sentinels are not content
+                continue
+            lines.append("")
+            lines.append(f"### {field.replace(chr(0xA0), ' ').strip()}")
+            lines.append(str(answer))
+        lines.append("")
+        lines.append("───────────────────────────────────────────────────────────────")
+
     lines.append(f"→ To submit: `submit_application({job.id})`")
     lines.append(
         f'→ To edit and re-fill: `fill_application({job.id}, answers={{"field": "value"}})`'
