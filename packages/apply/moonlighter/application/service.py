@@ -299,6 +299,71 @@ def _render_draft(job_id: int, job: Job, draft: Any) -> str:
     return "\n".join(lines)
 
 
+def _normalize_label(label: str) -> str:
+    """A label reduced to what identifies it, ignoring the form's decoration.
+
+    Mirrors the normalisation the appliers use to find a field from a label
+    (`* ` markers, non-breaking spaces, collapsed whitespace, case). Kept in
+    step with `_find_field` in the Workable applier — if the two ever disagree,
+    an override can be judged "unmatched" here and still hit a field there.
+    """
+    return re.sub(r"\s+", " ", re.sub(r"[* ]+", " ", label)).strip().lower()
+
+
+def _merge_overrides(
+    stored: dict[str, str], overrides: dict[str, str] | None
+) -> tuple[dict[str, str], list[str]]:
+    """Stored answers with the overrides applied, plus the keys that matched nothing.
+
+    A plain `{**stored, **overrides}` requires the caller to reproduce the field
+    label BYTE for byte, including the required marker Workable puts on a line
+    of its own ("*\\n3 References…"). Get it slightly wrong and the override does
+    not replace anything: it lands as a SECOND entry, both are sent to the
+    applier, both resolve to the same element by the normalised label, and the
+    one written last silently wins. Observed live on seeq #3322 (2026-08-05),
+    where it was harmless only because both copies held the same text.
+
+    So an override is matched against the stored keys by normalised label, and
+    replaces the stored key in place. A key matching nothing is still applied —
+    that is how a field the extractor missed gets answered, e.g. `Choose file` —
+    but it is reported so a typo cannot pass for an edit. An AMBIGUOUS key
+    (normalising to two or more stored keys) is left alone rather than guessed
+    at, and reported the same way.
+    """
+    if not overrides:
+        return dict(stored), []
+
+    by_normal: dict[str, list[str]] = {}
+    for key in stored:
+        by_normal.setdefault(_normalize_label(key), []).append(key)
+
+    merged = dict(stored)
+    unmatched: list[str] = []
+    for key, value in overrides.items():
+        if key in merged:
+            merged[key] = value
+            continue
+        candidates = by_normal.get(_normalize_label(key), [])
+        if len(candidates) == 1:
+            merged[candidates[0]] = value
+        else:
+            merged[key] = value
+            unmatched.append(key)
+    return merged, unmatched
+
+
+def _unmatched_warning(unmatched: list[str]) -> str:
+    if not unmatched:
+        return ""
+    listed = "\n".join(f"  - {key!r}" for key in unmatched)
+    return (
+        f"\n⚠️  {len(unmatched)} override key(s) matched no stored field and were added "
+        f"as new answers:\n{listed}\n"
+        "   If one of those was meant to EDIT an existing answer, it did not — check the "
+        "label below and re-send it.\n"
+    )
+
+
 # ── confirm_apply: submits ──────────────────────────────────────────────────
 
 
@@ -310,7 +375,7 @@ async def confirm_apply(
         return f"⚠️  Job #{job_id} not found or has no draft. Run apply_jobs first."
     job, app = loaded
 
-    final_answers = {**app.get_form_data(), **(answers or {})}
+    final_answers, unmatched = _merge_overrides(app.get_form_data(), answers)
     blocked = _pending_review_message(job_id, final_answers)
     if blocked:
         return blocked
@@ -323,7 +388,8 @@ async def confirm_apply(
     except CVNotFoundError as e:
         return f"⚠️  {e}\n🚫 Not submitted — I won't upload the wrong CV."
 
-    return await _submit_on_page(job, app, final_answers, ref, cv_path, config, profile)
+    sent = await _submit_on_page(job, app, final_answers, ref, cv_path, config, profile)
+    return _unmatched_warning(unmatched) + sent
 
 
 def _load_draft(job_id: int) -> tuple[Job, Application] | None:
@@ -566,7 +632,7 @@ async def fill_application(
         return f"⚠️  Job #{job_id} not found or has no draft. Run apply_jobs first."
     job, app = loaded
 
-    final_answers = {**app.get_form_data(), **(answers or {})}
+    final_answers, unmatched = _merge_overrides(app.get_form_data(), answers)
     blocked = _pending_review_message(job_id, final_answers)
     if blocked:
         return blocked
@@ -592,7 +658,9 @@ async def fill_application(
             app.email_ref = ref
             app.updated_at = datetime.now()
             app.save()
-            message = _render_filled(job, fill_status, config, final_answers)
+            message = _unmatched_warning(unmatched) + _render_filled(
+                job, fill_status, config, final_answers
+            )
             if any(s.startswith("failed") for s in fill_status.values()):
                 await _show_window_safe(page)
                 needs_review = True

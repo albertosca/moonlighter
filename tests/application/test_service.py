@@ -931,3 +931,66 @@ def test_record_submitted_tells_the_operator_to_check_spam(tmp_db, tmp_path):
 
     assert "spam" in out.lower()
     assert "zz9900" in out, "o alias tem que aparecer, senão não dá pra procurar"
+
+
+# ── override merging ────────────────────────────────────────────────────────
+
+
+def test_merge_overrides_replaces_by_exact_key():
+    merged, unmatched = apply_service._merge_overrides({"Phone": "old"}, {"Phone": "new"})
+    assert merged == {"Phone": "new"}
+    assert unmatched == []
+
+
+def test_merge_overrides_matches_across_required_marker_and_newline():
+    """The seeq #3322 case: the stored label carries Workable's own-line marker.
+
+    Without normalisation this produced TWO entries for one textarea, and the
+    last one written silently won.
+    """
+    stored = {"*\n3 References (1 Direct Manager)": "old text"}
+    merged, unmatched = apply_service._merge_overrides(
+        stored, {"3 References (1 Direct Manager)": "new text"}
+    )
+    assert merged == {"*\n3 References (1 Direct Manager)": "new text"}
+    assert unmatched == []
+
+
+def test_merge_overrides_ignores_case_and_extra_whitespace():
+    stored = {"First  name": "Alberto"}
+    merged, _ = apply_service._merge_overrides(stored, {"first name": "Beto"})
+    assert merged == {"First  name": "Beto"}
+
+
+def test_merge_overrides_keeps_unmatched_key_and_reports_it():
+    """An unmatched key still applies — that is how `Choose file` gets skipped."""
+    merged, unmatched = apply_service._merge_overrides({"Phone": "x"}, {"Choose file": "__SKIP__"})
+    assert merged == {"Phone": "x", "Choose file": "__SKIP__"}
+    assert unmatched == ["Choose file"]
+
+
+def test_merge_overrides_refuses_to_guess_between_ambiguous_stored_keys():
+    stored = {"*\nName": "a", "Name": "b"}
+    merged, unmatched = apply_service._merge_overrides(stored, {" name ": "c"})
+    assert merged["*\nName"] == "a"
+    assert merged["Name"] == "b"
+    assert unmatched == [" name "]
+
+
+def test_merge_overrides_without_overrides_copies_stored():
+    stored = {"Phone": "x"}
+    merged, unmatched = apply_service._merge_overrides(stored, None)
+    assert merged == stored
+    assert merged is not stored
+    assert unmatched == []
+
+
+def test_unmatched_warning_is_empty_when_everything_matched():
+    assert apply_service._unmatched_warning([]) == ""
+
+
+def test_unmatched_warning_names_every_offending_key():
+    warning = apply_service._unmatched_warning(["Choose file", "Typo"])
+    assert "2 override key(s)" in warning
+    assert "'Choose file'" in warning
+    assert "'Typo'" in warning
