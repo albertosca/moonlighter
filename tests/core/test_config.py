@@ -367,6 +367,26 @@ class TestValidateConfig:
         cfg.pop("email", None)  # email is optional
         validate_config(cfg)
 
+    def test_zero_lookback_days_rejected(self):
+        """Gmail's newer_than:0d matches zero messages (verified live), so a
+        lookback_days of 0 silently disables the sync forever — reading exactly
+        like an empty mailbox instead of the config mistake it is."""
+        cfg = _valid_config()
+        cfg["email"] = {"lookback_days": 0}
+        with pytest.raises(ConfigError, match="lookback_days"):
+            validate_config(cfg)
+
+    def test_negative_lookback_days_rejected(self):
+        cfg = _valid_config()
+        cfg["email"] = {"lookback_days": -1}
+        with pytest.raises(ConfigError, match="lookback_days"):
+            validate_config(cfg)
+
+    def test_positive_lookback_days_accepted(self):
+        cfg = _valid_config()
+        cfg["email"] = {"lookback_days": 30}
+        validate_config(cfg)  # must not raise
+
     def test_example_config_validates(self):
         from moonlighter.core.config import DEFAULTS
 

@@ -180,6 +180,13 @@ def validate_config(config: dict[str, Any]) -> None:
                 if sub_key not in sub_schema:
                     raise ConfigError(f"unknown config key '{key}.{sub_key}'")
                 _check_type(f"{key}.{sub_key}", sub_value, sub_schema[sub_key])
+                if key == "email" and sub_key == "lookback_days" and sub_value <= 0:
+                    # Gmail's newer_than:0d matches zero messages (verified live) —
+                    # a non-positive value silently disables the sync forever, reading
+                    # exactly like an empty mailbox instead of a config mistake.
+                    raise ConfigError(
+                        f"config key 'email.lookback_days' must be positive, got {sub_value}"
+                    )
 
 
 def load_config(config_path: str | Path | None = None) -> dict[str, Any]:

@@ -11,7 +11,7 @@ class FakeMessages:
     def __init__(self) -> None:
         self.queries: list[str] = []
 
-    def list(self, userId: str, q: str, maxResults: int) -> Any:
+    def list(self, userId: str, q: str, maxResults: int, pageToken: str | None = None) -> Any:
         self.queries.append(q)
         return self
 

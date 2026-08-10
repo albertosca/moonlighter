@@ -10,7 +10,8 @@ import logging
 import re
 from typing import Any
 
-from moonlighter.core.llm import LLMCaller
+from moonlighter.core.llm import LLMCaller, is_spend_limit
+from moonlighter.core.metrics import record_spend_limit_hit
 from moonlighter.tracking.classification import classify_response
 from moonlighter.tracking.gmail_client import (
     _get_or_create_label,
@@ -90,7 +91,25 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
             continue  # already processed in a previous run — don't re-call the LLM
 
         message = parse_message(service, msg_id)
-        classification = await classify_response(message, stages, llm_caller, model)
+        try:
+            classification = await classify_response(message, stages, llm_caller, model)
+        except Exception as e:
+            if is_spend_limit(e):
+                record_spend_limit_hit()
+                logger.warning(
+                    "sync_responses: spend limit hit while classifying %s — stopping sync "
+                    "early, leaving it and the rest of this batch unprocessed for the next run",
+                    msg_id,
+                )
+                break
+            logger.warning(
+                "sync_responses: classification failed for %s — leaving it unprocessed "
+                "for the next run: %s",
+                msg_id,
+                e,
+            )
+            continue  # NOT mark_done: a failed classification must not burn the message
+
         if classification["type"] == "unrelated":
             mark_done(msg_id)
             continue
