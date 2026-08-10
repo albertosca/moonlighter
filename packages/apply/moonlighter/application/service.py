@@ -8,7 +8,6 @@ config/profile/caller. The logic lives here, testable in isolation.
 import contextlib
 import json
 import re
-import secrets
 import shutil
 import statistics
 from collections.abc import AsyncIterator
@@ -18,7 +17,11 @@ from pathlib import Path
 from typing import Any, cast
 
 from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
-from moonlighter.application.answers.email_alias import build_email_alias, inject_email_alias
+from moonlighter.application.answers.email_alias import (
+    build_email_alias,
+    inject_email_alias,
+    new_email_ref,
+)
 from moonlighter.application.appliers.ashby import AshbyApplier
 from moonlighter.application.appliers.base import (
     BaseApplier,
@@ -380,7 +383,7 @@ async def confirm_apply(
     if blocked:
         return blocked
 
-    ref = secrets.token_urlsafe(4)[:6]
+    ref = new_email_ref()
     _inject_reply_alias(final_answers, ref, config)
 
     try:
@@ -637,7 +640,7 @@ async def fill_application(
     if blocked:
         return blocked
 
-    ref = secrets.token_urlsafe(4)[:6]
+    ref = new_email_ref()
     _inject_reply_alias(final_answers, ref, config)
     try:
         cv_path = resolve_cv_path(job.company, config)

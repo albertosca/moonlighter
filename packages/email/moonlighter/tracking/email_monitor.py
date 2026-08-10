@@ -219,11 +219,11 @@ def _resolve_application(ref: str | None, classification: dict[str, Any]) -> tup
 
 def _match_by_ref(ref: str) -> Any:
     from moonlighter.core.db import Application
+    from peewee import fn
 
-    try:
-        return Application.get(Application.email_ref == ref)
-    except Application.DoesNotExist:
-        return None
+    # Refs minted before 2026-08-06 are mixed case, and providers lowercase the local
+    # part on the way back, so both sides are folded rather than the column migrated.
+    return Application.get_or_none(fn.LOWER(Application.email_ref) == ref.lower())
 
 
 def _match_by_company_title(company: str | None, job_title: str | None) -> Any:

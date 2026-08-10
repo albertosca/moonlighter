@@ -1,4 +1,30 @@
-from moonlighter.application.answers.email_alias import build_email_alias, inject_email_alias
+import re
+
+from moonlighter.application.answers.email_alias import (
+    build_email_alias,
+    inject_email_alias,
+    new_email_ref,
+)
+
+
+def test_a_ref_carries_no_case_so_a_provider_cannot_change_it():
+    for _ in range(200):
+        ref = new_email_ref()
+        assert ref == ref.lower()
+
+
+def test_a_ref_avoids_characters_a_human_would_misread():
+    banned = set("lo01")
+    for _ in range(200):
+        assert not (set(new_email_ref()) & banned)
+
+
+def test_a_ref_is_eight_characters_of_the_expected_alphabet():
+    assert re.fullmatch(r"[a-z2-9]{8}", new_email_ref())
+
+
+def test_refs_do_not_repeat_in_practice():
+    assert len({new_email_ref() for _ in range(500)}) == 500
 
 
 def test_build_email_alias_formats_correctly():

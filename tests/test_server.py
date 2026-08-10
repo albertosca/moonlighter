@@ -2064,8 +2064,8 @@ async def test_scan_registered_scanner_session_expired_does_not_block_http_resul
 # ── email: confirm_apply generates ref and saves ──────────────────────────────
 
 
-async def test_confirm_apply_generates_6_char_ref(tmp_db, tmp_path):
-    """confirm_apply must generate a 6-char email_ref and persist it."""
+async def test_confirm_apply_generates_8_char_ref(tmp_db, tmp_path):
+    """confirm_apply must generate an 8-char email_ref and persist it."""
     init_db()
     job = create_job(
         tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca-ref-1", status="applying"
@@ -2093,11 +2093,12 @@ async def test_confirm_apply_generates_6_char_ref(tmp_db, tmp_path):
 
     saved = Application.get_by_id(app.id)
     assert saved.email_ref is not None
-    assert len(saved.email_ref) == 6
+    assert len(saved.email_ref) == 8
 
 
 async def test_confirm_apply_ref_is_url_safe(tmp_db, tmp_path):
-    """The generated ref must contain only url-safe chars (letters, digits, -, _)."""
+    """The generated ref must contain only lowercase letters/digits from the
+    misread-avoiding alphabet (a superset of url-safe: no case, no l/o/0/1)."""
     import re
 
     init_db()
@@ -2126,7 +2127,7 @@ async def test_confirm_apply_ref_is_url_safe(tmp_db, tmp_path):
         await confirm_apply(job_id=job.id, ctx=make_test_context())
 
     saved = Application.get_by_id(app.id)
-    assert re.match(r"^[A-Za-z0-9_-]{6}$", saved.email_ref)
+    assert re.match(r"^[a-z2-9]{8}$", saved.email_ref)
 
 
 async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
@@ -2161,7 +2162,8 @@ async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
 
         refs.add(Application.get(Application.job == job).email_ref)
 
-    # With 10 urlsafe 6-char refs (~62^6 possibilities), collision is virtually zero
+    # With 10 refs from an 8-char, 33-symbol alphabet (~33^8 possibilities), collision
+    # is virtually zero
     assert len(refs) == 10
 
 

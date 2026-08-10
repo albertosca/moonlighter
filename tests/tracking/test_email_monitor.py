@@ -95,6 +95,28 @@ def _make_application(job, **kwargs):
     return Application.create(job=job, **defaults)
 
 
+# ── _match_by_ref ─────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("looked_up", ["nt7eig", "NT7EIG", "Nt7eig"])
+def test_a_stored_mixed_case_ref_matches_whatever_case_the_reply_carries(
+    application_factory, looked_up
+):
+    # The refs already in the database were minted in mixed case; a reply arriving
+    # lowercased must still find them, or the alias mechanism is decorative.
+    from moonlighter.tracking.email_monitor import _match_by_ref
+
+    app = application_factory(email_ref="Nt7eig")
+    assert _match_by_ref(looked_up).id == app.id
+
+
+def test_an_unknown_ref_still_matches_nothing(application_factory):
+    from moonlighter.tracking.email_monitor import _match_by_ref
+
+    application_factory(email_ref="Nt7eig")
+    assert _match_by_ref("zzzzzz") is None
+
+
 # ── extract_ref ───────────────────────────────────────────────────────────────
 
 
