@@ -31,7 +31,7 @@ _TYPE_TO_STATUS = {
     "interview": "interviews",
     "offer": "offer",
     "rejection": "rejected",
-    # info_request and unrelated → keeps the current status
+    # acknowledgement, info_request and unrelated → keeps the current status
 }
 
 

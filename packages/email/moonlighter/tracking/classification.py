@@ -35,13 +35,19 @@ Known stages: {stages_str}
 
 Classify this email and return JSON with exactly these fields:
 {{
-  "type": "rejection"|"interview"|"screening"|"offer"|"info_request"|"unrelated",
+  "type": "rejection"|"acknowledgement"|"interview"|"screening"|"offer"|"info_request"|"unrelated",
   "stage": "<stage slug if type is interview or screening, otherwise null>",
   "new_stage": "<new slug if the stage isn't in the list above, otherwise null>",
   "company": "<company name or null>",
   "job_title": "<job title or null>",
   "summary": "<one-sentence summary of what the email says>"
 }}
+
+- "acknowledgement" is an automated confirmation that the application was received
+  ("thank you for applying", "we have received your application"). It means the
+  process has not started: it is NOT a screening and NOT an interview. Use
+  "screening" or "interview" only when a human is asking the candidate to do
+  something — take a call, schedule a meeting, complete an assignment.
 
 Answer ONLY with the JSON, no additional text."""
 
@@ -55,10 +61,14 @@ Answer ONLY with the JSON, no additional text."""
 
 def _classification_from(result: dict[str, Any]) -> dict[str, Any]:
     """Normalizes the LLM output ensuring all fields are present (safe defaults)."""
+    kind = result.get("type", "unrelated")
+    # A receipt says the process has not started, so it can never carry a stage —
+    # even when the model volunteers one.
+    is_receipt = kind == "acknowledgement"
     return {
-        "type": result.get("type", "unrelated"),
-        "stage": result.get("stage"),
-        "new_stage": result.get("new_stage"),
+        "type": kind,
+        "stage": None if is_receipt else result.get("stage"),
+        "new_stage": None if is_receipt else result.get("new_stage"),
         "company": result.get("company"),
         "job_title": result.get("job_title"),
         "summary": result.get("summary", ""),

@@ -2232,6 +2232,18 @@ def test_get_or_create_label_creates_when_missing():
     assert _get_or_create_label(service, "moonlighter/processed") == "Label_new"
 
 
+# ── _TYPE_TO_STATUS ──────────────────────────────────────────────────────────
+
+
+def test_an_acknowledgement_maps_to_no_status_change():
+    from moonlighter.tracking.email_monitor import _TYPE_TO_STATUS
+
+    # Absence here is the behaviour, so it gets a test — otherwise someone "completes"
+    # the dict later and receipts start advancing applications again.
+    assert "acknowledgement" not in _TYPE_TO_STATUS
+    assert _TYPE_TO_STATUS.get("acknowledgement") is None
+
+
 # ── _status_rank ────────────────────────────────────────────────────────────
 
 
