@@ -5,7 +5,7 @@ Coverage:
   - extract_ref: pure, no mocks
   - classify_response: mock llm_caller
   - parse_message: mock Gmail service
-  - fetch_unread_messages: mock Gmail service
+  - fetch_recent_messages: mock Gmail service
   - mark_processed: mock Gmail service
   - setup_gmail_service: mock google.oauth2 + googleapiclient
   - sync_responses: mock Gmail + tmp_db (real integration with the DB)
@@ -793,7 +793,7 @@ class TestParseMessage:
         assert result["body"] == ""
 
 
-# ── fetch_unread_messages ─────────────────────────────────────────────────────
+# ── fetch_recent_messages ─────────────────────────────────────────────────────
 
 
 class TestTokenScopes:
@@ -861,54 +861,80 @@ class TestIsOurs:
         assert gmail_client._is_ours(Path("/tmp/qualquer/token.json")) is False
 
 
-class TestFetchUnreadMessages:
+class TestFetchRecentMessages:
     def test_searches_spam_as_well_as_the_inbox(self):
         """ATS confirmations sent to a plus-alias land in spam regularly — one did,
         for the holepunch application on 2026-08-04, and the monitor could not see
-        it: SPAM is a separate label from INBOX, so labelIds=[INBOX, UNREAD] hid it
-        entirely. "We received your application" is the reply least worth missing."""
-        from moonlighter.tracking.gmail_client import fetch_unread_messages
+        it: SPAM is a separate label from INBOX, so labelIds=[INBOX] hid it entirely.
+        "We received your application" is the reply least worth missing."""
+        from moonlighter.tracking.gmail_client import fetch_recent_messages
 
         service = MagicMock()
         listing = service.users.return_value.messages.return_value.list
         listing.return_value.execute.return_value = {"messages": []}
 
-        fetch_unread_messages(service)
+        fetch_recent_messages(service)
 
         kwargs = listing.call_args.kwargs
         assert "in:anywhere" in kwargs.get("q", "")
-        assert "is:unread" in kwargs["q"]
         assert "labelIds" not in kwargs, "labelIds=[INBOX] exclui o spam"
 
+    def test_does_not_gate_on_read_state(self):
+        """A person reads their mail; a reply already read is exactly the reply
+        worth recording. Re-processing is prevented by ProcessedEmail, not by
+        the unread flag."""
+        from moonlighter.tracking.gmail_client import fetch_recent_messages
+
+        service = MagicMock()
+        listing = service.users.return_value.messages.return_value.list
+        listing.return_value.execute.return_value = {"messages": []}
+
+        fetch_recent_messages(service)
+
+        kwargs = listing.call_args.kwargs
+        assert "is:unread" not in kwargs.get("q", "")
+
+    def test_bounds_the_search_by_the_lookback_window(self):
+        from moonlighter.tracking.gmail_client import fetch_recent_messages
+
+        service = MagicMock()
+        listing = service.users.return_value.messages.return_value.list
+        listing.return_value.execute.return_value = {"messages": []}
+
+        fetch_recent_messages(service, lookback_days=7)
+
+        kwargs = listing.call_args.kwargs
+        assert "newer_than:7d" in kwargs.get("q", "")
+
     def test_returns_list_of_id_and_thread_id(self):
-        from moonlighter.tracking.gmail_client import fetch_unread_messages
+        from moonlighter.tracking.gmail_client import fetch_recent_messages
 
         service = MagicMock()
         msgs = [{"id": "a1", "threadId": "t1"}, {"id": "a2", "threadId": "t2"}]
         service.users().messages().list().execute.return_value = {"messages": msgs}
 
-        result = fetch_unread_messages(service)
+        result = fetch_recent_messages(service)
 
         assert len(result) == 2
         assert result[0]["id"] == "a1"
         assert result[1]["threadId"] == "t2"
 
     def test_returns_empty_list_when_no_messages(self):
-        from moonlighter.tracking.gmail_client import fetch_unread_messages
+        from moonlighter.tracking.gmail_client import fetch_recent_messages
 
         service = MagicMock()
         service.users().messages().list().execute.return_value = {}
 
-        result = fetch_unread_messages(service)
+        result = fetch_recent_messages(service)
         assert result == []
 
     def test_respects_max_results(self):
-        from moonlighter.tracking.gmail_client import fetch_unread_messages
+        from moonlighter.tracking.gmail_client import fetch_recent_messages
 
         service = MagicMock()
         service.users().messages().list().execute.return_value = {}
 
-        fetch_unread_messages(service, max_results=10)
+        fetch_recent_messages(service, max_results=10)
 
         call_kwargs = service.users().messages().list.call_args
         assert call_kwargs.kwargs.get("maxResults") == 10 or 10 in call_kwargs.args
@@ -1261,7 +1287,7 @@ class TestSyncResponses:
         with (
             patch("moonlighter.tracking.email_monitor.setup_gmail_service", return_value=service),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=messages[0]),
@@ -1319,7 +1345,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1371,7 +1397,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1420,7 +1446,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1465,7 +1491,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1512,7 +1538,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1557,7 +1583,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1601,7 +1627,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1658,7 +1684,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1711,7 +1737,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1755,7 +1781,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1805,7 +1831,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1852,7 +1878,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1900,7 +1926,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1954,7 +1980,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
@@ -1996,7 +2022,7 @@ class TestSyncResponses:
             patch(
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
-            patch("moonlighter.tracking.email_monitor.fetch_unread_messages", return_value=raw_ids),
+            patch("moonlighter.tracking.email_monitor.fetch_recent_messages", return_value=raw_ids),
             patch("moonlighter.tracking.email_monitor.parse_message", side_effect=messages),
             patch(
                 "moonlighter.tracking.email_monitor.classify_response",
@@ -2034,7 +2060,7 @@ class TestSyncResponses:
             patch(
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
-            patch("moonlighter.tracking.email_monitor.fetch_unread_messages", return_value=raw_ids),
+            patch("moonlighter.tracking.email_monitor.fetch_recent_messages", return_value=raw_ids),
             patch("moonlighter.tracking.email_monitor.parse_message", side_effect=messages),
             patch(
                 "moonlighter.tracking.email_monitor.classify_response",
@@ -2073,7 +2099,7 @@ class TestSyncResponses:
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
             patch(
-                "moonlighter.tracking.email_monitor.fetch_unread_messages",
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
                 return_value=[{"id": "msg0", "threadId": "t0"}],
             ),
             patch("moonlighter.tracking.email_monitor.parse_message") as mock_parse,
@@ -2093,7 +2119,7 @@ class TestSyncResponses:
             patch(
                 "moonlighter.tracking.email_monitor.setup_gmail_service", return_value=MagicMock()
             ),
-            patch("moonlighter.tracking.email_monitor.fetch_unread_messages", return_value=[]),
+            patch("moonlighter.tracking.email_monitor.fetch_recent_messages", return_value=[]),
             patch(
                 "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
             ),

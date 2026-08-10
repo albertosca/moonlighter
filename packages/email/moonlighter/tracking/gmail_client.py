@@ -132,19 +132,30 @@ def setup_gmail_service(config: dict[str, Any]) -> Any:
     return build("gmail", "v1", credentials=creds)
 
 
-def fetch_unread_messages(service: Any, max_results: int = 50) -> list[dict[str, Any]]:
-    """Fetches unread emails, spam included. Returns a list of {id, threadId}.
+def fetch_recent_messages(
+    service: Any, lookback_days: int = 30, max_results: int = 50
+) -> list[dict[str, Any]]:
+    """Recent messages, whether or not they have been read. Returns a list of
+    {id, threadId}.
 
-    `in:anywhere` rather than labelIds=[INBOX, UNREAD]: SPAM is a separate label
-    from INBOX, so the label filter hid every message Gmail had flagged. ATS
-    confirmations sent to a plus-alias land there routinely — one did, for the
-    holepunch application on 2026-08-04 — and "we received your application" is
-    the single reply least worth missing.
+    Read state is deliberately not part of the search: a person reads their mail, and
+    a reply that has been read is exactly the reply worth recording. Re-processing is
+    prevented by ProcessedEmail, not by the unread flag.
+
+    `in:anywhere` rather than labelIds=[INBOX]: SPAM is a separate label from INBOX,
+    so the label filter hid every message Gmail had flagged. ATS confirmations sent to
+    a plus-alias land there routinely — one did, for the holepunch application on
+    2026-08-04 — and "we received your application" is the single reply least worth
+    missing.
     """
     response = (
         service.users()
         .messages()
-        .list(userId="me", q="is:unread in:anywhere", maxResults=max_results)
+        .list(
+            userId="me",
+            q=f"newer_than:{lookback_days}d in:anywhere",
+            maxResults=max_results,
+        )
         .execute()
     )
     messages: list[dict[str, Any]] = response.get("messages", [])

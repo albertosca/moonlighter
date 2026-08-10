@@ -14,7 +14,7 @@ from moonlighter.core.llm import LLMCaller
 from moonlighter.tracking.classification import classify_response
 from moonlighter.tracking.gmail_client import (
     _get_or_create_label,
-    fetch_unread_messages,
+    fetch_recent_messages,
     mark_processed,
     parse_message,
     setup_gmail_service,
@@ -62,7 +62,7 @@ def extract_ref(to_field: str, base_address: str) -> str | None:
 
 
 async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[dict[str, Any]]:
-    """Orchestrates the full flow: reads unread emails, classifies them, and updates
+    """Orchestrates the full flow: reads recent emails, classifies them, and updates
     the database. Returns the list of updates made."""
     from moonlighter.core.db import ProcessedEmail
 
@@ -84,7 +84,7 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
             mark_processed(service, message_id, label_id)
 
     updates = []
-    for msg_ref in fetch_unread_messages(service):
+    for msg_ref in fetch_recent_messages(service, int(email_cfg.get("lookback_days", 30))):
         msg_id = msg_ref["id"]
         if ProcessedEmail.select().where(ProcessedEmail.message_id == msg_id).exists():
             continue  # already processed in a previous run — don't re-call the LLM

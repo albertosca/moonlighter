@@ -120,6 +120,7 @@ _EMAIL_SCHEMA: dict[str, tuple[type, ...]] = {
     "token_path": (str,),
     "processed_label": (str,),
     "mark_processed": (bool,),
+    "lookback_days": (int,),
     "interview_stages": (list,),
 }
 _NESTED_SCHEMAS = {

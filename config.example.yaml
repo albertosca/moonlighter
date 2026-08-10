@@ -54,6 +54,8 @@ email:
   processed_label: "moonlighter/processed"
   # false (default) = sync is read-only; dedup is done in a local table.
   mark_processed: false
+  # How many days back the sync searches, regardless of read/unread state.
+  lookback_days: 30
   interview_stages:
     - phone_screening
     - technical_interview

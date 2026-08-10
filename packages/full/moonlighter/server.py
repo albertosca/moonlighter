@@ -409,7 +409,7 @@ async def setup_email(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
 @tool_logged
 async def sync_email_responses(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
     """
-    Read unread emails in candidaturas@gmail.com,
+    Read recent emails in candidaturas@gmail.com, whether read or unread,
     classify them with the LLM, and update the applications database.
     Returns a summary of the updates made.
     """
