@@ -12,6 +12,7 @@ from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.application.answers.field_map import pre_populate_answers
 from moonlighter.application.answers.option_matcher import match_option_locally
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.core.config import NEEDS_REVIEW_SENTINEL
 from moonlighter.core.llm import LLMCaller
 from moonlighter.core.parsing import wrap_untrusted
 
@@ -99,6 +100,17 @@ async def compose_answers(
             continue
 
         answer = known.get(question.label) or await _generate(question, profile, job, llm_caller)
+
+        # pre_populate_answers can hand back its own review sentinel instead of a real
+        # value (work-authorization/sponsorship fields when the country can't be inferred;
+        # salary fields when the units disagree) — for ANY question kind, not just choices.
+        # Screened unconditionally, before is_choice, so it never reaches a TEXT/LONG_TEXT
+        # field as a literal "__NEEDS_REVIEW__" answer pasted into a real form.
+        if answer == NEEDS_REVIEW_SENTINEL:
+            composed.append(
+                ComposedAnswer(question, None, "no defensible answer here — answer this yourself")
+            )
+            continue
 
         if answer is None:
             composed.append(ComposedAnswer(question, None, "no basis in your profile to answer"))
