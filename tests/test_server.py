@@ -879,6 +879,43 @@ async def test_submit_application_tool_delegates_to_service(monkeypatch):
     assert called["id"] == 42
 
 
+# ── prepare_application / prepare_application_from_paste ──────────────────────
+
+
+async def test_prepare_application_tool_delegates_to_assisted_service(monkeypatch):
+    import moonlighter.server as server
+
+    called = {}
+
+    async def fake_prepare(job_id, config, profile):
+        called["args"] = (job_id, config, profile)
+        return "sheet"
+
+    monkeypatch.setattr(server.assisted_service, "prepare_application", fake_prepare)
+    result = await server.prepare_application(42, ctx=make_test_context())
+    assert result == "sheet"
+    assert called["args"][0] == 42
+
+
+async def test_prepare_application_from_paste_tool_delegates_to_assisted_service(monkeypatch):
+    import moonlighter.server as server
+
+    called = {}
+
+    async def fake_prepare_from_paste(job_id, page_text, config, profile):
+        called["args"] = (job_id, page_text)
+        return "sheet from paste"
+
+    monkeypatch.setattr(
+        server.assisted_service, "prepare_application_from_paste", fake_prepare_from_paste
+    )
+    result = await server.prepare_application_from_paste(
+        42, "copied page text", ctx=make_test_context()
+    )
+    assert result == "sheet from paste"
+    assert called["args"] == (42, "copied page text")
+
+
 # ── get_pipeline ──────────────────────────────────────────────────────────────
 
 

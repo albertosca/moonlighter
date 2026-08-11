@@ -10,6 +10,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.session import ServerSession
 from moonlighter._tool_logging import tool_logged
 from moonlighter.application import service as apply_service
+from moonlighter.application.assisted import service as assisted_service
 from moonlighter.core import browser as _browser_mod
 from moonlighter.core.config import (
     harden_permissions,
@@ -288,6 +289,38 @@ async def retry_apply(job_id: int, *, ctx: Context[ServerSession, AppContext, An
     """Retry a failed application. Reuses stored draft answers."""
     app = ctx.request_context.lifespan_context
     return await apply_service.retry_apply(job_id, app.config, app.profile)
+
+
+@mcp.tool()
+@tool_logged
+async def prepare_application(job_id: int, *, ctx: Context[ServerSession, AppContext, Any]) -> str:
+    """
+    Produce the full set of answers for a job application, for you to paste into
+    the form yourself. Reads the questions from the ATS API when it publishes them
+    (Greenhouse, Recruitee); otherwise asks you to copy the page.
+    job_id: ID of the job
+    """
+    app = ctx.request_context.lifespan_context
+    with operation_metrics("prepare_application"):
+        return await assisted_service.prepare_application(job_id, app.config, app.profile)
+
+
+@mcp.tool()
+@tool_logged
+async def prepare_application_from_paste(
+    job_id: int, page_text: str, *, ctx: Context[ServerSession, AppContext, Any]
+) -> str:
+    """
+    Same as prepare_application, for a page whose questions no API publishes:
+    select the whole application page, copy it, and pass the text here.
+    job_id: ID of the job
+    page_text: everything copied off the application page
+    """
+    app = ctx.request_context.lifespan_context
+    with operation_metrics("prepare_application_from_paste"):
+        return await assisted_service.prepare_application_from_paste(
+            job_id, page_text, app.config, app.profile
+        )
 
 
 @mcp.tool()
