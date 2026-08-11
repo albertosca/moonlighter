@@ -29,6 +29,18 @@ def choice(
     )
 
 
+def multi_choice(
+    label: str, options: tuple[str, ...], picked: str, required: bool = True
+) -> ComposedAnswer:
+    return ComposedAnswer(
+        FormQuestion(
+            label=label, kind=QuestionKind.MULTI_SELECT, required=required, options=options
+        ),
+        picked,
+        None,
+    )
+
+
 def _entry_block(sheet: str, marker: str) -> str:
     """Return the single entry paragraph that starts with `marker`, isolated from the rest."""
     entries = sheet.split("\n\n")
@@ -86,23 +98,34 @@ def test_a_choice_shows_the_pick_distinguished_from_the_alternatives():
     entry = _entry_block(sheet, "[1/1]")
     lines = entry.splitlines()
     assert "> Yes, now" in lines
-    # "No" (the alternative) must appear in the options line, never as the chosen pick.
+    # "No" (the alternative) must appear in the "not chosen" line, never as the chosen pick
+    # — regression guard for the old "options:" label, which read as if "No" were the answer.
     assert "> No" not in lines
-    assert any(line.startswith("  options:") and "No" in line for line in lines)
+    assert any(line.startswith("  not chosen:") and "No" in line for line in lines)
 
 
-def test_a_choice_with_no_remaining_alternative_omits_the_options_line():
+def test_a_choice_with_no_remaining_alternative_omits_the_not_chosen_line():
     sheet = render_sheet([choice("Confirm?", ("Yes",), "Yes")], **HEADER)
     entry = _entry_block(sheet, "[1/1]")
     lines = entry.splitlines()
     assert "> Yes" in lines
-    assert not any(line.startswith("  options:") for line in lines)
+    assert not any(line.startswith("  not chosen:") for line in lines)
 
 
-def test_a_choice_question_is_marked_pick_one_of_n():
+def test_a_single_select_question_is_marked_pick_one_of_n():
     sheet = render_sheet([choice("Sponsorship?", ("No", "Yes, now", "Later"), "No")], **HEADER)
     entry = _entry_block(sheet, "[1/1]")
     assert "pick 1 of 3" in entry.splitlines()[0]
+
+
+def test_a_multi_select_question_is_marked_pick_any_of_n_not_pick_one():
+    sheet = render_sheet(
+        [multi_choice("Which languages?", ("Python", "Ruby", "Elixir"), "Python")], **HEADER
+    )
+    entry = _entry_block(sheet, "[1/1]")
+    header_line = entry.splitlines()[0]
+    assert "pick any of 3" in header_line
+    assert "pick 1 of" not in header_line
 
 
 def test_the_header_carries_the_job_and_the_apply_url():
@@ -123,6 +146,20 @@ def test_a_sheet_with_no_gaps_says_so():
     assert "0 of" not in sheet
 
 
+def test_an_empty_sheet_demands_a_manual_check_instead_of_claiming_success():
+    sheet = render_sheet([], **HEADER)
+    # Must NOT read as a completed application — the exact failure mode this sheet
+    # exists to prevent (the old automation silently submitted empty sections).
+    assert "nothing left for you" not in sheet
+    assert "answered" not in sheet
+    assert "NO QUESTIONS FOUND" in sheet
+    assert "check" in sheet.lower()
+    # The header (job/company/URL) still carries through so the human knows which
+    # application to go check.
+    assert "Staff Engineer" in sheet
+    assert "https://x/apply" in sheet
+
+
 def test_a_realistic_mix_keeps_every_marker_on_its_own_question():
     composed = [
         answered("First Name", "Alberto"),
@@ -140,7 +177,7 @@ def test_a_realistic_mix_keeps_every_marker_on_its_own_question():
     assert "(required)" in name.splitlines()[0]
     assert "(required)" not in headline.splitlines()[0]
     assert "> Yes" in auth.splitlines()
-    assert "options: No" in auth
+    assert "not chosen: No" in auth
     assert "!! I DON'T KNOW" in salary
     assert "no basis in your profile to answer" in salary
     assert "1 of 4 need you" in sheet
