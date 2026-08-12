@@ -287,6 +287,15 @@ def load_company_list(path: str | Path | None = None, phase: str | None = None) 
             result[source] = []
 
     for source, entries in result.items():
+        if not isinstance(entries, list):
+            # A phase filter selecting a non-list value (e.g. a scalar phase
+            # entry) leaves `entries` as that raw value -- a string iterates
+            # character-by-character, and every single-char "slug" is a str,
+            # so the entry-level check below would silently pass.
+            raise ConfigError(
+                f"company_list.yaml: source {source!r} did not resolve to a list "
+                f"(got {type(entries).__name__}: {entries!r})"
+            )
         for entry in entries:
             if not isinstance(entry, str):
                 raise ConfigError(
