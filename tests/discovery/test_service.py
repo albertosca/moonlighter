@@ -832,9 +832,19 @@ def test_stats_warnings_flags_errors_and_empty_sources():
     lines = _stats_warnings(stats)
     assert lines == [
         "⚠️  ashby: 0 jobs from 39 companies (39 fetch errors)",
-        "⚠️  remoteok: 0 jobs (1 fetch errors)",
+        "⚠️  remoteok: 0 jobs (1 fetch error)",
         "⚠️  workable: 0 jobs from 12 companies",
     ]
+
+
+def test_stats_warnings_singularizes_one_company_and_one_error():
+    """MINOR regression: 'from 1 companies' / '1 fetch errors' read as broken
+    grammar -- singular counts must use the singular noun."""
+    stats: ScanStats = {
+        "greenhouse": SourceStats(companies=1, jobs=0, errors=1),
+    }
+    lines = _stats_warnings(stats)
+    assert lines == ["⚠️  greenhouse: 0 jobs from 1 company (1 fetch error)"]
 
 
 async def test_dead_api_reaches_the_scan_report():

@@ -367,8 +367,14 @@ def _stats_warnings(stats: ScanStats) -> list[str]:
     for source, s in sorted(stats.items()):
         if s.errors == 0 and s.jobs > 0:
             continue
-        scope = f" from {s.companies} companies" if s.companies else ""
-        errs = f" ({s.errors} fetch errors)" if s.errors else ""
+        scope = ""
+        if s.companies:
+            company_word = "company" if s.companies == 1 else "companies"
+            scope = f" from {s.companies} {company_word}"
+        errs = ""
+        if s.errors:
+            error_word = "error" if s.errors == 1 else "errors"
+            errs = f" ({s.errors} fetch {error_word})"
         lines.append(f"⚠️  {source}: {s.jobs} jobs{scope}{errs}")
     return lines
 
