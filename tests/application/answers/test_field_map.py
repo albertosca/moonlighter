@@ -484,6 +484,58 @@ def test_salary_refusal_never_sends_the_field_to_the_llm():
     assert "Expected salary (annual USD)" in out
 
 
+# ─── Question-shaped salary labels (the 2026-08-03 Holepunch gap) ────────────
+
+
+def test_salary_question_with_foreign_units_refuses():
+    """The REAL live label that fell through to the LLM. With the interrogative
+    lead it now matches — and the currency/period guard refuses (annual USD
+    against a BRL-monthly figure)."""
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(
+        ["What is your expected salary? (annual USD)"], profile, {}, None, None
+    )
+    assert answers["What is your expected salary? (annual USD)"] == NEEDS_REVIEW_SENTINEL
+
+
+def test_salary_question_plain_answers_the_figure():
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(["What is your salary expectation?"], profile, {}, None, None)
+    assert answers["What is your salary expectation?"] == "35000"
+
+
+def test_salary_question_contracted_lead():
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(
+        ["What's your expected salary (BRL, monthly)?"], profile, {}, None, None
+    )
+    assert answers["What's your expected salary (BRL, monthly)?"] == "35000"
+
+
+def test_salary_question_ptbr_lead():
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(["Qual a sua pretensão salarial?"], profile, {}, None, None)
+    assert answers["Qual a sua pretensão salarial?"] == "35000"
+
+
+def test_salary_essay_with_interrogative_lead_still_falls_through():
+    """The lead must not re-open the essay over-match: 'view on salary
+    transparency' continues into non-whitelisted words and must reach the LLM."""
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(
+        ["What is your view on salary transparency?"], profile, {}, None, None
+    )
+    assert "What is your view on salary transparency?" not in answers
+
+
+def test_salary_growth_question_still_falls_through():
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(
+        ["What is your expected salary growth over five years?"], profile, {}, None, None
+    )
+    assert "What is your expected salary growth over five years?" not in answers
+
+
 # ── label normalisation ───────────────────────────────────────────────────────
 
 

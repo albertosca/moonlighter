@@ -91,13 +91,19 @@ _RULES: list[tuple[str, _RuleFn]] = [
     # swallowed start-anchored essays; and an unbounded parenthetical smuggled essays in
     # parens — all silently replacing the field with a bare number. Also supports bare PT-BR
     # keywords (Salário, Faixa salarial) to match form labels in Portuguese without a lead word.
+    # A fourth widening (2026-08-12) adds an optional interrogative lead ("What is your", "What's",
+    # "Qual (é) sua") and allows the `?` on either side of the parenthetical, matching the live
+    # Holepunch label "What is your expected salary? (annual USD)". It holds because the lead is a
+    # closed alternation ending in "your"/"sua", so essays that continue into non-whitelisted words
+    # ("What is your view on salary transparency?") still never reach `$`.
     # See the field_map test file for every regression case.
     (
-        r"^(?:(?:desired|expected|current|target|minimum|base|total)\s+)?"
+        r"^(?:(?:what\s+is|what's|what\s+are)\s+your\s+|qual\s+(?:é\s+)?(?:a\s+)?sua\s+)?"
+        r"(?:(?:desired|expected|current|target|minimum|base|total)\s+)?"
         r"(?:salary|compensation|pay|pretens\w*|remunera\w*|sal[aá]rio|faixa\s+salarial)"
         r"(?:\s+(?:expectations?|requirements?|range|salari\w*|pretendid\w*|desejad\w*"
         r"|mensa(?:l|is)|monthly|anual|annual|target|desired|expected))*"
-        r"(?:\s*\([^)]{0,15}\))?\s*:?\s*$",
+        r"\s*\??\s*(?:\([^)]{0,15}\))?\s*\??\s*:?\s*$",
         _salary_expectation,
     ),
     # Contact (PT-BR) — "preferência" and "sobrenome" BEFORE "^nome" (order matters)
