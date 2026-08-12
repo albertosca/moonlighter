@@ -163,10 +163,10 @@ async def _collect_raw_jobs(
             warnings.append(warning)
 
     raw_jobs.extend(await _scan_gupy(keywords, config, stats))
-    raw_jobs.extend(await _scan_remoteok(config, stats))
-    raw_jobs.extend(await _scan_remotive(config, stats))
-    raw_jobs.extend(await _scan_wwr(config, stats))
-    raw_jobs.extend(await _scan_hn_whoishiring(config, stats))
+    raw_jobs.extend(await _scan_remoteok(config, stats, keywords))
+    raw_jobs.extend(await _scan_remotive(config, stats, keywords))
+    raw_jobs.extend(await _scan_wwr(config, stats, keywords))
+    raw_jobs.extend(await _scan_hn_whoishiring(config, stats, keywords))
     warnings.extend(_stats_warnings(stats))
     raw_jobs = [replace(j, url=normalize_job_url(j.url)) for j in raw_jobs]
     return raw_jobs, ("\n".join(warnings) or None)
@@ -184,47 +184,69 @@ async def _scan_gupy(keywords: str, config: dict[str, Any], stats: ScanStats) ->
     return await GupyScanner().scan(keywords=keywords or "software engineer", stats=stats)
 
 
-async def _scan_remoteok(config: dict[str, Any], stats: ScanStats) -> list[RawJob]:
+def _matches_keywords(title: str, keywords: str) -> bool:
+    """Comma-separated terms; a title matches when ANY term is a
+    case-insensitive substring. No keywords = everything matches."""
+    terms = [t.strip().lower() for t in keywords.split(",") if t.strip()]
+    if not terms:
+        return True
+    lowered = title.lower()
+    return any(term in lowered for term in terms)
+
+
+async def _scan_remoteok(config: dict[str, Any], stats: ScanStats, keywords: str) -> list[RawJob]:
     """RemoteOK is a portal-wide remote-jobs board, dispatched like Gupy --
     config-gated (off by default) to avoid flooding scans without the
-    operator opting in."""
+    operator opting in. The feed has no server-side query, so it is filtered
+    by title keywords here before any LLM evaluation."""
     if not config.get("scan_remoteok"):
         return []
     from moonlighter.discovery.sources.http import RemoteOKScanner
 
-    return await RemoteOKScanner().scan(stats=stats)
+    jobs = await RemoteOKScanner().scan(stats=stats)
+    return [j for j in jobs if _matches_keywords(j.title, keywords)]
 
 
-async def _scan_remotive(config: dict[str, Any], stats: ScanStats) -> list[RawJob]:
+async def _scan_remotive(config: dict[str, Any], stats: ScanStats, keywords: str) -> list[RawJob]:
     """Remotive is a portal-wide remote-jobs board, dispatched like Gupy --
     config-gated (off by default). ToS caps usage at 4 requests/day -- no
-    rate-limiter here, the operator is responsible for scan frequency."""
+    rate-limiter here, the operator is responsible for scan frequency. The
+    feed has no server-side query, so it is filtered by title keywords here
+    before any LLM evaluation."""
     if not config.get("scan_remotive"):
         return []
     from moonlighter.discovery.sources.http import RemotiveScanner
 
-    return await RemotiveScanner().scan(stats=stats)
+    jobs = await RemotiveScanner().scan(stats=stats)
+    return [j for j in jobs if _matches_keywords(j.title, keywords)]
 
 
-async def _scan_wwr(config: dict[str, Any], stats: ScanStats) -> list[RawJob]:
+async def _scan_wwr(config: dict[str, Any], stats: ScanStats, keywords: str) -> list[RawJob]:
     """WeWorkRemotely is a portal-wide RSS feed, dispatched like Gupy --
-    config-gated (off by default)."""
+    config-gated (off by default). The feed has no server-side query, so it
+    is filtered by title keywords here before any LLM evaluation."""
     if not config.get("scan_wwr"):
         return []
     from moonlighter.discovery.sources.http import WeWorkRemotelyScanner
 
-    return await WeWorkRemotelyScanner().scan(stats=stats)
+    jobs = await WeWorkRemotelyScanner().scan(stats=stats)
+    return [j for j in jobs if _matches_keywords(j.title, keywords)]
 
 
-async def _scan_hn_whoishiring(config: dict[str, Any], stats: ScanStats) -> list[RawJob]:
+async def _scan_hn_whoishiring(
+    config: dict[str, Any], stats: ScanStats, keywords: str
+) -> list[RawJob]:
     """HN's monthly Who is hiring? thread, dispatched like Gupy -- config-gated
     (off by default). Weakest signal of the 4 new boards (free-text comments,
-    not structured fields) -- see HNWhoIsHiringScanner's docstring."""
+    not structured fields) -- see HNWhoIsHiringScanner's docstring. The feed
+    has no server-side query, so it is filtered by title keywords here before
+    any LLM evaluation."""
     if not config.get("scan_hn_whoishiring"):
         return []
     from moonlighter.discovery.sources.http import HNWhoIsHiringScanner
 
-    return await HNWhoIsHiringScanner().scan(stats=stats)
+    jobs = await HNWhoIsHiringScanner().scan(stats=stats)
+    return [j for j in jobs if _matches_keywords(j.title, keywords)]
 
 
 def _drop_already_seen(raw_jobs: list[RawJob]) -> list[RawJob]:

@@ -32,6 +32,21 @@ title_blocklist:
   - "recruiter"
   - "product manager"
 
+# ─── Portal-wide job boards ──────────────────────────────────────────────
+# Unlike the per-company ATS scanners (driven by company_list.yaml), these
+# scan an entire public board in one pass. All OFF by default: an ungated
+# board floods the pipeline (and the LLM evaluation spend) with every job
+# it lists. When enabled, pass keywords to scan_and_evaluate — the feeds
+# are filtered by title before anything reaches the LLM.
+#
+# scan_remoteok: true         # remoteok.com — remote jobs, all categories
+# scan_remotive: true         # remotive.com — ToS caps polling at 4 requests/DAY;
+#                             # there is no rate limiter here, you are the control
+# scan_wwr: true              # weworkremotely.com — programming category RSS
+# scan_hn_whoishiring: true   # HN's monthly "Who is hiring?" thread; free-text
+#                             # comments, so titles/companies are best-effort
+# scan_gupy: true             # gupy.io — BR-focused portal, keyword-driven
+
 # Country-dependent work authorization. Empty -> always __NEEDS_REVIEW__ (never guesses).
 # citizenship_country accepts free forms ("Brazil"/"Brasil"/"BR"/"USA"/"United States").
 work_authorization:

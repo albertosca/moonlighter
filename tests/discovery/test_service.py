@@ -710,7 +710,9 @@ async def test_collect_raw_jobs_skips_remoteok_by_default():
 
 
 async def test_collect_raw_jobs_calls_remoteok_when_config_enabled():
-    job = RawJob(source="remoteok", company="Acme", title="Eng", url="https://remoteok.com/1")
+    # Title must match the "engineer" keyword _collect() passes through, or the
+    # dispatcher's own keyword filter (added alongside the config gate) drops it.
+    job = RawJob(source="remoteok", company="Acme", title="Engineer", url="https://remoteok.com/1")
     with patch("moonlighter.discovery.sources.http.RemoteOKScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_remoteok": True})
@@ -727,7 +729,7 @@ async def test_collect_raw_jobs_skips_remotive_by_default():
 
 
 async def test_collect_raw_jobs_calls_remotive_when_config_enabled():
-    job = RawJob(source="remotive", company="Acme", title="Eng", url="https://remotive.com/1")
+    job = RawJob(source="remotive", company="Acme", title="Engineer", url="https://remotive.com/1")
     with patch("moonlighter.discovery.sources.http.RemotiveScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_remotive": True})
@@ -745,7 +747,10 @@ async def test_collect_raw_jobs_skips_wwr_by_default():
 
 async def test_collect_raw_jobs_calls_wwr_when_config_enabled():
     job = RawJob(
-        source="weworkremotely", company="Acme", title="Eng", url="https://weworkremotely.com/1"
+        source="weworkremotely",
+        company="Acme",
+        title="Engineer",
+        url="https://weworkremotely.com/1",
     )
     with patch("moonlighter.discovery.sources.http.WeWorkRemotelyScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
@@ -766,7 +771,7 @@ async def test_collect_raw_jobs_calls_hn_whoishiring_when_config_enabled():
     job = RawJob(
         source="hn_whoishiring",
         company="Acme",
-        title="Eng",
+        title="Engineer",
         url="https://news.ycombinator.com/item?id=1",
     )
     with patch("moonlighter.discovery.sources.http.HNWhoIsHiringScanner") as MockScanner:
@@ -776,11 +781,35 @@ async def test_collect_raw_jobs_calls_hn_whoishiring_when_config_enabled():
     assert raw_jobs == [job]
 
 
+# ── Portal keyword filter ─────────────────────────────────────────────────
+
+
+def test_matches_keywords_any_term_case_insensitive():
+    assert _matches_keywords("Senior Backend Engineer", "backend, sre")
+    assert not _matches_keywords("Account Executive", "backend, sre")
+    assert _matches_keywords("Anything", "")  # no keywords = no filter
+
+
+async def test_portal_feed_is_filtered_by_keywords():
+    jobs = [
+        RawJob(source="remoteok", company="a", title="Backend Engineer", url="https://r.ok/1"),
+        RawJob(source="remoteok", company="b", title="Marketing Lead", url="https://r.ok/2"),
+    ]
+    with patch(
+        "moonlighter.discovery.sources.http.RemoteOKScanner.scan",
+        new=AsyncMock(return_value=jobs),
+    ):
+        got = await _scan_remoteok({"scan_remoteok": True}, {}, "backend")
+    assert [j.title for j in got] == ["Backend Engineer"]
+
+
 # ── Per-source warnings + dead-API canary ────────────────────────────────────
 
 from moonlighter.discovery.service import (  # noqa: E402
     _collect_raw_jobs,
     _drop_already_seen,
+    _matches_keywords,
+    _scan_remoteok,
     _stats_warnings,
 )
 from moonlighter.discovery.sources.base import ScanStats, SourceStats  # noqa: E402
