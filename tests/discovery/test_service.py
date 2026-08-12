@@ -738,7 +738,11 @@ async def test_collect_raw_jobs_calls_hn_whoishiring_when_config_enabled():
 
 # ── Per-source warnings + dead-API canary ────────────────────────────────────
 
-from moonlighter.discovery.service import _collect_raw_jobs, _stats_warnings  # noqa: E402
+from moonlighter.discovery.service import (  # noqa: E402
+    _collect_raw_jobs,
+    _drop_already_seen,
+    _stats_warnings,
+)
 from moonlighter.discovery.sources.base import ScanStats, SourceStats  # noqa: E402
 
 
@@ -787,3 +791,10 @@ async def test_unknown_company_list_source_warns():
         _, warning = await _collect_raw_jobs("", {}, {"workday": ["acme"]})
     assert warning is not None
     assert "unknown source 'workday'" in warning
+
+
+def test_drop_already_seen_matches_across_apply_suffix(tmp_db):
+    init_db()
+    ScanLog.create(job_url="https://x.recruitee.com/o/dev/c/new", source="recruitee")
+    raw = RawJob(source="recruitee", company="x", title="Dev", url="https://x.recruitee.com/o/dev")
+    assert _drop_already_seen([raw]) == []

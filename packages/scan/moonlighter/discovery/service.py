@@ -7,6 +7,7 @@ config/profile/caller. The logic lives here, testable in isolation.
 import asyncio
 import json
 import re
+from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
@@ -27,6 +28,7 @@ from moonlighter.discovery.evaluator import (
 )
 from moonlighter.discovery.sources.base import RawJob, ScanStats
 from moonlighter.discovery.sources.registry import build_http_scanners
+from moonlighter.discovery.urls import normalize_job_url
 from moonlighter.views import render_jobs_table
 from peewee import IntegrityError
 
@@ -165,6 +167,7 @@ async def _collect_raw_jobs(
     raw_jobs.extend(await _scan_wwr(config, stats))
     raw_jobs.extend(await _scan_hn_whoishiring(config, stats))
     warnings.extend(_stats_warnings(stats))
+    raw_jobs = [replace(j, url=normalize_job_url(j.url)) for j in raw_jobs]
     return raw_jobs, ("\n".join(warnings) or None)
 
 
@@ -224,8 +227,8 @@ async def _scan_hn_whoishiring(config: dict[str, Any], stats: ScanStats) -> list
 
 
 def _drop_already_seen(raw_jobs: list[RawJob]) -> list[RawJob]:
-    seen = {row.job_url for row in ScanLog.select(ScanLog.job_url)}
-    return [j for j in raw_jobs if j.url not in seen]
+    seen = {normalize_job_url(row.job_url) for row in ScanLog.select(ScanLog.job_url)}
+    return [j for j in raw_jobs if normalize_job_url(j.url) not in seen]
 
 
 async def _evaluate_and_store(
@@ -407,6 +410,7 @@ async def add_job(
     profile: dict[str, Any],
     caller: LLMCaller,
 ) -> str:
+    url = normalize_job_url(url)
     if not description:
         fetched, error = await _fetch_description(url)
         if error:
