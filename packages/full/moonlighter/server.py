@@ -99,6 +99,28 @@ async def scan_and_evaluate(
 
 @mcp.tool()
 @tool_logged
+async def scan_company(
+    source: str, company: str, *, ctx: Context[ServerSession, AppContext, Any]
+) -> str:
+    """Scan every open posting at ONE company right now and evaluate the new ones.
+
+    Does not touch company_list.yaml — use it for ad-hoc checks ("what is open
+    at trm-labs on Ashby?") without editing config.
+
+    Args:
+        source: ATS name — greenhouse, lever, ashby, workable, recruitee, smartrecruiters
+        company: the company's slug on that ATS (e.g. "trm-labs"), or a full
+                 custom career domain for Recruitee (e.g. "jobs.channable.com")
+    """
+    app = ctx.request_context.lifespan_context
+    with operation_metrics("scan_company"):
+        return await scan_service.scan_company(
+            source, company, app.config, app.profile, app.llm_caller
+        )
+
+
+@mcp.tool()
+@tool_logged
 async def add_job(
     url: str,
     company: str = "",

@@ -402,6 +402,37 @@ async def scan_and_evaluate(
     return _with_warning(report, li_warning)
 
 
+async def scan_company(
+    source: str, company: str, config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
+) -> str:
+    """Scan every open posting at ONE company right now, without touching
+    company_list.yaml. `company` is an ATS slug, or (Recruitee) a custom
+    career domain."""
+    scanners = build_http_scanners()
+    if source not in scanners:
+        return (
+            f"Unknown source {source!r}. Valid sources: {', '.join(sorted(scanners))}. "
+            "Portal boards (gupy, remoteok, remotive, weworkremotely, hn_whoishiring) "
+            "are enabled via config flags and scanned by scan_and_evaluate."
+        )
+    stats: ScanStats = {}
+    raw_jobs = await scanners[source].scan([company], stats=stats)
+    raw_jobs = [replace(j, url=normalize_job_url(j.url)) for j in raw_jobs]
+    new_jobs = _drop_already_seen(raw_jobs)
+
+    if new_jobs:
+        saved, spend_hit = await _evaluate_and_store(new_jobs, config, profile, caller)
+        report = _format_report(saved, spend_hit, config["score_threshold"])
+    else:
+        report = f"No new jobs at {company!r} ({len(raw_jobs)} found, all already known)."
+
+    report += (
+        f"\n\nTip: add {company!r} under '{source}:' in company_list.yaml "
+        "to include it in recurring scans."
+    )
+    return _with_warning(report, "\n".join(_stats_warnings(stats)) or None)
+
+
 async def add_job(
     url: str,
     company: str,

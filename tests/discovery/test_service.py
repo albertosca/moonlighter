@@ -838,3 +838,49 @@ def test_drop_already_seen_matches_across_apply_suffix(tmp_db):
     ScanLog.create(job_url="https://x.recruitee.com/o/dev/c/new", source="recruitee")
     raw = RawJob(source="recruitee", company="x", title="Dev", url="https://x.recruitee.com/o/dev")
     assert _drop_already_seen([raw]) == []
+
+
+# ── scan_company ─────────────────────────────────────────────────────────────
+
+from moonlighter.discovery.service import scan_company  # noqa: E402
+
+_fake_caller = MagicMock()
+
+
+async def test_scan_company_rejects_unknown_source():
+    report = await scan_company("workday", "acme", {"score_threshold": 6.5}, {}, _fake_caller)
+    assert "Unknown source 'workday'" in report
+    assert "greenhouse" in report  # names the valid ones
+
+
+async def test_scan_company_scans_evaluates_and_reports(tmp_db):
+    init_db()
+    with (
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch(
+            "moonlighter.discovery.service._evaluate_and_store",
+            new=AsyncMock(return_value=([], False)),
+        ) as ev,
+    ):
+        MockGH.return_value.scan = AsyncMock(return_value=[_raw(1, source="greenhouse")])
+        report = await scan_company(
+            "greenhouse", "stripe", {"score_threshold": 6.5}, {}, _fake_caller
+        )
+    assert ev.await_count == 1
+    assert "company_list.yaml" in report  # the recurring-scan tip
+
+
+async def test_scan_company_no_new_jobs_skips_evaluation(tmp_db):
+    init_db()
+    ScanLog.create(job_url="https://x.com/scan/1", source="greenhouse")
+    with (
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.service._evaluate_and_store", new=AsyncMock()) as ev,
+    ):
+        MockGH.return_value.scan = AsyncMock(return_value=[_raw(1, source="greenhouse")])
+        report = await scan_company(
+            "greenhouse", "stripe", {"score_threshold": 6.5}, {}, _fake_caller
+        )
+    ev.assert_not_called()
+    assert "No new jobs at 'stripe'" in report
+    assert "company_list.yaml" in report
