@@ -220,3 +220,43 @@ async def test_salary_label_is_still_prepopulated_from_full_profile():
     questions = [FormQuestion(label="Salary expectation", kind=QuestionKind.TEXT, required=True)]
     composed = await compose_answers(questions, profile, {}, {"description": "A job."}, caller)
     assert composed[0].answer == "35000"
+
+
+OPERATOR_NOTE_REFERENCES = (
+    "I can share professional references on request, so the candidate needs to "
+    "supply names, roles and emails before submission."
+)
+OPERATOR_NOTE_ADDRESS = (
+    "Note: no street address is available in the material provided - please "
+    "supply before submitting."
+)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("note", [OPERATOR_NOTE_REFERENCES, OPERATOR_NOTE_ADDRESS])
+async def test_operator_directed_prose_becomes_a_gap(note):
+    """CANARY: these are the verbatim answers that shipped toward employers on
+    2026-08-04 (references) and 2026-08-05 (address). The guard must bite on the
+    failures that actually happened."""
+
+    async def caller(prompt: str, model: str) -> str:
+        return note
+
+    questions = [FormQuestion(label="References", kind=QuestionKind.LONG_TEXT, required=False)]
+    composed = await compose_answers(questions, {}, {}, {"description": "A job."}, caller)
+    assert composed[0].answer is None
+    assert composed[0].gap_reason is not None
+    assert "answer this yourself" in composed[0].gap_reason
+
+
+@pytest.mark.asyncio
+async def test_ordinary_first_person_answer_passes():
+    async def caller(prompt: str, model: str) -> str:
+        return "I have led backend teams for six years and enjoy mentoring."
+
+    questions = [
+        FormQuestion(label="Tell us about you", kind=QuestionKind.LONG_TEXT, required=False)
+    ]
+    composed = await compose_answers(questions, {}, {}, {"description": "A job."}, caller)
+    assert composed[0].answer is not None
+    assert composed[0].gap_reason is None
