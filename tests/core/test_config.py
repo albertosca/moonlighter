@@ -494,3 +494,15 @@ def test_load_config_fills_llm_backend_from_defaults(tmp_path, monkeypatch):
     (tmp_path / "config.yaml").write_text("score_threshold: 7.0\n")
 
     assert load_config(tmp_path / "config.yaml")["llm_backend"] == "cli"
+
+
+# ── email defaults ───────────────────────────────────────────────────────────
+
+
+def test_defaults_carry_the_documented_email_paths():
+    """credentials_path/token_path must have real defaults so setup_gmail_service
+    can name the exact missing key instead of raising a raw KeyError."""
+    from moonlighter.core.config import DEFAULTS
+
+    assert DEFAULTS["email"]["token_path"] == "~/.moonlighter/gmail-token.json"
+    assert DEFAULTS["email"]["credentials_path"] == "~/.moonlighter/gmail-client.json"

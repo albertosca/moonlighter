@@ -347,9 +347,11 @@ async def update_status(
 @tool_logged
 async def setup_email(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
     """
-    Configure Gmail authentication for candidaturas@gmail.com.
+    Configure Gmail authentication for the account that receives application replies.
     Run only once. Opens the browser to authorize access.
-    Requires gmail-client.json in ~/.moonlighter/.
+    Requires the OAuth client file at email.credentials_path
+    (default ~/.moonlighter/gmail-client.json) and writes the token to
+    email.token_path — overwriting whatever file that path names.
     """
     app = ctx.request_context.lifespan_context
     config = app.config
@@ -378,7 +380,7 @@ async def setup_email(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
 @tool_logged
 async def sync_email_responses(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
     """
-    Read recent emails in candidaturas@gmail.com, whether read or unread,
+    Read recent emails in the configured Gmail account, whether read or unread,
     classify them with the LLM, and update the applications database.
     Returns a summary of the updates made.
     """

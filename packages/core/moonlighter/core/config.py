@@ -71,6 +71,14 @@ DEFAULTS = {
         "authorized_answer": "Yes",
         "not_authorized_answer": "No",
     },
+    # Gmail response tracking. Both files live under MOONLIGHTER_HOME by
+    # default; setup_email() creates the token after the OAuth consent.
+    # NOTE: setup_email() writes (and overwrites) whatever file token_path
+    # names — point it elsewhere only if you own that file.
+    "email": {
+        "credentials_path": "~/.moonlighter/gmail-client.json",
+        "token_path": "~/.moonlighter/gmail-token.json",
+    },
 }
 
 _PATH_KEYS = ("browser_session_dir", "screenshots_dir")

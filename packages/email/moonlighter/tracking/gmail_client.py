@@ -105,7 +105,14 @@ def setup_gmail_service(config: dict[str, Any]) -> Any:
             " and then setup_email() to authorize access."
         )
 
-    token_path = Path(config["email"]["token_path"]).expanduser()
+    token_path_raw = (config.get("email") or {}).get("token_path")
+    if not token_path_raw:
+        raise GmailAuthError(
+            "email.token_path is not configured. Add an 'email:' block to "
+            "config.yaml (see config.example.yaml) and run setup_email() to "
+            "authorize access."
+        )
+    token_path = Path(token_path_raw).expanduser()
     if not token_path.exists():
         raise GmailAuthError("Gmail token not found. Run setup_email() first to authorize access.")
 
