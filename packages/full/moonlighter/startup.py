@@ -72,13 +72,15 @@ def _check_llm_backend(config: dict[str, Any]) -> StartupWarning | None:
 
 
 def _check_cv(cv_path: str) -> StartupWarning | None:
-    """Missing CV → confirm_apply will fail."""
+    """Missing CV → prepare_application can't name a file to attach for the form's
+    upload question."""
     if Path(cv_path).exists():
         return None
     return StartupWarning(
         "warn",
-        f"CV file not found at {cv_path}. confirm_apply will fail. "
-        "Add your resume there, or set cv.default in config.yaml to a different path.",
+        f"CV file not found at {cv_path}. prepare_application won't be able to point you "
+        "at a file to upload. Add your resume there, or set cv.default in config.yaml to "
+        "a different path.",
     )
 
 

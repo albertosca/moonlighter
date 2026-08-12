@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "moonlighter-core"
 version = "0.1.0"
-description = "Core database, configuration, browser automation and LLM primitives for moonlighter"
+description = "Core database, configuration, and LLM primitives for moonlighter, with an optional browser driver (the [browser] extra)"
 license = {text = "AGPL-3.0-only"}
 authors = [{name = "Alberto de Sá Cavalcanti de Albuquerque", email = "albertoalbuquerque01@gmail.com"}]
 requires-python = ">=3.14"
