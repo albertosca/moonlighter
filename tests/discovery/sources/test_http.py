@@ -5,8 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from moonlighter.discovery.sources.base import ScanStats, SourceStats
 from moonlighter.discovery.sources.http import (
     AshbyScanner,
+    FetchError,
     GreenhouseScanner,
     GupyScanner,
     HNWhoIsHiringScanner,
@@ -17,6 +19,7 @@ from moonlighter.discovery.sources.http import (
     SmartRecruitersScanner,
     WeWorkRemotelyScanner,
     WorkableScanner,
+    _get_json,
 )
 
 GREENHOUSE_RESPONSE = {
@@ -758,6 +761,11 @@ _SR_LIST_P2 = {
     ],
 }
 _SR_DETAIL = {"jobAd": {"sections": {"jobDescription": {"text": "<p>Own the pipeline</p>"}}}}
+# _SR_LIST_P1 reports totalFound=2 with only 1 item on this page, so _list keeps
+# paginating; the detail-failure tests below only care about page 1, so they close
+# pagination with this empty second page rather than hand-waving it away like the
+# old blanket try/except did.
+_SR_LIST_EMPTY_P2 = {"offset": 1, "limit": 1, "totalFound": 2, "content": []}
 
 
 def _sr_response(payload, status_code=200):
@@ -948,6 +956,8 @@ async def test_smartrecruiters_detail_500_yields_none_description():
     async def fake_get(url, headers=None):
         if "postings?limit=100&offset=0" in url:
             return _sr_response(_SR_LIST_P1)
+        if "postings?limit=100&offset=1" in url:
+            return _sr_response(_SR_LIST_EMPTY_P2)
         if "postings/744000000000001" in url:
             return _sr_response({}, status_code=500)
         raise AssertionError(f"unexpected URL requested: {url}")
@@ -966,6 +976,8 @@ async def test_smartrecruiters_detail_network_exception_yields_none_description(
     async def fake_get(url, headers=None):
         if "postings?limit=100&offset=0" in url:
             return _sr_response(_SR_LIST_P1)
+        if "postings?limit=100&offset=1" in url:
+            return _sr_response(_SR_LIST_EMPTY_P2)
         if "postings/744000000000001" in url:
             raise httpx.ConnectError("timeout")
         raise AssertionError(f"unexpected URL requested: {url}")
@@ -987,6 +999,8 @@ async def test_smartrecruiters_detail_non_dict_response_yields_none_description(
     async def fake_get(url, headers=None):
         if "postings?limit=100&offset=0" in url:
             return _sr_response(_SR_LIST_P1)
+        if "postings?limit=100&offset=1" in url:
+            return _sr_response(_SR_LIST_EMPTY_P2)
         if "postings/744000000000001" in url:
             return _sr_response([{"jobAd": {}}])
         raise AssertionError(f"unexpected URL requested: {url}")
@@ -2131,3 +2145,74 @@ async def test_ashby_null_jobs_returns_empty():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
+
+
+async def test_ashby_non_dict_response_returns_empty():
+    mock_client = _make_mock_client([{"title": "Eng"}])
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs == []
+
+
+# --- _get_json + per-source stats counting ---
+
+
+def _mock_client_cls(mock_client):
+    cls = MagicMock()
+    cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+    cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    return cls
+
+
+@pytest.mark.asyncio
+async def test_get_json_raises_on_network_error():
+    client = AsyncMock()
+    client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
+    with pytest.raises(FetchError):
+        await _get_json(client, "https://example.test/x")
+
+
+@pytest.mark.asyncio
+async def test_get_json_raises_on_non_200():
+    client = AsyncMock()
+    response = MagicMock(status_code=500)
+    client.get = AsyncMock(return_value=response)
+    with pytest.raises(FetchError, match="HTTP 500"):
+        await _get_json(client, "https://example.test/x")
+
+
+@pytest.mark.asyncio
+async def test_get_json_raises_on_non_json_body():
+    client = AsyncMock()
+    response = MagicMock(status_code=200)
+    response.json.side_effect = ValueError("not json")
+    client.get = AsyncMock(return_value=response)
+    with pytest.raises(FetchError, match="non-JSON"):
+        await _get_json(client, "https://example.test/x")
+
+
+@pytest.mark.asyncio
+async def test_gather_jobs_counts_failures_per_source():
+    """One slug succeeds, one errors: the error is COUNTED in stats, not silently
+    dropped — [] from a broken API must stay distinguishable from no openings."""
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = GREENHOUSE_RESPONSE
+    boom = MagicMock(status_code=500)
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(side_effect=[ok, boom])
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await GreenhouseScanner().scan(["stripe", "deadco"], stats=stats)
+    assert len(jobs) == 1
+    assert stats["greenhouse"] == SourceStats(companies=2, jobs=1, errors=1)
+
+
+@pytest.mark.asyncio
+async def test_scan_without_stats_still_works():
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = GREENHOUSE_RESPONSE
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        jobs = await GreenhouseScanner().scan(["stripe"])
+    assert len(jobs) == 1

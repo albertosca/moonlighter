@@ -10,47 +10,76 @@ from typing import Any, ClassVar
 
 import httpx
 from moonlighter.core.log import get_logger
-from moonlighter.discovery.sources.base import BaseScanner, RawJob, normalize_remote_type
+from moonlighter.discovery.sources.base import (
+    BaseScanner,
+    RawJob,
+    ScanStats,
+    SourceStats,
+    normalize_remote_type,
+)
 
 logger = get_logger(__name__)
+
+HEADERS = {"User-Agent": "moonlighter/0.1"}
 
 _Fetch = Callable[[httpx.AsyncClient, str], Awaitable[list[RawJob]]]
 
 
-async def _gather_jobs(source: str, slugs: list[str], fetch: _Fetch) -> list[RawJob]:
+class FetchError(Exception):
+    """A board fetch that failed: network error, non-200, non-JSON, wrong shape."""
+
+
+async def _get_json(client: httpx.AsyncClient, url: str) -> Any:
+    """GET + JSON-decode, raising FetchError on any failure instead of returning
+    a shape the caller must remember to test. The raise is what keeps a dead API
+    distinguishable from a company with no openings (the Ashby lesson)."""
+    try:
+        r = await client.get(url, headers=HEADERS)
+    except Exception as e:
+        raise FetchError(f"{type(e).__name__}: {e}") from e
+    if r.status_code != 200:
+        raise FetchError(f"HTTP {r.status_code}")
+    try:
+        return r.json()
+    except ValueError as e:
+        raise FetchError("non-JSON response") from e
+
+
+async def _gather_jobs(
+    source: str, slugs: list[str], fetch: _Fetch, stats: ScanStats | None = None
+) -> list[RawJob]:
     """Fetches all companies in parallel and flattens the result. A company that
-    fails (exception in fetch) is ignored, it doesn't take down the others."""
+    fails doesn't take down the others — but it is counted and logged, never
+    silently dropped."""
     logger.info("[%s] scanning %d companies", source, len(slugs))
     jobs: list[RawJob] = []
+    errors = 0
     async with httpx.AsyncClient(timeout=15) as client:
         results = await asyncio.gather(
             *(fetch(client, slug) for slug in slugs), return_exceptions=True
         )
-    for result in results:
+    for slug, result in zip(slugs, results, strict=True):
         if isinstance(result, list):
             jobs.extend(result)
-    logger.info("[%s] %d raw jobs fetched", source, len(jobs))
+        else:
+            errors += 1
+            logger.warning("[%s] fetch failed for %r: %s", source, slug, result)
+    logger.info("[%s] %d raw jobs fetched (%d fetch errors)", source, len(jobs), errors)
+    if stats is not None:
+        stats[source] = SourceStats(companies=len(slugs), jobs=len(jobs), errors=errors)
     return jobs
 
 
 class GreenhouseScanner(BaseScanner):
     BASE = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
-    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
-        return await _gather_jobs("greenhouse", company_slugs, self._fetch)
+        return await _gather_jobs("greenhouse", company_slugs, self._fetch, kwargs.get("stats"))
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
-        url = self.BASE.format(slug=slug)
-        try:
-            r = await client.get(url, headers=self.HEADERS)
-        except Exception:
-            return []
-        if r.status_code != 200:
-            return []
-        data = r.json()
+        data = await _get_json(client, self.BASE.format(slug=slug))
         if not isinstance(data, dict):
-            return []
+            raise FetchError("unexpected payload shape")
         jobs = []
         for item in data.get("jobs", []):
             title = item.get("title")
@@ -81,22 +110,14 @@ class GreenhouseScanner(BaseScanner):
 
 class LeverScanner(BaseScanner):
     BASE = "https://api.lever.co/v0/postings/{slug}"
-    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
-        return await _gather_jobs("lever", company_slugs, self._fetch)
+        return await _gather_jobs("lever", company_slugs, self._fetch, kwargs.get("stats"))
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
-        url = self.BASE.format(slug=slug)
-        try:
-            r = await client.get(url, headers=self.HEADERS)
-        except Exception:
-            return []
-        if r.status_code != 200:
-            return []
-        raw_list = r.json()
+        raw_list = await _get_json(client, self.BASE.format(slug=slug))
         if not isinstance(raw_list, list):
-            return []
+            raise FetchError("unexpected payload shape")
         jobs = []
         for item in raw_list:
             title = item.get("text", "")
@@ -135,21 +156,17 @@ class AshbyScanner(BaseScanner):
     """
 
     BASE = "https://api.ashbyhq.com/posting-api/job-board/{slug}"
-    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
-        return await _gather_jobs("ashby", company_slugs, self._fetch)
+        return await _gather_jobs("ashby", company_slugs, self._fetch, kwargs.get("stats"))
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
-        try:
-            r = await client.get(self.BASE.format(slug=slug), headers=self.HEADERS)
-        except Exception:
-            return []
-        if r.status_code != 200:
-            return []
-        postings = r.json().get("jobs") or []
+        data = await _get_json(client, self.BASE.format(slug=slug))
+        if not isinstance(data, dict):
+            raise FetchError("unexpected payload shape")
+        postings = data.get("jobs") or []
         if not isinstance(postings, list):
-            return []
+            raise FetchError("unexpected payload shape")
         jobs = []
         for item in postings:
             title = item.get("title")
@@ -181,21 +198,14 @@ class AshbyScanner(BaseScanner):
 
 class WorkableScanner(BaseScanner):
     BASE = "https://apply.workable.com/api/v1/widget/accounts/{slug}?details=true"
-    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
-        return await _gather_jobs("workable", company_slugs, self._fetch)
+        return await _gather_jobs("workable", company_slugs, self._fetch, kwargs.get("stats"))
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
-        try:
-            r = await client.get(self.BASE.format(slug=slug), headers=self.HEADERS)
-        except Exception:
-            return []
-        if r.status_code != 200:
-            return []
-        data = r.json()
+        data = await _get_json(client, self.BASE.format(slug=slug))
         if not isinstance(data, dict):
-            return []
+            raise FetchError("unexpected payload shape")
         jobs = []
         for item in data.get("jobs", []):
             title, url = item.get("title"), item.get("application_url")
@@ -226,21 +236,14 @@ class WorkableScanner(BaseScanner):
 
 class RecruiteeScanner(BaseScanner):
     BASE = "https://{slug}.recruitee.com/api/offers/"
-    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
-        return await _gather_jobs("recruitee", company_slugs, self._fetch)
+        return await _gather_jobs("recruitee", company_slugs, self._fetch, kwargs.get("stats"))
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
-        try:
-            r = await client.get(self.BASE.format(slug=slug), headers=self.HEADERS)
-        except Exception:
-            return []
-        if r.status_code != 200:
-            return []
-        data = r.json()
+        data = await _get_json(client, self.BASE.format(slug=slug))
         if not isinstance(data, dict):
-            return []
+            raise FetchError("unexpected payload shape")
         jobs = []
         for item in data.get("offers", []):
             title, url = item.get("title"), item.get("careers_apply_url")
@@ -268,10 +271,11 @@ class SmartRecruitersScanner(BaseScanner):
     LIST = "https://api.smartrecruiters.com/v1/companies/{slug}/postings?limit=100&offset={offset}"
     DETAIL = "https://api.smartrecruiters.com/v1/companies/{slug}/postings/{pid}"
     APPLY = "https://jobs.smartrecruiters.com/{slug}/{pid}"
-    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
 
     async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
-        return await _gather_jobs("smartrecruiters", company_slugs, self._fetch)
+        return await _gather_jobs(
+            "smartrecruiters", company_slugs, self._fetch, kwargs.get("stats")
+        )
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
         postings = await self._list(client, slug)
@@ -307,17 +311,9 @@ class SmartRecruitersScanner(BaseScanner):
         out: list[dict[str, Any]] = []
         offset = 0
         while True:
-            try:
-                r = await client.get(
-                    self.LIST.format(slug=slug, offset=offset), headers=self.HEADERS
-                )
-            except Exception:
-                return out
-            if r.status_code != 200:
-                return out
-            data = r.json()
+            data = await _get_json(client, self.LIST.format(slug=slug, offset=offset))
             if not isinstance(data, dict):
-                return out
+                raise FetchError("unexpected payload shape")
             content = data.get("content") or []
             out.extend(content)
             total = data.get("totalFound", 0)
@@ -328,12 +324,9 @@ class SmartRecruitersScanner(BaseScanner):
     async def _detail(self, client: httpx.AsyncClient, slug: str, pid: str) -> str | None:
         await asyncio.sleep(0.1)
         try:
-            r = await client.get(self.DETAIL.format(slug=slug, pid=pid), headers=self.HEADERS)
-        except Exception:
+            data = await _get_json(client, self.DETAIL.format(slug=slug, pid=pid))
+        except FetchError:
             return None
-        if r.status_code != 200:
-            return None
-        data = r.json()
         if not isinstance(data, dict):
             return None
         sections = (data.get("jobAd") or {}).get("sections") or {}
