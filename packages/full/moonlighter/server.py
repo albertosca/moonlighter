@@ -99,6 +99,28 @@ async def scan_and_evaluate(
 
 @mcp.tool()
 @tool_logged
+async def scan_company(
+    source: str, company: str, *, ctx: Context[ServerSession, AppContext, Any]
+) -> str:
+    """Scan every open posting at ONE company right now and evaluate the new ones.
+
+    Does not touch company_list.yaml — use it for ad-hoc checks ("what is open
+    at trm-labs on Ashby?") without editing config.
+
+    Args:
+        source: ATS name — greenhouse, lever, ashby, workable, recruitee, smartrecruiters
+        company: the company's slug on that ATS (e.g. "trm-labs"), or a full
+                 custom career domain for Recruitee (e.g. "jobs.channable.com")
+    """
+    app = ctx.request_context.lifespan_context
+    with operation_metrics("scan_company"):
+        return await scan_service.scan_company(
+            source, company, app.config, app.profile, app.llm_caller
+        )
+
+
+@mcp.tool()
+@tool_logged
 async def add_job(
     url: str,
     company: str = "",
@@ -110,13 +132,18 @@ async def add_job(
     """Evaluates a manually provided job and saves it to the database.
 
     Useful for LinkedIn postings, job posts, or any source not supported by
-    the automatic scanner. If 'description' is not provided, tries to fetch
-    the URL via HTTP (doesn't work for pages requiring authentication, like LinkedIn).
+    the automatic scanner. For Greenhouse and Recruitee URLs, any missing
+    'company', 'title', or 'description' is auto-filled from the ATS's own API.
+    For everything else, if 'description' is not provided, tries to fetch the
+    URL via HTTP (doesn't work for pages requiring authentication, like LinkedIn) —
+    'company' and 'title' are still required in that case.
 
     Args:
         url: job URL (required, used as unique identifier)
-        company: company name (e.g. "ifood")
-        title: job title (e.g. "Senior Software Engineer")
+        company: company name (e.g. "ifood"). Optional for routed ATSes (Greenhouse,
+            Recruitee); required otherwise.
+        title: job title (e.g. "Senior Software Engineer"). Optional for routed ATSes;
+            required otherwise.
         description: job description text. If empty, tries to fetch it automatically.
     """
     app = ctx.request_context.lifespan_context

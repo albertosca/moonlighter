@@ -375,6 +375,24 @@ async def test_scan_status_archived_if_below_threshold(tmp_db):
     assert job.status == "archived"
 
 
+# ── scan_company ─────────────────────────────────────────────────────────────
+
+
+async def test_scan_company_tool_delegates_to_service(tmp_db):
+    init_db()
+    from moonlighter.server import scan_company
+
+    with patch(
+        "moonlighter.discovery.service.scan_company", new=AsyncMock(return_value="report")
+    ) as mock_scan_company:
+        result = await scan_company("greenhouse", "stripe", ctx=make_test_context())
+    assert result == "report"
+    mock_scan_company.assert_awaited_once()
+    args = mock_scan_company.await_args.args
+    assert args[0] == "greenhouse"
+    assert args[1] == "stripe"
+
+
 # ── list_jobs ─────────────────────────────────────────────────────────────────
 
 

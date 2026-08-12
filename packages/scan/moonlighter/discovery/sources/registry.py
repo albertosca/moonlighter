@@ -42,3 +42,10 @@ def build_http_scanners() -> dict[str, BaseScanner]:
 LISTING_SOURCES: frozenset[str] = frozenset(
     source.value for source, spec in SOURCES.items() if spec.supports_listing
 )
+
+# Portal-wide feeds: config-gated, keyword-filtered, and not per-company —
+# staleness cannot be checked by re-listing a company, so staleness.py reports
+# them as one aggregate line per source instead of one line per job's company.
+PORTAL_SOURCES: frozenset[str] = frozenset(
+    {"gupy", "remoteok", "remotive", "weworkremotely", "hn_whoishiring"}
+)

@@ -36,6 +36,30 @@ async def test_job_still_in_listing_is_not_stale():
     assert result.failed_companies == []
 
 
+async def test_stored_normalized_url_matches_raw_apply_suffix_in_listing():
+    """CRITICAL regression: stored job.url is normalized (Task 5 strips the
+    Recruitee /c/new apply suffix), but the fresh listing still returns the
+    raw careers_apply_url ending in /c/new. Comparing the two forms unnormalized
+    would archive every freshly-stored Recruitee job as stale on its first
+    re-scan — both sides must be normalized before comparing."""
+    job = _job(source="recruitee", company="x", url="https://x.recruitee.com/o/dev")
+    scanners = {
+        "recruitee": _scanner(
+            [
+                RawJob(
+                    source="recruitee",
+                    company="x",
+                    title="Dev",
+                    url="https://x.recruitee.com/o/dev/c/new",
+                )
+            ]
+        )
+    }
+    result = await find_stale_jobs({("recruitee", "x"): [job]}, scanners, CONFIG)
+    assert result.stale == []
+    assert result.failed_companies == []
+
+
 async def test_job_missing_from_listing_is_stale():
     job = _job(url="https://x.com/1")
     scanners = {"greenhouse": _scanner([])}  # company has zero open postings now
@@ -147,3 +171,15 @@ def test_staleness_result_defaults_to_empty_lists():
     result = StalenessResult()
     assert result.stale == []
     assert result.failed_companies == []
+
+
+async def test_portal_jobs_aggregate_into_one_line_per_source():
+    """Portal boards aren't per-company: re-listing "the company" isn't possible,
+    so staleness reports one aggregate line per source instead of flooding
+    failed_companies with one entry per job's (made-up) company."""
+    jobs_by_company = {
+        ("remoteok", "acme"): [_job(1)],
+        ("remoteok", "globex"): [_job(2), _job(3)],
+    }
+    result = await find_stale_jobs(jobs_by_company, {}, {})
+    assert result.failed_companies == ["3 remoteok job(s) (portal feed, no per-company listing)"]
