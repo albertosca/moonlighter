@@ -11,6 +11,7 @@ from typing import Any
 from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.application.answers.field_map import pre_populate_answers
 from moonlighter.application.answers.option_matcher import match_option_locally
+from moonlighter.application.answers.profile import profile_for_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.core.config import NEEDS_REVIEW_SENTINEL
 from moonlighter.core.llm import LLMCaller
@@ -57,7 +58,11 @@ async def _generate(
         options = "\n".join(f"- {o}" for o in question.options)
         constraint = f"Reply with exactly one of these options, copied verbatim:\n{options}"
     prompt = PROMPT.format(
-        profile=wrap_untrusted("profile", str(profile), cap=6000),
+        # Least privilege at the prompt boundary: references (third-party
+        # contacts), preferences (the salary figure — E2) and demographics
+        # never reach the model. Deterministic pre-population upstream still
+        # uses the full profile; this curation is prompt-only.
+        profile=wrap_untrusted("profile", str(profile_for_answers(profile)), cap=6000),
         job=wrap_untrusted("job", str(job.get("description") or job), cap=6000),
         label=question.label,
         constraint=constraint,

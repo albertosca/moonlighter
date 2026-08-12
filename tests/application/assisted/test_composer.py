@@ -180,3 +180,43 @@ async def test_every_question_produces_exactly_one_entry_in_order():
     ]
     composed = await compose_answers(questions, PROFILE, {}, JOB, answers_anything)
     assert [c.question.label for c in composed] == [q.label for q in questions]
+
+
+@pytest.mark.asyncio
+async def test_llm_prompt_carries_only_the_curated_profile():
+    """references (a third party's contacts), preferences (the salary figure — E2)
+    and demographics must never reach the prompt; the old applier path curated
+    them out and the composer must too."""
+    profile = {
+        "name": "Alba Test",
+        "summary": "Senior engineer.",
+        "references": [{"name": "Ref Person", "email": "ref@example.com"}],
+        "preferences": {"salary_target_brl_monthly": 35000},
+        "demographics": {"gender": "prefer not to say"},
+    }
+    prompts: list[str] = []
+
+    async def caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        prompts.append(prompt)
+        return "An answer."
+
+    questions = [FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)]
+    await compose_answers(questions, profile, {}, {"description": "A job."}, caller)
+
+    assert len(prompts) == 1
+    for leaked in ("Ref Person", "ref@example.com", "35000", "prefer not to say", "references"):
+        assert leaked not in prompts[0]
+    assert "Senior engineer." in prompts[0]
+
+
+@pytest.mark.asyncio
+async def test_salary_label_is_still_prepopulated_from_full_profile():
+    """Curation is prompt-only: the deterministic salary rule still sees
+    preferences and answers without any LLM call."""
+    from unittest.mock import AsyncMock
+
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    caller = AsyncMock(side_effect=AssertionError("LLM must not be called"))
+    questions = [FormQuestion(label="Salary expectation", kind=QuestionKind.TEXT, required=True)]
+    composed = await compose_answers(questions, profile, {}, {"description": "A job."}, caller)
+    assert composed[0].answer == "35000"
