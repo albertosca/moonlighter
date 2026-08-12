@@ -445,8 +445,14 @@ async def scan_company(
     if new_jobs:
         saved, spend_hit = await _evaluate_and_store(new_jobs, config, profile, caller)
         report = _format_report(saved, spend_hit, config["score_threshold"])
-    else:
+    elif raw_jobs:
         report = f"No new jobs at {company!r} ({len(raw_jobs)} found, all already known)."
+    else:
+        # An empty raw_jobs can mean the company genuinely has zero open
+        # postings OR the fetch itself failed -- "0 found, all already known"
+        # would lie in the second case. _stats_warnings (appended below via
+        # _with_warning) carries the fetch-error detail when there is one.
+        report = f"No open jobs found at {company!r} (see warnings below if the fetch failed)."
 
     report += (
         f"\n\nTip: add {company!r} under '{source}:' in company_list.yaml "

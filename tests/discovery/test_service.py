@@ -913,3 +913,23 @@ async def test_scan_company_no_new_jobs_skips_evaluation(tmp_db):
     ev.assert_not_called()
     assert "No new jobs at 'stripe'" in report
     assert "company_list.yaml" in report
+
+
+async def test_scan_company_zero_raw_jobs_does_not_claim_all_already_known(tmp_db):
+    """MINOR regression: an empty raw_jobs list can mean either 'company has no
+    open postings' or 'the fetch failed' -- the old '(0 found, all already
+    known)' message asserted the fetch succeeded and simply found nothing,
+    which is false when it errored."""
+    init_db()
+    with (
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.service._evaluate_and_store", new=AsyncMock()) as ev,
+    ):
+        MockGH.return_value.scan = AsyncMock(return_value=[])
+        report = await scan_company(
+            "greenhouse", "stripe", {"score_threshold": 6.5}, {}, _fake_caller
+        )
+    ev.assert_not_called()
+    assert "No open jobs found at 'stripe'" in report
+    assert "all already known" not in report
+    assert "company_list.yaml" in report
