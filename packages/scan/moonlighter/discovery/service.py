@@ -25,7 +25,7 @@ from moonlighter.discovery.evaluator import (
     evaluate_jobs_batch,
     should_skip_by_title,
 )
-from moonlighter.discovery.sources.base import RawJob
+from moonlighter.discovery.sources.base import RawJob, ScanStats
 from moonlighter.discovery.sources.registry import build_http_scanners
 from moonlighter.views import render_jobs_table
 from peewee import IntegrityError
@@ -135,13 +135,15 @@ async def _collect_raw_jobs(
 ) -> tuple[list[RawJob], str | None]:
     """Collects jobs from the HTTP sources and every registered browser-scanner
     plugin (e.g. LinkedIn, if installed). Returns the raw jobs and any warnings
-    from the browser scanners, joined into one string."""
+    -- from the browser scanners plus one line per HTTP/portal source that
+    errored or came back empty -- joined into one string."""
     scanners = build_http_scanners()
+    stats: ScanStats = {}
     raw_jobs: list[RawJob] = []
     for source, scanner in scanners.items():
         slugs = companies.get(source, [])
         if slugs:
-            raw_jobs.extend(await scanner.scan(slugs))
+            raw_jobs.extend(await scanner.scan(slugs, stats=stats))
 
     warnings: list[str] = []
     for scanner_cls in discover_entry_points("moonlighter.scanners"):
@@ -150,15 +152,16 @@ async def _collect_raw_jobs(
         if warning:
             warnings.append(warning)
 
-    raw_jobs.extend(await _scan_gupy(keywords, config))
-    raw_jobs.extend(await _scan_remoteok(config))
-    raw_jobs.extend(await _scan_remotive(config))
-    raw_jobs.extend(await _scan_wwr(config))
-    raw_jobs.extend(await _scan_hn_whoishiring(config))
+    raw_jobs.extend(await _scan_gupy(keywords, config, stats))
+    raw_jobs.extend(await _scan_remoteok(config, stats))
+    raw_jobs.extend(await _scan_remotive(config, stats))
+    raw_jobs.extend(await _scan_wwr(config, stats))
+    raw_jobs.extend(await _scan_hn_whoishiring(config, stats))
+    warnings.extend(_stats_warnings(stats))
     return raw_jobs, ("\n".join(warnings) or None)
 
 
-async def _scan_gupy(keywords: str, config: dict[str, Any]) -> list[RawJob]:
+async def _scan_gupy(keywords: str, config: dict[str, Any], stats: ScanStats) -> list[RawJob]:
     """Gupy is a portal-wide keyword feed (all companies hosted on Gupy, not a
     per-company board), so it's dispatched here like LinkedIn rather than through
     the SOURCES registry -- and gated hard behind a config flag (default off)
@@ -167,10 +170,10 @@ async def _scan_gupy(keywords: str, config: dict[str, Any]) -> list[RawJob]:
         return []
     from moonlighter.discovery.sources.http import GupyScanner
 
-    return await GupyScanner().scan(keywords=keywords or "software engineer")
+    return await GupyScanner().scan(keywords=keywords or "software engineer", stats=stats)
 
 
-async def _scan_remoteok(config: dict[str, Any]) -> list[RawJob]:
+async def _scan_remoteok(config: dict[str, Any], stats: ScanStats) -> list[RawJob]:
     """RemoteOK is a portal-wide remote-jobs board, dispatched like Gupy --
     config-gated (off by default) to avoid flooding scans without the
     operator opting in."""
@@ -178,10 +181,10 @@ async def _scan_remoteok(config: dict[str, Any]) -> list[RawJob]:
         return []
     from moonlighter.discovery.sources.http import RemoteOKScanner
 
-    return await RemoteOKScanner().scan()
+    return await RemoteOKScanner().scan(stats=stats)
 
 
-async def _scan_remotive(config: dict[str, Any]) -> list[RawJob]:
+async def _scan_remotive(config: dict[str, Any], stats: ScanStats) -> list[RawJob]:
     """Remotive is a portal-wide remote-jobs board, dispatched like Gupy --
     config-gated (off by default). ToS caps usage at 4 requests/day -- no
     rate-limiter here, the operator is responsible for scan frequency."""
@@ -189,20 +192,20 @@ async def _scan_remotive(config: dict[str, Any]) -> list[RawJob]:
         return []
     from moonlighter.discovery.sources.http import RemotiveScanner
 
-    return await RemotiveScanner().scan()
+    return await RemotiveScanner().scan(stats=stats)
 
 
-async def _scan_wwr(config: dict[str, Any]) -> list[RawJob]:
+async def _scan_wwr(config: dict[str, Any], stats: ScanStats) -> list[RawJob]:
     """WeWorkRemotely is a portal-wide RSS feed, dispatched like Gupy --
     config-gated (off by default)."""
     if not config.get("scan_wwr"):
         return []
     from moonlighter.discovery.sources.http import WeWorkRemotelyScanner
 
-    return await WeWorkRemotelyScanner().scan()
+    return await WeWorkRemotelyScanner().scan(stats=stats)
 
 
-async def _scan_hn_whoishiring(config: dict[str, Any]) -> list[RawJob]:
+async def _scan_hn_whoishiring(config: dict[str, Any], stats: ScanStats) -> list[RawJob]:
     """HN's monthly Who is hiring? thread, dispatched like Gupy -- config-gated
     (off by default). Weakest signal of the 4 new boards (free-text comments,
     not structured fields) -- see HNWhoIsHiringScanner's docstring."""
@@ -210,7 +213,7 @@ async def _scan_hn_whoishiring(config: dict[str, Any]) -> list[RawJob]:
         return []
     from moonlighter.discovery.sources.http import HNWhoIsHiringScanner
 
-    return await HNWhoIsHiringScanner().scan()
+    return await HNWhoIsHiringScanner().scan(stats=stats)
 
 
 def _drop_already_seen(raw_jobs: list[RawJob]) -> list[RawJob]:
@@ -320,6 +323,21 @@ async def _evaluate_and_store(
     if spend_hit:
         logger.warning("scan_and_evaluate: stopped by spend limit after %d jobs", len(saved))
     return saved, spend_hit
+
+
+def _stats_warnings(stats: ScanStats) -> list[str]:
+    """One report line per source that errored or came back empty. Zero-from-N
+    with no errors still earns a line: it is exactly the shape the dead Ashby
+    GraphQL API produced for weeks (HTTP 200, error payload, zero jobs). A
+    healthy source adds nothing."""
+    lines: list[str] = []
+    for source, s in sorted(stats.items()):
+        if s.errors == 0 and s.jobs > 0:
+            continue
+        scope = f" from {s.companies} companies" if s.companies else ""
+        errs = f" ({s.errors} fetch errors)" if s.errors else ""
+        lines.append(f"⚠️  {source}: {s.jobs} jobs{scope}{errs}")
+    return lines
 
 
 def _with_warning(message: str, warning: str | None) -> str:

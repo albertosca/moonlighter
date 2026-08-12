@@ -7,7 +7,7 @@ config/profile/caller logic, without depending on the global config loaded on im
 
 import asyncio
 from typing import ClassVar
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 from moonlighter.core.db import Job, ScanLog, init_db
@@ -657,7 +657,7 @@ async def test_collect_raw_jobs_calls_gupy_when_config_enabled():
     with patch("moonlighter.discovery.sources.http.GupyScanner") as MockGupy:
         MockGupy.return_value.scan = AsyncMock(return_value=[gupy_job])
         raw_jobs, _ = await _collect({"scan_gupy": True})
-    MockGupy.return_value.scan.assert_awaited_once_with(keywords="engineer")
+    MockGupy.return_value.scan.assert_awaited_once_with(keywords="engineer", stats=ANY)
     assert raw_jobs == [gupy_job]
 
 
@@ -674,7 +674,7 @@ async def test_collect_raw_jobs_calls_remoteok_when_config_enabled():
     with patch("moonlighter.discovery.sources.http.RemoteOKScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_remoteok": True})
-    MockScanner.return_value.scan.assert_awaited_once_with()
+    MockScanner.return_value.scan.assert_awaited_once_with(stats=ANY)
     assert raw_jobs == [job]
 
 
@@ -691,7 +691,7 @@ async def test_collect_raw_jobs_calls_remotive_when_config_enabled():
     with patch("moonlighter.discovery.sources.http.RemotiveScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_remotive": True})
-    MockScanner.return_value.scan.assert_awaited_once_with()
+    MockScanner.return_value.scan.assert_awaited_once_with(stats=ANY)
     assert raw_jobs == [job]
 
 
@@ -710,7 +710,7 @@ async def test_collect_raw_jobs_calls_wwr_when_config_enabled():
     with patch("moonlighter.discovery.sources.http.WeWorkRemotelyScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_wwr": True})
-    MockScanner.return_value.scan.assert_awaited_once_with()
+    MockScanner.return_value.scan.assert_awaited_once_with(stats=ANY)
     assert raw_jobs == [job]
 
 
@@ -732,5 +732,51 @@ async def test_collect_raw_jobs_calls_hn_whoishiring_when_config_enabled():
     with patch("moonlighter.discovery.sources.http.HNWhoIsHiringScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_hn_whoishiring": True})
-    MockScanner.return_value.scan.assert_awaited_once_with()
+    MockScanner.return_value.scan.assert_awaited_once_with(stats=ANY)
     assert raw_jobs == [job]
+
+
+# ── Per-source warnings + dead-API canary ────────────────────────────────────
+
+from moonlighter.discovery.service import _collect_raw_jobs, _stats_warnings  # noqa: E402
+from moonlighter.discovery.sources.base import ScanStats, SourceStats  # noqa: E402
+
+
+def _mock_client_cls(mock_client):
+    cls = MagicMock()
+    cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+    cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    return cls
+
+
+def test_stats_warnings_flags_errors_and_empty_sources():
+    stats: ScanStats = {
+        "greenhouse": SourceStats(companies=3, jobs=17, errors=0),  # healthy → silent
+        "ashby": SourceStats(companies=39, jobs=0, errors=39),  # broken → loud
+        "workable": SourceStats(companies=12, jobs=0, errors=0),  # empty → loud
+        "remoteok": SourceStats(companies=0, jobs=0, errors=1),  # portal error → loud
+    }
+    lines = _stats_warnings(stats)
+    assert lines == [
+        "⚠️  ashby: 0 jobs from 39 companies (39 fetch errors)",
+        "⚠️  remoteok: 0 jobs (1 fetch errors)",
+        "⚠️  workable: 0 jobs from 12 companies",
+    ]
+
+
+async def test_dead_api_reaches_the_scan_report():
+    """CANARY: the exact dead-Ashby shape (HTTP 200, error payload, no jobs key)
+    must surface in the user-visible report — this is the detector biting on the
+    failure that actually happened, silently, for weeks."""
+    dead = MagicMock(status_code=200)
+    dead.json.return_value = {"errors": [{"message": "Cannot query field"}]}
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=dead)
+    with (
+        patch("httpx.AsyncClient", _mock_client_cls(mock_client)),
+        patch("moonlighter.discovery.service.discover_entry_points", return_value=[]),
+    ):
+        raw_jobs, warning = await _collect_raw_jobs("", {}, {"ashby": ["linear", "posthog"]})
+    assert raw_jobs == []
+    assert warning is not None
+    assert "ashby: 0 jobs from 2 companies" in warning
