@@ -2216,3 +2216,161 @@ async def test_scan_without_stats_still_works():
     with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
         jobs = await GreenhouseScanner().scan(["stripe"])
     assert len(jobs) == 1
+
+
+# --- portal scanners: stats via the same helper ---
+
+
+@pytest.mark.asyncio
+async def test_remoteok_records_stats_on_failure():
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=MagicMock(status_code=503))
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await RemoteOKScanner().scan(stats=stats)
+    assert jobs == []
+    assert stats["remoteok"] == SourceStats(companies=0, jobs=0, errors=1)
+
+
+@pytest.mark.asyncio
+async def test_remoteok_records_stats_on_success():
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = _REMOTEOK_RESPONSE
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await RemoteOKScanner().scan(stats=stats)
+    assert stats["remoteok"].jobs == len(jobs) > 0
+    assert stats["remoteok"].errors == 0
+
+
+@pytest.mark.asyncio
+async def test_remotive_records_stats_on_failure():
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=MagicMock(status_code=503))
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await RemotiveScanner().scan(stats=stats)
+    assert jobs == []
+    assert stats["remotive"] == SourceStats(companies=0, jobs=0, errors=1)
+
+
+@pytest.mark.asyncio
+async def test_remotive_records_stats_on_success():
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = _REMOTIVE_RESPONSE
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await RemotiveScanner().scan(stats=stats)
+    assert stats["remotive"].jobs == len(jobs) > 0
+    assert stats["remotive"].errors == 0
+
+
+@pytest.mark.asyncio
+async def test_wwr_records_stats_on_failure():
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=MagicMock(status_code=503))
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await WeWorkRemotelyScanner().scan(stats=stats)
+    assert jobs == []
+    assert stats["weworkremotely"] == SourceStats(companies=0, jobs=0, errors=1)
+
+
+@pytest.mark.asyncio
+async def test_wwr_records_stats_on_success():
+    ok = MagicMock(status_code=200)
+    ok.text = _WWR_RSS
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await WeWorkRemotelyScanner().scan(stats=stats)
+    assert stats["weworkremotely"].jobs == len(jobs) > 0
+    assert stats["weworkremotely"].errors == 0
+
+
+@pytest.mark.asyncio
+async def test_gupy_records_stats_on_failure():
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=MagicMock(status_code=503))
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await GupyScanner().scan(keywords="eng", stats=stats)
+    assert jobs == []
+    assert stats["gupy"] == SourceStats(companies=0, jobs=0, errors=1)
+
+
+@pytest.mark.asyncio
+async def test_gupy_records_stats_on_success():
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = _GUPY_P1
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await GupyScanner().scan(keywords="eng", stats=stats)
+    assert stats["gupy"].jobs == len(jobs) > 0
+    assert stats["gupy"].errors == 0
+
+
+@pytest.mark.asyncio
+async def test_hn_records_stats_on_failure_when_no_thread_found():
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=MagicMock(status_code=503))
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await HNWhoIsHiringScanner().scan(stats=stats)
+    assert jobs == []
+    assert stats["hn_whoishiring"] == SourceStats(companies=0, jobs=0, errors=1)
+
+
+@pytest.mark.asyncio
+async def test_hn_records_stats_on_success():
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        url_map = _hn_url_map()
+        if url in url_map:
+            mock_response.status_code = 200
+            mock_response.json.return_value = url_map[url]
+        else:
+            mock_response.status_code = 404
+            mock_response.json.return_value = None
+        return mock_response
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await HNWhoIsHiringScanner().scan(stats=stats)
+    assert stats["hn_whoishiring"].jobs == len(jobs) > 0
+    # kid 203 is a deleted comment (dropped, not an error); kid 202 has no
+    # separator and falls back to the prose title (also not an error) -- only
+    # a genuine fetch/parse failure should count.
+    assert stats["hn_whoishiring"].errors == 0
+
+
+@pytest.mark.asyncio
+async def test_hn_records_stats_counts_comment_gather_exceptions():
+    """_fetch_comment already swallows its own network/HTTP failures into None
+    (a 404'd or dead comment is indistinguishable and not an error, per the
+    brief) -- but asyncio.gather(return_exceptions=True) can still surface a
+    genuine Exception object if something above that try/except blows up.
+    That's what the error-counting formula is for; force one here directly."""
+    url_map = _hn_url_map(kids=(201, 202))
+    mock_client = _make_hn_client(url_map)
+    with (
+        patch("httpx.AsyncClient", _mock_client_cls(mock_client)),
+        patch.object(
+            HNWhoIsHiringScanner,
+            "_fetch_comment",
+            new=AsyncMock(side_effect=RuntimeError("boom")),
+        ),
+    ):
+        stats: ScanStats = {}
+        jobs = await HNWhoIsHiringScanner().scan(stats=stats)
+    assert jobs == []
+    assert stats["hn_whoishiring"] == SourceStats(companies=0, jobs=0, errors=2)

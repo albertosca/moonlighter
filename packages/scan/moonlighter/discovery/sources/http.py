@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from typing import Any, ClassVar
+from typing import Any
 
 import httpx
 from moonlighter.core.log import get_logger
@@ -343,30 +343,27 @@ class GupyScanner(BaseScanner):
     the LinkedIn model) and gated behind a config flag in service.py."""
 
     BASE = "https://employability-portal.gupy.io/api/v1/jobs?jobName={kw}&limit={limit}&offset={offset}"
-    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
 
     async def scan(
         self, company_slugs: list[str] | None = None, *, keywords: str = "", **kwargs: Any
     ) -> list[RawJob]:
+        stats: ScanStats | None = kwargs.get("stats")
         jobs: list[RawJob] = []
         offset = 0
+        errors = 0
         async with httpx.AsyncClient(timeout=15) as client:
             while True:
                 try:
-                    r = await client.get(
-                        self.BASE.format(kw=keywords, limit=100, offset=offset),
-                        headers=self.HEADERS,
+                    data = await _get_json(
+                        client, self.BASE.format(kw=keywords, limit=100, offset=offset)
                     )
-                except Exception:
-                    return jobs
-                if r.status_code != 200:
-                    return jobs
-                try:
-                    data = r.json()
-                except ValueError:
-                    return jobs
+                except FetchError as e:
+                    logger.warning("[gupy] fetch failed: %s", e)
+                    errors += 1
+                    break
                 if not isinstance(data, dict):
-                    return jobs
+                    errors += 1
+                    break
                 page = data.get("data") or []
                 for item in page:
                     title, url = item.get("name"), item.get("jobUrl")
@@ -404,7 +401,10 @@ class GupyScanner(BaseScanner):
                 offset += len(page)
                 total = (data.get("pagination") or {}).get("total", 0)
                 if not page or offset >= total:
-                    return jobs
+                    break
+        if stats is not None:
+            stats["gupy"] = SourceStats(companies=0, jobs=len(jobs), errors=errors)
+        return jobs
 
 
 class RemoteOKScanner(BaseScanner):
@@ -414,23 +414,20 @@ class RemoteOKScanner(BaseScanner):
     in service.py, gated behind a config flag (off by default)."""
 
     BASE = "https://remoteok.com/api"
-    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
 
     async def scan(self, company_slugs: list[str] | None = None, **kwargs: Any) -> list[RawJob]:
+        stats: ScanStats | None = kwargs.get("stats")
         jobs: list[RawJob] = []
+        errors = 0
         async with httpx.AsyncClient(timeout=15) as client:
             try:
-                r = await client.get(self.BASE, headers=self.HEADERS)
-            except Exception:
-                return jobs
-            if r.status_code != 200:
-                return jobs
-            try:
-                data = r.json()
-            except ValueError:
-                return jobs
+                data = await _get_json(client, self.BASE)
+            except FetchError as e:
+                logger.warning("[remoteok] fetch failed: %s", e)
+                errors, data = 1, []
         if not isinstance(data, list):
-            return jobs
+            # A shape change is an error, not a silent zero.
+            errors, data = errors or 1, []
         for item in data:
             title, url = item.get("position"), item.get("url")
             if not title or not url:
@@ -452,6 +449,8 @@ class RemoteOKScanner(BaseScanner):
                     description=description,
                 )
             )
+        if stats is not None:
+            stats["remoteok"] = SourceStats(companies=0, jobs=len(jobs), errors=errors)
         return jobs
 
 
@@ -466,23 +465,20 @@ class RemotiveScanner(BaseScanner):
     for not scanning more than a few times a day."""
 
     BASE = "https://remotive.com/api/remote-jobs?category=software-dev"
-    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
 
     async def scan(self, company_slugs: list[str] | None = None, **kwargs: Any) -> list[RawJob]:
+        stats: ScanStats | None = kwargs.get("stats")
         jobs: list[RawJob] = []
+        errors = 0
         async with httpx.AsyncClient(timeout=15) as client:
             try:
-                r = await client.get(self.BASE, headers=self.HEADERS)
-            except Exception:
-                return jobs
-            if r.status_code != 200:
-                return jobs
-            try:
-                data = r.json()
-            except ValueError:
-                return jobs
+                data = await _get_json(client, self.BASE)
+            except FetchError as e:
+                logger.warning("[remotive] fetch failed: %s", e)
+                errors, data = 1, {}
         if not isinstance(data, dict):
-            return jobs
+            # A shape change is an error, not a silent zero.
+            errors, data = errors or 1, {}
         for item in data.get("jobs") or []:
             title, url = item.get("title"), item.get("url")
             if not title or not url:
@@ -504,6 +500,8 @@ class RemotiveScanner(BaseScanner):
                     description=description,
                 )
             )
+        if stats is not None:
+            stats["remotive"] = SourceStats(companies=0, jobs=len(jobs), errors=errors)
         return jobs
 
 
@@ -513,72 +511,84 @@ class WeWorkRemotelyScanner(BaseScanner):
     behind a config flag (off by default)."""
 
     BASE = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
-    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
 
     async def scan(self, company_slugs: list[str] | None = None, **kwargs: Any) -> list[RawJob]:
+        stats: ScanStats | None = kwargs.get("stats")
         jobs: list[RawJob] = []
+        errors = 0
+        body = ""
         async with httpx.AsyncClient(timeout=15) as client:
             try:
-                r = await client.get(self.BASE, headers=self.HEADERS)
-            except Exception:
-                return jobs
-            if r.status_code != 200:
-                return jobs
-            body = r.text
-        try:
-            # S314: stdlib ElementTree parses untrusted network data (the RSS
-            # feed is external, fetched over the network). Accepted: Python's
-            # ElementTree does not resolve external entities/DTDs by default
-            # (unlike some other XML parsers), so the residual risk is
-            # entity-expansion DoS (e.g. "billion laughs"), not XXE file
-            # disclosure -- a local nuisance (this call briefly hangs), not a
-            # security breach, for a single-user local tool. No new
-            # dependency (defusedxml) added for this; revisit if that
-            # tradeoff changes.
-            root = ET.fromstring(body)  # noqa: S314
-        except ET.ParseError:
-            return jobs
-        for item in root.findall(".//item"):
-            raw_title = (item.findtext("title") or "").strip()
-            url = (item.findtext("link") or "").strip()
-            if not raw_title or not url:
-                continue
-            if ":" in raw_title:
-                company, _, position = raw_title.partition(":")
-                company = company.strip()
-                title = position.strip()
+                r = await client.get(self.BASE, headers=HEADERS)
+            except Exception as e:
+                logger.warning("[weworkremotely] fetch failed: %s", e)
+                errors = 1
             else:
-                company = "WeWorkRemotely"
-                title = raw_title
-            raw_desc = item.findtext("description") or ""
-            # Same 3-pass normalization as RemotiveScanner (Task 2) -- a single
-            # tag-strip regex leaves double spaces / space-before-punctuation on
-            # nested tags. See that task's code comment for the concrete example.
-            # None-init + if-guard (matching RemoteOKScanner/RemotiveScanner)
-            # keeps mypy's inferred type as str | None throughout, not just str.
-            description = None
-            if raw_desc:
-                description = re.sub(r"<[^>]+>", " ", raw_desc).strip()
-                description = re.sub(r"\s+", " ", description)
-                description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
-            location = (item.findtext("region") or "").strip() or None
-            posted_at = None
-            pub_date = item.findtext("pubDate")
-            if pub_date:
-                with contextlib.suppress(Exception):
-                    posted_at = parsedate_to_datetime(pub_date)
-            jobs.append(
-                RawJob(
-                    source="weworkremotely",
-                    company=company,
-                    title=title,
-                    url=url,
-                    location=location,
-                    remote_type="remote",
-                    description=description,
-                    posted_at=posted_at,
+                if r.status_code != 200:
+                    logger.warning("[weworkremotely] fetch failed: HTTP %s", r.status_code)
+                    errors = 1
+                else:
+                    body = r.text
+        root = None
+        if body:
+            try:
+                # S314: stdlib ElementTree parses untrusted network data (the RSS
+                # feed is external, fetched over the network). Accepted: Python's
+                # ElementTree does not resolve external entities/DTDs by default
+                # (unlike some other XML parsers), so the residual risk is
+                # entity-expansion DoS (e.g. "billion laughs"), not XXE file
+                # disclosure -- a local nuisance (this call briefly hangs), not a
+                # security breach, for a single-user local tool. No new
+                # dependency (defusedxml) added for this; revisit if that
+                # tradeoff changes.
+                root = ET.fromstring(body)  # noqa: S314
+            except ET.ParseError as e:
+                logger.warning("[weworkremotely] malformed feed: %s", e)
+                errors = errors or 1
+        if root is not None:
+            for item in root.findall(".//item"):
+                raw_title = (item.findtext("title") or "").strip()
+                url = (item.findtext("link") or "").strip()
+                if not raw_title or not url:
+                    continue
+                if ":" in raw_title:
+                    company, _, position = raw_title.partition(":")
+                    company = company.strip()
+                    title = position.strip()
+                else:
+                    company = "WeWorkRemotely"
+                    title = raw_title
+                raw_desc = item.findtext("description") or ""
+                # Same 3-pass normalization as RemotiveScanner (Task 2) -- a single
+                # tag-strip regex leaves double spaces / space-before-punctuation on
+                # nested tags. See that task's code comment for the concrete example.
+                # None-init + if-guard (matching RemoteOKScanner/RemotiveScanner)
+                # keeps mypy's inferred type as str | None throughout, not just str.
+                description = None
+                if raw_desc:
+                    description = re.sub(r"<[^>]+>", " ", raw_desc).strip()
+                    description = re.sub(r"\s+", " ", description)
+                    description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
+                location = (item.findtext("region") or "").strip() or None
+                posted_at = None
+                pub_date = item.findtext("pubDate")
+                if pub_date:
+                    with contextlib.suppress(Exception):
+                        posted_at = parsedate_to_datetime(pub_date)
+                jobs.append(
+                    RawJob(
+                        source="weworkremotely",
+                        company=company,
+                        title=title,
+                        url=url,
+                        location=location,
+                        remote_type="remote",
+                        description=description,
+                        posted_at=posted_at,
+                    )
                 )
-            )
+        if stats is not None:
+            stats["weworkremotely"] = SourceStats(companies=0, jobs=len(jobs), errors=errors)
         return jobs
 
 
@@ -596,32 +606,43 @@ class HNWhoIsHiringScanner(BaseScanner):
     empty comments are dropped."""
 
     BASE = "https://hacker-news.firebaseio.com/v0"
-    HEADERS: ClassVar[dict[str, str]] = {"User-Agent": "moonlighter/0.1"}
     _MAX_CONCURRENT_COMMENTS = 20
     _SUBMITTED_LOOKBACK = 10
 
     async def scan(self, company_slugs: list[str] | None = None, **kwargs: Any) -> list[RawJob]:
+        stats: ScanStats | None = kwargs.get("stats")
+        jobs: list[RawJob] = []
+        errors = 0
         async with httpx.AsyncClient(timeout=15) as client:
             thread_id = await self._find_latest_thread(client)
             if thread_id is None:
-                return []
-            kids = await self._fetch_kids(client, thread_id)
-            if not kids:
-                return []
-            sem = asyncio.Semaphore(self._MAX_CONCURRENT_COMMENTS)
+                errors = 1
+            else:
+                kids = await self._fetch_kids(client, thread_id)
+                if not kids:
+                    errors = 1
+                else:
+                    sem = asyncio.Semaphore(self._MAX_CONCURRENT_COMMENTS)
 
-            async def _fetch_one(kid: int) -> RawJob | None:
-                async with sem:
-                    return await self._fetch_comment(client, kid)
+                    async def _fetch_one(kid: int) -> RawJob | None:
+                        async with sem:
+                            return await self._fetch_comment(client, kid)
 
-            results = await asyncio.gather(
-                *(_fetch_one(kid) for kid in kids), return_exceptions=True
-            )
-        return [r for r in results if isinstance(r, RawJob)]
+                    results = await asyncio.gather(
+                        *(_fetch_one(kid) for kid in kids), return_exceptions=True
+                    )
+                    jobs = [r for r in results if isinstance(r, RawJob)]
+                    # A None is a deleted/dead/empty comment -- not an error. Only
+                    # count entries that are neither a parsed job nor an expected
+                    # "nothing here" result.
+                    errors = sum(1 for r in results if not isinstance(r, RawJob) and r is not None)
+        if stats is not None:
+            stats["hn_whoishiring"] = SourceStats(companies=0, jobs=len(jobs), errors=errors)
+        return jobs
 
     async def _find_latest_thread(self, client: httpx.AsyncClient) -> int | None:
         try:
-            r = await client.get(f"{self.BASE}/user/whoishiring.json", headers=self.HEADERS)
+            r = await client.get(f"{self.BASE}/user/whoishiring.json", headers=HEADERS)
             if r.status_code != 200:
                 return None
             submitted = (r.json() or {}).get("submitted") or []
@@ -629,7 +650,7 @@ class HNWhoIsHiringScanner(BaseScanner):
             return None
         for item_id in submitted[: self._SUBMITTED_LOOKBACK]:
             try:
-                r = await client.get(f"{self.BASE}/item/{item_id}.json", headers=self.HEADERS)
+                r = await client.get(f"{self.BASE}/item/{item_id}.json", headers=HEADERS)
                 if r.status_code != 200:
                     continue
                 item = r.json() or {}
@@ -641,7 +662,7 @@ class HNWhoIsHiringScanner(BaseScanner):
 
     async def _fetch_kids(self, client: httpx.AsyncClient, thread_id: int) -> list[int]:
         try:
-            r = await client.get(f"{self.BASE}/item/{thread_id}.json", headers=self.HEADERS)
+            r = await client.get(f"{self.BASE}/item/{thread_id}.json", headers=HEADERS)
             if r.status_code != 200:
                 return []
             return list((r.json() or {}).get("kids") or [])
@@ -650,7 +671,7 @@ class HNWhoIsHiringScanner(BaseScanner):
 
     async def _fetch_comment(self, client: httpx.AsyncClient, kid: int) -> RawJob | None:
         try:
-            r = await client.get(f"{self.BASE}/item/{kid}.json", headers=self.HEADERS)
+            r = await client.get(f"{self.BASE}/item/{kid}.json", headers=HEADERS)
             if r.status_code != 200:
                 return None
             item = r.json() or {}
