@@ -235,13 +235,21 @@ class WorkableScanner(BaseScanner):
 
 
 class RecruiteeScanner(BaseScanner):
-    BASE = "https://{slug}.recruitee.com/api/offers/"
+    @staticmethod
+    def _offers_url(entry: str) -> str:
+        """An entry with a dot is a custom career domain (jobs.channable.com);
+        a bare slug is the recruitee.com subdomain. Most Recruitee customers
+        use their own domain, and it serves the same offers API — verified
+        live 2026-08-12."""
+        if "." in entry:
+            return f"https://{entry}/api/offers/"
+        return f"https://{entry}.recruitee.com/api/offers/"
 
     async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
         return await _gather_jobs("recruitee", company_slugs, self._fetch, kwargs.get("stats"))
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
-        data = await _get_json(client, self.BASE.format(slug=slug))
+        data = await _get_json(client, self._offers_url(slug))
         if not isinstance(data, dict):
             raise FetchError("unexpected payload shape")
         jobs = []

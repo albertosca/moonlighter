@@ -780,3 +780,10 @@ async def test_dead_api_reaches_the_scan_report():
     assert raw_jobs == []
     assert warning is not None
     assert "ashby: 0 jobs from 2 companies" in warning
+
+
+async def test_unknown_company_list_source_warns():
+    with patch("httpx.AsyncClient", _mock_client_cls(AsyncMock())):
+        _, warning = await _collect_raw_jobs("", {}, {"workday": ["acme"]})
+    assert warning is not None
+    assert "unknown source 'workday'" in warning

@@ -246,19 +246,22 @@ def load_profile(profile_path: str | Path | None = None) -> dict[str, Any]:
 
 
 def load_company_list(path: str | Path | None = None, phase: str | None = None) -> dict[str, Any]:
-    """Load company list from YAML file, optionally filtered by phase.
+    """Load the company list from YAML, optionally filtered by phase.
 
-    O company_list.yaml organiza slugs por ATS e fase:
+    company_list.yaml groups entries by ATS and phase:
         greenhouse:
           phase1: [slug, ...]
           phase2: [slug, ...]
 
+    An entry is an ATS slug ("nubank") or, for Recruitee, optionally a full
+    custom career domain ("jobs.channable.com").
+
     Args:
-        path: Path to company_list.yaml file
-        phase: "phase1", "phase2", "phase3", ou None para todas as fases.
+        path: path to company_list.yaml.
+        phase: "phase1", "phase2", "phase3", or None for all phases combined.
 
     Returns:
-        dict: {source: [slug, ...]} (e.g., {"greenhouse": ["nubank", "ifoodcarreiras"]})
+        dict: {source: [entry, ...]}
     """
     path = Path(path) if path is not None else moonlighter_home() / "company_list.yaml"
     if not path.exists():
@@ -282,6 +285,14 @@ def load_company_list(path: str | Path | None = None, phase: str | None = None) 
                 result[source] = slugs
         else:
             result[source] = []
+
+    for source, entries in result.items():
+        for entry in entries:
+            if not isinstance(entry, str):
+                raise ConfigError(
+                    f"company_list.yaml: source '{source}' has a non-string entry: {entry!r}"
+                )
+
     return result
 
 

@@ -732,6 +732,32 @@ async def test_recruitee_missing_offers_key_returns_empty():
     assert jobs == []
 
 
+async def test_recruitee_custom_domain_entry():
+    """An entry containing a dot is a custom career domain. Live-verified
+    2026-08-12: careers.tellent.com and jobs.channable.com serve the same
+    /api/offers/ payload as {slug}.recruitee.com."""
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = RECRUITEE_RESPONSE
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        jobs = await RecruiteeScanner().scan(["jobs.channable.com"])
+    assert len(jobs) > 0
+    called_url = mock_client.get.call_args.args[0]
+    assert called_url == "https://jobs.channable.com/api/offers/"
+    assert jobs[0].company == "jobs.channable.com"
+
+
+async def test_recruitee_slug_entry_unchanged():
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = RECRUITEE_RESPONSE
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        await RecruiteeScanner().scan(["acme"])
+    assert mock_client.get.call_args.args[0] == "https://acme.recruitee.com/api/offers/"
+
+
 # --- SmartRecruitersScanner tests ---
 
 _SR_LIST_P1 = {

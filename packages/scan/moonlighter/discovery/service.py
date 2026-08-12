@@ -138,6 +138,14 @@ async def _collect_raw_jobs(
     -- from the browser scanners plus one line per HTTP/portal source that
     errored or came back empty -- joined into one string."""
     scanners = build_http_scanners()
+
+    warnings: list[str] = []
+    for unknown in sorted(set(companies) - set(scanners)):
+        warnings.append(
+            f"⚠️  company_list.yaml: unknown source {unknown!r} — no scanner with that name, "
+            "entries ignored"
+        )
+
     stats: ScanStats = {}
     raw_jobs: list[RawJob] = []
     for source, scanner in scanners.items():
@@ -145,7 +153,6 @@ async def _collect_raw_jobs(
         if slugs:
             raw_jobs.extend(await scanner.scan(slugs, stats=stats))
 
-    warnings: list[str] = []
     for scanner_cls in discover_entry_points("moonlighter.scanners"):
         jobs, warning = await _run_browser_scanner(scanner_cls, keywords, config)
         raw_jobs.extend(jobs)

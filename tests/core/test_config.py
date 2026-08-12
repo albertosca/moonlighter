@@ -253,6 +253,13 @@ def test_load_company_list_with_phase_filter(tmp_path):
     assert result["greenhouse"] == ["stripe"]
 
 
+def test_company_list_rejects_non_string_entry(tmp_path):
+    path = tmp_path / "company_list.yaml"
+    path.write_text("greenhouse:\n  - nubank\n  - 42\n")
+    with pytest.raises(ConfigError, match=r"greenhouse.*42"):
+        load_company_list(path)
+
+
 # --- scan_concurrency ---
 
 
