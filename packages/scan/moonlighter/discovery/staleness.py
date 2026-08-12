@@ -15,6 +15,7 @@ from moonlighter.core.plugins import discover_entry_points_by_name
 from moonlighter.discovery.sources.base import BaseScanner
 from moonlighter.discovery.sources.registry import LISTING_SOURCES as _LISTING_SOURCES
 from moonlighter.discovery.sources.registry import PORTAL_SOURCES
+from moonlighter.discovery.urls import normalize_job_url
 
 logger = get_logger(__name__)
 
@@ -79,5 +80,9 @@ async def _check_via_listing(
         logger.warning("staleness: %s scan returned unexpected type for %s", source, company)
         result.failed_companies.append(company)
         return
-    open_urls = {r.url for r in raw}
-    result.stale.extend(job for job in jobs if job.url not in open_urls)
+    # Stored job.url is normalized (Task 5 strips the Recruitee /c/new apply
+    # suffix), but the fresh listing's raw URLs are not — normalize both sides,
+    # or every freshly-stored Recruitee job compares unequal and is archived
+    # as stale on its very first re-scan.
+    open_urls = {normalize_job_url(r.url) for r in raw}
+    result.stale.extend(job for job in jobs if normalize_job_url(job.url) not in open_urls)
