@@ -1,20 +1,20 @@
-"""Re-avalia vagas que foram archivadas pelo bug do stdin (score_notes começa com
+"""Re-evaluates jobs archived by the stdin bug (score_notes starts with
 'evaluation error: claude CLI exited with code 1').
 
-Usa eval_model do config (padrão: Haiku) para reduzir custo.
-Aplica title_blocklist do config antes de chamar o LLM — custo zero.
+Uses eval_model from config (default: Haiku) to reduce cost.
+Applies title_blocklist from config before calling LLM — zero cost.
 
-Uso:
+Usage:
     python scripts/reevaluate_bug_victims.py [--dry-run] [--company SLUG] [--limit N] [--model MODEL] [--title-only] [--concurrency N]
 
 Flags:
-    --dry-run       Mostra o que seria feito, sem gravar no banco.
-    --company       Filtra por empresa (ex: --company nubank).
-    --limit         Processa no máximo N vagas (útil para testar).
-    --model         Sobrescreve o eval_model do config.
-    --title-only    Envia só o título pro LLM (sem a descrição completa). Muito mais barato.
-    --concurrency N Quantas avaliações rodar em paralelo (padrão: 5).
-                    Ao primeiro spend limit, para tudo imediatamente.
+    --dry-run       Shows what would be done without writing to the database.
+    --company       Filter by company (ex: --company nubank).
+    --limit         Process at most N jobs (useful for testing).
+    --model         Override eval_model from config.
+    --title-only    Send only the title to LLM (without full description). Much cheaper.
+    --concurrency N How many evaluations to run in parallel (default: 5).
+                    On first spend limit, stop everything immediately.
 """
 
 import argparse
@@ -89,7 +89,7 @@ async def _reevaluate(
                         status="archived",
                     ).where(Job.id == job.id).execute()
                 async with print_lock:
-                    print(f"{label} -- skip título ({matched_pattern!r})")
+                    print(f"{label} -- skip title ({matched_pattern!r})")
                     title_skipped += 1
                 return
 
@@ -119,10 +119,10 @@ async def _reevaluate(
                         stop.set()
                         quota_hit = True
                         async with print_lock:
-                            print(f"{label} 🚫 COTA ATINGIDA — parando. Erro: {e}")
+                            print(f"{label} 🚫 SPEND LIMIT reached — stopping. Error: {e}")
                         return
                     async with print_lock:
-                        print(f"{label} ✗ ERRO: {e}")
+                        print(f"{label} ✗ ERROR: {e}")
                         errors += 1
                     if not dry_run:
                         Job.update(score_notes=f"reevaluate_error: {str(e)[:200]}").where(
@@ -155,36 +155,34 @@ async def _reevaluate(
         await asyncio.gather(*[_process(idx, job) for idx, job in enumerate(jobs, 1)])
 
         if quota_hit:
-            print("\n🚫 Re-avaliação interrompida por spend limit.")
+            print("\n🚫 Re-evaluation interrupted by spend limit.")
 
         llm_attempted = total - title_skipped
-        mode = "título-only" if title_only else "descrição completa"
+        mode = "title-only" if title_only else "full description"
         prefix = "[DRY RUN] " if dry_run else ""
-        print(
-            f"\n{prefix}Resultado: {total} vagas encontradas  [{mode}] concorrência={concurrency}"
-        )
-        print(f"  -- ignoradas por título:   {title_skipped}")
-        print(f"  ↑ promovidas para 'new':   {promoted}")
-        print(f"     continuam archived:      {stayed_archived}")
-        print(f"  ✗ erros:                   {errors}")
-        print(f"  Chamadas LLM ({model}): {llm_attempted}")
+        print(f"\n{prefix}Result: {total} jobs found  [{mode}] concurrency={concurrency}")
+        print(f"  -- skipped by title:       {title_skipped}")
+        print(f"  ↑ promoted to 'new':       {promoted}")
+        print(f"     remain archived:        {stayed_archived}")
+        print(f"  ✗ errors:                  {errors}")
+        print(f"  LLM calls ({model}):      {llm_attempted}")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--dry-run", action="store_true", help="Não grava no banco")
-    parser.add_argument("--company", help="Filtra por empresa")
-    parser.add_argument("--limit", type=int, help="Máximo de vagas a processar")
-    parser.add_argument("--model", help="Sobrescreve eval_model do config")
+    parser.add_argument("--dry-run", action="store_true", help="Do not write to the database")
+    parser.add_argument("--company", help="Filter by company")
+    parser.add_argument("--limit", type=int, help="Maximum jobs to process")
+    parser.add_argument("--model", help="Override eval_model from config")
     parser.add_argument(
         "--title-only",
         action="store_true",
-        help="Usa só o título (sem descrição) — muito mais barato",
+        help="Use only the title (no description) — much cheaper",
     )
     parser.add_argument(
-        "--concurrency", type=int, default=5, help="Avaliações em paralelo (padrão: 5)"
+        "--concurrency", type=int, default=5, help="Evaluations in parallel (default: 5)"
     )
     args = parser.parse_args()
 
@@ -199,10 +197,10 @@ def main() -> None:
 
     victims = _fetch_victims(args.company, args.limit)
     if not victims:
-        print("Nenhuma vaga com assinatura do bug encontrada.")
+        print("No jobs with bug signature found.")
         return
 
-    print(f"Vagas encontradas: {len(victims)}  |  modelo: {model}")
+    print(f"Jobs found: {len(victims)}  |  model: {model}")
     by_company: dict[str, int] = {}
     for j in victims:
         by_company[j.company] = by_company.get(j.company, 0) + 1
@@ -210,7 +208,7 @@ def main() -> None:
         print(f"  {company:20s}: {count}")
 
     if args.dry_run:
-        print("\n⚠️  DRY RUN — nenhuma alteração será gravada.\n")
+        print("\n⚠️  DRY RUN — no changes will be saved.\n")
 
     asyncio.run(
         _reevaluate(

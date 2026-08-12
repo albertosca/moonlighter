@@ -1,4 +1,4 @@
-"""Renderização de tabelas para as respostas das tools MCP."""
+"""Table rendering for MCP tool responses."""
 
 import io
 
@@ -13,11 +13,11 @@ def render_jobs_table(jobs: list[Job]) -> str:
     console = Console(file=buf, width=120)
     table = Table(box=box.SIMPLE_HEAVY, show_lines=False)
     table.add_column("#", style="dim", width=4)
-    table.add_column("Empresa / Cargo", min_width=28)
+    table.add_column("Company / Title", min_width=28)
     table.add_column("Score", width=7)
-    table.add_column("Salário", width=14)
-    table.add_column("Publicada", width=11)
-    table.add_column("Remoto", width=8)
+    table.add_column("Salary", width=14)
+    table.add_column("Posted", width=11)
+    table.add_column("Remote", width=8)
     table.add_column("Caveats", min_width=20)
 
     for job in jobs:
@@ -26,7 +26,7 @@ def render_jobs_table(jobs: list[Job]) -> str:
             f"{job.company} / {job.title}",
             f"{job.score:.1f}" if job.score is not None else "—",
             _salary_cell(job),
-            job.posted_at.strftime("%d/%m") if job.posted_at else "—",
+            job.posted_at.strftime("%b %d") if job.posted_at else "—",
             job.remote_type or "—",
             _caveat_cell(job),
         )
@@ -40,7 +40,7 @@ def _salary_cell(job: Job) -> str:
         return f"{cell} *" if job.salary_source == "llm_estimate" else cell
     if job.salary_min:
         return f"${job.salary_min // 1000}k+"
-    return "n/d"
+    return "n/a"
 
 
 def _caveat_cell(job: Job) -> str:
