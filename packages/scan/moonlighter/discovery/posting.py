@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 import httpx
 from moonlighter.discovery.sources.http import FetchError, _get_json
+from moonlighter.discovery.urls import normalize_job_url
 
 _GREENHOUSE_URL = re.compile(r"greenhouse\.io/(?P<board>[^/]+)/jobs/(?P<job_id>\d+)")
 # Any host with a Recruitee-shaped /o/{offer} path: subdomain customers AND
@@ -64,6 +65,20 @@ async def _fetch_greenhouse(board: str, job_id: str) -> FetchedPosting | None:
 
 
 async def _fetch_recruitee_offer(host: str, offer: str) -> FetchedPosting | None:
+    """Fetches the whole offers feed and picks the matching entry.
+
+    The single-offer endpoint (GET /api/offers/{offer}) would avoid the
+    matching below entirely, and is the same API shape already live-verified
+    (2026-08-11) in application/assisted/sources/recruitee.py -- but that
+    verification only covers <slug>.recruitee.com hosts. This module deliberately
+    also matches custom career domains (jobs.channable.com), and the list feed
+    (/api/offers/) is what's actually live-verified (2026-08-12, see module
+    docstring) to work across those. Switching to the single-offer endpoint here
+    would be an unverified assumption for the custom-domain case, so instead
+    the matching is fixed to be anchored: `needle` must match a full path
+    segment, not merely be a substring, so `/o/backend-engineer` no longer
+    matches `/o/backend-engineer-senior`.
+    """
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             data = await _get_json(client, f"https://{host}/api/offers/")
@@ -74,7 +89,7 @@ async def _fetch_recruitee_offer(host: str, offer: str) -> FetchedPosting | None
     needle = f"/o/{offer}"
     for item in data.get("offers") or []:
         apply_url = item.get("careers_apply_url") or ""
-        if needle in apply_url:
+        if normalize_job_url(apply_url).endswith(needle):
             return FetchedPosting(
                 company=item.get("company_name"),
                 title=item.get("title"),

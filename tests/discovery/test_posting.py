@@ -111,6 +111,65 @@ async def test_recruitee_non_dict_response_returns_none():
 
 
 @pytest.mark.asyncio
+async def test_recruitee_offer_prefix_collision_does_not_match_longer_slug():
+    """IMPORTANT regression: requesting /o/backend-engineer must not match a
+    feed entry at /o/backend-engineer-senior — the old unanchored substring
+    check (`needle in apply_url`) would wrongly return the senior posting."""
+    collision = {
+        "offers": [
+            {
+                "title": "Backend Engineer (Senior)",
+                "company_name": "Channable",
+                "description": "<p>Senior role.</p>",
+                "careers_apply_url": "https://jobs.channable.com/o/backend-engineer-senior/c/new",
+            },
+            {
+                "title": "Backend Engineer",
+                "company_name": "Channable",
+                "description": "<p>Elixir and Python.</p>",
+                "careers_apply_url": "https://jobs.channable.com/o/backend-engineer/c/new",
+            },
+        ]
+    }
+    cls, _client_mock = _client(collision)
+    with patch("httpx.AsyncClient", cls):
+        posting = await fetch_posting_via_ats("https://jobs.channable.com/o/backend-engineer")
+    assert posting is not None
+    assert posting.title == "Backend Engineer"
+    assert posting.company == "Channable"
+
+
+@pytest.mark.asyncio
+async def test_recruitee_longer_offer_slug_still_matches_itself():
+    """Sanity twin of the collision test above: requesting the longer slug
+    directly must still resolve to its own entry, not be blocked by the
+    anchoring fix."""
+    collision = {
+        "offers": [
+            {
+                "title": "Backend Engineer",
+                "company_name": "Channable",
+                "description": "<p>Elixir and Python.</p>",
+                "careers_apply_url": "https://jobs.channable.com/o/backend-engineer/c/new",
+            },
+            {
+                "title": "Backend Engineer (Senior)",
+                "company_name": "Channable",
+                "description": "<p>Senior role.</p>",
+                "careers_apply_url": "https://jobs.channable.com/o/backend-engineer-senior/c/new",
+            },
+        ]
+    }
+    cls, _client_mock = _client(collision)
+    with patch("httpx.AsyncClient", cls):
+        posting = await fetch_posting_via_ats(
+            "https://jobs.channable.com/o/backend-engineer-senior"
+        )
+    assert posting is not None
+    assert posting.title == "Backend Engineer (Senior)"
+
+
+@pytest.mark.asyncio
 async def test_recruitee_offer_not_in_list_returns_none():
     """The offers feed has entries, but none match the requested /o/{offer} slug."""
     other_offer = {
