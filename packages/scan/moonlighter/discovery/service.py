@@ -11,7 +11,6 @@ from datetime import datetime
 from typing import Any
 
 import httpx
-from moonlighter.core import browser
 from moonlighter.core.config import load_company_list
 from moonlighter.core.db import Job, ScanLog
 from moonlighter.core.llm import LLMCaller, is_spend_limit
@@ -114,6 +113,8 @@ async def _run_browser_scanner(
     from moonlighter.discovery.sources.base import ScannerSessionExpiredError
 
     try:
+        from moonlighter.core import browser
+
         page = await browser.new_page(config)
     except Exception:
         return [], None

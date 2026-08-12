@@ -14,7 +14,7 @@ from difflib import SequenceMatcher
 from typing import Any
 
 import yaml
-from moonlighter.application.appliers.base import profile_for_answers
+from moonlighter.application.answers.profile import profile_for_answers
 from moonlighter.core.llm import LLMCaller
 from moonlighter.core.parsing import wrap_untrusted
 

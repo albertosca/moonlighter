@@ -14,8 +14,10 @@ dependencies = [
     "pyyaml>=6.0",
     "rich>=13.7",
     "anthropic>=0.40",
-    "playwright>=1.47",
 ]
+
+[project.optional-dependencies]
+browser = ["playwright>=1.47"]
 
 [project.urls]
 Homepage = "https://github.com/albertosca/moonlighter"

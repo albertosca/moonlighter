@@ -264,7 +264,7 @@ async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=No
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch),
         patch("moonlighter.discovery.service.discover_entry_points", return_value=registered),
         patch(
@@ -282,7 +282,7 @@ async def test_run_browser_scanner_browser_launch_failure_is_silent():
     """If browser.new_page() itself raises (no browser configured, launch error),
     the browser-scanner plugin is skipped silently -- same as any other failure,
     it must not block the HTTP results."""
-    with patch("moonlighter.discovery.service.browser") as mock_browser:
+    with patch("moonlighter.core.browser", create=True) as mock_browser:
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
         jobs, warning = await scan_service._run_browser_scanner(
             _FakeBrowserScanner, "engineer", CONFIG

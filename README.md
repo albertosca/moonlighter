@@ -2,13 +2,13 @@
 
 # moonlighter
 
-AI-powered job application pipeline. Scans job boards, scores candidate fit via LLM, and automates browser-based applications — all driven from Claude through a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server.
+AI-powered job application pipeline. Scans job boards, scores candidate fit via LLM, and composes every answer a job application form asks for — all driven from Claude through a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server. moonlighter never opens a browser to fill or submit a form, and never submits an application on your behalf — see [How it works](#how-it-works) below and [DISCLAIMER.md](DISCLAIMER.md).
 
 ## How it works
 
-1. **Scan** — fetches job listings from Greenhouse, Lever, Ashby, Recruitee, Workable, and SmartRecruiters for a company list you configure, plus optional remote-first boards (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring) and Gupy, both config-gated off by default. LinkedIn scanning/Easy Apply is available as a separate, privately-distributed extension — see [Extensions (adding a new ATS)](#extensions-adding-a-new-ats) below.
+1. **Scan** — fetches job listings from Greenhouse, Lever, Ashby, Recruitee, Workable, and SmartRecruiters for a company list you configure, plus optional remote-first boards (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring) and Gupy, both config-gated off by default. LinkedIn scanning is available as a separate, privately-distributed extension — see [Extensions (adding a new ATS scanner)](#extensions-adding-a-new-ats-scanner) below.
 2. **Evaluate** — scores each job against your profile using an LLM; jobs below the threshold are archived automatically.
-3. **Apply** — fills and submits application forms in a real browser (Playwright), using LLM-generated answers tailored to each posting.
+3. **Prepare** — `prepare_application` reads the form's questions (from the ATS API where one publishes them, e.g. Greenhouse/Recruitee) and composes an answer for every question it can, curated from your profile. It renders one reviewable sheet — the whole application, not a screenshot of a fraction of it — with any question it couldn't answer flagged for you. When no API publishes the questions, `prepare_application_from_paste` does the same from text you copy off the page yourself. Either way, you paste the answers into the form and submit it — moonlighter never touches the form or clicks submit.
 4. **Track** — monitors your Gmail inbox for interview invitations and updates the pipeline status.
 
 All steps are exposed as MCP tools and orchestrated by Claude in a conversation.
@@ -19,16 +19,16 @@ A [uv workspace](https://docs.astral.sh/uv/concepts/workspaces/) of 5 namespace 
 
 | Package | Namespace | Purpose |
 |---------|-----------|---------|
-| `moonlighter-core` | `moonlighter.core` | DB (Peewee/SQLite), config, browser driver, LLM client |
+| `moonlighter-core` | `moonlighter.core` | DB (Peewee/SQLite), config, optional browser driver (`[browser]` extra), LLM client |
 | `moonlighter-scan` | `moonlighter.discovery` | ATS scrapers and LLM-based job scoring |
-| `moonlighter-apply` | `moonlighter.application` | Form filler, answer generator, work-auth resolver |
+| `moonlighter-apply` | `moonlighter.application` | Answer composer (curated profile → LLM answers) and work-auth resolver |
 | `moonlighter-email` | `moonlighter.tracking` | Gmail sync and interview stage classification |
 | `moonlighter` | `moonlighter.server` | FastMCP server — wires all packages together |
 
 ## Requirements
 
 - [uv](https://docs.astral.sh/uv/) — fetches Python 3.14 for you; no separate install needed
-- Chrome, Chromium, or Brave (moonlighter drives a real browser so your logged-in sessions work)
+- Chrome, Chromium, or Brave — optional, only needed if you install a browser-based scan extension (e.g. LinkedIn scanning, see [Extensions](#extensions-adding-a-new-ats-scanner) below). The base product (scanning the configured ATS APIs and preparing applications) never opens a browser.
 - An LLM backend, switchable in `config.yaml` at any time:
   - `llm_backend: cli` (default) — the [Claude Code CLI](https://claude.ai/code), billed to your
     Claude subscription. No API key.
@@ -82,8 +82,10 @@ files still need your input:
 Start from [`profile.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/profile.example.yaml) and [`company_list.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/company_list.example.yaml).
 
 The wizard writes a minimal `config.yaml`; [`config.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/config.example.yaml) documents the rest of the configuration surface, notably the `cv` block (only needed to use a different resume per company — by default
-`confirm_apply` uploads `cv.pdf` from `MOONLIGHTER_HOME`, and aborts if that file is missing) and
-the `email` block. `profile.yaml`, `company_list.yaml`, `config.yaml`, and `cv.pdf` (your resume, uploaded with applications) all belong in `MOONLIGHTER_HOME` (defaults to `~/.moonlighter/`).
+`prepare_application` points you at `cv.pdf` from `MOONLIGHTER_HOME` for the form's file-upload question, and
+tells you plainly if none is configured) and the `email` block. `profile.yaml`, `company_list.yaml`,
+`config.yaml`, and `cv.pdf` (your resume — moonlighter names it for you to attach, never uploads it itself)
+all belong in `MOONLIGHTER_HOME` (defaults to `~/.moonlighter/`).
 
 Once connected, ask Claude to run `get_pipeline` — besides the application funnel, it reports setup problems such as a missing profile, CV, or browser.
 
@@ -108,36 +110,34 @@ To work on the code rather than just use it, see [CONTRIBUTING.md](CONTRIBUTING.
 | `list_jobs` | List jobs by status (`new`, `scored`, `applied`, `archived`, …) |
 | `get_job` | Show full details and pipeline history for a job |
 | `add_job` | Manually add a job by URL |
-| `apply_jobs` | Batch-apply to a list of job IDs |
-| `fill_application` | Fill a form and pause for review before submitting |
-| `submit_application` | Submit an already-filled application |
-| `confirm_apply` | Fill and submit in one atomic step |
-| `retry_apply` | Retry a failed application |
-| `login` | Open browser and persist session for a platform that needs one (only available if an extension registers it — see below) |
+| `prepare_application` | Compose every answer for a job's application form into one reviewable sheet, for you to paste in and submit yourself |
+| `prepare_application_from_paste` | Same as `prepare_application`, for a form whose questions no API publishes — pass it the text you copied off the page |
 | `update_status` | Manually move a job through the pipeline |
 | `setup_email` | Authorize Gmail OAuth |
 | `sync_email_responses` | Pull latest replies and classify interview stages |
 | `get_pipeline` | Full pipeline summary |
 
-## Extensions (adding a new ATS)
+## Extensions (adding a new ATS scanner)
 
 Every ATS integration you see above (Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters, Gupy)
-is a normal part of this repo — but moonlighter also supports **extensions**: separate, independently
-installed Python packages that register a new scanner or applier without forking or modifying this repo
-at all. This is how LinkedIn support is distributed — not because the mechanism is LinkedIn-specific, but
-because LinkedIn's own Terms of Service explicitly and unambiguously prohibit automation (see
-[DISCLAIMER.md](DISCLAIMER.md)), so that one integration ships as an opt-in extension instead of bundled
-code anyone who clones this repo gets by default.
+is a normal part of this repo — but moonlighter also supports **scanner extensions**: separate,
+independently installed Python packages that register a new job-listing source without forking or
+modifying this repo at all. This is how LinkedIn scanning is distributed — not because the mechanism is
+LinkedIn-specific, but because LinkedIn's own Terms of Service explicitly and unambiguously prohibit
+automation (see [DISCLAIMER.md](DISCLAIMER.md)), so that integration ships as an opt-in extension instead
+of bundled code anyone who clones this repo gets by default.
+
+Browser-driven form filling and submission is not part of this repo at all (see
+[How it works](#how-it-works) above) and is not an extension point — `prepare_application` composes
+answers for you to paste yourself, for any ATS.
 
 ### How it works
 
 An extension is a normal Python package that:
 
-1. Depends on the `moonlighter-*` packages it needs (typically `moonlighter-core` plus whichever of
-   `moonlighter-scan`/`moonlighter-apply` it extends), pinned to a released tag of this repo.
-2. Ships its own module(s) implementing a `BaseScanner` subclass (see
-   `packages/scan/moonlighter/discovery/sources/base.py`) and/or a `BaseApplier` subclass (see
-   `packages/apply/moonlighter/application/appliers/base.py`).
+1. Depends on `moonlighter-core` and `moonlighter-scan`, pinned to a released tag of this repo.
+2. Ships its own module implementing a `BaseScanner` subclass (see
+   `packages/scan/moonlighter/discovery/sources/base.py`).
 3. Declares itself via `entry_points` in its own `pyproject.toml` — no code in this repo ever imports or
    names the extension:
 
@@ -145,17 +145,14 @@ An extension is a normal Python package that:
 [project.entry-points."moonlighter.scanners"]
 my_platform = "my_package.my_module:MyScanner"
 
-[project.entry-points."moonlighter.appliers"]
-my_platform = "my_package.my_module:MyApplier"
-
-# Optional: a platform your applier needs a saved browser login for (the `login` MCP tool)
-[project.entry-points."moonlighter.login_urls"]
-my_platform = "my_package.my_module:MY_PLATFORM_LOGIN_URL"
-
 # Optional: a browser-based staleness check for a source with no listing API
 [project.entry-points."moonlighter.staleness_checkers"]
 my_platform = "my_package.my_module:check_staleness"
 ```
+
+A browser-based scanner (like `moonlighter.scanners` entries typically are) needs
+`moonlighter-core[browser]` — see [Requirements](#requirements) above; a pure-HTTP scanner needs nothing
+extra.
 
 4. Must be present in the **same** Python environment moonlighter runs from, so its entry points are
    discoverable at runtime. If you installed moonlighter via `uvx moonlighter`, there's no persistent
@@ -171,17 +168,16 @@ my_platform = "my_package.my_module:check_staleness"
 Because the top-level `moonlighter` package is a [PEP 420 namespace package](https://peps.python.org/pep-0420/)
 (no `__init__.py` at that level), an extension can even contribute its own top-level subpackage (e.g.
 `moonlighter/my_extension/`) that coexists with `moonlighter.core`/`moonlighter.discovery`/etc. — just don't
-place files *inside* an existing subpackage like `moonlighter/discovery/sources/` or
-`moonlighter/application/appliers/`, since those are regular (non-namespace) packages owned entirely by
-this repo's own distributions, and a second distribution writing to the same path silently collides at
-install time. Give your extension its own top-level directory instead.
+place files *inside* an existing subpackage like `moonlighter/discovery/sources/`, since that is a regular
+(non-namespace) package owned entirely by this repo's own distributions, and a second distribution writing
+to the same path silently collides at install time. Give your extension its own top-level directory instead.
 
 ### Real example
 
 The private `moonlighter-linkedin` extension (not published, for the reason above) follows exactly this
-pattern — its `LinkedInScanner`/`LinkedInApplier` live in their own `moonlighter/linkedin_ext/` package,
-registered via all four entry_points groups above. If you're building your own extension, that's the
-reference shape to copy.
+pattern for scanning — its `LinkedInScanner` lives in its own `moonlighter/linkedin_ext/` package,
+registered via the `moonlighter.scanners` entry point group above. If you're building your own scanner
+extension, that's the reference shape to copy.
 
 ## License
 
