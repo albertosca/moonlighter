@@ -26,6 +26,7 @@ from moonlighter.discovery.evaluator import (
     evaluate_jobs_batch,
     should_skip_by_title,
 )
+from moonlighter.discovery.posting import fetch_posting_via_ats
 from moonlighter.discovery.sources.base import RawJob, ScanStats
 from moonlighter.discovery.sources.registry import build_http_scanners
 from moonlighter.discovery.urls import normalize_job_url
@@ -411,6 +412,12 @@ async def add_job(
     caller: LLMCaller,
 ) -> str:
     url = normalize_job_url(url)
+    if not description or not company or not title:
+        posting = await fetch_posting_via_ats(url)
+        if posting is not None:
+            company = company or posting.company or ""
+            title = title or posting.title or ""
+            description = description or posting.description or ""
     if not description:
         fetched, error = await _fetch_description(url)
         if error:
@@ -476,7 +483,11 @@ async def _fetch_description(url: str) -> tuple[str | None, str | None]:
             return None, (
                 f"Could not fetch the URL (HTTP {r.status_code}). Provide 'description' manually."
             )
-        text = re.sub(r"<[^>]+>", " ", r.text).strip()
+        # Remove script/style/noscript WITH their contents first: a bare
+        # tag-strip leaves e.g. a styled-components CSS bundle as the
+        # "description" of any SPA page (job #2646, the Ziflow case).
+        text = re.sub(r"(?is)<(script|style|noscript)\b[^>]*>.*?</\1\s*>", " ", r.text)
+        text = re.sub(r"<[^>]+>", " ", text).strip()
         return re.sub(r"\s+", " ", text)[:8000], None
     except Exception as e:
         return None, (

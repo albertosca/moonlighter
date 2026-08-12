@@ -13,6 +13,7 @@ import pytest
 from moonlighter.core.db import Job, ScanLog, init_db
 from moonlighter.discovery import service as scan_service
 from moonlighter.discovery.evaluator import EvaluationResult
+from moonlighter.discovery.posting import FetchedPosting
 
 CONFIG = {
     "score_threshold": 7.0,
@@ -74,6 +75,45 @@ async def test_add_job_fetches_description_when_empty(tmp_db):
     assert "NEW" in result
     job = Job.get(Job.url == "https://x.com/2")
     assert "Real desc" in (job.description or "")
+
+
+async def test_fetch_description_drops_style_and_script_contents():
+    html_page = "<style>.a{color:red}</style><script>var x=1;</script><p>Real text</p>"
+    response = MagicMock(status_code=200, text=html_page)
+    client = AsyncMock()
+    client.get = AsyncMock(return_value=response)
+    cls = MagicMock()
+    cls.return_value.__aenter__ = AsyncMock(return_value=client)
+    cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch("httpx.AsyncClient", cls):
+        description, error = await scan_service._fetch_description("https://example.com/job")
+    assert error is None
+    assert description == "Real text"
+    assert "color" not in description and "var x" not in description
+
+
+async def test_add_job_routes_through_ats_when_fields_missing(tmp_db):
+    init_db()
+    posting = FetchedPosting(
+        company="GitLab", title="Account Executive", description="Build things."
+    )
+    url = "https://boards.greenhouse.io/gitlab/jobs/8503792002"
+    with (
+        patch(
+            "moonlighter.discovery.service.fetch_posting_via_ats",
+            new=AsyncMock(return_value=posting),
+        ),
+        patch(
+            "moonlighter.discovery.service.evaluate_job",
+            new=AsyncMock(return_value=_eval(8.0)),
+        ),
+    ):
+        result = await scan_service.add_job(url, "", "", "", CONFIG, PROFILE, MagicMock())
+    assert "NEW" in result
+    job = Job.get(Job.url == url)
+    assert job.company == "GitLab"
+    assert job.title == "Account Executive"
+    assert job.description == "Build things."
 
 
 async def test_add_job_http_non_200_returns_error(tmp_db):
