@@ -1,7 +1,7 @@
 """
 Email monitor for job applications.
 
-Monitors candidaturas@gmail.com, classifies replies with the LLM,
+Monitors the configured Gmail account, classifies replies with the LLM,
 and automatically updates the applications pipeline.
 """
 
@@ -39,7 +39,7 @@ _TYPE_TO_STATUS = {
 def extract_ref(to_field: str, base_address: str) -> str | None:
     """Extracts the ref from a Gmail (+ref) alias in the To field.
 
-    "candidaturas+x7k2mp@gmail.com" → "x7k2mp"
+    "you+x7k2mp@gmail.com" → "x7k2mp"
     None if there's no alias or it doesn't match base_address."""
     if not to_field:
         return None

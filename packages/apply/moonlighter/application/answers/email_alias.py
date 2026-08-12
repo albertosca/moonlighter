@@ -1,6 +1,6 @@
 """+ref tracking alias for the email field on the ATS form.
 
-The company replies to candidaturas+<ref>@gmail.com (monitored account),
+The company replies to <account>+<ref>@gmail.com (the configured tracking account),
 which lets email_monitor match the reply to the application by the ref.
 """
 
@@ -19,7 +19,7 @@ def new_email_ref() -> str:
 
 
 def build_email_alias(address: str, ref: str) -> str:
-    """'candidaturas@gmail.com' + 'x7k2mp' → 'candidaturas+x7k2mp@gmail.com'"""
+    """'you@gmail.com' + 'x7k2mp' → 'you+x7k2mp@gmail.com'"""
     local, _, domain = address.partition("@")
     return f"{local}+{ref}@{domain}"
 
