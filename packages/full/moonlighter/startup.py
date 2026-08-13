@@ -58,7 +58,7 @@ def _check_llm_backend(config: dict[str, Any]) -> StartupWarning | None:
         return StartupWarning(
             "error",
             "llm_backend is 'api' but ANTHROPIC_API_KEY is not in the environment. "
-            "scan_and_evaluate and apply_jobs will not work. Set the key, or switch to "
+            "scan_and_evaluate and prepare_application will not work. Set the key, or switch to "
             "llm_backend: cli in config.yaml to use your Claude subscription instead.",
         )
     if shutil.which("claude") is not None:
@@ -66,7 +66,7 @@ def _check_llm_backend(config: dict[str, Any]) -> StartupWarning | None:
     return StartupWarning(
         "error",
         "llm_backend is 'cli' but the `claude` CLI was not found on PATH. "
-        "scan_and_evaluate and apply_jobs will not work. Install Claude Code, or switch to "
+        "scan_and_evaluate and prepare_application will not work. Install Claude Code, or switch to "
         "llm_backend: api in config.yaml and set ANTHROPIC_API_KEY.",
     )
 
