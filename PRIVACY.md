@@ -61,6 +61,15 @@ There is currently no built-in per-application or per-job deletion/retention too
 accumulates until you remove it manually or delete the whole directory. If you need finer-grained
 deletion, the tables are plain SQLite (`moonlighter.db`) and can be queried/edited directly.
 
+## Contributor signatures
+
+This section covers a different, code-contribution activity — not tool usage. If you sign the
+[Contributor License Agreement](CLA.md) to submit a pull request, that act records your GitHub
+username, numeric GitHub user ID, and the timestamp of your signature in a file committed to
+this repository's public git history. Because git history is effectively permanent, this record
+cannot be fully removed once committed. Storage location and retention are under the
+Maintainer's review; see `CLA.md`'s "Signature records" section for the current state.
+
 ## Third-party data processors
 
 moonlighter itself does not employ any third-party data processor. The services **you** configure
