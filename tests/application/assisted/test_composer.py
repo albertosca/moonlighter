@@ -260,3 +260,75 @@ async def test_ordinary_first_person_answer_passes():
     composed = await compose_answers(questions, {}, {}, {"description": "A job."}, caller)
     assert composed[0].answer is not None
     assert composed[0].gap_reason is None
+
+
+
+# ── CRITICAL 2: presence vs truthiness for pre-populated answers ────────────
+
+
+@pytest.mark.asyncio
+async def test_salary_label_with_no_target_configured_becomes_a_gap_without_the_llm():
+    """CRITICAL: `known.get(label) or await _generate(...)` treated the deliberate
+    "" that _salary_expectation returns when no salary_target_brl_monthly is
+    configured as absence, and fell through to the LLM to invent a figure — a
+    direct violation of E2 (the salary figure must never reach the model)."""
+    question = FormQuestion(label="Salary expectation", kind=QuestionKind.TEXT, required=True)
+    composed = await compose_answers([question], PROFILE, {}, JOB, never_called)
+    assert composed[0].answer is None
+    assert composed[0].gap_reason == "no configured value for this field — answer this yourself"
+
+
+@pytest.mark.asyncio
+async def test_salary_gap_is_counted_in_the_sheet_footer():
+    """The gap from the fix above must actually surface to the human, not just
+    exist as a ComposedAnswer -- the sheet footer is where the human decides
+    whether an application is ready to paste and submit."""
+    from moonlighter.application.assisted.sheet import render_sheet
+
+    question = FormQuestion(label="Salary expectation", kind=QuestionKind.TEXT, required=True)
+    composed = await compose_answers([question], PROFILE, {}, JOB, never_called)
+    sheet = render_sheet(
+        composed, job_title=JOB["title"], company=JOB["company"], apply_url="https://x/apply"
+    )
+    assert "1 of 1 need you" in sheet
+    assert "no configured value for this field" in sheet
+
+
+@pytest.mark.asyncio
+async def test_a_label_absent_from_known_answers_still_calls_the_llm():
+    """The other side of the presence/truthiness fix: a label pre_populate_answers
+    never touched must still reach the LLM exactly as before."""
+    question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
+    composed = await compose_answers([question], PROFILE, {}, JOB, answers_anything)
+    assert composed[0].answer == "a generated answer"
+    assert composed[0].gap_reason is None
+
+
+# ── IMPORTANT 5: generation failure vs a genuine UNKNOWN ─────────────────────
+
+
+@pytest.mark.asyncio
+async def test_an_llm_error_reports_generation_failure_not_a_knowledge_gap():
+    """Before this fix, `except Exception: return None` in _generate made a
+    spend-limit or network error read exactly like a genuine UNKNOWN -- "no basis
+    in your profile to answer" is a fact about the candidate, and an LLM outage
+    is a fact about the tool run. They must not share a gap reason."""
+
+    async def explodes(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        raise RuntimeError("spend limit reached")
+
+    question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
+    composed = await compose_answers([question], PROFILE, {}, JOB, explodes)
+    assert composed[0].answer is None
+    assert composed[0].gap_reason == "answer generation failed — answer this yourself"
+
+
+@pytest.mark.asyncio
+async def test_a_genuine_unknown_keeps_the_no_basis_reason():
+    async def replies_unknown(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        return "UNKNOWN"
+
+    question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
+    composed = await compose_answers([question], PROFILE, {}, JOB, replies_unknown)
+    assert composed[0].answer is None
+    assert composed[0].gap_reason == "no basis in your profile to answer"

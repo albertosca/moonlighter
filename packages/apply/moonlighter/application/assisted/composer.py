@@ -83,6 +83,18 @@ class ComposedAnswer:
             raise ValueError("a composed answer is either answered or a gap, never both or neither")
 
 
+class _GenerationError(Exception):
+    """The LLM call itself failed (spend limit, network, backend outage, ...).
+
+    Distinct on purpose from a plain UNKNOWN: UNKNOWN means the profile gives
+    no basis to answer, which is a fact about the candidate. This means the
+    attempt to answer never completed, which is a fact about the tool run.
+    Conflating the two put "answer generation failed" and "no basis in your
+    profile to answer" behind the same gap reason, which reads as a
+    knowledge gap even when a spend-limit or network error is the real cause.
+    """
+
+
 async def _generate(
     question: FormQuestion, profile: dict[str, Any], job: dict[str, Any], llm_caller: LLMCaller
 ) -> str | None:
@@ -102,9 +114,9 @@ async def _generate(
     )
     try:
         raw = await llm_caller(prompt, "claude-sonnet-4-6")
-    except Exception:
+    except Exception as e:
         logger.warning("could not generate an answer for %r", question.label)
-        return None
+        raise _GenerationError(str(e)) from e
     answer = raw.strip()
     return None if not answer or answer == "UNKNOWN" else answer
 
@@ -137,7 +149,34 @@ async def compose_answers(
             composed.append(ComposedAnswer(question, None, reason))
             continue
 
-        answer = known.get(question.label) or await _generate(question, profile, job, llm_caller)
+        answer: str | None
+        if question.label in known:
+            # Presence, not truthiness: known can legitimately map a label to ""
+            # (_salary_expectation with no salary_target configured, by design —
+            # E2 forbids letting the figure fall through to the LLM). `known.get(...)
+            # or ...` treated that deliberate "" the same as absence and asked the
+            # LLM to invent a number anyway.
+            value = known[question.label]
+            if value == "":
+                composed.append(
+                    ComposedAnswer(
+                        question,
+                        None,
+                        "no configured value for this field — answer this yourself",
+                    )
+                )
+                continue
+            answer = value
+        else:
+            try:
+                answer = await _generate(question, profile, job, llm_caller)
+            except _GenerationError:
+                composed.append(
+                    ComposedAnswer(
+                        question, None, "answer generation failed — answer this yourself"
+                    )
+                )
+                continue
 
         # pre_populate_answers can hand back its own review sentinel instead of a real
         # value (work-authorization/sponsorship fields when the country can't be inferred;
