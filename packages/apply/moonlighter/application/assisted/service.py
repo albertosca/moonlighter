@@ -3,8 +3,13 @@
 from typing import Any, cast
 
 import httpx
-from moonlighter.application.assisted.composer import compose_answers
-from moonlighter.application.assisted.questions import FormQuestion
+from moonlighter.application.answers.email_alias import (
+    build_email_alias,
+    is_email_label,
+    new_email_ref,
+)
+from moonlighter.application.assisted.composer import ComposedAnswer, compose_answers
+from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sheet import render_sheet
 from moonlighter.application.assisted.sources.greenhouse import (
     board_and_job_from_url,
@@ -15,7 +20,7 @@ from moonlighter.application.assisted.sources.recruitee import (
     fetch_recruitee_questions,
     slug_and_offer_from_url,
 )
-from moonlighter.core.db import Job
+from moonlighter.core.db import Application, Job
 from moonlighter.core.llm import make_caller
 
 PASTE_HINT = (
@@ -38,6 +43,36 @@ async def _questions_from_api(job: Job) -> list[FormQuestion]:
     return []
 
 
+def _tracking_alias(job: Job, config: dict[str, Any]) -> str | None:
+    """The +ref alias for this application, minting the draft Application row on
+    first use and reusing its ref forever after (a regenerated ref orphans every
+    reply already sent to the old one). None when no tracking mailbox is
+    configured — the sheet then keeps whatever email the field map filled in."""
+    address = (config.get("email") or {}).get("address")
+    if not address:
+        return None
+    application, _ = Application.get_or_create(job=job, defaults={"status": "draft"})
+    if not application.email_ref:
+        application.email_ref = new_email_ref()
+        application.save()
+    return build_email_alias(str(address), str(application.email_ref))
+
+
+def _with_tracking_alias(composed: list[ComposedAnswer], alias: str) -> list[ComposedAnswer]:
+    """The alias answers every email field — including one the composer left as a
+    gap: tracking must not depend on the profile carrying an email address."""
+    return [
+        ComposedAnswer(item.question, alias, None)
+        if (
+            is_email_label(item.question.label)
+            and not item.question.is_choice
+            and item.question.kind is not QuestionKind.FILE
+        )
+        else item
+        for item in composed
+    ]
+
+
 async def _sheet(
     job: Job, questions: list[FormQuestion], config: dict[str, Any], profile: dict[str, Any]
 ) -> str:
@@ -54,6 +89,8 @@ async def _sheet(
         },
         make_caller(config),
     )
+    if (alias := _tracking_alias(job, config)) is not None:
+        composed = _with_tracking_alias(composed, alias)
     return render_sheet(composed, job_title=job.title, company=job.company, apply_url=job.url)
 
 

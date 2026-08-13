@@ -101,7 +101,17 @@ async def _generate(
     constraint = ""
     if question.is_choice:
         options = "\n".join(f"- {o}" for o in question.options)
-        constraint = f"Reply with exactly one of these options, copied verbatim:\n{options}"
+        # "Strongest the profile supports": the model picked "minor limitations"
+        # for a profile saying English (fluent/native) — live, 2026-08-13 — with
+        # the fact right there in the prompt. Hedging downward misrepresents the
+        # candidate exactly like overclaiming does, just in the safer-feeling
+        # direction.
+        constraint = (
+            f"Reply with exactly one of these options, copied verbatim:\n{options}\n"
+            "Pick the strongest option the profile supports: when the profile states "
+            "the fact plainly (a language listed as fluent, a technology used in "
+            "production), do not choose a weaker option than the fact warrants."
+        )
     prompt = PROMPT.format(
         # Least privilege at the prompt boundary: references (third-party
         # contacts), preferences (the salary figure — E2) and demographics

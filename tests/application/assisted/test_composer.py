@@ -219,7 +219,7 @@ async def test_salary_label_is_still_prepopulated_from_full_profile():
     caller = AsyncMock(side_effect=AssertionError("LLM must not be called"))
     questions = [FormQuestion(label="Salary expectation", kind=QuestionKind.TEXT, required=True)]
     composed = await compose_answers(questions, profile, {}, {"description": "A job."}, caller)
-    assert composed[0].answer == "35000"
+    assert composed[0].answer == "BRL 35.000/month"
 
 
 OPERATOR_NOTE_REFERENCES = (
@@ -353,3 +353,27 @@ async def test_a_genuine_unknown_keeps_the_no_basis_reason():
     composed = await compose_answers([question], PROFILE, {}, JOB, replies_unknown)
     assert composed[0].answer is None
     assert composed[0].gap_reason == "no basis in your profile to answer"
+
+
+@pytest.mark.asyncio
+async def test_a_choice_prompt_tells_the_model_not_to_underclaim():
+    """The model picked "minor limitations" for a profile that says English
+    (fluent/native) — live on the Nubank shadow-run (2026-08-13), with the fact
+    present in the curated prompt. The choice constraint must instruct it to
+    pick the strongest option the profile supports."""
+    captured: dict[str, str] = {}
+
+    async def caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        captured["prompt"] = prompt
+        return "Fluent"
+
+    question = FormQuestion(
+        label="English level",
+        kind=QuestionKind.SINGLE_SELECT,
+        required=False,
+        options=("Basic", "Fluent"),
+    )
+    profile = {"languages": ["English (fluent/native)"]}
+    await compose_answers([question], profile, {}, {"description": "A job."}, caller)
+
+    assert "strongest option the profile supports" in captured["prompt"]

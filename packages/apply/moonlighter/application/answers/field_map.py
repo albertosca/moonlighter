@@ -58,7 +58,11 @@ def _salary_expectation(profile: dict[str, Any], label: str = "") -> str:
         return ""
     if _FOREIGN_CURRENCY.search(label) or _OTHER_PERIOD.search(label):
         return NEEDS_REVIEW_SENTINEL
-    return str(target)
+    # Currency + dot-separated thousands + explicit period, the format ATS labels
+    # themselves exemplify ("MXN 9.000"). A bare "35000" left currency and period
+    # to the reader's guess — observed live on the Nubank form (2026-08-13),
+    # whose label asked for "Currency + Monthly Salary" outright.
+    return f"BRL {target:,}/month".replace(",", ".")
 
 
 # Each entry: (regex pattern on the label, callable(profile) -> str)
