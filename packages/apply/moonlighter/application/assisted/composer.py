@@ -5,6 +5,7 @@ defensible answer becomes a visible gap. Never an invented answer, never silence
 """
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -18,6 +19,10 @@ from moonlighter.core.llm import LLMCaller
 from moonlighter.core.parsing import wrap_untrusted
 
 logger = logging.getLogger(__name__)
+
+# File fields whose label asks for a CV/resume — the only ones whose gap should
+# name the configured CV as the file to attach.
+_CV_LABEL = re.compile(r"\bcv\b|resume|curr[ií]c", re.I)
 
 PROMPT = """Answer one question on a job application, as the candidate.
 
@@ -150,12 +155,17 @@ async def compose_answers(
     for question in questions:
         if question.kind is QuestionKind.FILE:
             # A file cannot be pasted, but naming the exact file to attach turns a
-            # dead end into an instruction.
-            try:
-                path = resolve_cv_path(str(job.get("company") or ""), config)
-                reason = f"upload this file yourself: {path}"
-            except CVNotFoundError:
-                reason = "upload a file yourself — no CV is configured"
+            # dead end into an instruction — only for CV-shaped labels: a "Cover
+            # letter" gap naming the CV instructs the operator to attach the
+            # wrong document (found on the GitLab gate sheet, 2026-08-13).
+            if _CV_LABEL.search(question.label):
+                try:
+                    path = resolve_cv_path(str(job.get("company") or ""), config)
+                    reason = f"upload this file yourself: {path}"
+                except CVNotFoundError:
+                    reason = "upload a file yourself — no CV is configured"
+            else:
+                reason = "upload a file yourself"
             composed.append(ComposedAnswer(question, None, reason))
             continue
 

@@ -283,9 +283,29 @@ async def test_a_choice_question_mentioning_email_is_not_overwritten(job_factory
 
     out = await service.prepare_application_from_paste(job.id, "p", _TRACKING_CONFIG, {})
 
+    # The choice keeps its own answer; the alias reaches the operator through
+    # the footer instead, since no text question could carry it.
     ref = Application.get(Application.job == job).email_ref
     assert "> Yes" in out
-    assert f"track+{ref}" not in out
+    assert f"use: track+{ref}@example.com" in out
+
+
+async def test_an_alias_with_no_email_question_is_surfaced_on_the_sheet(job_factory, monkeypatch):
+    # A source that publishes no email question (a paste that missed it, an API
+    # that omits standard fields) must still hand the operator the alias — it
+    # already exists in the DB, and a sheet that hides it sends the reply to a
+    # mailbox the monitor never reads. Found live on the Curotec gate leg.
+    async def extract(page_text: str, llm_caller: Any) -> list[FormQuestion]:
+        return [FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)]
+
+    job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+    monkeypatch.setattr(service, "extract_questions_from_page", extract)
+    monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
+
+    out = await service.prepare_application_from_paste(job.id, "p", _TRACKING_CONFIG, {})
+
+    ref = Application.get(Application.job == job).email_ref
+    assert f"track+{ref}@example.com" in out
 
 
 async def test_the_api_path_carries_the_alias_too(job_factory, monkeypatch):

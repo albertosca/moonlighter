@@ -58,17 +58,19 @@ def _tracking_alias(job: Job, config: dict[str, Any]) -> str | None:
     return build_email_alias(str(address), str(application.email_ref))
 
 
+def _takes_alias(question: FormQuestion) -> bool:
+    return (
+        is_email_label(question.label)
+        and not question.is_choice
+        and question.kind is not QuestionKind.FILE
+    )
+
+
 def _with_tracking_alias(composed: list[ComposedAnswer], alias: str) -> list[ComposedAnswer]:
     """The alias answers every email field — including one the composer left as a
     gap: tracking must not depend on the profile carrying an email address."""
     return [
-        ComposedAnswer(item.question, alias, None)
-        if (
-            is_email_label(item.question.label)
-            and not item.question.is_choice
-            and item.question.kind is not QuestionKind.FILE
-        )
-        else item
+        ComposedAnswer(item.question, alias, None) if _takes_alias(item.question) else item
         for item in composed
     ]
 
@@ -89,9 +91,16 @@ async def _sheet(
         },
         make_caller(config),
     )
-    if (alias := _tracking_alias(job, config)) is not None:
+    alias = _tracking_alias(job, config)
+    if alias is not None:
         composed = _with_tracking_alias(composed, alias)
-    return render_sheet(composed, job_title=job.title, company=job.company, apply_url=job.url)
+    sheet = render_sheet(composed, job_title=job.title, company=job.company, apply_url=job.url)
+    if alias is not None and not any(_takes_alias(item.question) for item in composed):
+        # No email question reached the sheet (a paste that missed it, a source
+        # that omits standard fields) — the alias must reach the operator anyway,
+        # or the company's reply lands in a mailbox the monitor never reads.
+        sheet += f"\n\nWhere the form asks for an email address, use: {alias}"
+    return sheet
 
 
 async def prepare_application(job_id: int, config: dict[str, Any], profile: dict[str, Any]) -> str:

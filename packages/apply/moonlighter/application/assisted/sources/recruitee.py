@@ -31,6 +31,31 @@ _SIMPLE_KINDS = {
     "date": QuestionKind.TEXT,
 }
 
+# The offers API publishes only the *custom* questions; the standard candidate
+# fields are declared by options_* flags ("required" | "optional" | "off") on
+# the offer instead. A sheet without them claims completeness over a form that
+# still wants name, email and a CV — and gives the tracking alias no email
+# question to land on (found live on the Curotec gate application, 2026-08-13).
+# Name and email carry no flag: every Recruitee form asks them.
+_STANDARD_FLAGS = (
+    ("options_phone", "Phone", QuestionKind.TEXT),
+    ("options_photo", "Photo", QuestionKind.FILE),
+    ("options_cv", "CV", QuestionKind.FILE),
+    ("options_cover_letter", "Cover letter", QuestionKind.LONG_TEXT),
+)
+
+
+def _standard_fields(offer: dict[str, Any]) -> list[FormQuestion]:
+    questions = [
+        FormQuestion(label="Full name", kind=QuestionKind.TEXT, required=True),
+        FormQuestion(label="Email", kind=QuestionKind.TEXT, required=True),
+    ]
+    for flag, label, kind in _STANDARD_FLAGS:
+        value = str(offer.get(flag) or "off")
+        if value != "off":
+            questions.append(FormQuestion(label=label, kind=kind, required=value == "required"))
+    return questions
+
 
 def slug_and_offer_from_url(url: str) -> tuple[str, str] | None:
     match = _URL.search(url)
@@ -70,8 +95,13 @@ def _question(item: dict[str, Any]) -> FormQuestion | None:
 
 
 def parse_recruitee_questions(payload: dict[str, Any]) -> list[FormQuestion]:
-    offer = payload.get("offer") or {}
-    questions: list[FormQuestion] = []
+    offer = payload.get("offer")
+    if not isinstance(offer, dict):
+        # A 200 without an offer object is a malformed payload, not a form with
+        # zero questions — returning [] keeps the paste-hint path reachable
+        # instead of producing a phantom name+email sheet.
+        return []
+    questions: list[FormQuestion] = _standard_fields(offer)
 
     for item in [*(offer.get("open_questions") or []), *(offer.get("dynamic_fields") or [])]:
         if isinstance(item, dict) and (question := _question(item)) is not None:

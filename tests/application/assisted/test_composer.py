@@ -377,3 +377,19 @@ async def test_a_choice_prompt_tells_the_model_not_to_underclaim():
     await compose_answers([question], profile, {}, {"description": "A job."}, caller)
 
     assert "strongest option the profile supports" in captured["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_a_non_cv_file_gap_does_not_name_the_cv(tmp_path):
+    """A "Cover letter" file field whose gap says "upload this file yourself:
+    <the CV>" instructs the operator to attach the wrong document — found on
+    the GitLab gate sheet (2026-08-13). Only CV-shaped labels get the path."""
+    cv = tmp_path / "cv.pdf"
+    cv.write_bytes(b"%PDF-1.4")
+    question = FormQuestion(label="Cover Letter", kind=QuestionKind.FILE, required=False)
+    composed = await compose_answers(
+        [question], PROFILE, {"cv": {"default": str(cv)}}, JOB, answers_anything
+    )
+    assert composed[0].answer is None
+    assert str(cv) not in composed[0].gap_reason
+    assert "upload" in composed[0].gap_reason
