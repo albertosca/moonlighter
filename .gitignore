@@ -5,6 +5,7 @@ __pycache__/
 *.egg-info/
 .superpowers/
 .claude/
+.claude.local.md
 
 # Personal data — kept on disk locally, out of the repo. Generic templates
 # (.example) get added when preparing the public release.
