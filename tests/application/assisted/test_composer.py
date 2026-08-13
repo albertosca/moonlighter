@@ -262,7 +262,6 @@ async def test_ordinary_first_person_answer_passes():
     assert composed[0].gap_reason is None
 
 
-
 @pytest.mark.asyncio
 async def test_a_verbatim_option_naming_the_candidate_stays_selectable():
     """CANARY for MINOR 7 (spec B2): the operator-directed guard exists to catch
