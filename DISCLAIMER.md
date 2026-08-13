@@ -3,14 +3,18 @@
 ## Third-Party Terms of Service
 
 This tool interacts with job boards and applicant tracking systems (LinkedIn, Greenhouse, Lever,
-Ashby, Workable, SmartRecruiters, Recruitee, and optionally Gupy) by driving a real browser or
-making HTTP requests, always through **your own account/session**, applying to **real postings on
-your own behalf** — never scraping other candidates' data, never creating fake accounts, never
-sending bulk/spam applications. Use of these platforms is subject to their respective Terms of
-Service. **You use this software at your own risk and are solely responsible for compliance with
-any applicable ToS.** This section is a factual summary of public research, not legal advice —
-verify against the current terms yourself before relying on it, especially since terms change
-over time.
+Ashby, Workable, SmartRecruiters, Recruitee, and optionally Gupy), always through **your own
+account/session**, to find and evaluate **real postings for your own applications** — never
+scraping other candidates' data, never creating fake accounts, never sending bulk/spam
+applications. The default interaction is read-only HTTP requests (discovery scans and, where an
+ATS exposes it, reading a job's application-question schema). Driving a real browser is limited to
+the optional `moonlighter-core[browser]` extra, used by browser-based scanner plugins (e.g. the
+privately-distributed LinkedIn add-on) strictly for login and listing scans — never for filling in
+or submitting a form; see [Browser Automation](#browser-automation) below and
+[PRIVACY.md](PRIVACY.md). Use of these platforms is subject to their respective Terms of Service.
+**You use this software at your own risk and are solely responsible for compliance with any
+applicable ToS.** This section is a factual summary of public research, not legal advice — verify
+against the current terms yourself before relying on it, especially since terms change over time.
 
 **LinkedIn** — the User Agreement (§8.2) broadly and explicitly prohibits scraping and "bots or
 other unauthorized automated methods," with no stated carve-out for personal, single-account,
@@ -86,9 +90,18 @@ that applier.
 
 ## Browser Automation
 
-This tool automates form submission in job application portals. Excessive, abusive, or
-high-frequency use may result in your account being flagged, rate-limited, or banned by the
-platform. Use responsibly and only for legitimate, human-supervised job applications.
+The shipped product never drives a browser to fill in or submit a form — see the LinkedIn bullet
+above and [PRIVACY.md](PRIVACY.md) for how `prepare_application` composes answers for you to paste
+in and submit yourself. Browser-driven form fill/submit was built and then deliberately moved off
+the distributed product, onto a separate, paused branch (`feat/ats-automation`) not included in
+any release.
+
+The browser automation that *does* ship is narrower: the optional `moonlighter-core[browser]`
+extra, used only by browser-based scanner plugins (e.g. the LinkedIn add-on) to log in and scan
+listings. That is still automated interaction with a third-party platform, and the same ToS-risk
+framing applies to it — excessive, abusive, or high-frequency scanning may result in your account
+being flagged, rate-limited, or banned by the platform, same as the LinkedIn discussion above. Use
+responsibly, keep scan frequency reasonable, and only for legitimate, single-account, personal use.
 
 ## LLM Backend — `cli` mode
 
