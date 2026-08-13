@@ -9,6 +9,7 @@ from moonlighter.core.config import (
     load_config,
     load_profile,
     moonlighter_home,
+    resolve_under_home,
     validate_config,
 )
 
@@ -501,8 +502,30 @@ def test_load_config_fills_llm_backend_from_defaults(tmp_path, monkeypatch):
 
 def test_defaults_carry_the_documented_email_paths():
     """credentials_path/token_path must have real defaults so setup_gmail_service
-    can name the exact missing key instead of raising a raw KeyError."""
+    can name the exact missing key instead of raising a raw KeyError. Relative
+    filenames, not ~/.moonlighter/... -- resolve_under_home() resolves them at
+    the point of use, honoring a MOONLIGHTER_HOME override (IMPORTANT 6)."""
     from moonlighter.core.config import DEFAULTS
 
-    assert DEFAULTS["email"]["token_path"] == "~/.moonlighter/gmail-token.json"
-    assert DEFAULTS["email"]["credentials_path"] == "~/.moonlighter/gmail-client.json"
+    assert DEFAULTS["email"]["token_path"] == "gmail-token.json"
+    assert DEFAULTS["email"]["credentials_path"] == "gmail-client.json"
+
+
+# ── resolve_under_home ───────────────────────────────────────────────────────
+
+
+def test_resolve_under_home_joins_a_relative_path_onto_moonlighter_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    assert resolve_under_home("gmail-client.json") == tmp_path / "gmail-client.json"
+
+
+def test_resolve_under_home_leaves_an_absolute_path_untouched(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "not-this-one"))
+    absolute = tmp_path / "elsewhere" / "creds.json"
+    assert resolve_under_home(str(absolute)) == absolute
+
+
+def test_resolve_under_home_expands_a_tilde_path_without_touching_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "not-this-one"))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert resolve_under_home("~/creds.json") == tmp_path / "creds.json"

@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from moonlighter.core.config import moonlighter_home
+from moonlighter.core.config import moonlighter_home, resolve_under_home
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ def setup_gmail_service(config: dict[str, Any]) -> Any:
             "config.yaml (see config.example.yaml) and run setup_email() to "
             "authorize access."
         )
-    token_path = Path(token_path_raw).expanduser()
+    token_path = resolve_under_home(token_path_raw)
     if not token_path.exists():
         raise GmailAuthError("Gmail token not found. Run setup_email() first to authorize access.")
 

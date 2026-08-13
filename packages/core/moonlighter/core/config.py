@@ -9,6 +9,23 @@ def moonlighter_home() -> Path:
     return Path(os.environ.get("MOONLIGHTER_HOME", "~/.moonlighter")).expanduser()
 
 
+def resolve_under_home(value: str) -> Path:
+    """A config-supplied path, resolved under MOONLIGHTER_HOME when it is relative.
+
+    Same convention as cv.default (see application/answers/cv.py's
+    configured_cv_path): an absolute path, or a '~'-prefixed one, is honored
+    exactly as given; anything else is joined onto moonlighter_home(). Callers
+    are expected to reject an empty string themselves with a message naming the
+    config key -- Path("").expanduser() is ".", a directory that always exists,
+    so resolving it silently here would trade a clear "not configured" error for
+    a confusing "Is a directory" failure downstream.
+    """
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = moonlighter_home() / path
+    return path
+
+
 def _learned_blocklist_path() -> Path:
     return moonlighter_home() / "blocklist_learned.yaml"
 
@@ -31,7 +48,7 @@ def browser_executable(config: dict[str, Any]) -> str:
 NEEDS_REVIEW_SENTINEL = "__NEEDS_REVIEW__"
 
 
-DEFAULTS = {
+DEFAULTS: dict[str, Any] = {
     # Browser executable path (Chrome/Chromium/Brave). Empty by default:
     # set browser_path in config.yaml. Accepts brave_path (legacy) as a fallback.
     "browser_path": "",
@@ -72,13 +89,15 @@ DEFAULTS = {
         "authorized_answer": "Yes",
         "not_authorized_answer": "No",
     },
-    # Gmail response tracking. Both files live under MOONLIGHTER_HOME by
-    # default; setup_email() creates the token after the OAuth consent.
-    # NOTE: setup_email() writes (and overwrites) whatever file token_path
-    # names — point it elsewhere only if you own that file.
+    # Gmail response tracking. Relative filenames, resolved under MOONLIGHTER_HOME
+    # by resolve_under_home() at the point of use (same convention as cv.default) —
+    # NOT hardcoded to ~/.moonlighter, which ignores a MOONLIGHTER_HOME override.
+    # setup_email() creates the token after the OAuth consent. NOTE: setup_email()
+    # writes (and overwrites) whatever file token_path names — point it at an
+    # absolute path elsewhere only if you own that file.
     "email": {
-        "credentials_path": "~/.moonlighter/gmail-client.json",
-        "token_path": "~/.moonlighter/gmail-token.json",
+        "credentials_path": "gmail-client.json",
+        "token_path": "gmail-token.json",
     },
 }
 

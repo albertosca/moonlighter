@@ -11,10 +11,12 @@ from mcp.server.session import ServerSession
 from moonlighter._tool_logging import tool_logged
 from moonlighter.application.assisted import service as assisted_service
 from moonlighter.core.config import (
+    DEFAULTS,
     harden_permissions,
     load_company_list,
     load_config,
     load_profile,
+    resolve_under_home,
     validate_config,
 )
 from moonlighter.core.db import Application, Job, init_db
@@ -350,20 +352,33 @@ async def setup_email(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
     Configure Gmail authentication for the account that receives application replies.
     Run only once. Opens the browser to authorize access.
     Requires the OAuth client file at email.credentials_path
-    (default ~/.moonlighter/gmail-client.json) and writes the token to
+    (default MOONLIGHTER_HOME/gmail-client.json) and writes the token to
     email.token_path — overwriting whatever file that path names.
     """
     app = ctx.request_context.lifespan_context
     config = app.config
     email_cfg = config.get("email", {})
-    creds_path = str(Path(email_cfg.get("credentials_path", "")).expanduser())
-    token_path = str(Path(email_cfg.get("token_path", "")).expanduser())
+
+    # Checked before resolving: Path("").expanduser() is ".", a directory that
+    # always exists, so resolving an unconfigured path first would trade this
+    # clear message for a confusing "Is a directory" failure further down.
+    creds_path_raw = email_cfg.get("credentials_path", "")
+    if not creds_path_raw:
+        return (
+            "⚠️  email.credentials_path is not configured.\n"
+            "Download client_secret.json from the Google Cloud Console, save it under "
+            "MOONLIGHTER_HOME (or point credentials_path at your own location), and run "
+            "setup_email() again."
+        )
+    creds_path = str(resolve_under_home(creds_path_raw))
+    token_path = str(
+        resolve_under_home(email_cfg.get("token_path") or DEFAULTS["email"]["token_path"])
+    )
 
     if not Path(creds_path).exists():
         return (
             f"⚠️  Credentials file not found: {creds_path}\n"
-            "Download client_secret.json from the Google Cloud Console and save it to "
-            "~/.moonlighter/gmail-client.json"
+            "Download client_secret.json from the Google Cloud Console and save it there."
         )
 
     try:

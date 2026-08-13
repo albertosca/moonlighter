@@ -1109,6 +1109,30 @@ class TestSetupGmailService:
         assert service is not None
         mock_build.assert_called_once_with("gmail", "v1", credentials=mock_creds)
 
+    def test_resolves_a_relative_token_path_under_moonlighter_home(self, tmp_path, monkeypatch):
+        """IMPORTANT 6: token_path defaults to a relative filename now
+        ("gmail-token.json"), and setup_gmail_service must resolve it under
+        MOONLIGHTER_HOME rather than treating it as relative to the cwd."""
+        from moonlighter.tracking.gmail_client import setup_gmail_service
+
+        monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+        (tmp_path / "gmail-token.json").write_text("{}")
+
+        mock_creds = MagicMock(valid=True, expired=False)
+        config = {"email": {"token_path": "gmail-token.json"}}
+
+        with (
+            patch("moonlighter.tracking.gmail_client.Credentials") as MockCreds,
+            patch("moonlighter.tracking.gmail_client.build") as mock_build,
+        ):
+            MockCreds.from_authorized_user_file.return_value = mock_creds
+            mock_build.return_value = MagicMock()
+            setup_gmail_service(config)
+
+        MockCreds.from_authorized_user_file.assert_called_once()
+        called_path = MockCreds.from_authorized_user_file.call_args.args[0]
+        assert called_path == str(tmp_path / "gmail-token.json")
+
     def test_refreshed_token_is_persisted_when_the_file_is_ours(self, tmp_path, monkeypatch):
         from moonlighter.tracking.gmail_client import setup_gmail_service
 
