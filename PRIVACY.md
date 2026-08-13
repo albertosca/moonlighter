@@ -14,9 +14,8 @@ plain SQLite and files — never uploaded anywhere by moonlighter itself:
 |------|----------|----------|
 | Your candidate profile | `profile.yaml` | Name, contact info, work history, skills — whatever you put there. Read directly from disk each run; not copied elsewhere. |
 | Job postings found | `moonlighter.db` (`Job` table) | Scraped listing text (company, title, description, salary if stated) — third-party content, not your personal data. |
-| Your applications | `moonlighter.db` (`Application` table) | The form answers submitted on your behalf (`form_data`) — this **is** your personal data, since it's the same name/email/phone/etc. that went into the employer's form. Kept indefinitely; no automatic expiry. |
-| Screenshots | `screenshots/<job_id>/` | Captured before/after filling and submitting, for your own review. These visibly contain whatever was on the page at that moment, including your filled-in answers. |
-| Browser session | `browser-session/` | The Playwright/Chrome profile used for automation (cookies, local storage) — same as any browser profile. |
+| Your applications | `moonlighter.db` (`Application` table) | The composed answers moonlighter drafted for your review (`form_data`) — this **is** your personal data, since it's the same name/email/phone/etc. that goes into the employer's form once you paste it in and submit it yourself. Kept indefinitely; no automatic expiry. |
+| Browser session (optional) | `browser-session/` | Only exists if you install the optional `moonlighter-core[browser]` extra and enable a browser-based scanner plugin (e.g. the privately-distributed LinkedIn add-on). The Playwright/Chromium profile that plugin logs in with (cookies, local storage) — not used by the core scan/evaluate/apply flow, which never opens a browser. |
 | Email sync dedup | `moonlighter.db` (`ProcessedEmail` table) | Only a Gmail message ID and a timestamp, so the sync doesn't reprocess the same email twice. **Not** the email body or subject — see below. |
 
 None of this is encrypted at rest by moonlighter itself; it relies on your OS/disk-level
@@ -24,10 +23,15 @@ protections, same as any local application storing config files.
 
 ## What leaves your machine
 
-- **Job-board/ATS requests** — HTTP requests and browser navigation to the platforms listed in
-  [`DISCLAIMER.md`](DISCLAIMER.md), carrying whatever a normal browser session would send (your IP,
-  user agent, and — during an application — the form data you're submitting to that specific
-  employer, same as if you filled it in by hand).
+- **Job-board/ATS requests** — read-only HTTP requests to the platforms listed in
+  [`DISCLAIMER.md`](DISCLAIMER.md), for discovery (scanning listings) and, where the ATS exposes
+  it, reading a job's application-question schema. These carry your IP and user agent, same as
+  loading the page in a browser — but never your application answers, since moonlighter never
+  submits a form. You paste the composed answers into the employer's form yourself, and that
+  traffic goes straight from your own browser to the employer, never through moonlighter. If you
+  install the optional `moonlighter-core[browser]` extra and enable a browser-based scanner plugin
+  (e.g. the LinkedIn add-on), that plugin additionally drives a real browser to log in and scan
+  listings, sending the same kind of traffic a manual session on that platform would.
 - **LLM calls** — job descriptions and a filtered subset of your profile (see
   `profile_for_answers`/`_ANSWER_PROFILE_KEYS` in `base.py` — headline, summary, skills,
   experience, education, languages, publications; **not** salary targets, hard filters, or
