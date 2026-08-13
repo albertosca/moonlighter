@@ -305,7 +305,7 @@ def load_company_list(path: str | Path | None = None, phase: str | None = None) 
             if phase:
                 result[source] = value.get(phase, [])
             else:
-                # Todas as fases concatenadas
+                # All phases concatenated
                 slugs = []
                 for slugs_in_phase in value.values():
                     if isinstance(slugs_in_phase, list):
