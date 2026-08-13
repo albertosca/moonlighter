@@ -263,6 +263,28 @@ async def test_ordinary_first_person_answer_passes():
 
 
 
+@pytest.mark.asyncio
+async def test_a_verbatim_option_naming_the_candidate_stays_selectable():
+    """CANARY for MINOR 7 (spec B2): the operator-directed guard exists to catch
+    the LLM narrating ABOUT the candidate in prose ("the candidate should..."),
+    not to reject a legitimate, verbatim-correct dropdown option that happens to
+    contain the phrase "the candidate". Gating the guard on `is_choice` keeps a
+    real option like this pickable."""
+    question = FormQuestion(
+        label="Are you the candidate applying?",
+        kind=QuestionKind.SINGLE_SELECT,
+        required=True,
+        options=("Yes, I am the candidate", "No"),
+    )
+
+    async def caller(prompt: str, model: str) -> str:
+        return "Yes, I am the candidate"
+
+    composed = await compose_answers([question], PROFILE, {}, JOB, caller)
+    assert composed[0].answer == "Yes, I am the candidate"
+    assert composed[0].gap_reason is None
+
+
 # ── CRITICAL 2: presence vs truthiness for pre-populated answers ────────────
 
 

@@ -193,7 +193,7 @@ async def compose_answers(
             composed.append(ComposedAnswer(question, None, "no basis in your profile to answer"))
             continue
 
-        if (marker := _operator_directed(answer)) is not None:
+        if not question.is_choice and (marker := _operator_directed(answer)) is not None:
             composed.append(
                 ComposedAnswer(
                     question,
