@@ -114,10 +114,13 @@ async def save_screenshot(page: Page, job_id: int, step: str, config: dict[str, 
 
     `page.screenshot()` captures from the compositor surface, and a minimized
     window produces no new frames — the call then blocks until it times out.
-    Since `fill_application` minimizes the window before filling, this made the
-    03-filled review artifact impossible to produce, on every ATS. Reproduced on
-    both Greenhouse and Recruitee; `fromSurface: False` was measured as an
-    alternative and took 175s, so restoring around the capture it is.
+    The browser-driven filler this predates minimized the window before
+    filling, which made the 03-filled review artifact impossible to produce,
+    on every ATS. Reproduced on both Greenhouse and Recruitee; `fromSurface:
+    False` was measured as an alternative and took 175s, so restoring around
+    the capture it is. Kept for browser-based extensions (e.g. LinkedIn
+    scanning) that still drive a page — the assisted flow that replaced the
+    in-repo filler never opens a browser.
 
     The window is put back exactly as it was, so the two screenshots taken with
     the window deliberately visible are not minimized as a side effect. Every

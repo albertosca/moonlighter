@@ -46,7 +46,7 @@ genuinely unreachable defensive branches, never to skip a real path.
 Pull requests adding a scanner or applier to this repository are welcome — open one and we'll
 review it like any other change.
 
-You also have the option not to. moonlighter discovers scanners and appliers through
+You also have the option not to. moonlighter discovers scanners through
 `entry_points`, so you can ship one as a separate package without touching this repo at all, and
 keep it on your own release schedule under whatever license you like. See the "Extensions (adding
 a new ATS)" section of the [README](README.md).

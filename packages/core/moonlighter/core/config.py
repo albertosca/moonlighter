@@ -58,7 +58,8 @@ DEFAULTS = {
     # 'default' used when the company has no entry, and defaults to 'cv.pdf'
     # (i.e. MOONLIGHTER_HOME/cv.pdf) — the same file the startup warning names.
     # Can be overridden in the local config.yaml. If the chosen file doesn't
-    # exist, confirm_apply aborts.
+    # exist, the composer emits a gap on the file-upload question instead of
+    # naming a file to attach.
     "cv": {
         "default": "cv.pdf",
         "by_company": {},

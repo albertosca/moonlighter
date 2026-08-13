@@ -264,9 +264,9 @@ async def test_save_screenshot_creates_job_subdir(tmp_path):
 async def test_save_screenshot_restores_a_minimized_window_and_re_minimizes_it(tmp_path):
     """A minimized window produces no compositor frames, so page.screenshot()
     blocks until it times out -- reproduced on both Greenhouse and Recruitee.
-    fill_application minimizes before filling, which made the 03-filled review
-    artifact impossible to produce. Restore around the capture, then put the
-    window back exactly as it was."""
+    The browser-driven filler this predates minimized the window before
+    filling, which made the 03-filled review artifact impossible to produce.
+    Restore around the capture, then put the window back exactly as it was."""
     config = {**_CONFIG, "screenshots_dir": str(tmp_path)}
     mock_page = MagicMock()
     mock_page.screenshot = AsyncMock()

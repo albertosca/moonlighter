@@ -34,11 +34,14 @@ non-lawyer analysis and citations — not legal advice):
   program is not realistically obtainable by an individual developer, and the most visible
   third-party "licensed" LinkedIn job-data provider (Proxycurl) was sued by LinkedIn and shut down
   in 2025.
-- One mitigation already built into the tool's architecture, worth naming explicitly: applying is
-  always two explicit, separate steps — `fill_application` fills the form and produces a screenshot
-  for your own review, and `submit_application` is a distinct, separately-invoked action. This is
-  human-supervised, assisted form-filling, not unattended bulk auto-apply — true for every ATS this
-  tool talks to, including LinkedIn.
+- One mitigation already built into the tool's architecture, worth naming explicitly: moonlighter
+  never drives a browser to fill in or submit an application. `prepare_application` (or
+  `prepare_application_from_paste`, when no API publishes the form's questions) composes an answer
+  for every question it can, from your profile, and renders the whole application as one
+  reviewable sheet — flagging anything it couldn't answer for you to fill in by hand. You paste
+  the answers into the form and submit it yourself. This is human-supervised, assisted answer
+  composition, not unattended bulk auto-apply — true for every ATS this tool talks to, including
+  LinkedIn.
 
 By using this tool against LinkedIn, you are choosing to accept that contractual/account risk
 yourself — this project takes no responsibility for account restrictions LinkedIn may impose.
