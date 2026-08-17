@@ -85,7 +85,6 @@ automatically; no other action is required.
 ## Signature records
 
 Signing records your GitHub username, your numeric GitHub user ID, and the timestamp of your
-signature in a file committed to this repository's public git history. Because git history is
-effectively permanent, this record cannot be fully removed once committed. See
-[`PRIVACY.md`](PRIVACY.md) for further disclosure; where and how signatures are stored is a
-decision the Maintainer is still reviewing.
+signature in a file committed to the public git history of this repository, on the dedicated
+`cla-signatures` branch. Because git history is effectively permanent, this record cannot be
+fully removed once committed. See [`PRIVACY.md`](PRIVACY.md) for further disclosure.

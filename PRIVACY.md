@@ -66,9 +66,8 @@ deletion, the tables are plain SQLite (`moonlighter.db`) and can be queried/edit
 This section covers a different, code-contribution activity — not tool usage. If you sign the
 [Contributor License Agreement](CLA.md) to submit a pull request, that act records your GitHub
 username, numeric GitHub user ID, and the timestamp of your signature in a file committed to
-this repository's public git history. Because git history is effectively permanent, this record
-cannot be fully removed once committed. Storage location and retention are under the
-Maintainer's review; see `CLA.md`'s "Signature records" section for the current state.
+this repository's public git history, on the dedicated `cla-signatures` branch. Because git
+history is effectively permanent, this record cannot be fully removed once committed.
 
 ## Third-party data processors
 
