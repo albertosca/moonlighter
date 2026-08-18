@@ -29,6 +29,10 @@ ashby:
 #   phase1:
 #     - acme
 
+# inhire:                    # Brazilian ATS (*.inhire.app); slug = the subdomain
+#   - alice
+#   - kanastra
+
 # smartrecruiters:
 #   phase1:
 #     - acme
