@@ -1,4 +1,5 @@
 from moonlighter.application.answers.option_matcher import (
+    _starts_with_word,
     match_option_locally,
 )
 
@@ -48,3 +49,10 @@ def test_fuzzy_below_threshold_returns_none():
 def test_empty_inputs_return_none():
     assert match_option_locally("", ["A", "B"]) is None
     assert match_option_locally("X", []) is None
+
+
+def test_starts_with_word_equal_strings_is_boundary_match():
+    # Direct helper contract: an exact-length prefix is a word-boundary match.
+    # Unreachable through match_option_locally (the exact path wins first),
+    # but the helper's own contract must hold for any future caller.
+    assert _starts_with_word("brazil", "brazil") is True
