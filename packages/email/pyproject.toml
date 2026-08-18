@@ -5,7 +5,8 @@ build-backend = "hatchling.build"
 [project]
 name = "moonlighter-email"
 version = "0.1.0"
-description = "Gmail-based reply tracking and interview pipeline monitoring for moonlighter"
+description = "Employer-reply tracking via Gmail, matched to each application by its alias — the tracking slice of moonlighter"
+readme = "README.md"
 license = {text = "AGPL-3.0-only"}
 authors = [{name = "Alberto de Sá Cavalcanti de Albuquerque", email = "albertoalbuquerque01@gmail.com"}]
 requires-python = ">=3.14"
