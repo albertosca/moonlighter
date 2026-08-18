@@ -240,7 +240,15 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
     }
     if config_path.exists():
         user = yaml.safe_load(config_path.read_text()) or {}
-        config.update(user)
+        for key, value in user.items():
+            # A dict-valued default (e.g. email:) merges key-by-key: a user
+            # overriding one sub-key must not silently drop the siblings'
+            # defaults, which is how a partial email: block used to lose
+            # token_path and trip the credentials guard on valid setups.
+            if isinstance(value, dict) and isinstance(config.get(key), dict):
+                config[key] = {**config[key], **value}
+            else:
+                config[key] = value
     for key in _PATH_KEYS:
         config[key] = str(Path(config[key]).expanduser())
 

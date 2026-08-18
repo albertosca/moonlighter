@@ -529,3 +529,22 @@ def test_resolve_under_home_expands_a_tilde_path_without_touching_home(monkeypat
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "not-this-one"))
     monkeypatch.setenv("HOME", str(tmp_path))
     assert resolve_under_home("~/creds.json") == tmp_path / "creds.json"
+
+
+def test_load_config_partial_email_block_keeps_sibling_defaults(tmp_path):
+    # A user overriding ONE key inside a dict-valued default (email:) must not
+    # lose the siblings -- the shallow update() replaced the whole dict, which
+    # is the root cause behind the credentials guard firing on valid setups.
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("email:\n  credentials_path: my-creds.json\n")
+    config = load_config(config_path=str(cfg_file))
+    assert config["email"]["credentials_path"] == "my-creds.json"
+    assert config["email"]["token_path"] == "gmail-token.json"
+
+
+def test_load_config_full_email_block_still_overrides_both(tmp_path):
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("email:\n  credentials_path: a.json\n  token_path: b.json\n")
+    config = load_config(config_path=str(cfg_file))
+    assert config["email"]["credentials_path"] == "a.json"
+    assert config["email"]["token_path"] == "b.json"
