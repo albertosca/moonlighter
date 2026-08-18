@@ -6,8 +6,8 @@ import pytest
 from moonlighter.application.assisted.questions import QuestionKind
 from moonlighter.application.assisted.sources.recruitee import (
     fetch_recruitee_questions,
+    host_and_offer_from_url,
     parse_recruitee_questions,
-    slug_and_offer_from_url,
 )
 
 PAYLOAD = json.loads((Path(__file__).parent / "fixtures" / "recruitee_offer.json").read_text())
@@ -165,16 +165,25 @@ def test_a_non_dict_entry_in_the_question_list_is_skipped():
     assert [q.label for q in parse_recruitee_questions(payload)] == ["Full name", "Email"]
 
 
-def test_slug_and_offer_are_read_from_a_recruitee_url():
-    assert slug_and_offer_from_url("https://curotec.recruitee.com/o/senior-android/c/new") == (
-        "curotec",
+def test_host_and_offer_are_read_from_a_recruitee_url():
+    assert host_and_offer_from_url("https://curotec.recruitee.com/o/senior-android/c/new") == (
+        "curotec.recruitee.com",
         "senior-android",
     )
 
 
-def test_a_custom_domain_is_not_matched():
-    # Most Recruitee customers use their own domain; those go through pasting.
-    assert slug_and_offer_from_url("https://jobs.channable.com/o/x") is None
+def test_a_custom_career_domain_is_matched_too():
+    # Most Recruitee customers use their own domain, and it serves the same
+    # offers API (proven by the discovery scanner, wave A). Safe here because
+    # the service routes to this source only when job.source == "recruitee".
+    assert host_and_offer_from_url("https://jobs.channable.com/o/x") == (
+        "jobs.channable.com",
+        "x",
+    )
+
+
+def test_a_non_offer_path_is_not_matched():
+    assert host_and_offer_from_url("https://careers.acme.com/jobs/engineer") is None
 
 
 @pytest.mark.asyncio
