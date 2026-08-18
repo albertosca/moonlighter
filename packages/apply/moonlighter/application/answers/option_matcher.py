@@ -11,12 +11,6 @@ and the human sees it in the screenshot. Never guesses.
 
 import re
 from difflib import SequenceMatcher
-from typing import Any
-
-import yaml
-from moonlighter.application.answers.profile import profile_for_answers
-from moonlighter.core.llm import LLMCaller
-from moonlighter.core.parsing import wrap_untrusted
 
 
 def _norm(s: str) -> str:
@@ -85,45 +79,3 @@ Candidate profile (YAML):
 Pick the option index whose text best fits the intended answer for this candidate.
 Return ONLY the index number (e.g. "2"). If NO option is a reasonable match, return __NONE__.
 """
-
-
-async def pick_option_with_llm(
-    label: str,
-    answer: str,
-    options: list[str],
-    profile: dict[str, Any],
-    caller: LLMCaller,
-    model: str,
-) -> str | None:
-    """
-    Uses the LLM to choose among the dropdown's REAL options when the local match
-    failed. Returns the exact text of the chosen option, or None (no options, LLM
-    undecided/__NONE__, index out of range, or error). Does not call the caller if
-    there are no options.
-    """
-    if not options:
-        return None
-    try:
-        options_text = "\n".join(f"{i}: {o}" for i, o in enumerate(options))
-        prompt = _PICK_PROMPT.format(
-            label=wrap_untrusted("field_label", label),
-            answer=answer,
-            profile=yaml.dump(profile_for_answers(profile), allow_unicode=True)
-            if profile
-            else "(none)",
-            options=wrap_untrusted("options", options_text),
-        )
-        raw = await caller(prompt, model)
-    except Exception:
-        return None
-
-    text = "" if raw is None else str(raw)
-    if "__NONE__" in text:
-        return None
-    m = re.search(r"\d+", text)
-    if not m:
-        return None
-    idx = int(m.group())
-    if 0 <= idx < len(options):
-        return options[idx]
-    return None
