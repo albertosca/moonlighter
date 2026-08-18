@@ -1,0 +1,16 @@
+name: env-probe
+
+# Throwaway probe (2026-08-18): does a job with `environment:` run on a private
+# repo under the free plan? Decides whether the per-package-environment publish
+# matrix can run before the repo goes public. Delete after reading the answer.
+
+on:
+  push:
+    branches: [feat/license-and-distribution]
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - run: echo "environment-scoped job ran fine on this plan/visibility"
