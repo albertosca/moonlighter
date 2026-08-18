@@ -9,6 +9,44 @@
 
 Pipeline de candidatura a vagas com IA. Escaneia portais de emprego, avalia o fit do candidato via LLM e compõe todas as respostas que um formulário de candidatura pede — tudo orquestrado pelo Claude através de um servidor [Model Context Protocol](https://modelcontextprotocol.io) (MCP). O moonlighter nunca abre um browser pra preencher ou enviar um formulário, e nunca envia uma candidatura em seu nome — veja [Como funciona](#como-funciona) abaixo e [DISCLAIMER.md](DISCLAIMER.md) (em inglês).
 
+## Sessenta segundos disso
+
+```text
+Você: varre minhas empresas
+
+moonlighter: 3 fontes varridas — 41 vagas, 38 já conhecidas, 3 novas
+  ✓ NOVA — Acme Robotics / Senior Backend Engineer
+    Score: 8.1/10  (corte: 6.5)
+  ✓ NOVA — Nimbus Health / Staff Engineer
+    Score: 7.4/10
+  ✗ Vandelay Industries / .NET Architect — 3.2/10, arquivada (filtro duro: .NET)
+
+Você: prepara a candidatura da Acme
+
+moonlighter: Senior Backend Engineer — Acme Robotics
+
+  [1/9] Full name  (required)
+  Ana Lima
+
+  [2/9] Email  (required)
+  ana.jobs+k3xv9q@gmail.com     ← alias de rastreio: a resposta da Acme casa sozinha com esta candidatura
+
+  [3/9] Why do you want to work at Acme?  (required)
+  Três frases honestas compostas do perfil da Ana — e só dele.
+
+  [4/9] Desired salary  (required)
+  BRL 28.000/month
+
+  [5/9] Do you hold a US work visa?  (required)
+  !! I DON'T KNOW — no basis in your profile to answer
+
+  8 de 9 respondidas · 1 precisa de você
+
+Você: (revisa, cola no formulário, aperta enviar — o moonlighter nunca aperta)
+```
+
+A conversa é ilustrativa; os formatos de saída são os reais, inclusive a parte em que ele se recusa a inventar resposta que não tem.
+
 ## Como funciona
 
 ```mermaid

@@ -9,6 +9,44 @@
 
 AI-powered job application pipeline. Scans job boards, scores candidate fit via LLM, and composes every answer a job application form asks for — all driven from Claude through a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server. moonlighter never opens a browser to fill or submit a form, and never submits an application on your behalf — see [How it works](#how-it-works) below and [DISCLAIMER.md](DISCLAIMER.md).
 
+## Sixty seconds of it
+
+```text
+You: scan my companies
+
+moonlighter: 3 sources scanned — 41 postings, 38 already known, 3 new
+  ✓ NEW — Acme Robotics / Senior Backend Engineer
+    Score: 8.1/10  (threshold: 6.5)
+  ✓ NEW — Nimbus Health / Staff Engineer
+    Score: 7.4/10
+  ✗ Vandelay Industries / .NET Architect — 3.2/10, archived (hard filter: .NET)
+
+You: prepare the application for the Acme one
+
+moonlighter: Senior Backend Engineer — Acme Robotics
+
+  [1/9] Full name  (required)
+  Ana Lima
+
+  [2/9] Email  (required)
+  ana.jobs+k3xv9q@gmail.com     ← tracking alias: Acme's reply will match this application by itself
+
+  [3/9] Why do you want to work at Acme?  (required)
+  Three honest sentences composed from Ana's profile — and only from it.
+
+  [4/9] Desired salary  (required)
+  BRL 28.000/month
+
+  [5/9] Do you hold a US work visa?  (required)
+  !! I DON'T KNOW — no basis in your profile to answer
+
+  8 of 9 answered · 1 needs you
+
+You: (review it, paste it into the form, hit send — moonlighter never does)
+```
+
+The conversation is illustrative; the output formats are the real ones, including the part where it refuses to invent an answer it doesn't have.
+
 ## How it works
 
 ```mermaid
