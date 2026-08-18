@@ -4,17 +4,17 @@ build-backend = "hatchling.build"
 
 [project]
 name = "moonlighter"
-version = "0.1.0"
+version = "0.1.1"
 description = "AI-powered job application pipeline as an MCP server for Claude — scan boards, score fit, compose every answer; you review and submit"
 readme = "README.md"
 license = {text = "AGPL-3.0-only"}
 authors = [{name = "Alberto de Sá Cavalcanti de Albuquerque", email = "albertoalbuquerque01@gmail.com"}]
 requires-python = ">=3.14"
 dependencies = [
-    "moonlighter-core==0.1.0",
-    "moonlighter-scan==0.1.0",
-    "moonlighter-apply==0.1.0",
-    "moonlighter-email==0.1.0",
+    "moonlighter-core==0.1.1",
+    "moonlighter-scan==0.1.1",
+    "moonlighter-apply==0.1.1",
+    "moonlighter-email==0.1.1",
     "fastmcp>=2.0",
 ]
 
