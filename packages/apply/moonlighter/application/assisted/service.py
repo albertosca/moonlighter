@@ -36,7 +36,11 @@ def _job(job_id: int) -> Job | None:
 
 async def _questions_from_api(job: Job) -> list[FormQuestion]:
     async with httpx.AsyncClient(timeout=20) as client:
-        if job.source == "greenhouse" and (found := board_and_job_from_url(job.url)):
+        # Keyed on the URL, not job.source: add_job stores source='manual' even
+        # for a recognizable Greenhouse URL, and the regex demands a
+        # greenhouse.io host, so a false positive cannot happen. (Recruitee
+        # stays source-gated below — its /o/ pattern matches any host.)
+        if found := board_and_job_from_url(job.url):
             return await fetch_greenhouse_questions(found[0], found[1], client)
         if job.source == "recruitee" and (found := slug_and_offer_from_url(job.url)):
             return await fetch_recruitee_questions(found[0], found[1], client)

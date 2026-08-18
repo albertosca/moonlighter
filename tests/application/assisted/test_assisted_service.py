@@ -325,3 +325,26 @@ async def test_the_api_path_carries_the_alias_too(job_factory, monkeypatch):
 
     ref = Application.get(Application.job == job).email_ref
     assert f"track+{ref}@example.com" in out
+
+
+async def test_a_manual_job_with_a_greenhouse_url_still_gets_the_api(job_factory, monkeypatch):
+    # add_job stores source='manual' even for a recognizable Greenhouse URL
+    # (EU job-boards host included) — routing must key on the URL, not on how
+    # the job entered the DB. Found live: Teachable, job-boards.eu, 2026-08-18.
+    job = job_factory(
+        source="manual",
+        url="https://job-boards.eu.greenhouse.io/teachablecareers/jobs/4913809101?gh_src=x",
+    )
+    seen: dict[str, str] = {}
+
+    async def fake_fetch(board: str, job_id: str, client: Any) -> list[FormQuestion]:
+        seen["board"], seen["job_id"] = board, job_id
+        return [FormQuestion(label="Email", kind=QuestionKind.TEXT, required=True, options=())]
+
+    monkeypatch.setattr(service, "fetch_greenhouse_questions", fake_fetch)
+    monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
+
+    out = await service.prepare_application(job.id, {}, {})
+
+    assert seen == {"board": "teachablecareers", "job_id": "4913809101"}
+    assert "prepare_application_from_paste" not in out
