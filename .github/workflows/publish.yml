@@ -76,6 +76,10 @@ jobs:
     environment: ${{ matrix.environment }}
     permissions:
       id-token: write        # PyPI trusted publishing -- no API token stored
+      # An explicit permissions block REPLACES the default set, dropping the
+      # implicit contents:read -- without this line, checkout of the private
+      # repo fails with "Repository not found" (hit live on the v0.1.0 run).
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
