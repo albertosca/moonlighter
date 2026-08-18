@@ -393,3 +393,56 @@ async def test_a_non_cv_file_gap_does_not_name_the_cv(tmp_path):
     assert composed[0].answer is None
     assert str(cv) not in composed[0].gap_reason
     assert "upload" in composed[0].gap_reason
+
+
+@pytest.mark.asyncio
+async def test_multi_select_accepts_several_verbatim_options():
+    # "Which technologies do you know?" answered with ONE pick under-claims
+    # structurally — a multi-select must let the model pick every option the
+    # profile supports, newline-joined so the sheet can render each one.
+    async def caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        return "Ruby\nElixir"
+
+    question = FormQuestion(
+        label="Which of these do you know?",
+        kind=QuestionKind.MULTI_SELECT,
+        required=True,
+        options=("Ruby", "Elixir", ".NET"),
+    )
+    composed = await compose_answers([question], PROFILE, {}, JOB, caller)
+    assert composed[0].answer == "Ruby\nElixir"
+    assert composed[0].gap_reason is None
+
+
+@pytest.mark.asyncio
+async def test_multi_select_prompt_allows_more_than_one():
+    captured: dict[str, str] = {}
+
+    async def caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        captured["prompt"] = prompt
+        return "Ruby"
+
+    question = FormQuestion(
+        label="Which of these do you know?",
+        kind=QuestionKind.MULTI_SELECT,
+        required=False,
+        options=("Ruby", "Elixir"),
+    )
+    await compose_answers([question], PROFILE, {}, JOB, caller)
+    assert "one or more" in captured["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_multi_select_with_no_matching_option_is_a_gap():
+    async def caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        return "COBOL"
+
+    question = FormQuestion(
+        label="Which of these do you know?",
+        kind=QuestionKind.MULTI_SELECT,
+        required=True,
+        options=("Ruby", "Elixir"),
+    )
+    composed = await compose_answers([question], PROFILE, {}, JOB, caller)
+    assert composed[0].answer is None
+    assert "pick" in composed[0].gap_reason
