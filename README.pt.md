@@ -54,6 +54,17 @@ Um [workspace uv](https://docs.astral.sh/uv/concepts/workspaces/) com 5 namespac
 
 ## Instalação
 
+Com pressa? O caminho inteiro é:
+
+```bash
+uvx moonlighter init                  # wizard: escreve o config.yaml
+# preencha profile.yaml e company_list.yaml (exemplos abaixo)
+claude mcp add-json --scope user moonlighter '{"command":"uvx","args":["moonlighter"]}'
+# sessão nova do Claude → "varre minhas empresas"
+```
+
+Os detalhes:
+
 ### Opção A — plugin do Claude Code (recomendado)
 
 ```
@@ -196,6 +207,17 @@ A extensão privada `moonlighter-linkedin` (não publicada, pelo motivo acima) s
 pro scan — o `LinkedInScanner` dela vive no próprio pacote `moonlighter/linkedin_ext/`, registrado via o
 grupo de entry_points `moonlighter.scanners` acima. Se você for construir sua própria extensão de scanner,
 essa é a forma de referência a copiar.
+
+## Solução de problemas
+
+- **As ferramentas do moonlighter não aparecem no Claude** — servidores MCP são lidos no início da sessão: reinicie o Claude Code (ou abra sessão nova) depois de registrar.
+- **`uvx moonlighter` roda versão velha** — o uvx faz cache de ambientes; rode `uvx --refresh moonlighter` uma vez depois de um release.
+- **Scan não acha nada** — confira o `company_list.yaml`: cada entrada precisa do slug real da empresa no ATS (a parte da URL de careers), sob a chave de source certa. Teste uma empresa com `scan_company` antes de varrer tudo.
+- **Erros de LLM com `llm_backend: cli`** — o backend padrão chama o [CLI do Claude Code](https://claude.ai/code); ele precisa estar instalado e logado. Troque para `llm_backend: api` + `ANTHROPIC_API_KEY` se preferir cobrar em créditos de API.
+- **Avisos de "missing profile / CV"** — peça ao Claude pra rodar `get_pipeline`: além do funil, ele reporta exatamente qual arquivo de setup falta e onde deve ficar.
+- **Sync do Gmail não faz nada** — o rastreio de email é opcional e desligado até o `setup_email` completar o fluxo OAuth; veja a seção do Gmail acima.
+
+Continua travado? [Abra uma discussion](https://github.com/albertosca/moonlighter/discussions) — relato que inclui o que o `get_pipeline` imprimiu anda mais rápido.
 
 ## Engenharia
 
