@@ -15,7 +15,7 @@ from moonlighter.application.answers.option_matcher import match_option_locally
 from moonlighter.application.answers.profile import profile_for_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.core.config import NEEDS_REVIEW_SENTINEL
-from moonlighter.core.llm import LLMCaller
+from moonlighter.core.llm import LLMCaller, is_spend_limit
 from moonlighter.core.parsing import wrap_untrusted
 
 logger = logging.getLogger(__name__)
@@ -86,6 +86,9 @@ class ComposedAnswer:
     def __post_init__(self) -> None:
         if (self.answer is None) == (self.gap_reason is None):
             raise ValueError("a composed answer is either answered or a gap, never both or neither")
+
+
+_SPEND_LIMIT_REASON = "the LLM spend limit was hit — generation aborted, answer this yourself"
 
 
 class _GenerationError(Exception):
@@ -160,6 +163,7 @@ async def compose_answers(
     )
 
     composed: list[ComposedAnswer] = []
+    llm_exhausted = False
     for question in questions:
         if question.kind is QuestionKind.FILE:
             # A file cannot be pasted, but naming the exact file to attach turns a
@@ -196,14 +200,25 @@ async def compose_answers(
                 continue
             answer = value
         else:
+            if llm_exhausted:
+                composed.append(ComposedAnswer(question, None, _SPEND_LIMIT_REASON))
+                continue
             try:
                 answer = await _generate(question, profile, job, llm_caller)
-            except _GenerationError:
-                composed.append(
-                    ComposedAnswer(
-                        question, None, "answer generation failed — answer this yourself"
+            except _GenerationError as e:
+                # After a spend-limit failure every further call is doomed the
+                # same way — one gap per remaining generated answer, no more
+                # calls. Deterministic pre-population above is unaffected.
+                cause = e.__cause__
+                if isinstance(cause, Exception) and is_spend_limit(cause):
+                    llm_exhausted = True
+                    composed.append(ComposedAnswer(question, None, _SPEND_LIMIT_REASON))
+                else:
+                    composed.append(
+                        ComposedAnswer(
+                            question, None, "answer generation failed — answer this yourself"
+                        )
                     )
-                )
                 continue
 
         # pre_populate_answers can hand back its own review sentinel instead of a real

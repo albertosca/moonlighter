@@ -336,7 +336,9 @@ async def test_an_llm_error_reports_generation_failure_not_a_knowledge_gap():
     is a fact about the tool run. They must not share a gap reason."""
 
     async def explodes(prompt: str, model: str, cache_prefix: str | None = None) -> str:
-        raise RuntimeError("spend limit reached")
+        # A non-spend failure: the spend-limit string now routes to its own
+        # abort path (see test_spend_limit_aborts_remaining_generations).
+        raise RuntimeError("backend exploded")
 
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
     composed = await compose_answers([question], PROFILE, {}, JOB, explodes)
@@ -446,3 +448,44 @@ async def test_multi_select_with_no_matching_option_is_a_gap():
     composed = await compose_answers([question], PROFILE, {}, JOB, caller)
     assert composed[0].answer is None
     assert "pick" in composed[0].gap_reason
+
+
+@pytest.mark.asyncio
+async def test_spend_limit_aborts_remaining_generations():
+    # One doomed LLM call per question after the limit is pure latency; the
+    # first spend-limit failure marks every remaining generated answer as a
+    # gap without another call. Deterministic fields are unaffected.
+    calls = {"n": 0}
+
+    async def spent(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        calls["n"] += 1
+        raise RuntimeError("Claude AI usage spend limit reached")
+
+    questions = [
+        FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True),
+        FormQuestion(label="Why now?", kind=QuestionKind.LONG_TEXT, required=True),
+        FormQuestion(label="Email", kind=QuestionKind.TEXT, required=True),
+    ]
+    composed = await compose_answers(questions, PROFILE, {}, JOB, spent)
+
+    assert calls["n"] == 1
+    assert composed[0].answer is None and "spend limit" in composed[0].gap_reason
+    assert composed[1].answer is None and "spend limit" in composed[1].gap_reason
+    assert composed[2].answer == PROFILE["email"]  # deterministic, no LLM needed
+
+
+@pytest.mark.asyncio
+async def test_a_non_spend_failure_still_tries_each_question():
+    calls = {"n": 0}
+
+    async def flaky(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        calls["n"] += 1
+        raise RuntimeError("connection reset")
+
+    questions = [
+        FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True),
+        FormQuestion(label="Why now?", kind=QuestionKind.LONG_TEXT, required=True),
+    ]
+    composed = await compose_answers(questions, PROFILE, {}, JOB, flaky)
+    assert calls["n"] == 2
+    assert all("generation failed" in c.gap_reason for c in composed)
