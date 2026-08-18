@@ -678,13 +678,10 @@ class HNWhoIsHiringScanner(BaseScanner):
             return []
 
     async def _fetch_comment(self, client: httpx.AsyncClient, kid: int) -> RawJob | None:
-        try:
-            r = await client.get(f"{self.BASE}/item/{kid}.json", headers=HEADERS)
-            if r.status_code != 200:
-                return None
-            item = r.json() or {}
-        except Exception:
-            return None
+        # A fetch failure must not flatten into the deleted/dead/empty None:
+        # FetchError propagates to gather(return_exceptions=True) in scan(),
+        # whose stats line counts exactly the not-RawJob-not-None entries.
+        item = await _get_json(client, f"{self.BASE}/item/{kid}.json") or {}
         if not item or item.get("deleted") or item.get("dead"):
             return None
         raw_text = item.get("text") or ""

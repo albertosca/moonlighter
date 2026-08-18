@@ -2400,3 +2400,18 @@ async def test_hn_records_stats_counts_comment_gather_exceptions():
         jobs = await HNWhoIsHiringScanner().scan(stats=stats)
     assert jobs == []
     assert stats["hn_whoishiring"] == SourceStats(companies=0, jobs=0, errors=2)
+
+
+async def test_hn_comment_fetch_failures_count_as_errors_deleted_do_not():
+    # A 404 on a comment used to flatten into the same None as a deleted
+    # comment, so per-comment fetch failures never reached the stats.
+    url_map = _hn_url_map(kids=(201, 203, 999))  # 999 is absent -> 404
+    mock_client = _make_hn_client(url_map)
+    stats = {}
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan(stats=stats)
+
+    assert [j.company for j in jobs] == ["Acme"]
+    s = stats["hn_whoishiring"]
+    assert s.jobs == 1
+    assert s.errors == 1  # the 404; the deleted comment 203 is not an error
