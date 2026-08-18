@@ -11,6 +11,17 @@ AI-powered job application pipeline. Scans job boards, scores candidate fit via 
 
 ## How it works
 
+```mermaid
+flowchart LR
+    A["Claude conversation<br/>(MCP tools)"] --> B["scan<br/>Greenhouse · Lever · Ashby<br/>Recruitee · Workable · SmartRecruiters"]
+    B --> C["evaluate<br/>LLM score against your profile"]
+    C --> D["prepare<br/>complete answer sheet"]
+    D --> E{"YOU review,<br/>paste and submit"}
+    E --> F["employer's ATS"]
+    F -. reply .-> G["track<br/>Gmail, matched by alias"]
+    G --> A
+```
+
 1. **Scan** — fetches job listings from Greenhouse, Lever, Ashby, Recruitee, Workable, and SmartRecruiters for a company list you configure, plus optional remote-first boards (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring) and Gupy, both config-gated off by default. LinkedIn scanning is available as a separate, privately-distributed extension — see [Extensions (adding a new ATS scanner)](#extensions-adding-a-new-ats-scanner) below.
 2. **Evaluate** — scores each job against your profile using an LLM; jobs below the threshold are archived automatically.
 3. **Prepare** — `prepare_application` reads the form's questions (from the ATS API where one publishes them, e.g. Greenhouse/Recruitee) and composes an answer for every question it can, curated from your profile. It renders one reviewable sheet — the whole application, not a screenshot of a fraction of it — with any question it couldn't answer flagged for you. When no API publishes the questions, `prepare_application_from_paste` does the same from text you copy off the page yourself. Either way, you paste the answers into the form and submit it — moonlighter never touches the form or clicks submit.
@@ -183,6 +194,16 @@ The private `moonlighter-linkedin` extension (not published, for the reason abov
 pattern for scanning — its `LinkedInScanner` lives in its own `moonlighter/linkedin_ext/` package,
 registered via the `moonlighter.scanners` entry point group above. If you're building your own scanner
 extension, that's the reference shape to copy.
+
+## Engineering
+
+The pipeline applies for jobs with your name on them, so the bar is trust:
+
+- **1171 tests, 100% branch coverage** — enforced as a CI gate (`--cov-fail-under=100`), not a dashboard number.
+- **mypy strict** across all nine `moonlighter.*` packages; **ruff** with the security (`S`) ruleset on.
+- **Lockstep releases** — the five packages must agree on version, pins and tag before anything uploads; the check runs before the build, because PyPI uploads are irreversible.
+- **Protected main** — every change lands by pull request, with the CLA, the test suite and a security audit as required checks.
+- **Curated, never invented** — answers come only from your profile; ambiguous fields (a salary in the wrong currency, an unclear visa question) are refused back to you instead of silently guessed.
 
 ## License
 

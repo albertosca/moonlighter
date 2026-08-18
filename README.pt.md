@@ -11,6 +11,17 @@ Pipeline de candidatura a vagas com IA. Escaneia portais de emprego, avalia o fi
 
 ## Como funciona
 
+```mermaid
+flowchart LR
+    A["Conversa no Claude<br/>(ferramentas MCP)"] --> B["scan<br/>Greenhouse · Lever · Ashby<br/>Recruitee · Workable · SmartRecruiters"]
+    B --> C["evaluate<br/>nota por LLM contra o seu perfil"]
+    C --> D["prepare<br/>folha de respostas completa"]
+    D --> E{"VOCÊ revisa,<br/>cola e envia"}
+    E --> F["ATS do empregador"]
+    F -. resposta .-> G["track<br/>Gmail, casado por alias"]
+    G --> A
+```
+
 1. **Scan** — busca vagas no Greenhouse, Lever, Ashby, Recruitee, Workable e SmartRecruiters para a lista de empresas que você configura, além de portais remote-first opcionais (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring) e Gupy, ambos desativados por padrão (config-gated). O scan do LinkedIn está disponível como uma extensão separada, distribuída de forma privada — veja [Extensões (adicionando um novo scanner de ATS)](#extensões-adicionando-um-novo-scanner-de-ats) abaixo.
 2. **Avaliação** — pontua cada vaga em relação ao seu perfil via LLM; vagas abaixo do limiar são arquivadas automaticamente.
 3. **Preparo** — `prepare_application` lê as perguntas do formulário (via API do ATS quando ela publica isso, ex: Greenhouse/Recruitee) e compõe uma resposta pra cada pergunta que conseguir, com base no seu perfil. Ele renderiza uma única folha revisável — a candidatura inteira, não um screenshot de uma fração dela — com qualquer pergunta que não conseguiu responder sinalizada pra você. Quando nenhuma API publica as perguntas, `prepare_application_from_paste` faz o mesmo a partir de um texto que você mesmo copia da página. Nos dois casos, você é quem cola as respostas no formulário e envia — o moonlighter nunca toca o formulário nem clica em enviar.
@@ -185,6 +196,16 @@ A extensão privada `moonlighter-linkedin` (não publicada, pelo motivo acima) s
 pro scan — o `LinkedInScanner` dela vive no próprio pacote `moonlighter/linkedin_ext/`, registrado via o
 grupo de entry_points `moonlighter.scanners` acima. Se você for construir sua própria extensão de scanner,
 essa é a forma de referência a copiar.
+
+## Engenharia
+
+O pipeline se candidata a vagas com o seu nome nelas, então a régua é confiança:
+
+- **1171 testes, 100% de cobertura de branches** — imposta como gate de CI (`--cov-fail-under=100`), não número de dashboard.
+- **mypy strict** nos nove pacotes `moonlighter.*`; **ruff** com o ruleset de segurança (`S`) ligado.
+- **Releases em lockstep** — os cinco pacotes precisam concordar em versão, pins e tag antes de qualquer upload; a checagem roda antes do build, porque upload no PyPI é irreversível.
+- **main protegido** — toda mudança entra por pull request, com CLA, suite de testes e auditoria de segurança como checks obrigatórios.
+- **Curado, nunca inventado** — respostas saem só do seu perfil; campo ambíguo (salário em moeda errada, pergunta de visto confusa) volta pra sua revisão em vez de virar chute silencioso.
 
 ## Licença
 
