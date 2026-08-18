@@ -18,7 +18,7 @@ from moonlighter.application.assisted.sources.greenhouse import (
 from moonlighter.application.assisted.sources.pasted import extract_questions_from_page
 from moonlighter.application.assisted.sources.recruitee import (
     fetch_recruitee_questions,
-    slug_and_offer_from_url,
+    host_and_offer_from_url,
 )
 from moonlighter.core.db import Application, Job
 from moonlighter.core.llm import make_caller
@@ -42,7 +42,7 @@ async def _questions_from_api(job: Job) -> list[FormQuestion]:
         # stays source-gated below — its /o/ pattern matches any host.)
         if found := board_and_job_from_url(job.url):
             return await fetch_greenhouse_questions(found[0], found[1], client)
-        if job.source == "recruitee" and (found := slug_and_offer_from_url(job.url)):
+        if job.source == "recruitee" and (found := host_and_offer_from_url(job.url)):
             return await fetch_recruitee_questions(found[0], found[1], client)
     return []
 
