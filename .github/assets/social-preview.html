@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    background: linear-gradient(135deg, #0B1026 0%, #101632 55%, #151C3F 100%);
+    font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+    position: relative;
+    color: #F2ECDA;
+  }
+  .star { position: absolute; border-radius: 50%; background: #F2ECDA; }
+  .moon {
+    position: absolute; right: 96px; top: 96px;
+    width: 300px; height: 300px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 40%, #F5EFDB 0%, #E8DDB4 45%, #DFC178 100%);
+    box-shadow: 0 0 90px 18px rgba(223, 193, 120, 0.18);
+  }
+  .moon-shadow {
+    position: absolute; right: 60px; top: 66px;
+    width: 300px; height: 300px; border-radius: 50%;
+    background: #0e1430;
+  }
+  .content { position: absolute; left: 96px; top: 178px; width: 760px; }
+  .wordmark {
+    font-family: "Menlo", monospace;
+    font-size: 92px; font-weight: 700; letter-spacing: -3px;
+    color: #F2ECDA;
+  }
+  .wordmark .dim { color: #8A92B6; font-weight: 400; }
+  .tagline {
+    margin-top: 30px;
+    font-size: 31px; font-weight: 500; line-height: 1.4;
+    color: #B9BFD9; max-width: 780px;
+  }
+  .tagline b { color: #F2ECDA; font-weight: 600; }
+  .pipeline {
+    position: absolute; left: 96px; bottom: 78px;
+    font-family: "Menlo", monospace;
+    font-size: 24px; color: #8A92B6; letter-spacing: 0.5px;
+  }
+  .pipeline .you { color: #DFC178; font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="star" style="left:180px;  top:80px;  width:3px; height:3px; opacity:.55"></div>
+  <div class="star" style="left:430px;  top:52px;  width:2px; height:2px; opacity:.4"></div>
+  <div class="star" style="left:700px;  top:120px; width:3px; height:3px; opacity:.5"></div>
+  <div class="star" style="left:1030px; top:470px; width:2px; height:2px; opacity:.45"></div>
+  <div class="star" style="left:860px;  top:70px;  width:2px; height:2px; opacity:.35"></div>
+  <div class="star" style="left:290px;  top:520px; width:2px; height:2px; opacity:.3"></div>
+  <div class="star" style="left:1180px; top:180px; width:3px; height:3px; opacity:.5"></div>
+  <div class="star" style="left:80px;   top:320px; width:2px; height:2px; opacity:.3"></div>
+
+  <div class="moon"></div>
+  <div class="moon-shadow"></div>
+
+  <div class="content">
+    <div class="wordmark">moonlighter<span class="dim">_</span></div>
+    <div class="tagline">Job hunting from a <b>Claude conversation</b> — scans the boards, scores the fit, writes every answer.</div>
+  </div>
+
+  <div class="pipeline">scan → evaluate → prepare → <span class="you">YOU review &amp; submit</span></div>
+</body>
+</html>
