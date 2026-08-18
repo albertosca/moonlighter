@@ -2,6 +2,11 @@
 
 # moonlighter
 
+[![PyPI](https://img.shields.io/pypi/v/moonlighter)](https://pypi.org/project/moonlighter/)
+[![Python](https://img.shields.io/pypi/pyversions/moonlighter)](https://pypi.org/project/moonlighter/)
+[![CI](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml/badge.svg)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+
 Pipeline de candidatura a vagas com IA. Escaneia portais de emprego, avalia o fit do candidato via LLM e compõe todas as respostas que um formulário de candidatura pede — tudo orquestrado pelo Claude através de um servidor [Model Context Protocol](https://modelcontextprotocol.io) (MCP). O moonlighter nunca abre um browser pra preencher ou enviar um formulário, e nunca envia uma candidatura em seu nome — veja [Como funciona](#como-funciona) abaixo e [DISCLAIMER.md](DISCLAIMER.md) (em inglês).
 
 ## Como funciona
