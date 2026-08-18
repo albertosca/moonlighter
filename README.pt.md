@@ -3,7 +3,7 @@
 # moonlighter
 
 [![PyPI](https://img.shields.io/pypi/v/moonlighter)](https://pypi.org/project/moonlighter/)
-[![Python](https://img.shields.io/pypi/pyversions/moonlighter)](https://pypi.org/project/moonlighter/)
+[![Python](https://img.shields.io/badge/python-3.14%2B-blue)](https://pypi.org/project/moonlighter/)
 [![CI](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml/badge.svg)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
