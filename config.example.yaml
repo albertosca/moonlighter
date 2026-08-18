@@ -78,3 +78,8 @@ email:
     - technical_interview
     - system_design
     - final_interview
+
+# Portal-feed jobs (RemoteOK, Remotive, WeWorkRemotely, HN Who Is Hiring) can
+# never be staleness-checked at their source; archive_stale_jobs archives them
+# once they age past this many days. 0 disables age-based archiving.
+# portal_max_age_days: 30
