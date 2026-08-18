@@ -160,7 +160,7 @@ Reinicie o Claude Code, ou inicie uma nova sessão, para que as ferramentas do m
 
 1. Crie um projeto no [Google Cloud Console](https://console.cloud.google.com), ative a API do
    Gmail e baixe as credenciais OAuth como `client.json`.
-2. Coloque o arquivo em `~/.moonlighter/gmail-client.json`.
+2. Coloque o arquivo como `gmail-client.json` dentro do `MOONLIGHTER_HOME` (padrão `~/.moonlighter/`).
 3. Na primeira chamada a `setup_email`, um browser abrirá para autorização e o token será salvo.
 
 ### Desenvolvendo no moonlighter
