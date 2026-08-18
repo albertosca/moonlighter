@@ -181,3 +181,38 @@ def test_a_realistic_mix_keeps_every_marker_on_its_own_question():
     assert "!! I DON'T KNOW" in salary
     assert "no basis in your profile to answer" in salary
     assert "1 of 4 need you" in sheet
+
+
+def test_multi_select_renders_every_chosen_option():
+    question = FormQuestion(
+        label="Which of these do you know?",
+        kind=QuestionKind.MULTI_SELECT,
+        required=True,
+        options=("Ruby", "Elixir", ".NET"),
+    )
+    sheet = render_sheet(
+        [ComposedAnswer(question, "Ruby\nElixir", None)],
+        job_title="T",
+        company="C",
+        apply_url="http://x",
+    )
+    assert "> Ruby" in sheet
+    assert "> Elixir" in sheet
+    assert "not chosen: .NET" in sheet
+    assert "pick any of 3" in sheet
+
+
+def test_multi_select_with_every_option_chosen_has_no_not_chosen_line():
+    question = FormQuestion(
+        label="Which of these do you know?",
+        kind=QuestionKind.MULTI_SELECT,
+        required=True,
+        options=("Ruby", "Elixir"),
+    )
+    sheet = render_sheet(
+        [ComposedAnswer(question, "Ruby\nElixir", None)],
+        job_title="T",
+        company="C",
+        apply_url="http://x",
+    )
+    assert "not chosen" not in sheet

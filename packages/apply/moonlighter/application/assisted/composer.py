@@ -111,8 +111,16 @@ async def _generate(
         # the fact right there in the prompt. Hedging downward misrepresents the
         # candidate exactly like overclaiming does, just in the safer-feeling
         # direction.
+        # A multi-select answered with a single pick under-claims structurally
+        # ("which of these do you know?"); the model may take every option the
+        # profile supports.
+        how_many = (
+            "one or more of these options, one per line"
+            if question.kind is QuestionKind.MULTI_SELECT
+            else "exactly one of these options"
+        )
         constraint = (
-            f"Reply with exactly one of these options, copied verbatim:\n{options}\n"
+            f"Reply with {how_many}, copied verbatim:\n{options}\n"
             "Pick the strongest option the profile supports: when the profile states "
             "the fact plainly (a language listed as fluent, a technology used in "
             "production), do not choose a weaker option than the fact warrants."
@@ -223,7 +231,19 @@ async def compose_answers(
             )
             continue
 
-        if question.is_choice:
+        if question.kind is QuestionKind.MULTI_SELECT:
+            picks: list[str] = []
+            for part in re.split(r"[\n,]+", answer):
+                matched = match_option_locally(part.strip(), list(question.options))
+                if matched and matched not in picks:
+                    picks.append(matched)
+            if not picks:
+                composed.append(
+                    ComposedAnswer(question, None, "no offered option matches — pick yourself")
+                )
+                continue
+            answer = "\n".join(picks)
+        elif question.is_choice:
             picked = match_option_locally(answer, list(question.options))
             if picked is None:
                 composed.append(

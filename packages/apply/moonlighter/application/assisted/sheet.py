@@ -26,6 +26,12 @@ def _entry(index: int, total: int, item: ComposedAnswer) -> str:
     lines = [f"[{index}/{total}] {question.label}{suffix}"]
     if item.answer is None:
         lines.append(f"{GAP} — {item.gap_reason}")
+    elif question.kind is QuestionKind.MULTI_SELECT:
+        chosen = item.answer.split("\n")
+        lines.extend(f"> {c}" for c in chosen)
+        others = [o for o in question.options if o not in chosen]
+        if others:
+            lines.append(f"  not chosen: {' / '.join(others)}")
     elif question.is_choice:
         lines.append(f"> {item.answer}")
         others = [o for o in question.options if o != item.answer]
