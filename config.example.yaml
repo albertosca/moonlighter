@@ -64,8 +64,10 @@ cv:
 # Email monitoring (Gmail OAuth). Optional — only if you want to track replies.
 email:
   address: "your-email@gmail.com"
-  credentials_path: "~/.moonlighter/gmail-client.json"
-  token_path: "~/.moonlighter/gmail-token.json"
+  # Relative filenames resolve under MOONLIGHTER_HOME (works with a custom
+  # MOONLIGHTER_HOME too — a hardcoded ~/.moonlighter path would not).
+  credentials_path: "gmail-client.json"
+  token_path: "gmail-token.json"
   processed_label: "moonlighter/processed"
   # false (default) = sync is read-only; dedup is done in a local table.
   mark_processed: false
