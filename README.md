@@ -186,6 +186,15 @@ extension, that's the reference shape to copy.
 
 ## License
 
-AGPL-3.0 — see [LICENSE](LICENSE).  
+AGPL-3.0 — see [LICENSE](LICENSE): use it, fork it, modify it — as long as what you distribute
+or serve over a network stays open.
+
+### Commercial licensing
+
+If you want to offer moonlighter as a hosted or paid service without the AGPL's obligations, a
+commercial license is available — [open an issue](https://github.com/albertosca/moonlighter/issues)
+to start that conversation. The [CLA](CLA.md) every contributor signs exists exactly to keep this
+offer possible.
+
 See [DISCLAIMER.md](DISCLAIMER.md) for important notes on ToS, automation, and LLM backend usage.
 See [PRIVACY.md](PRIVACY.md) for what data this tool stores and where it goes.
