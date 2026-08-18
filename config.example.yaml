@@ -68,6 +68,12 @@ email:
   # MOONLIGHTER_HOME too — a hardcoded ~/.moonlighter path would not).
   credentials_path: "gmail-client.json"
   token_path: "gmail-token.json"
+  # Post-sync cleanup (both default false; either one requires the gmail.modify
+  # scope — setup_email() re-consent if your token is readonly):
+  #   archive_ref_matched: true    # mark read + archive replies matched by alias
+  #                                # that applied a pipeline update (certainty only)
+  #   archive_all_classified: true # superset: also fuzzy/uncertain classified mail;
+  #                                # 'unrelated' mail is never touched
   processed_label: "moonlighter/processed"
   # false (default) = sync is read-only; dedup is done in a local table.
   mark_processed: false
