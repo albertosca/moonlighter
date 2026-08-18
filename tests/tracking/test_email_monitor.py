@@ -1388,6 +1388,55 @@ class TestSyncResponses:
         service.users().messages().modify().execute.return_value = {}
         return service
 
+    async def test_ref_match_reports_the_db_job_not_the_email_guess(self, tmp_db):
+        # The classifier reads company/title off the EMAIL and often can't
+        # (rejections rarely repeat the title) — but a ref match already knows
+        # the exact Job. The update must carry the DB truth, not "?" material.
+        init_db()
+        job = _make_job(tmp_db, company="Acme Robotics", title="Staff Engineer")
+        _make_application(job, status="submitted", email_ref="q9ref1")
+
+        messages = [
+            {
+                "to": "candidaturas+q9ref1@gmail.com",
+                "from_": "no-reply@acme.com",
+                "subject": "Your application",
+                "body": "Thank you for applying. We will not move forward.",
+            }
+        ]
+        classify_result = {
+            "type": "rejection",
+            "stage": None,
+            "new_stage": None,
+            "company": None,
+            "job_title": None,
+            "summary": "Rejection.",
+        }
+        service = self._mock_service(messages)
+
+        with (
+            patch("moonlighter.tracking.email_monitor.setup_gmail_service", return_value=service),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
+                return_value=[{"id": "msg0", "threadId": "t0"}],
+            ),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=messages[0]),
+            patch(
+                "moonlighter.tracking.email_monitor.classify_response",
+                new=AsyncMock(return_value=classify_result),
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
+        ):
+            from moonlighter.tracking.email_monitor import sync_responses
+
+            updates = await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
+
+        assert len(updates) == 1
+        assert updates[0]["company"] == "Acme Robotics"
+        assert updates[0]["title"] == "Staff Engineer"
+
     async def test_email_with_ref_updates_application_status(self, tmp_db):
         init_db()
         job = _make_job(tmp_db)
