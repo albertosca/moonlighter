@@ -3,17 +3,17 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "moonlighter-full"
+name = "moonlighter"
 version = "0.1.0"
 description = "Full moonlighter bundle — MCP server exposing all tools to Claude"
 license = {text = "AGPL-3.0-only"}
 authors = [{name = "Alberto de Sá Cavalcanti de Albuquerque", email = "albertoalbuquerque01@gmail.com"}]
 requires-python = ">=3.14"
 dependencies = [
-    "moonlighter-core>=0.1.0",
-    "moonlighter-scan>=0.1.0",
-    "moonlighter-apply>=0.1.0",
-    "moonlighter-email>=0.1.0",
+    "moonlighter-core==0.1.0",
+    "moonlighter-scan==0.1.0",
+    "moonlighter-apply==0.1.0",
+    "moonlighter-email==0.1.0",
     "fastmcp>=2.0",
 ]
 

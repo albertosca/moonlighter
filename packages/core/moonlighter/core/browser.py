@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import subprocess
 import urllib.request
 from pathlib import Path
@@ -109,10 +110,50 @@ async def new_page(config: dict[str, Any]) -> Page:
 
 
 async def save_screenshot(page: Page, job_id: int, step: str, config: dict[str, Any]) -> str:
+    """Capture the page, restoring a minimized window for the duration.
+
+    `page.screenshot()` captures from the compositor surface, and a minimized
+    window produces no new frames — the call then blocks until it times out.
+    The browser-driven filler this predates minimized the window before
+    filling, which made the 03-filled review artifact impossible to produce,
+    on every ATS. Reproduced on both Greenhouse and Recruitee; `fromSurface:
+    False` was measured as an alternative and took 175s, so restoring around
+    the capture it is. Kept for browser-based extensions (e.g. LinkedIn
+    scanning) that still drive a page — the assisted flow that replaced the
+    in-repo filler never opens a browser.
+
+    The window is put back exactly as it was, so the two screenshots taken with
+    the window deliberately visible are not minimized as a side effect. Every
+    window-state call is best-effort (as elsewhere in this module): losing the
+    minimized posture must never cost us the screenshot.
+    """
     screenshots_dir = Path(config["screenshots_dir"]) / str(job_id)
     screenshots_dir.mkdir(parents=True, exist_ok=True)
     path = str(screenshots_dir / f"{step}.png")
-    await page.screenshot(path=path)
+
+    cdp = None
+    window_id = None
+    with contextlib.suppress(Exception):
+        cdp = await page.context.new_cdp_session(page)
+        info = await cdp.send("Browser.getWindowForTarget")
+        if info.get("bounds", {}).get("windowState") == "minimized":
+            window_id = info["windowId"]
+            await cdp.send(
+                "Browser.setWindowBounds",
+                {"windowId": window_id, "bounds": {"windowState": "normal"}},
+            )
+    try:
+        # full_page, because this is a review artifact: the viewport is ~750 CSS
+        # px and a real application form runs to ~4500, so a viewport capture
+        # showed 17% of it — asking a human to approve what they cannot see.
+        await page.screenshot(path=path, full_page=True)
+    finally:
+        if cdp is not None and window_id is not None:
+            with contextlib.suppress(Exception):
+                await cdp.send(
+                    "Browser.setWindowBounds",
+                    {"windowId": window_id, "bounds": {"windowState": "minimized"}},
+                )
     return path
 
 
@@ -133,6 +174,31 @@ async def hide_window(page: Page) -> None:
 async def show_window(page: Page) -> None:
     """Restore and focus the browser window via CDP. Idempotent."""
     await _set_window_state(page, "normal")
+
+
+async def detach() -> None:
+    """Let go of the browser completely, leaving it running for the human.
+
+    Unlike close(), the browser PROCESS survives — the window, its tabs and a
+    filled-in form stay exactly as they are. Only the Playwright driver goes
+    away, so the page stops being automation-controlled.
+
+    This exists for captcha: a token minted inside a CDP-controlled tab does not
+    validate server-side (Recruitee answers HTTP 422 on captchaToken), so the
+    only honest handover is to actually stop driving. Errors on the way out are
+    swallowed, but the handles are cleared regardless — a stale connection would
+    be reused by the next call.
+    """
+    global _playwright, _browser
+    if _browser:
+        with contextlib.suppress(Exception):
+            await _browser.close()
+        _browser = None
+    if _playwright:
+        with contextlib.suppress(Exception):
+            await _playwright.stop()
+        _playwright = None
+    logger.info("browser: detached — no longer automation-controlled")
 
 
 async def close() -> None:

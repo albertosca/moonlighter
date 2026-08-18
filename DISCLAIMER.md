@@ -3,14 +3,18 @@
 ## Third-Party Terms of Service
 
 This tool interacts with job boards and applicant tracking systems (LinkedIn, Greenhouse, Lever,
-Ashby, Workable, SmartRecruiters, Recruitee, and optionally Gupy) by driving a real browser or
-making HTTP requests, always through **your own account/session**, applying to **real postings on
-your own behalf** — never scraping other candidates' data, never creating fake accounts, never
-sending bulk/spam applications. Use of these platforms is subject to their respective Terms of
-Service. **You use this software at your own risk and are solely responsible for compliance with
-any applicable ToS.** This section is a factual summary of public research, not legal advice —
-verify against the current terms yourself before relying on it, especially since terms change
-over time.
+Ashby, Workable, SmartRecruiters, Recruitee, and optionally Gupy), always through **your own
+account/session**, to find and evaluate **real postings for your own applications** — never
+scraping other candidates' data, never creating fake accounts, never sending bulk/spam
+applications. The default interaction is read-only HTTP requests (discovery scans and, where an
+ATS exposes it, reading a job's application-question schema). Driving a real browser is limited to
+the optional `moonlighter-core[browser]` extra, used by browser-based scanner plugins (e.g. the
+privately-distributed LinkedIn add-on) strictly for login and listing scans — never for filling in
+or submitting a form; see [Browser Automation](#browser-automation) below and
+[PRIVACY.md](PRIVACY.md). Use of these platforms is subject to their respective Terms of Service.
+**You use this software at your own risk and are solely responsible for compliance with any
+applicable ToS.** This section is a factual summary of public research, not legal advice — verify
+against the current terms yourself before relying on it, especially since terms change over time.
 
 **LinkedIn** — the User Agreement (§8.2) broadly and explicitly prohibits scraping and "bots or
 other unauthorized automated methods," with no stated carve-out for personal, single-account,
@@ -34,11 +38,14 @@ non-lawyer analysis and citations — not legal advice):
   program is not realistically obtainable by an individual developer, and the most visible
   third-party "licensed" LinkedIn job-data provider (Proxycurl) was sued by LinkedIn and shut down
   in 2025.
-- One mitigation already built into the tool's architecture, worth naming explicitly: applying is
-  always two explicit, separate steps — `fill_application` fills the form and produces a screenshot
-  for your own review, and `submit_application` is a distinct, separately-invoked action. This is
-  human-supervised, assisted form-filling, not unattended bulk auto-apply — true for every ATS this
-  tool talks to, including LinkedIn.
+- One mitigation already built into the tool's architecture, worth naming explicitly: moonlighter
+  never drives a browser to fill in or submit an application. `prepare_application` (or
+  `prepare_application_from_paste`, when no API publishes the form's questions) composes an answer
+  for every question it can, from your profile, and renders the whole application as one
+  reviewable sheet — flagging anything it couldn't answer for you to fill in by hand. You paste
+  the answers into the form and submit it yourself. This is human-supervised, assisted answer
+  composition, not unattended bulk auto-apply — true for every ATS this tool talks to, including
+  LinkedIn.
 
 By using this tool against LinkedIn, you are choosing to accept that contractual/account risk
 yourself — this project takes no responsibility for account restrictions LinkedIn may impose.
@@ -83,9 +90,18 @@ that applier.
 
 ## Browser Automation
 
-This tool automates form submission in job application portals. Excessive, abusive, or
-high-frequency use may result in your account being flagged, rate-limited, or banned by the
-platform. Use responsibly and only for legitimate, human-supervised job applications.
+The shipped product never drives a browser to fill in or submit a form — see the LinkedIn bullet
+above and [PRIVACY.md](PRIVACY.md) for how `prepare_application` composes answers for you to paste
+in and submit yourself. Browser-driven form fill/submit was built and then deliberately moved off
+the distributed product, onto a separate, paused branch (`feat/ats-automation`) not included in
+any release.
+
+The browser automation that *does* ship is narrower: the optional `moonlighter-core[browser]`
+extra, used only by browser-based scanner plugins (e.g. the LinkedIn add-on) to log in and scan
+listings. That is still automated interaction with a third-party platform, and the same ToS-risk
+framing applies to it — excessive, abusive, or high-frequency scanning may result in your account
+being flagged, rate-limited, or banned by the platform, same as the LinkedIn discussion above. Use
+responsibly, keep scan frequency reasonable, and only for legitimate, single-account, personal use.
 
 ## LLM Backend — `cli` mode
 

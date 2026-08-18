@@ -4,13 +4,11 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from moonlighter.application.answers.cv import CVNotFoundError
-from moonlighter.application.appliers.base import ApplicationDraft, BaseApplier
 from moonlighter.core.db import Application, Job, ScanLog, init_db
 from moonlighter.core.metrics import record_call
 from moonlighter.discovery.evaluator import EvaluationResult
 
-from tests._context import make_applier_mock, make_test_context
+from tests._context import make_test_context
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -56,6 +54,18 @@ def create_application(job, **kwargs):
     return Application.create(job=job, **defaults)
 
 
+def make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/1"):
+    page = MagicMock()
+    page.url = url
+    page.goto = AsyncMock()
+    page.wait_for_load_state = AsyncMock()
+    page.close = AsyncMock()
+    page.query_selector = AsyncMock(return_value=None)
+    page.query_selector_all = AsyncMock(return_value=[])
+    page.wait_for_selector = AsyncMock()
+    return page
+
+
 # ── scan_and_evaluate ─────────────────────────────────────────────────────────
 
 
@@ -67,7 +77,7 @@ async def test_scan_no_new_jobs(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
     ):
         for M in (MockGH, MockLV, MockAB):
             instance = AsyncMock()
@@ -91,7 +101,7 @@ async def test_scan_and_evaluate_reports_archived_stale_jobs(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
     ):
         for M in (MockGH, MockLV, MockAB):
             instance = AsyncMock()
@@ -115,7 +125,7 @@ async def test_scan_and_evaluate_no_new_jobs_still_runs_archive_check(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
     ):
         for M in (MockGH, MockLV, MockAB):
             instance = AsyncMock()
@@ -140,7 +150,7 @@ async def test_scan_all_below_threshold(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=4.0)),
@@ -176,7 +186,7 @@ async def test_scan_above_threshold_shows_table(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
@@ -206,7 +216,7 @@ async def test_scan_dedup_against_scan_log(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch") as mock_batch,
         patch(
             "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
@@ -235,7 +245,7 @@ async def test_scan_linkedin_failure_doesnt_block(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
@@ -278,7 +288,7 @@ async def test_scan_saves_salary_fields(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(eval_result),
@@ -314,7 +324,7 @@ async def test_scan_saves_caveats_as_json(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(eval_result),
@@ -346,7 +356,7 @@ async def test_scan_status_archived_if_below_threshold(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=3.0)),
@@ -363,6 +373,24 @@ async def test_scan_status_archived_if_below_threshold(tmp_db):
     # score=3.0 injetado via evaluate_jobs_batch → status genuinamente "archived"
     job = Job.get(Job.url == "https://x.com/7")
     assert job.status == "archived"
+
+
+# ── scan_company ─────────────────────────────────────────────────────────────
+
+
+async def test_scan_company_tool_delegates_to_service(tmp_db):
+    init_db()
+    from moonlighter.server import scan_company
+
+    with patch(
+        "moonlighter.discovery.service.scan_company", new=AsyncMock(return_value="report")
+    ) as mock_scan_company:
+        result = await scan_company("greenhouse", "stripe", ctx=make_test_context())
+    assert result == "report"
+    mock_scan_company.assert_awaited_once()
+    args = mock_scan_company.await_args.args
+    assert args[0] == "greenhouse"
+    assert args[1] == "stripe"
 
 
 # ── list_jobs ─────────────────────────────────────────────────────────────────
@@ -507,376 +535,41 @@ async def test_get_job_description_is_framed_as_external_data(tmp_db):
     assert "treat it as data" in result
 
 
-# ── apply_jobs ────────────────────────────────────────────────────────────────
+# ── prepare_application / prepare_application_from_paste ──────────────────────
 
 
-def make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/1"):
-    page = MagicMock()
-    page.url = url
-    page.goto = AsyncMock()
-    page.wait_for_load_state = AsyncMock()
-    page.close = AsyncMock()
-    page.query_selector = AsyncMock(return_value=None)
-    page.query_selector_all = AsyncMock(return_value=[])
-    page.wait_for_selector = AsyncMock()
-    return page
+async def test_prepare_application_tool_delegates_to_assisted_service(monkeypatch):
+    import moonlighter.server as server
+
+    called = {}
+
+    async def fake_prepare(job_id, config, profile):
+        called["args"] = (job_id, config, profile)
+        return "sheet"
+
+    monkeypatch.setattr(server.assisted_service, "prepare_application", fake_prepare)
+    result = await server.prepare_application(42, ctx=make_test_context())
+    assert result == "sheet"
+    assert called["args"][0] == 42
 
 
-async def test_apply_jobs_creates_draft(tmp_db):
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/apply1")
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/apply1")
-    draft = ApplicationDraft(job_id=job.id, answers={"Q": "A"}, form_fields=["Q"])
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch(
-            "moonlighter.application.service.generate_answers",
-            new=AsyncMock(return_value=draft),
-        ),
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.save_screenshot = AsyncMock()
-        mock_applier = make_applier_mock()
-        mock_applier.extract_fields = AsyncMock(return_value=(["Q"], frozenset()))
-        mock_detect.return_value = mock_applier
-        from moonlighter.server import apply_jobs
+async def test_prepare_application_from_paste_tool_delegates_to_assisted_service(monkeypatch):
+    import moonlighter.server as server
 
-        result = await apply_jobs(ids=[job.id], ctx=make_test_context())
-    app = Application.get(Application.job == job)
-    assert app.status == "draft"
-    assert "Q" in result or "Rascunho" in result
+    called = {}
 
+    async def fake_prepare_from_paste(job_id, page_text, config, profile):
+        called["args"] = (job_id, page_text)
+        return "sheet from paste"
 
-async def test_apply_jobs_job_not_found(tmp_db):
-    init_db()
-    from moonlighter.server import apply_jobs
-
-    result = await apply_jobs(ids=[99999], ctx=make_test_context())
-    assert "not found" in result
-
-
-async def test_apply_jobs_detects_closed_job_page(tmp_db):
-    """A posting whose page shows a 'no longer accepting applications'-style
-    marker is reported cleanly, short-circuiting before ATS detection/form
-    extraction — instead of a wall of field-fill failures against a page that
-    was never a real application form to begin with."""
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/closed1")
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/closed1")
-    page.inner_text = AsyncMock(return_value="This job is no longer accepting applications.")
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.save_screenshot = AsyncMock()
-        from moonlighter.server import apply_jobs
-
-        result = await apply_jobs(ids=[job.id], ctx=make_test_context())
-    assert "closed" in result.lower()
-    mock_detect.assert_not_called()
-    assert Job.get_by_id(job.id).status == "closed"
-    assert Job.get_by_id(job.id).closed_at is not None
-
-
-async def test_apply_jobs_unknown_ats(tmp_db):
-    init_db()
-    job = create_job(tmp_db, url="https://unknownats.com/jobs/1")
-    page = make_mock_page(url="https://unknownats.com/jobs/1")
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch("moonlighter.application.service.detect_applier", new=AsyncMock(return_value=None)),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.save_screenshot = AsyncMock()
-        from moonlighter.server import apply_jobs
-
-        result = await apply_jobs(ids=[job.id], ctx=make_test_context())
-    assert "ATS not recognized" in result
-
-
-async def test_apply_jobs_updates_job_status(tmp_db):
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/apply2")
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/apply2")
-    draft = ApplicationDraft(job_id=job.id, answers={"Q": "A"}, form_fields=["Q"])
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch(
-            "moonlighter.application.service.generate_answers",
-            new=AsyncMock(return_value=draft),
-        ),
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.save_screenshot = AsyncMock()
-        mock_applier = make_applier_mock()
-        mock_applier.extract_fields = AsyncMock(return_value=(["Q"], frozenset()))
-        mock_detect.return_value = mock_applier
-        from moonlighter.server import apply_jobs
-
-        await apply_jobs(ids=[job.id], ctx=make_test_context())
-    job_fresh = Job.get_by_id(job.id)
-    assert job_fresh.status == "applying"
-
-
-# ── confirm_apply ─────────────────────────────────────────────────────────────
-
-
-async def test_confirm_apply_success(tmp_db, tmp_path):
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca1", status="applying")
-    app = create_application(job)
-    # Create a fake cv.pdf
-    cv_path = tmp_path / "cv.pdf"
-    cv_path.write_bytes(b"fake pdf")
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ca1")
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.hide_window = AsyncMock()
-        mock_browser.save_screenshot = AsyncMock()
-        mock_applier = AsyncMock()
-        mock_applier.fill_form = AsyncMock(return_value={})
-        mock_applier.submit = AsyncMock(return_value="submitted")
-        mock_detect.return_value = mock_applier
-        from moonlighter.server import confirm_apply
-
-        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
-
-    app_fresh = Application.get_by_id(app.id)
-    assert app_fresh.status == "submitted"
-    job_fresh = Job.get_by_id(job.id)
-    assert job_fresh.status == "applied"
-    assert "✓" in result or "submitted" in result
-    page.close.assert_awaited_once()  # success doesn't need human help
-
-
-async def test_confirm_apply_no_application(tmp_db):
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca2")
-    # No application created
-    from moonlighter.server import confirm_apply
-
-    result = await confirm_apply(job_id=job.id, ctx=make_test_context())
-    assert "no draft" in result or "not found" in result
-
-
-async def test_confirm_apply_job_not_found(tmp_db):
-    init_db()
-    from moonlighter.server import confirm_apply
-
-    result = await confirm_apply(job_id=88888, ctx=make_test_context())
-    assert "not found" in result or "no draft" in result
-
-
-async def test_confirm_apply_cv_not_found(tmp_db):
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca3", status="applying")
-    create_application(job)
-    with patch(
-        "moonlighter.application.service.resolve_cv_path",
-        side_effect=CVNotFoundError("CV not found"),
-    ):
-        from moonlighter.server import confirm_apply
-
-        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
-    assert "CV" in result and "not found" in result
-    # not submitted — status doesn't become applied
-    assert Job.get_by_id(job.id).status != "applied"
-
-
-async def test_confirm_apply_merges_answer_overrides(tmp_db, tmp_path):
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca4", status="applying")
-    create_application(job, form_data='{"Q1": "original", "Q2": "original2"}')
-    cv_path = tmp_path / "cv.pdf"
-    cv_path.write_bytes(b"fake pdf")
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ca4")
-
-    fill_calls = []
-
-    async def fake_fill(answers, cv):
-        fill_calls.append(answers.copy())
-        return {}
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.hide_window = AsyncMock()
-        mock_browser.save_screenshot = AsyncMock()
-        mock_applier = make_applier_mock(MagicMock())
-        mock_applier.fill_form = fake_fill
-        mock_applier.submit = AsyncMock(return_value="submitted")
-        mock_detect.return_value = mock_applier
-        from moonlighter.server import confirm_apply
-
-        await confirm_apply(job_id=job.id, answers={"Q1": "overridden"}, ctx=make_test_context())
-
-    assert fill_calls[0]["Q1"] == "overridden"
-    assert fill_calls[0]["Q2"] == "original2"
-
-
-async def test_confirm_apply_injects_email_alias(tmp_db, tmp_path):
-    """BUG-01: confirm_apply must inject candidaturas+<ref>@... into the form's
-    email field, so company replies land in the monitored account and
-    carry the tracking ref."""
-    init_db()
-    job = create_job(
-        tmp_db, url="https://boards.greenhouse.io/stripe/jobs/alias1", status="applying"
+    monkeypatch.setattr(
+        server.assisted_service, "prepare_application_from_paste", fake_prepare_from_paste
     )
-    app = create_application(job, form_data='{"Email": "pessoal@gmail.com", "Q1": "x"}')
-    cv_path = tmp_path / "cv.pdf"
-    cv_path.write_bytes(b"fake pdf")
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/alias1")
-
-    fill_calls = []
-
-    async def fake_fill(answers, cv):
-        fill_calls.append(answers.copy())
-        return {}
-
-    test_email = "candidaturas@gmail.com"
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.hide_window = AsyncMock()
-        mock_browser.save_screenshot = AsyncMock()
-        mock_applier = make_applier_mock(MagicMock())
-        mock_applier.fill_form = fake_fill
-        mock_applier.submit = AsyncMock(return_value="submitted")
-        mock_detect.return_value = mock_applier
-        from moonlighter.application.answers.email_alias import build_email_alias
-        from moonlighter.server import confirm_apply
-
-        await confirm_apply(
-            job_id=job.id,
-            ctx=make_test_context(
-                config={"email": {"address": test_email}, "screenshots_dir": str(tmp_path)}
-            ),
-        )
-
-    app_fresh = Application.get_by_id(app.id)
-    assert app_fresh.email_ref  # ref was generated
-    expected = build_email_alias(test_email, app_fresh.email_ref)
-    assert fill_calls[0]["Email"] == expected
-    assert "+" in fill_calls[0]["Email"]
-
-
-async def test_confirm_apply_exception_reverts_status(tmp_db, tmp_path):
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca5", status="applying")
-    app = create_application(job)
-    cv_path = tmp_path / "cv.pdf"
-    cv_path.write_bytes(b"fake pdf")
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ca5")
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.hide_window = AsyncMock()
-        mock_browser.show_window = AsyncMock()
-        mock_browser.save_screenshot = AsyncMock()
-        mock_applier = make_applier_mock(MagicMock())
-        mock_applier.fill_form = AsyncMock(side_effect=Exception("browser crash"))
-        mock_detect.return_value = mock_applier
-        from moonlighter.server import confirm_apply
-
-        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
-
-    app_fresh = Application.get_by_id(app.id)
-    assert app_fresh.status == "draft"
-    job_fresh = Job.get_by_id(job.id)
-    assert job_fresh.status == "reviewed"
-    assert "Error" in result or "⚠️" in result
-    mock_browser.hide_window.assert_awaited_once()
-    mock_browser.show_window.assert_awaited_once()
-    page.close.assert_not_awaited()  # tab stays open for a human to work on
-
-
-# ── retry_apply ───────────────────────────────────────────────────────────────
-
-
-async def test_retry_apply_no_draft(tmp_db):
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ra1")
-    from moonlighter.server import retry_apply
-
-    result = await retry_apply(job_id=job.id, ctx=make_test_context())
-    assert "apply_jobs" in result or "first" in result
-
-
-async def test_retry_apply_calls_confirm_apply(tmp_db, tmp_path):
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ra2", status="applying")
-    create_application(job)
-    cv_path = tmp_path / "cv.pdf"
-    cv_path.write_bytes(b"fake pdf")
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/ra2")
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.hide_window = AsyncMock()
-        mock_browser.save_screenshot = AsyncMock()
-        mock_applier = AsyncMock()
-        mock_applier.fill_form = AsyncMock(return_value={})
-        mock_applier.submit = AsyncMock(return_value="submitted")
-        mock_detect.return_value = mock_applier
-        from moonlighter.server import retry_apply
-
-        result = await retry_apply(job_id=job.id, ctx=make_test_context())
-    assert "submetida" in result or "✓" in result
-
-
-# ── fill_application ──────────────────────────────────────────────────────────
-
-
-async def test_fill_application_tool_delegates_to_service(monkeypatch):
-    import moonlighter.server as server
-
-    called = {}
-
-    async def fake_fill(job_id, answers, config, profile):
-        called["args"] = (job_id, answers)
-        return "filled"
-
-    monkeypatch.setattr(server.apply_service, "fill_application", fake_fill)
-    result = await server.fill_application(42, {"field": "v"}, ctx=make_test_context())
-    assert result == "filled"
-    assert called["args"] == (42, {"field": "v"})
-
-
-async def test_submit_application_tool_delegates_to_service(monkeypatch):
-    import moonlighter.server as server
-
-    called = {}
-
-    async def fake_submit(job_id, config, profile):
-        called["id"] = job_id
-        return "submetida"
-
-    monkeypatch.setattr(server.apply_service, "submit_application", fake_submit)
-    result = await server.submit_application(42, ctx=make_test_context())
-    assert result == "submetida"
-    assert called["id"] == 42
+    result = await server.prepare_application_from_paste(
+        42, "copied page text", ctx=make_test_context()
+    )
+    assert result == "sheet from paste"
+    assert called["args"] == (42, "copied page text")
 
 
 # ── get_pipeline ──────────────────────────────────────────────────────────────
@@ -922,6 +615,63 @@ async def test_get_pipeline_skips_empty_statuses(tmp_db):
     result = await get_pipeline(ctx=make_test_context())
     # "Offer" section should not appear since no offer apps
     assert "## Offer" not in result
+
+
+async def test_get_pipeline_shows_warnings_when_setup_incomplete(tmp_db):
+    """An empty profile (the make_test_context default) surfaces a Setup Warnings
+    section with a distinguishable marker, prepended before the pipeline itself."""
+    init_db()
+    from moonlighter.server import get_pipeline
+
+    result = await get_pipeline(ctx=make_test_context(profile={}))
+    assert "# Setup Warnings" in result
+    assert "[WARN]" in result or "[ERROR]" in result
+    assert result.index("# Setup Warnings") < result.index("# Application Pipeline")
+
+
+async def test_get_pipeline_no_warnings_section_when_setup_is_clean(tmp_db, tmp_path):
+    """A fully-configured setup (real profile, real cv.pdf, cli backend, existing
+    browser) produces zero warnings -> no Setup Warnings section at all, and the
+    pipeline output is unchanged from the pre-existing behavior."""
+    init_db()
+    from moonlighter.server import get_pipeline
+
+    cv = tmp_path / "cv.pdf"
+    cv.write_text("fake cv")
+    browser = tmp_path / "browser"
+    browser.write_text("fake browser")
+    config = {"llm_backend": "cli", "browser_path": str(browser)}
+    profile = {"skills": ["python"]}
+
+    # `claude` must be pinned as present: the cli backend now checks for it, and
+    # the dev machine has it while CI does not -- otherwise this passes locally
+    # and fails in CI for a reason that has nothing to do with the assertion.
+    with (
+        patch("moonlighter.startup.moonlighter_home", return_value=tmp_path),
+        patch("moonlighter.startup.shutil.which", return_value="/usr/local/bin/claude"),
+    ):
+        result = await get_pipeline(ctx=make_test_context(config=config, profile=profile))
+    assert "# Setup Warnings" not in result
+    assert result.startswith("# Application Pipeline")
+
+
+async def test_get_pipeline_warnings_distinguish_error_and_warn_levels(tmp_db, tmp_path):
+    """No ANTHROPIC_API_KEY + api backend -> an 'error'-level warning; missing cv.pdf
+    -> a 'warn'-level warning. Both render with their own marker in the same call."""
+    init_db()
+    from moonlighter.server import get_pipeline
+
+    with (
+        patch("moonlighter.startup.moonlighter_home", return_value=tmp_path),
+        patch.dict("os.environ", {}, clear=False),
+    ):
+        import os as _os
+
+        _os.environ.pop("ANTHROPIC_API_KEY", None)
+        config = {"llm_backend": "api"}
+        result = await get_pipeline(ctx=make_test_context(config=config, profile={"skills": []}))
+    assert "[ERROR]" in result
+    assert "[WARN]" in result
 
 
 # ── update_status ─────────────────────────────────────────────────────────────
@@ -1136,7 +886,7 @@ async def test_scan_concurrent_batch_all_processed(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch(
             "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
@@ -1188,7 +938,7 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch(
             "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
@@ -1244,7 +994,7 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch(
             "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
@@ -1307,7 +1057,7 @@ async def test_scan_non_spend_error_keeps_title_filtered_in_report(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch(
             "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
@@ -1362,7 +1112,7 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tmp
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service._claim", side_effect=Exception("db corrupted")),
         patch(
             "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
@@ -1388,245 +1138,6 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tmp
     assert "0 jobs processed" in result
 
 
-# ── apply_jobs: missing scenarios ─────────────────────────────────────────────
-
-
-class _NotApplicableApplier(BaseApplier):
-    """A minimal applier whose not_applicable_reason() hook opts out of extract_fields()
-    -- LinkedIn is the real-world example (Easy Apply unavailable), provided by the
-    private moonlighter-linkedin plugin, not by this repo. See
-    docs/superpowers/specs/2026-07-22-linkedin-plugin-split-design.md."""
-
-    async def detect(self):
-        return True
-
-    async def not_applicable_reason(self):
-        return "does not have Easy Apply. Manual application required"
-
-    async def extract_fields(self):
-        return ([], frozenset())
-
-    async def fill_form(self, answers, cv_path):
-        return {}
-
-    async def submit(self):
-        return "submitted"
-
-
-async def test_apply_jobs_not_applicable_reason_shows_warning(tmp_db):
-    """An applier's not_applicable_reason() (e.g. LinkedIn without Easy Apply) ->
-    warning with the reason, instead of attempting extract_fields()."""
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/acme/jobs/1")
-    page = make_mock_page(url="https://boards.greenhouse.io/acme/jobs/1")
-    applier = _NotApplicableApplier(page, {}, {})
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch(
-            "moonlighter.application.service.detect_applier",
-            new=AsyncMock(return_value=applier),
-        ),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.save_screenshot = AsyncMock()
-        from moonlighter.server import apply_jobs
-
-        result = await apply_jobs(ids=[job.id], ctx=make_test_context())
-
-    assert "Easy Apply" in result or "easy apply" in result.lower()
-
-
-async def test_apply_jobs_llm_error_still_creates_draft(tmp_db):
-    """generate_answers returns draft.error → Application still created in DB."""
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/err1")
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/err1")
-    error_draft = ApplicationDraft(job_id=job.id, answers={}, form_fields=[], error="LLM timeout")
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch(
-            "moonlighter.application.service.generate_answers",
-            new=AsyncMock(return_value=error_draft),
-        ),
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.save_screenshot = AsyncMock()
-        mock_applier = make_applier_mock()
-        mock_applier.extract_fields = AsyncMock(return_value=(["Q"], frozenset()))
-        mock_detect.return_value = mock_applier
-        from moonlighter.server import apply_jobs
-
-        result = await apply_jobs(ids=[job.id], ctx=make_test_context())
-
-    app = Application.get(Application.job == job)
-    assert app is not None
-    assert "error" in result.lower() or "LLM" in result
-
-
-async def test_apply_jobs_updates_existing_draft(tmp_db):
-    """When Application already exists, form_data is updated (get_or_create → not created path)."""
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/upd1")
-    existing_app = create_application(job, form_data='{"OldQ": "OldA"}')
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/upd1")
-    new_draft = ApplicationDraft(job_id=job.id, answers={"NewQ": "NewA"}, form_fields=["NewQ"])
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch(
-            "moonlighter.application.service.generate_answers",
-            new=AsyncMock(return_value=new_draft),
-        ),
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.save_screenshot = AsyncMock()
-        mock_applier = make_applier_mock()
-        mock_applier.extract_fields = AsyncMock(return_value=(["NewQ"], frozenset()))
-        mock_detect.return_value = mock_applier
-        from moonlighter.server import apply_jobs
-
-        await apply_jobs(ids=[job.id], ctx=make_test_context())
-
-    app_fresh = Application.get_by_id(existing_app.id)
-    data = json.loads(app_fresh.form_data)
-    assert "NewQ" in data
-    assert data["NewQ"] == "NewA"
-
-
-async def test_apply_jobs_exception_continues_to_next(tmp_db):
-    """Exception inside job processing (from _detect_applier) doesn't abort next job."""
-    init_db()
-    job1 = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/exc1")
-    job2 = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/exc2", company="Linear")
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/exc2")
-    draft = ApplicationDraft(job_id=job2.id, answers={"Q": "A"}, form_fields=["Q"])
-
-    detect_calls = [0]
-
-    async def detect_side_effect(pg, cfg, prof, source=None):
-        detect_calls[0] += 1
-        if detect_calls[0] == 1:
-            raise Exception("ATS detection crashed on job 1")
-        mock_applier = make_applier_mock()
-        mock_applier.extract_fields = AsyncMock(return_value=(["Q"], frozenset()))
-        return mock_applier
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch(
-            "moonlighter.application.service.generate_answers",
-            new=AsyncMock(return_value=draft),
-        ),
-        patch("moonlighter.application.service.detect_applier", side_effect=detect_side_effect),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.save_screenshot = AsyncMock()
-        from moonlighter.server import apply_jobs
-
-        result = await apply_jobs(ids=[job1.id, job2.id], ctx=make_test_context())
-
-    # Job 2 should have been processed despite job 1 crashing
-    assert Application.select().where(Application.job == job2).count() == 1
-    assert "Linear" in result or "exc2" in result
-
-
-# ── confirm_apply: missing scenarios ──────────────────────────────────────────
-
-
-async def test_confirm_apply_submit_false_returns_warning(tmp_db, tmp_path):
-    """submit() returns False → warning message with screenshot path."""
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/sf1", status="applying")
-    app = create_application(job)
-    cv_path = tmp_path / "cv.pdf"
-    cv_path.write_bytes(b"fake pdf")
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/sf1")
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.hide_window = AsyncMock()
-        mock_browser.show_window = AsyncMock()
-        mock_browser.save_screenshot = AsyncMock()
-        mock_applier = AsyncMock()
-        mock_applier.fill_form = AsyncMock(return_value={})
-        mock_applier.submit = AsyncMock(return_value="failed")
-        mock_detect.return_value = mock_applier
-        from moonlighter.server import confirm_apply
-
-        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
-
-    assert "⚠️" in result or "not submitted" in result.lower()
-    assert "screenshot" in result.lower() or "04-submitted" in result
-    # 'failed' is retryable → reverts to draft
-    assert Application.get_by_id(app.id).status == "draft"
-    mock_browser.hide_window.assert_awaited_once()
-    mock_browser.show_window.assert_awaited_once()
-    page.close.assert_not_awaited()  # aba fica aberta pro humano mexer
-
-
-async def test_confirm_apply_unverified_goes_to_needs_review_not_applied(tmp_db, tmp_path):
-    """RELIABILITY: submit 'unverified' (clicked, without confirming or detecting an error)
-    → NEVER marks it as sent. Becomes needs_review, saves screenshot and ref, and asks
-    for manual review. Conservative: zero false 'sent'."""
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/stripe/jobs/uv1", status="applying")
-    app = create_application(job)
-    cv_path = tmp_path / "cv.pdf"
-    cv_path.write_bytes(b"fake pdf")
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/uv1")
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.hide_window = AsyncMock()
-        mock_browser.show_window = AsyncMock()
-        mock_browser.save_screenshot = AsyncMock()
-        mock_applier = AsyncMock()
-        mock_applier.fill_form = AsyncMock(return_value={})
-        mock_applier.submit = AsyncMock(return_value="unverified")
-        mock_detect.return_value = mock_applier
-        from moonlighter.server import confirm_apply
-
-        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
-
-    app_fresh = Application.get_by_id(app.id)
-    assert app_fresh.status == "needs_review"  # NOT submitted
-    assert app_fresh.applied_at is None  # doesn't count as sent
-    assert app_fresh.email_ref  # ref saved to track if it got a reply
-    assert Job.get_by_id(job.id).status == "needs_review"
-    assert "04-submitted" in result  # points to the screenshot
-    assert "update_status" in result  # instructs the next human step
-    mock_browser.hide_window.assert_awaited_once()
-    mock_browser.show_window.assert_awaited_once()
-    page.close.assert_not_awaited()  # tab stays open for a human to work on
-
-
-async def test_retry_apply_refuses_needs_review(tmp_db):
-    """retry_apply must NOT re-submit an application in needs_review (it may have
-    gone through → would duplicate). Instructs the human to decide via update_status."""
-    init_db()
-    job = create_job(
-        tmp_db, url="https://boards.greenhouse.io/stripe/jobs/nr1", status="needs_review"
-    )
-    create_application(job, status="needs_review")
-    from moonlighter.server import retry_apply
-
-    result = await retry_apply(job_id=job.id, ctx=make_test_context())
-    assert "needs_review" in result
-    assert "update_status" in result
-
-
 async def test_get_pipeline_shows_needs_review(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/pl-nr", company="Stripe")
@@ -1635,81 +1146,6 @@ async def test_get_pipeline_shows_needs_review(tmp_db):
 
     result = await get_pipeline(ctx=make_test_context())
     assert "needs_review" in result.lower()
-
-
-async def test_confirm_apply_unknown_ats(tmp_db, tmp_path):
-    """_detect_applier returns None → ATS not recognized."""
-    init_db()
-    job = create_job(tmp_db, url="https://unknownats.com/jobs/ca99", status="applying")
-    create_application(job)
-    cv_path = tmp_path / "cv.pdf"
-    cv_path.write_bytes(b"fake pdf")
-    page = make_mock_page(url="https://unknownats.com/jobs/ca99")
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch("moonlighter.application.service.detect_applier", new=AsyncMock(return_value=None)),
-        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.hide_window = AsyncMock()
-        mock_browser.save_screenshot = AsyncMock()
-        from moonlighter.server import confirm_apply
-
-        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
-
-    assert "ATS" in result and "recognized" in result
-
-
-async def test_confirm_apply_prepare_hook_opens_the_modal(tmp_db, tmp_path):
-    """An applier's prepare() override (e.g. LinkedIn opening its Easy Apply modal
-    via extract_fields()) is called before fill_form(). LinkedIn is the real-world
-    example, provided by the private moonlighter-linkedin plugin, not by this repo
-    -- see docs/superpowers/specs/2026-07-22-linkedin-plugin-split-design.md."""
-    init_db()
-    job = create_job(tmp_db, url="https://boards.greenhouse.io/acme/jobs/ca100", status="applying")
-    create_application(job)
-    cv_path = tmp_path / "cv.pdf"
-    cv_path.write_bytes(b"fake pdf")
-    page = make_mock_page(url="https://boards.greenhouse.io/acme/jobs/ca100")
-
-    extract_calls = []
-
-    class TrackingApplier(BaseApplier):
-        async def detect(self):
-            return True
-
-        async def prepare(self):
-            await self.extract_fields()
-
-        async def extract_fields(self):
-            extract_calls.append(True)
-            return ([], frozenset())
-
-        async def fill_form(self, answers, cv_path):
-            return {}
-
-        async def submit(self):
-            return "submitted"
-
-    applier = TrackingApplier(page, {}, {})
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch(
-            "moonlighter.application.service.detect_applier",
-            new=AsyncMock(return_value=applier),
-        ),
-        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.hide_window = AsyncMock()
-        mock_browser.save_screenshot = AsyncMock()
-        from moonlighter.server import confirm_apply
-
-        await confirm_apply(job_id=job.id, ctx=make_test_context())
-
-    assert len(extract_calls) == 1
 
 
 # ── get_job: bug fix verification ─────────────────────────────────────────────
@@ -1724,44 +1160,6 @@ async def test_get_job_score_null(tmp_db):
     result = await get_job(id=job.id, ctx=make_test_context())
     assert "—" in result
     assert "not found" not in result
-
-
-# ── login ─────────────────────────────────────────────────────────────────────
-
-
-async def test_login_unsupported_platform(tmp_db):
-    """login() with a platform that has no registered moonlighter.login_urls
-    plugin entry returns an error message -- the steady state for the public
-    repo alone, with no login-requiring plugin installed."""
-    init_db()
-    with patch("moonlighter.server.discover_entry_points_by_name", return_value={}):
-        from moonlighter.server import login
-
-        result = await login(platform="github", ctx=make_test_context())
-    assert "not supported" in result or "suport" in result.lower() or "github" in result.lower()
-
-
-async def test_login_registered_platform_opens_browser_and_returns_instruction(tmp_db):
-    """login() for a platform registered via a moonlighter.login_urls plugin entry
-    opens the browser at that URL and returns an instruction string -- see
-    docs/superpowers/specs/2026-07-22-linkedin-plugin-split-design.md (LinkedIn is
-    the real-world example, provided by the private moonlighter-linkedin plugin,
-    not hardcoded here)."""
-    init_db()
-    page = make_mock_page(url="https://example-ats.test/login")
-    with (
-        patch("moonlighter.server._browser_mod") as mock_browser,
-        patch(
-            "moonlighter.server.discover_entry_points_by_name",
-            return_value={"example_ats": "https://example-ats.test/login"},
-        ),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        from moonlighter.server import login
-
-        result = await login(platform="example_ats", ctx=make_test_context())
-    assert "example-ats.test/login" in result
-    page.goto.assert_called_once_with("https://example-ats.test/login")
 
 
 # ── list_jobs: table formatting ───────────────────────────────────────────────
@@ -1945,7 +1343,7 @@ async def test_scan_registered_scanner_session_expired_shows_warning(tmp_db):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.discover_entry_points",
             return_value=[_FakeSessionExpiredSource],
@@ -1980,7 +1378,7 @@ async def test_scan_registered_scanner_session_expired_does_not_block_http_resul
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.discover_entry_points",
             return_value=[_FakeSessionExpiredSource],
@@ -2002,110 +1400,6 @@ async def test_scan_registered_scanner_session_expired_does_not_block_http_resul
 
     assert "Stripe" in result  # HTTP job appears
     assert "_FakeSessionExpiredSource" in result  # warning appears too
-
-
-# ── email: confirm_apply generates ref and saves ──────────────────────────────
-
-
-async def test_confirm_apply_generates_6_char_ref(tmp_db, tmp_path):
-    """confirm_apply must generate a 6-char email_ref and persist it."""
-    init_db()
-    job = create_job(
-        tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca-ref-1", status="applying"
-    )
-    app = create_application(job, status="draft", form_data='{"Q": "A"}')
-    cv_path = tmp_path / "cv.pdf"
-    cv_path.write_bytes(b"fake pdf")
-    page = make_mock_page(url=job.url)
-
-    from moonlighter.server import confirm_apply
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.hide_window = AsyncMock()
-        mock_browser.save_screenshot = AsyncMock()
-        applier = AsyncMock()
-        applier.fill_form = AsyncMock(return_value={})
-        applier.submit = AsyncMock(return_value="submitted")
-        mock_detect.return_value = applier
-        await confirm_apply(job_id=job.id, ctx=make_test_context())
-
-    saved = Application.get_by_id(app.id)
-    assert saved.email_ref is not None
-    assert len(saved.email_ref) == 6
-
-
-async def test_confirm_apply_ref_is_url_safe(tmp_db, tmp_path):
-    """The generated ref must contain only url-safe chars (letters, digits, -, _)."""
-    import re
-
-    init_db()
-    job = create_job(
-        tmp_db, url="https://boards.greenhouse.io/stripe/jobs/ca-safe-1", status="applying"
-    )
-    app = create_application(job, status="draft", form_data='{"Q": "A"}')
-    cv_path = tmp_path / "cv.pdf"
-    cv_path.write_bytes(b"fake pdf")
-    page = make_mock_page(url=job.url)
-
-    from moonlighter.server import confirm_apply
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.hide_window = AsyncMock()
-        mock_browser.save_screenshot = AsyncMock()
-        applier = AsyncMock()
-        applier.fill_form = AsyncMock(return_value={})
-        applier.submit = AsyncMock(return_value="submitted")
-        mock_detect.return_value = applier
-        await confirm_apply(job_id=job.id, ctx=make_test_context())
-
-    saved = Application.get_by_id(app.id)
-    assert re.match(r"^[A-Za-z0-9_-]{6}$", saved.email_ref)
-
-
-async def test_confirm_apply_refs_are_unique_across_calls(tmp_db, tmp_path):
-    """Ten calls to confirm_apply must generate distinct refs."""
-    init_db()
-    cv_path = tmp_path / "cv.pdf"
-    cv_path.write_bytes(b"fake pdf")
-    refs = set()
-
-    from moonlighter.server import confirm_apply
-
-    for i in range(10):
-        job = create_job(
-            tmp_db, url=f"https://boards.greenhouse.io/stripe/jobs/uniq-{i}", status="applying"
-        )
-        create_application(job, status="draft", form_data='{"Q": "A"}')
-        page = make_mock_page(url=job.url)
-
-        with (
-            patch("moonlighter.application.service.browser") as mock_browser,
-            patch("moonlighter.application.service.detect_applier") as mock_detect,
-            patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
-        ):
-            mock_browser.new_page = AsyncMock(return_value=page)
-            mock_browser.hide_window = AsyncMock()
-            mock_browser.save_screenshot = AsyncMock()
-            applier = AsyncMock()
-            applier.fill_form = AsyncMock(return_value={})
-            applier.submit = AsyncMock(return_value="submitted")
-            mock_detect.return_value = applier
-            await confirm_apply(job_id=job.id, ctx=make_test_context())
-
-        refs.add(Application.get(Application.job == job).email_ref)
-
-    # With 10 urlsafe 6-char refs (~62^6 possibilities), collision is virtually zero
-    assert len(refs) == 10
 
 
 # ── email: setup_email MCP tool ───────────────────────────────────────────────
@@ -2148,6 +1442,70 @@ async def test_setup_email_raises_friendly_error_when_client_json_missing():
     result = await setup_email(ctx=make_test_context(config=test_config))
 
     assert "client" in result.lower() or "credential" in result.lower() or "error" in result.lower()
+
+
+async def test_setup_email_resolves_a_relative_credentials_path_under_moonlighter_home(
+    tmp_path, monkeypatch
+):
+    """IMPORTANT 6: DEFAULTS ships relative filenames ("gmail-client.json"), and
+    setup_email must resolve them under MOONLIGHTER_HOME -- not hardcode
+    ~/.moonlighter, which ignores a MOONLIGHTER_HOME override."""
+    from moonlighter.server import setup_email
+
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "gmail-client.json").write_text("{}")
+    test_config = {
+        "email": {"credentials_path": "gmail-client.json", "token_path": "gmail-token.json"}
+    }
+    with (
+        patch("moonlighter.server.setup_gmail_service") as mock_setup,
+        patch("moonlighter.server._run_gmail_oauth") as mock_oauth,
+    ):
+        mock_oauth.return_value = None
+        mock_setup.return_value = MagicMock()
+        result = await setup_email(ctx=make_test_context(config=test_config))
+
+    assert "success" in result.lower() or "configured" in result.lower()
+    called_creds_path, called_token_path = mock_oauth.call_args.args[:2]
+    assert called_creds_path == str(tmp_path / "gmail-client.json")
+    assert called_token_path == str(tmp_path / "gmail-token.json")
+
+
+async def test_setup_email_leaves_an_absolute_credentials_path_untouched(tmp_path, monkeypatch):
+    """A user who already points credentials_path at their own absolute location
+    must not have it silently rewritten to somewhere under MOONLIGHTER_HOME."""
+    from moonlighter.server import setup_email
+
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "not-this-one"))
+    creds = tmp_path / "somewhere-else" / "client.json"
+    creds.parent.mkdir()
+    creds.write_text("{}")
+    test_config = {
+        "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
+    }
+    with (
+        patch("moonlighter.server.setup_gmail_service") as mock_setup,
+        patch("moonlighter.server._run_gmail_oauth") as mock_oauth,
+    ):
+        mock_oauth.return_value = None
+        mock_setup.return_value = MagicMock()
+        result = await setup_email(ctx=make_test_context(config=test_config))
+
+    assert "success" in result.lower() or "configured" in result.lower()
+    called_creds_path = mock_oauth.call_args.args[0]
+    assert called_creds_path == str(creds)
+
+
+async def test_setup_email_missing_credentials_path_gives_a_clear_message():
+    """MINOR 8: Path("").expanduser() is ".", a directory that always exists --
+    without this guard the tool falls through to a confusing 'Is a directory'
+    failure deep in the OAuth flow instead of naming the actual problem."""
+    from moonlighter.server import setup_email
+
+    test_config = {"email": {"token_path": "gmail-token.json"}}
+    result = await setup_email(ctx=make_test_context(config=test_config))
+    assert "credentials_path" in result
+    assert "not configured" in result.lower()
 
 
 # ── email: sync_email_responses MCP tool ─────────────────────────────────────
@@ -2253,85 +1611,6 @@ def test_mcp_server_initializes_logging():
     assert log_mod._initialized is True
 
 
-# ── _archive_screenshots ──────────────────────────────────────────────────────
-
-
-def test_archive_screenshots_moves_dir(tmp_path):
-    """_archive_screenshots moves the screenshots dir to done/<job_id>/."""
-    from moonlighter.application.service import archive_screenshots
-
-    job_dir = tmp_path / "42"
-    job_dir.mkdir()
-    (job_dir / "01-job-page.png").write_bytes(b"img")
-    (job_dir / "04-submitted.png").write_bytes(b"img")
-
-    config = {"screenshots_dir": str(tmp_path)}
-    archive_screenshots(42, config)
-
-    assert not job_dir.exists()
-    done_dir = tmp_path / "done" / "42"
-    assert done_dir.exists()
-    assert (done_dir / "04-submitted.png").exists()
-
-
-def test_archive_screenshots_no_dir_is_noop(tmp_path):
-    """_archive_screenshots does not fail when the dir does not exist yet."""
-    from moonlighter.application.service import archive_screenshots
-
-    config = {"screenshots_dir": str(tmp_path)}
-    archive_screenshots(999, config)  # must not raise
-
-
-def test_archive_screenshots_overwrites_existing_done(tmp_path):
-    """_archive_screenshots replaces done/<job_id>/ if it already exists."""
-    from moonlighter.application.service import archive_screenshots
-
-    job_dir = tmp_path / "7"
-    job_dir.mkdir()
-    (job_dir / "new.png").write_bytes(b"new")
-
-    done_dir = tmp_path / "done" / "7"
-    done_dir.mkdir(parents=True)
-    (done_dir / "old.png").write_bytes(b"old")
-
-    config = {"screenshots_dir": str(tmp_path)}
-    archive_screenshots(7, config)
-
-    assert (done_dir / "new.png").exists()
-    assert not (done_dir / "old.png").exists()
-
-
-async def test_confirm_apply_archives_on_success(tmp_db, tmp_path):
-    """confirm_apply calls _archive_screenshots when outcome='submitted'."""
-    init_db()
-    job = create_job(
-        tmp_db, url="https://boards.greenhouse.io/stripe/jobs/arch1", status="applying"
-    )
-    create_application(job)
-    cv_path = tmp_path / "cv.pdf"
-    cv_path.write_bytes(b"fake")
-    page = make_mock_page(url="https://boards.greenhouse.io/stripe/jobs/arch1")
-
-    with (
-        patch("moonlighter.application.service.browser") as mock_browser,
-        patch("moonlighter.application.service.detect_applier") as mock_detect,
-        patch("moonlighter.application.service.resolve_cv_path", return_value=str(cv_path)),
-        patch("moonlighter.application.service.archive_screenshots") as mock_archive,
-    ):
-        mock_browser.new_page = AsyncMock(return_value=page)
-        mock_browser.hide_window = AsyncMock()
-        mock_browser.save_screenshot = AsyncMock()
-        mock_applier = AsyncMock()
-        mock_applier.fill_form = AsyncMock(return_value={})
-        mock_applier.submit = AsyncMock(return_value="submitted")
-        mock_detect.return_value = mock_applier
-        from moonlighter.server import confirm_apply
-
-        await confirm_apply(job_id=job.id, ctx=make_test_context())
-
-    mock_archive.assert_called_once_with(job.id, mock_archive.call_args[0][1])
-
-
 # ── scan race condition (duplicate LLM calls) ─────────────────────────────────
 
 
@@ -2361,7 +1640,8 @@ def _scan_patches(raw_jobs, eval_mock):
     )
     stack.enter_context(
         patch(
-            "moonlighter.discovery.service.browser",
+            "moonlighter.core.browser",
+            create=True,
             **{"new_page": AsyncMock(side_effect=Exception("no browser"))},
         )
     )
@@ -2449,44 +1729,6 @@ async def test_scan_already_in_scan_log_skips_llm(tmp_db):
         await scan_and_evaluate(ctx=make_test_context())
 
     eval_mock.assert_not_called()
-
-
-async def test_confirm_apply_aborts_when_cv_missing(tmp_db):
-    """If the resolved CV does not exist, confirm_apply does NOT submit (won't upload the wrong CV)."""
-    init_db()
-    job = create_job(
-        tmp_db,
-        url="https://boards.greenhouse.io/stripe/jobs/cvmiss",
-        status="applying",
-        company="stripe",
-    )
-    create_application(job)
-    with patch(
-        "moonlighter.application.service.resolve_cv_path",
-        side_effect=CVNotFoundError("not found"),
-    ):
-        from moonlighter.server import confirm_apply
-
-        result = await confirm_apply(job_id=job.id, ctx=make_test_context())
-    assert "CV" in result and "not found" in result
-    assert Job.get_by_id(job.id).status != "applied"
-
-
-async def test_confirm_apply_aborts_on_pending_needs_review(tmp_db, tmp_path):
-    """If a __NEEDS_REVIEW__ field remains unanswered, confirm_apply does NOT submit."""
-    init_db()
-    job = create_job(
-        tmp_db,
-        url="https://boards.greenhouse.io/stripe/jobs/nr-pend",
-        status="applying",
-        company="stripe",
-    )
-    create_application(job, form_data='{"Authorized to work?": "__NEEDS_REVIEW__"}')
-    from moonlighter.server import confirm_apply
-
-    result = await confirm_apply(job_id=job.id, ctx=make_test_context())
-    assert "NOT submitted" in result or "decision" in result.lower()
-    assert Job.get_by_id(job.id).status != "applied"
 
 
 # ── add_job tool wrapper + setup_email error handlers ───────────────────────
@@ -2628,7 +1870,7 @@ async def test_scan_and_evaluate_logs_one_metrics_summary(tmp_db, caplog):
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch_records_calls),
         patch(
             "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
@@ -2677,7 +1919,7 @@ async def test_scan_and_evaluate_spend_limit_abort_increments_hits(tmp_db, caplo
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch_raises_spend_limit),
         patch(
             "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}

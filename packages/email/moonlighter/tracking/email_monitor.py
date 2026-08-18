@@ -1,7 +1,7 @@
 """
 Email monitor for job applications.
 
-Monitors candidaturas@gmail.com, classifies replies with the LLM,
+Monitors the configured Gmail account, classifies replies with the LLM,
 and automatically updates the applications pipeline.
 """
 
@@ -10,11 +10,12 @@ import logging
 import re
 from typing import Any
 
-from moonlighter.core.llm import LLMCaller
+from moonlighter.core.llm import LLMCaller, is_spend_limit
+from moonlighter.core.metrics import record_spend_limit_hit
 from moonlighter.tracking.classification import classify_response
 from moonlighter.tracking.gmail_client import (
     _get_or_create_label,
-    fetch_unread_messages,
+    fetch_recent_messages,
     mark_processed,
     parse_message,
     setup_gmail_service,
@@ -31,14 +32,14 @@ _TYPE_TO_STATUS = {
     "interview": "interviews",
     "offer": "offer",
     "rejection": "rejected",
-    # info_request and unrelated → keeps the current status
+    # acknowledgement, info_request and unrelated → keeps the current status
 }
 
 
 def extract_ref(to_field: str, base_address: str) -> str | None:
     """Extracts the ref from a Gmail (+ref) alias in the To field.
 
-    "candidaturas+x7k2mp@gmail.com" → "x7k2mp"
+    "you+x7k2mp@gmail.com" → "x7k2mp"
     None if there's no alias or it doesn't match base_address."""
     if not to_field:
         return None
@@ -62,7 +63,7 @@ def extract_ref(to_field: str, base_address: str) -> str | None:
 
 
 async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[dict[str, Any]]:
-    """Orchestrates the full flow: reads unread emails, classifies them, and updates
+    """Orchestrates the full flow: reads recent emails, classifies them, and updates
     the database. Returns the list of updates made."""
     from moonlighter.core.db import ProcessedEmail
 
@@ -84,13 +85,31 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
             mark_processed(service, message_id, label_id)
 
     updates = []
-    for msg_ref in fetch_unread_messages(service):
+    for msg_ref in fetch_recent_messages(service, int(email_cfg.get("lookback_days", 30))):
         msg_id = msg_ref["id"]
         if ProcessedEmail.select().where(ProcessedEmail.message_id == msg_id).exists():
             continue  # already processed in a previous run — don't re-call the LLM
 
         message = parse_message(service, msg_id)
-        classification = await classify_response(message, stages, llm_caller, model)
+        try:
+            classification = await classify_response(message, stages, llm_caller, model)
+        except Exception as e:
+            if is_spend_limit(e):
+                record_spend_limit_hit()
+                logger.warning(
+                    "sync_responses: spend limit hit while classifying %s — stopping sync "
+                    "early, leaving it and the rest of this batch unprocessed for the next run",
+                    msg_id,
+                )
+                break
+            logger.warning(
+                "sync_responses: classification failed for %s — leaving it unprocessed "
+                "for the next run: %s",
+                msg_id,
+                e,
+            )
+            continue  # NOT mark_done: a failed classification must not burn the message
+
         if classification["type"] == "unrelated":
             mark_done(msg_id)
             continue
@@ -219,11 +238,11 @@ def _resolve_application(ref: str | None, classification: dict[str, Any]) -> tup
 
 def _match_by_ref(ref: str) -> Any:
     from moonlighter.core.db import Application
+    from peewee import fn
 
-    try:
-        return Application.get(Application.email_ref == ref)
-    except Application.DoesNotExist:
-        return None
+    # Refs minted before 2026-08-06 are mixed case, and providers lowercase the local
+    # part on the way back, so both sides are folded rather than the column migrated.
+    return Application.get_or_none(fn.LOWER(Application.email_ref) == ref.lower())
 
 
 def _match_by_company_title(company: str | None, job_title: str | None) -> Any:

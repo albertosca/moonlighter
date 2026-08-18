@@ -1,20 +1,20 @@
-"""Analisa vagas com score baixo e propõe padrões de blocklist validados por IA.
+"""Analyzes low-scoring jobs and proposes AI-validated blocklist patterns.
 
-Fluxo:
-  1. Busca vagas archived com 0 < score <= threshold (avaliadas de verdade)
-  2. Agrupa títulos por empresa
-  3. Para cada empresa, pede ao LLM: "proponha substrings seguras para bloquear"
-  4. LLM retorna padrões com reasoning e flag safe=true/false
-  5. Padrões aprovados (safe=true) vão para blocklist_learned.yaml
-  6. load_config() já mescla o arquivo ao title_blocklist
+Workflow:
+  1. Fetches archived jobs with 0 < score <= threshold (genuinely evaluated)
+  2. Groups titles by company
+  3. For each company, asks LLM: "propose safe substrings to block"
+  4. LLM returns patterns with reasoning and safe=true/false flag
+  5. Approved patterns (safe=true) go to blocklist_learned.yaml
+  6. load_config() already merges the file into title_blocklist
 
-Uso:
+Usage:
     python scripts/build_blocklist.py [--threshold 3.0] [--dry-run] [--company SLUG]
 
 Flags:
-    --threshold  Score máximo para considerar uma vaga como candidata (padrão: 3.0)
-    --dry-run    Mostra o que seria adicionado sem gravar no arquivo
-    --company    Processa só uma empresa
+    --threshold  Maximum score to consider a job as a candidate (default: 3.0)
+    --dry-run    Shows what would be added without writing to the file
+    --company    Process a single company
 """
 
 import argparse
@@ -115,10 +115,10 @@ def _confirm_write(patterns: list[str]) -> bool:
     """Ask for explicit confirmation before merging LLM-proposed patterns into
     the real blocklist (S-10) — an over-broad hallucinated pattern silently
     filters out good jobs; the user's silence must NEVER count as consent."""
-    print(f"\n{len(patterns)} padrão(ões) novo(s) prestes a ser gravado(s):")
+    print(f"\n{len(patterns)} new pattern(s) about to be saved:")
     for p in patterns:
         print(f"  - {p!r}")
-    answer = input("Confirma a gravação? [y/N] ").strip().lower()
+    answer = input("Confirm save? [y/N] ").strip().lower()
     return answer in ("y", "yes", "s", "sim")
 
 
@@ -166,7 +166,7 @@ async def _propose_for_company(
         err = str(e).lower()
         if any(m in err for m in QUOTA_MARKERS):
             raise
-        print(f"  ⚠️  Erro ao processar {company}: {e}")
+        print(f"  ⚠️  Error processing {company}: {e}")
         return []
 
 
@@ -184,12 +184,12 @@ async def _run(
         grouped = _fetch_low_scorers(threshold, company_filter)
 
         if not grouped:
-            print("Nenhuma vaga encontrada com os critérios.")
+            print("No jobs matched the criteria.")
             return
 
         total_titles = sum(len(v) for v in grouped.values())
         print(
-            f"Vagas para análise: {total_titles} em {len(grouped)} empresa(s)  [threshold={threshold}]"
+            f"Jobs to analyze: {total_titles} across {len(grouped)} company/ies  [threshold={threshold}]"
         )
         print()
 
@@ -197,26 +197,26 @@ async def _run(
         all_new: list[str] = []
 
         for company, titles in sorted(grouped.items(), key=lambda x: -len(x[1])):
-            print(f"▶ {company} ({len(titles)} vagas)...")
+            print(f"▶ {company} ({len(titles)} jobs)...")
             try:
                 proposals = await _propose_for_company(
                     company, titles, threshold, caller, model, profile
                 )
             except Exception as e:
                 if any(m in str(e).lower() for m in QUOTA_MARKERS):
-                    print(f"🚫 COTA ATINGIDA — parando. Erro: {e}")
+                    print(f"🚫 SPEND LIMIT reached — stopping. Error: {e}")
                     break
-                print(f"  ✗ Erro: {e}")
+                print(f"  ✗ Error: {e}")
                 continue
 
             if not proposals:
-                print("  (nenhum padrão seguro identificado)")
+                print("  (no safe pattern identified)")
                 continue
 
             for p in proposals:
                 pattern = p["pattern"].lower().strip()
                 status = (
-                    "JÁ EXISTE" if pattern in existing else ("DRY RUN" if dry_run else "ADICIONADO")
+                    "ALREADY EXISTS" if pattern in existing else ("DRY RUN" if dry_run else "ADDED")
                 )
                 print(f"  + {pattern!r:40s} [{status}]")
                 print(f"    → {p.get('reasoning', '')}")
@@ -227,14 +227,14 @@ async def _run(
 
         if all_new and not dry_run:
             if not assume_yes and not _confirm_write(all_new):
-                print("Cancelado — nada foi gravado.")
+                print("Cancelled — nothing was saved.")
                 return
             _save_learned(all_new)
-            print(f"✓ {len(all_new)} padrão(ões) gravado(s) em blocklist_learned.yaml")
+            print(f"✓ {len(all_new)} pattern(s) saved to blocklist_learned.yaml")
         elif dry_run and all_new:
-            print(f"[DRY RUN] {len(all_new)} padrão(ões) seriam adicionados.")
+            print(f"[DRY RUN] {len(all_new)} pattern(s) would be added.")
         else:
-            print("Nenhum padrão novo.")
+            print("No new patterns.")
 
 
 def main() -> None:
@@ -242,17 +242,17 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "--threshold", type=float, default=3.0, help="Score máximo para considerar (padrão: 3.0)"
+        "--threshold", type=float, default=3.0, help="Maximum score to consider (default: 3.0)"
     )
-    parser.add_argument("--dry-run", action="store_true", help="Não grava no arquivo")
-    parser.add_argument("--company", help="Processa só uma empresa")
+    parser.add_argument("--dry-run", action="store_true", help="Do not write to the file")
+    parser.add_argument("--company", help="Process a single company")
     parser.add_argument(
         "--yes",
         "-y",
         action="store_true",
         help=(
-            "Grava os padrões aprovados sem pedir confirmação (S-10: por padrão, "
-            "sempre confirma antes de mesclar no blocklist real)."
+            "Save approved patterns without asking for confirmation (S-10: by default, "
+            "always confirm before merging into the real blocklist)."
         ),
     )
     args = parser.parse_args()
@@ -267,7 +267,7 @@ def main() -> None:
 
     model = config.get("eval_model", "claude-haiku-4-5-20251001")
     learned_path = moonlighter_home() / "blocklist_learned.yaml"
-    print(f"Modelo: {model}  |  blocklist_learned: {learned_path}")
+    print(f"Model: {model}  |  blocklist_learned: {learned_path}")
     print()
 
     asyncio.run(_run(args.threshold, args.company, args.dry_run, model, config, profile, args.yes))

@@ -44,4 +44,4 @@ def test_render_handles_null_score_and_no_salary(tmp_db):
     _job(tmp_db, url="https://x.com/3", score=None, posted_at=datetime.datetime(2026, 6, 1))
     out = render_jobs_table([Job.get(Job.url == "https://x.com/3")])
     assert "—" in out  # null score becomes an em dash
-    assert "01/06" in out
+    assert "Jun 01" in out

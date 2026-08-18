@@ -1,0 +1,12 @@
+{
+  "name": "moonlighter",
+  "version": "0.1.0",
+  "description": "AI-powered job application pipeline. Scans job boards, scores fit with an LLM, and fills applications in a real browser.",
+  "author": {
+    "name": "Alberto de Sá Cavalcanti de Albuquerque",
+    "url": "https://github.com/albertosca"
+  },
+  "homepage": "https://github.com/albertosca/moonlighter",
+  "license": "AGPL-3.0-only",
+  "keywords": ["jobs", "job-search", "automation", "ats", "mcp"]
+}

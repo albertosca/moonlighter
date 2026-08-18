@@ -9,13 +9,14 @@ from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.session import ServerSession
 from moonlighter._tool_logging import tool_logged
-from moonlighter.application import service as apply_service
-from moonlighter.core import browser as _browser_mod
+from moonlighter.application.assisted import service as assisted_service
 from moonlighter.core.config import (
+    DEFAULTS,
     harden_permissions,
     load_company_list,
     load_config,
     load_profile,
+    resolve_under_home,
     validate_config,
 )
 from moonlighter.core.db import Application, Job, init_db
@@ -23,7 +24,6 @@ from moonlighter.core.llm import LLMCaller, make_caller
 from moonlighter.core.log import setup as _setup_logging
 from moonlighter.core.metrics import operation_metrics
 from moonlighter.core.parsing import wrap_untrusted
-from moonlighter.core.plugins import discover_entry_points_by_name
 from moonlighter.discovery import service as scan_service
 from moonlighter.discovery.archive import ArchiveStaleJobsError, _format_archive_result
 from moonlighter.startup import StartupWarning, validate_startup
@@ -101,6 +101,28 @@ async def scan_and_evaluate(
 
 @mcp.tool()
 @tool_logged
+async def scan_company(
+    source: str, company: str, *, ctx: Context[ServerSession, AppContext, Any]
+) -> str:
+    """Scan every open posting at ONE company right now and evaluate the new ones.
+
+    Does not touch company_list.yaml — use it for ad-hoc checks ("what is open
+    at trm-labs on Ashby?") without editing config.
+
+    Args:
+        source: ATS name — greenhouse, lever, ashby, workable, recruitee, smartrecruiters
+        company: the company's slug on that ATS (e.g. "trm-labs"), or a full
+                 custom career domain for Recruitee (e.g. "jobs.channable.com")
+    """
+    app = ctx.request_context.lifespan_context
+    with operation_metrics("scan_company"):
+        return await scan_service.scan_company(
+            source, company, app.config, app.profile, app.llm_caller
+        )
+
+
+@mcp.tool()
+@tool_logged
 async def add_job(
     url: str,
     company: str = "",
@@ -112,13 +134,18 @@ async def add_job(
     """Evaluates a manually provided job and saves it to the database.
 
     Useful for LinkedIn postings, job posts, or any source not supported by
-    the automatic scanner. If 'description' is not provided, tries to fetch
-    the URL via HTTP (doesn't work for pages requiring authentication, like LinkedIn).
+    the automatic scanner. For Greenhouse and Recruitee URLs, any missing
+    'company', 'title', or 'description' is auto-filled from the ATS's own API.
+    For everything else, if 'description' is not provided, tries to fetch the
+    URL via HTTP (doesn't work for pages requiring authentication, like LinkedIn) —
+    'company' and 'title' are still required in that case.
 
     Args:
         url: job URL (required, used as unique identifier)
-        company: company name (e.g. "ifood")
-        title: job title (e.g. "Senior Software Engineer")
+        company: company name (e.g. "ifood"). Optional for routed ATSes (Greenhouse,
+            Recruitee); required otherwise.
+        title: job title (e.g. "Senior Software Engineer"). Optional for routed ATSes;
+            required otherwise.
         description: job description text. If empty, tries to fetch it automatically.
     """
     app = ctx.request_context.lifespan_context
@@ -204,96 +231,42 @@ async def get_job(id: int, *, ctx: Context[ServerSession, AppContext, Any]) -> s
 
 @mcp.tool()
 @tool_logged
-async def login(platform: str, *, ctx: Context[ServerSession, AppContext, Any]) -> str:
-    """Open the browser for manual login to a platform that needs a saved session
-    (e.g. LinkedIn, if its plugin package is installed — see PRIVACY.md/DISCLAIMER.md).
-    Session is saved and reused in future scans."""
+async def prepare_application(job_id: int, *, ctx: Context[ServerSession, AppContext, Any]) -> str:
+    """
+    Produce the full set of answers for a job application, for you to paste into
+    the form yourself. Reads the questions from the ATS API when it publishes them
+    (Greenhouse, Recruitee); otherwise asks you to copy the page.
+    job_id: ID of the job
+    """
     app = ctx.request_context.lifespan_context
-    urls = discover_entry_points_by_name("moonlighter.login_urls")
-    if platform not in urls:
-        supported = ", ".join(sorted(urls)) or "(none installed)"
-        return f"Platform '{platform}' not supported. Supported: {supported}"
-    page = await _browser_mod.new_page(app.config)
-    await page.goto(urls[platform])
-    return (
-        f"Browser opened at {urls[platform]}. "
-        "Log in manually. "
-        "The session will be saved automatically to ~/.moonlighter/browser-session/"
-    )
+    with operation_metrics("prepare_application"):
+        return await assisted_service.prepare_application(job_id, app.config, app.profile)
 
 
 @mcp.tool()
 @tool_logged
-async def apply_jobs(ids: list[int], *, ctx: Context[ServerSession, AppContext, Any]) -> str:
-    """
-    Start application flow for given job IDs.
-    Opens each job in the browser, extracts form fields, generates LLM answers.
-    Returns draft answers for review before submission.
-    """
-    app = ctx.request_context.lifespan_context
-    with operation_metrics("apply_jobs"):
-        return await apply_service.apply_jobs(ids, app.config, app.profile, app.llm_caller)
-
-
-@mcp.tool()
-@tool_logged
-async def confirm_apply(
-    job_id: int,
-    answers: dict[str, str] | None = None,
-    *,
-    ctx: Context[ServerSession, AppContext, Any],
+async def prepare_application_from_paste(
+    job_id: int, page_text: str, *, ctx: Context[ServerSession, AppContext, Any]
 ) -> str:
     """
-    Submit the application for a job.
-    job_id: ID of the job (must have a draft Application in DB)
-    answers: optional dict of {field: answer} overrides merged into the saved draft
+    Same as prepare_application, for a page whose questions no API publishes:
+    select the whole application page, copy it, and pass the text here.
+    job_id: ID of the job
+    page_text: everything copied off the application page
     """
     app = ctx.request_context.lifespan_context
-    return await apply_service.confirm_apply(job_id, answers, app.config, app.profile)
-
-
-@mcp.tool()
-@tool_logged
-async def fill_application(
-    job_id: int,
-    answers: dict[str, str] | None = None,
-    *,
-    ctx: Context[ServerSession, AppContext, Any],
-) -> str:
-    """
-    Fill the application form and STOP before submitting (review the 03-filled
-    screenshot, then call submit_application). Does not submit.
-    job_id: ID of the job (must have a draft Application in DB)
-    answers: optional {field: answer} overrides merged into the saved draft
-    """
-    app = ctx.request_context.lifespan_context
-    with operation_metrics("fill_application"):
-        return await apply_service.fill_application(job_id, answers, app.config, app.profile)
-
-
-@mcp.tool()
-@tool_logged
-async def submit_application(job_id: int, *, ctx: Context[ServerSession, AppContext, Any]) -> str:
-    """
-    Submit an already-filled application (must have been filled via fill_application).
-    Re-fills from the saved answers and submits.
-    """
-    app = ctx.request_context.lifespan_context
-    return await apply_service.submit_application(job_id, app.config, app.profile)
-
-
-@mcp.tool()
-@tool_logged
-async def retry_apply(job_id: int, *, ctx: Context[ServerSession, AppContext, Any]) -> str:
-    """Retry a failed application. Reuses stored draft answers."""
-    app = ctx.request_context.lifespan_context
-    return await apply_service.retry_apply(job_id, app.config, app.profile)
+    with operation_metrics("prepare_application_from_paste"):
+        return await assisted_service.prepare_application_from_paste(
+            job_id, page_text, app.config, app.profile
+        )
 
 
 @mcp.tool()
 @tool_logged
 async def get_pipeline(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
     """Show full application funnel: counts and list by status."""
+    app = ctx.request_context.lifespan_context
+    warnings = validate_startup(app.config, app.profile)
     statuses = [
         "draft",
         "needs_review",
@@ -303,7 +276,14 @@ async def get_pipeline(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
         "offer",
         "rejected",
     ]
-    lines = ["# Application Pipeline\n"]
+    lines: list[str] = []
+    if warnings:
+        lines.append("# Setup Warnings\n")
+        for w in warnings:
+            marker = "ERROR" if w.level == "error" else "WARN"
+            lines.append(f"- [{marker}] {w.message}")
+        lines.append("")
+    lines.append("# Application Pipeline\n")
     for status in statuses:
         apps = list(
             Application.select(Application, Job)
@@ -369,21 +349,36 @@ async def update_status(
 @tool_logged
 async def setup_email(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
     """
-    Configure Gmail authentication for candidaturas@gmail.com.
+    Configure Gmail authentication for the account that receives application replies.
     Run only once. Opens the browser to authorize access.
-    Requires gmail-client.json in ~/.moonlighter/.
+    Requires the OAuth client file at email.credentials_path
+    (default MOONLIGHTER_HOME/gmail-client.json) and writes the token to
+    email.token_path — overwriting whatever file that path names.
     """
     app = ctx.request_context.lifespan_context
     config = app.config
     email_cfg = config.get("email", {})
-    creds_path = str(Path(email_cfg.get("credentials_path", "")).expanduser())
-    token_path = str(Path(email_cfg.get("token_path", "")).expanduser())
+
+    # Checked before resolving: Path("").expanduser() is ".", a directory that
+    # always exists, so resolving an unconfigured path first would trade this
+    # clear message for a confusing "Is a directory" failure further down.
+    creds_path_raw = email_cfg.get("credentials_path", "")
+    if not creds_path_raw:
+        return (
+            "⚠️  email.credentials_path is not configured.\n"
+            "Download client_secret.json from the Google Cloud Console, save it under "
+            "MOONLIGHTER_HOME (or point credentials_path at your own location), and run "
+            "setup_email() again."
+        )
+    creds_path = str(resolve_under_home(creds_path_raw))
+    token_path = str(
+        resolve_under_home(email_cfg.get("token_path") or DEFAULTS["email"]["token_path"])
+    )
 
     if not Path(creds_path).exists():
         return (
             f"⚠️  Credentials file not found: {creds_path}\n"
-            "Download client_secret.json from the Google Cloud Console and save it to "
-            "~/.moonlighter/gmail-client.json"
+            "Download client_secret.json from the Google Cloud Console and save it there."
         )
 
     try:
@@ -400,7 +395,7 @@ async def setup_email(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
 @tool_logged
 async def sync_email_responses(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
     """
-    Read unread emails in candidaturas@gmail.com,
+    Read recent emails in the configured Gmail account, whether read or unread,
     classify them with the LLM, and update the applications database.
     Returns a summary of the updates made.
     """
@@ -430,7 +425,14 @@ async def sync_email_responses(*, ctx: Context[ServerSession, AppContext, Any]) 
         return "\n".join(lines)
 
 
-def main() -> None:  # pragma: no cover - entry-point do servidor MCP (boundary)
+def main() -> None:  # pragma: no cover - MCP server entry point (boundary)
+    import sys
+
+    if len(sys.argv) > 1 and sys.argv[1] == "init":
+        from moonlighter.init import main as init_main
+
+        init_main()
+        return
     mcp.run()
 
 

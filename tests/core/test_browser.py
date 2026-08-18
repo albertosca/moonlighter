@@ -239,12 +239,16 @@ async def test_new_page_returns_page_from_context(tmp_path):
 # ── save_screenshot ───────────────────────────────────────────────────────────
 
 
-async def test_save_screenshot_calls_page_screenshot(tmp_path):
+async def test_save_screenshot_captures_the_whole_page(tmp_path):
+    """The viewport is ~750 CSS px; a real application form is ~4500. A
+    viewport-only capture showed 17% of the form, so the human-review gate was
+    asking someone to approve what they could not see. full_page is what makes
+    03-filled a review artifact rather than a thumbnail."""
     config = {**_CONFIG, "screenshots_dir": str(tmp_path)}
     mock_page = MagicMock()
     mock_page.screenshot = AsyncMock()
     path = await browser_mod.save_screenshot(mock_page, job_id=42, step="fill", config=config)
-    mock_page.screenshot.assert_called_once_with(path=path)
+    mock_page.screenshot.assert_called_once_with(path=path, full_page=True)
     assert "42" in path
     assert "fill" in path
 
@@ -255,6 +259,64 @@ async def test_save_screenshot_creates_job_subdir(tmp_path):
     mock_page.screenshot = AsyncMock()
     await browser_mod.save_screenshot(mock_page, job_id=99, step="submit", config=config)
     assert (tmp_path / "99").is_dir()
+
+
+async def test_save_screenshot_restores_a_minimized_window_and_re_minimizes_it(tmp_path):
+    """A minimized window produces no compositor frames, so page.screenshot()
+    blocks until it times out -- reproduced on both Greenhouse and Recruitee.
+    The browser-driven filler this predates minimized the window before
+    filling, which made the 03-filled review artifact impossible to produce.
+    Restore around the capture, then put the window back exactly as it was."""
+    config = {**_CONFIG, "screenshots_dir": str(tmp_path)}
+    mock_page = MagicMock()
+    mock_page.screenshot = AsyncMock()
+    mock_cdp = AsyncMock()
+    mock_cdp.send = AsyncMock(return_value={"windowId": 5, "bounds": {"windowState": "minimized"}})
+    mock_page.context.new_cdp_session = AsyncMock(return_value=mock_cdp)
+
+    await browser_mod.save_screenshot(mock_page, job_id=1, step="03-filled", config=config)
+
+    states = [
+        call.args[1]["bounds"]["windowState"]
+        for call in mock_cdp.send.call_args_list
+        if call.args[0] == "Browser.setWindowBounds"
+    ]
+    assert states == ["normal", "minimized"], (
+        f"expected restore-then-re-minimize around the capture, got {states}"
+    )
+    mock_page.screenshot.assert_awaited_once()
+
+
+async def test_save_screenshot_leaves_an_already_visible_window_alone(tmp_path):
+    """01-job-page and 02-form are taken with the window visible. Blindly
+    re-minimizing after every capture would hide a window the flow means to
+    keep on screen."""
+    config = {**_CONFIG, "screenshots_dir": str(tmp_path)}
+    mock_page = MagicMock()
+    mock_page.screenshot = AsyncMock()
+    mock_cdp = AsyncMock()
+    mock_cdp.send = AsyncMock(return_value={"windowId": 5, "bounds": {"windowState": "normal"}})
+    mock_page.context.new_cdp_session = AsyncMock(return_value=mock_cdp)
+
+    await browser_mod.save_screenshot(mock_page, job_id=2, step="01-job-page", config=config)
+
+    assert not [
+        c for c in mock_cdp.send.call_args_list if c.args[0] == "Browser.setWindowBounds"
+    ], "a visible window must not have its state touched"
+    mock_page.screenshot.assert_awaited_once()
+
+
+async def test_save_screenshot_still_captures_when_window_state_is_unavailable(tmp_path):
+    """CDP window-state calls are best-effort everywhere else in this module
+    (96decbc); a failure here must not cost us the screenshot itself."""
+    config = {**_CONFIG, "screenshots_dir": str(tmp_path)}
+    mock_page = MagicMock()
+    mock_page.screenshot = AsyncMock()
+    mock_page.context.new_cdp_session = AsyncMock(side_effect=RuntimeError("no CDP"))
+
+    path = await browser_mod.save_screenshot(mock_page, job_id=3, step="03-filled", config=config)
+
+    mock_page.screenshot.assert_awaited_once_with(path=path, full_page=True)
 
 
 # ── hide_window / show_window ──────────────────────────────────────────────
@@ -338,3 +400,54 @@ async def test_get_context_logs_cdp_connected(caplog, tmp_path):
         await browser_mod.get_context(config)
 
     assert "CDP connected" in caplog.text
+
+
+# ── detach ────────────────────────────────────────────────────────────────────
+
+
+async def test_detach_disconnects_playwright_but_leaves_the_browser_running():
+    """A captcha token minted in a CDP-controlled tab does not validate
+    server-side, so handing the page back means genuinely letting go: stop the
+    Playwright driver, keep the window and its filled form alive for the human.
+    Killing the process would throw away the work."""
+    mock_browser = MagicMock()
+    mock_browser.close = AsyncMock()
+    mock_pw = MagicMock()
+    mock_pw.stop = AsyncMock()
+    mock_proc = MagicMock()
+
+    browser_mod._browser = mock_browser
+    browser_mod._playwright = mock_pw
+    browser_mod._browser_process = mock_proc
+
+    await browser_mod.detach()
+
+    mock_browser.close.assert_awaited_once()
+    mock_pw.stop.assert_awaited_once()
+    mock_proc.terminate.assert_not_called()
+    mock_proc.kill.assert_not_called()
+    assert browser_mod._browser is None
+    assert browser_mod._playwright is None
+    assert browser_mod._browser_process is mock_proc
+
+
+async def test_detach_is_safe_when_nothing_is_connected():
+    browser_mod._browser = None
+    browser_mod._playwright = None
+    await browser_mod.detach()
+
+
+async def test_detach_forgets_the_connection_even_if_closing_fails():
+    """A driver that errors on the way out must not leave a stale handle behind —
+    the next operation would reuse a dead connection."""
+    mock_browser = MagicMock()
+    mock_browser.close = AsyncMock(side_effect=RuntimeError("already gone"))
+    mock_pw = MagicMock()
+    mock_pw.stop = AsyncMock(side_effect=RuntimeError("nope"))
+    browser_mod._browser = mock_browser
+    browser_mod._playwright = mock_pw
+
+    await browser_mod.detach()
+
+    assert browser_mod._browser is None
+    assert browser_mod._playwright is None

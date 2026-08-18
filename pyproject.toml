@@ -18,7 +18,7 @@ dev = [
 asyncio_mode = "auto"
 addopts = "--cov --cov-fail-under=100 -m 'not e2e'"
 markers = [
-    "e2e: testes end-to-end que exigem navegador real (rodar com -m e2e)",
+    "e2e: end-to-end tests that require a real browser (run with -m e2e)",
 ]
 
 [tool.ruff]
@@ -33,7 +33,7 @@ ignore = ["RUF001", "RUF002", "RUF003", "E501"]
 "scripts/*" = ["E402"]
 # S101 assert: pytest's normal idiom. S108 /tmp paths: test fixtures, not runtime.
 # S105 hardcoded password: false positive on a mock dict key named "refresh_token".
-"tests/*" = ["S101", "S105", "S108"]
+"tests/*" = ["S101", "S105", "S106", "S108"]
 
 [tool.coverage.run]
 source_pkgs = [
@@ -45,6 +45,7 @@ source_pkgs = [
     "moonlighter.startup",
     "moonlighter.views",
     "moonlighter._tool_logging",
+    "moonlighter.init",
 ]
 branch = true
 omit = [

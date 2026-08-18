@@ -8,7 +8,7 @@ from typing import Any, Protocol
 
 import anthropic
 from anthropic.types import TextBlock
-from moonlighter.core.config import moonlighter_home
+from moonlighter.core.config import llm_backend, moonlighter_home
 from moonlighter.core.metrics import record_call
 
 
@@ -50,10 +50,10 @@ def make_caller(config: dict[str, Any]) -> LLMCaller:
 
     llm_backend: "cli"  → uses the `claude -p` CLI (no API key required)
     llm_backend: "api"  → uses the Anthropic Python SDK (requires ANTHROPIC_API_KEY)
-    Default: "api"
+    Default: "cli". Anything else raises ConfigError rather than silently
+    selecting a backend the user did not ask for.
     """
-    backend = config.get("llm_backend", "api")
-    if backend == "cli":
+    if llm_backend(config) == "cli":
         return _call_cli
     return make_api_caller()
 

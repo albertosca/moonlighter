@@ -9,6 +9,7 @@ from moonlighter.core.config import (
     load_config,
     load_profile,
     moonlighter_home,
+    resolve_under_home,
     validate_config,
 )
 
@@ -253,6 +254,24 @@ def test_load_company_list_with_phase_filter(tmp_path):
     assert result["greenhouse"] == ["stripe"]
 
 
+def test_company_list_rejects_non_list_phase_value(tmp_path):
+    """MINOR regression: a phase filter selecting a scalar phase value (not a
+    list) must raise, not silently iterate the string character-by-character
+    -- every single character is a str, so entry-level validation alone would
+    pass and single-char slugs would get scanned."""
+    path = tmp_path / "company_list.yaml"
+    path.write_text("greenhouse:\n  phase1: notalist\n")
+    with pytest.raises(ConfigError, match=r"greenhouse.*did not resolve to a list"):
+        load_company_list(path, phase="phase1")
+
+
+def test_company_list_rejects_non_string_entry(tmp_path):
+    path = tmp_path / "company_list.yaml"
+    path.write_text("greenhouse:\n  - nubank\n  - 42\n")
+    with pytest.raises(ConfigError, match=r"greenhouse.*42"):
+        load_company_list(path)
+
+
 # --- scan_concurrency ---
 
 
@@ -367,6 +386,26 @@ class TestValidateConfig:
         cfg.pop("email", None)  # email is optional
         validate_config(cfg)
 
+    def test_zero_lookback_days_rejected(self):
+        """Gmail's newer_than:0d matches zero messages (verified live), so a
+        lookback_days of 0 silently disables the sync forever — reading exactly
+        like an empty mailbox instead of the config mistake it is."""
+        cfg = _valid_config()
+        cfg["email"] = {"lookback_days": 0}
+        with pytest.raises(ConfigError, match="lookback_days"):
+            validate_config(cfg)
+
+    def test_negative_lookback_days_rejected(self):
+        cfg = _valid_config()
+        cfg["email"] = {"lookback_days": -1}
+        with pytest.raises(ConfigError, match="lookback_days"):
+            validate_config(cfg)
+
+    def test_positive_lookback_days_accepted(self):
+        cfg = _valid_config()
+        cfg["email"] = {"lookback_days": 30}
+        validate_config(cfg)  # must not raise
+
     def test_example_config_validates(self):
         from moonlighter.core.config import DEFAULTS
 
@@ -408,3 +447,85 @@ def test_harden_permissions_warns_on_chmod_failure_without_raising(tmp_path, mon
     assert len(warnings) >= 2
     assert any("profile.yaml" in w or "permiss" in w.lower() for w in warnings)
     assert any("browser-session" in w or "permiss" in w.lower() for w in warnings)
+
+
+# ── llm_backend ───────────────────────────────────────────────────────────────
+
+
+def test_llm_backend_defaults_to_cli_when_omitted():
+    """The subscription path is the default: `uvx moonlighter` users generally
+    have Claude Code and no API key."""
+    from moonlighter.core.config import llm_backend
+
+    assert llm_backend({}) == "cli"
+
+
+def test_llm_backend_returns_the_configured_value():
+    from moonlighter.core.config import llm_backend
+
+    assert llm_backend({"llm_backend": "api"}) == "api"
+    assert llm_backend({"llm_backend": "cli"}) == "cli"
+
+
+@pytest.mark.parametrize("bad", ["CLI", "Api", "clii", "subscription", ""])
+def test_llm_backend_rejects_anything_else_naming_the_valid_values(bad):
+    """These all used to select the api backend in silence -- 'CLI' being the
+    most plausible typo, and the most expensive, since it demands an API key."""
+    from moonlighter.core.config import llm_backend
+
+    with pytest.raises(ConfigError, match="cli, api"):
+        llm_backend({"llm_backend": bad})
+
+
+def test_validate_config_rejects_an_unknown_llm_backend():
+    with pytest.raises(ConfigError, match="cli, api"):
+        validate_config({"llm_backend": "CLI"})
+
+
+def test_validate_config_accepts_both_backends():
+    validate_config({"llm_backend": "cli"})
+    validate_config({"llm_backend": "api"})
+
+
+def test_load_config_fills_llm_backend_from_defaults(tmp_path, monkeypatch):
+    """The default has to arrive through DEFAULTS, not through a `.get()`
+    fallback at each call site -- that divergence is what made the wizard, the
+    README, and the factory disagree about which backend an omitted key means."""
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "config.yaml").write_text("score_threshold: 7.0\n")
+
+    assert load_config(tmp_path / "config.yaml")["llm_backend"] == "cli"
+
+
+# ── email defaults ───────────────────────────────────────────────────────────
+
+
+def test_defaults_carry_the_documented_email_paths():
+    """credentials_path/token_path must have real defaults so setup_gmail_service
+    can name the exact missing key instead of raising a raw KeyError. Relative
+    filenames, not ~/.moonlighter/... -- resolve_under_home() resolves them at
+    the point of use, honoring a MOONLIGHTER_HOME override (IMPORTANT 6)."""
+    from moonlighter.core.config import DEFAULTS
+
+    assert DEFAULTS["email"]["token_path"] == "gmail-token.json"
+    assert DEFAULTS["email"]["credentials_path"] == "gmail-client.json"
+
+
+# ── resolve_under_home ───────────────────────────────────────────────────────
+
+
+def test_resolve_under_home_joins_a_relative_path_onto_moonlighter_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    assert resolve_under_home("gmail-client.json") == tmp_path / "gmail-client.json"
+
+
+def test_resolve_under_home_leaves_an_absolute_path_untouched(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "not-this-one"))
+    absolute = tmp_path / "elsewhere" / "creds.json"
+    assert resolve_under_home(str(absolute)) == absolute
+
+
+def test_resolve_under_home_expands_a_tilde_path_without_touching_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "not-this-one"))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert resolve_under_home("~/creds.json") == tmp_path / "creds.json"

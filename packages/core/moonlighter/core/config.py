@@ -9,6 +9,23 @@ def moonlighter_home() -> Path:
     return Path(os.environ.get("MOONLIGHTER_HOME", "~/.moonlighter")).expanduser()
 
 
+def resolve_under_home(value: str) -> Path:
+    """A config-supplied path, resolved under MOONLIGHTER_HOME when it is relative.
+
+    Same convention as cv.default (see application/answers/cv.py's
+    configured_cv_path): an absolute path, or a '~'-prefixed one, is honored
+    exactly as given; anything else is joined onto moonlighter_home(). Callers
+    are expected to reject an empty string themselves with a message naming the
+    config key -- Path("").expanduser() is ".", a directory that always exists,
+    so resolving it silently here would trade a clear "not configured" error for
+    a confusing "Is a directory" failure downstream.
+    """
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = moonlighter_home() / path
+    return path
+
+
 def _learned_blocklist_path() -> Path:
     return moonlighter_home() / "blocklist_learned.yaml"
 
@@ -31,10 +48,17 @@ def browser_executable(config: dict[str, Any]) -> str:
 NEEDS_REVIEW_SENTINEL = "__NEEDS_REVIEW__"
 
 
-DEFAULTS = {
+DEFAULTS: dict[str, Any] = {
     # Browser executable path (Chrome/Chromium/Brave). Empty by default:
     # set browser_path in config.yaml. Accepts brave_path (legacy) as a fallback.
     "browser_path": "",
+    # Which LLM backend runs evaluations and answer generation.
+    #   "cli" -> the `claude` CLI, using the claude.ai subscription. No API key.
+    #   "api" -> the Anthropic SDK. Requires ANTHROPIC_API_KEY.
+    # Default is "cli" because that is what `moonlighter init`, the README, and
+    # config.example.yaml all lead with -- an installer coming through
+    # `uvx moonlighter` has Claude Code far more often than an API key.
+    "llm_backend": "cli",
     "score_threshold": 6.5,
     "llm_model": "claude-sonnet-4-6",
     "eval_model": "claude-haiku-4-5-20251001",
@@ -48,10 +72,13 @@ DEFAULTS = {
     # re-transmission by a factor of K. 1 disables batching (1 job per call).
     "scan_batch_size": 5,
     # CV per company. Paths relative to MOONLIGHTER_HOME; case-insensitive match.
-    # 'default' used when the company has no entry. Can be overridden in the
-    # local config.yaml. If the chosen file doesn't exist, confirm_apply aborts.
+    # 'default' used when the company has no entry, and defaults to 'cv.pdf'
+    # (i.e. MOONLIGHTER_HOME/cv.pdf) — the same file the startup warning names.
+    # Can be overridden in the local config.yaml. If the chosen file doesn't
+    # exist, the composer emits a gap on the file-upload question instead of
+    # naming a file to attach.
     "cv": {
-        "default": "",
+        "default": "cv.pdf",
         "by_company": {},
     },
     # Country-dependent work authorization. The candidate is authorized to work
@@ -61,6 +88,16 @@ DEFAULTS = {
         "citizenship_country": "",
         "authorized_answer": "Yes",
         "not_authorized_answer": "No",
+    },
+    # Gmail response tracking. Relative filenames, resolved under MOONLIGHTER_HOME
+    # by resolve_under_home() at the point of use (same convention as cv.default) —
+    # NOT hardcoded to ~/.moonlighter, which ignores a MOONLIGHTER_HOME override.
+    # setup_email() creates the token after the OAuth consent. NOTE: setup_email()
+    # writes (and overwrites) whatever file token_path names — point it at an
+    # absolute path elsewhere only if you own that file.
+    "email": {
+        "credentials_path": "gmail-client.json",
+        "token_path": "gmail-token.json",
     },
 }
 
@@ -111,6 +148,7 @@ _EMAIL_SCHEMA: dict[str, tuple[type, ...]] = {
     "token_path": (str,),
     "processed_label": (str,),
     "mark_processed": (bool,),
+    "lookback_days": (int,),
     "interview_stages": (list,),
 }
 _NESTED_SCHEMAS = {
@@ -133,6 +171,27 @@ def _check_type(key: str, value: Any, types: tuple[type, ...]) -> None:
         )
 
 
+LLM_BACKENDS = ("cli", "api")
+
+
+def llm_backend(config: dict[str, Any]) -> str:
+    """The configured LLM backend, validated.
+
+    Single source of truth for every site that branches on the backend -- the
+    caller factory and the startup checks -- so a warning can never describe a
+    different backend from the one that will actually run. Raises ConfigError
+    on anything outside LLM_BACKENDS: an unrecognized value used to fall
+    through to 'api' in silence, which turned the typo 'CLI' into a demand for
+    an API key the user had no reason to own.
+    """
+    backend: str = config.get("llm_backend", DEFAULTS["llm_backend"])
+    if backend not in LLM_BACKENDS:
+        raise ConfigError(
+            f"config key 'llm_backend' must be one of {', '.join(LLM_BACKENDS)}, got {backend!r}"
+        )
+    return backend
+
+
 def validate_config(config: dict[str, Any]) -> None:
     """Strict, closed-schema validation. Raises ConfigError on the first unknown key or
     wrong-typed value (naming the key). Runs after the DEFAULTS merge, so an omitted key is
@@ -141,12 +200,21 @@ def validate_config(config: dict[str, Any]) -> None:
         if key not in _CONFIG_SCHEMA:
             raise ConfigError(f"unknown config key '{key}'")
         _check_type(key, value, _CONFIG_SCHEMA[key])
+        if key == "llm_backend":
+            llm_backend(config)
         sub_schema = _NESTED_SCHEMAS.get(key)
         if sub_schema is not None:
             for sub_key, sub_value in value.items():
                 if sub_key not in sub_schema:
                     raise ConfigError(f"unknown config key '{key}.{sub_key}'")
                 _check_type(f"{key}.{sub_key}", sub_value, sub_schema[sub_key])
+                if key == "email" and sub_key == "lookback_days" and sub_value <= 0:
+                    # Gmail's newer_than:0d matches zero messages (verified live) —
+                    # a non-positive value silently disables the sync forever, reading
+                    # exactly like an empty mailbox instead of a config mistake.
+                    raise ConfigError(
+                        f"config key 'email.lookback_days' must be positive, got {sub_value}"
+                    )
 
 
 def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
@@ -206,19 +274,22 @@ def load_profile(profile_path: str | Path | None = None) -> dict[str, Any]:
 
 
 def load_company_list(path: str | Path | None = None, phase: str | None = None) -> dict[str, Any]:
-    """Load company list from YAML file, optionally filtered by phase.
+    """Load the company list from YAML, optionally filtered by phase.
 
-    O company_list.yaml organiza slugs por ATS e fase:
+    company_list.yaml groups entries by ATS and phase:
         greenhouse:
           phase1: [slug, ...]
           phase2: [slug, ...]
 
+    An entry is an ATS slug ("nubank") or, for Recruitee, optionally a full
+    custom career domain ("jobs.channable.com").
+
     Args:
-        path: Path to company_list.yaml file
-        phase: "phase1", "phase2", "phase3", ou None para todas as fases.
+        path: path to company_list.yaml.
+        phase: "phase1", "phase2", "phase3", or None for all phases combined.
 
     Returns:
-        dict: {source: [slug, ...]} (e.g., {"greenhouse": ["nubank", "ifoodcarreiras"]})
+        dict: {source: [entry, ...]}
     """
     path = Path(path) if path is not None else moonlighter_home() / "company_list.yaml"
     if not path.exists():
@@ -234,7 +305,7 @@ def load_company_list(path: str | Path | None = None, phase: str | None = None) 
             if phase:
                 result[source] = value.get(phase, [])
             else:
-                # Todas as fases concatenadas
+                # All phases concatenated
                 slugs = []
                 for slugs_in_phase in value.values():
                     if isinstance(slugs_in_phase, list):
@@ -242,6 +313,23 @@ def load_company_list(path: str | Path | None = None, phase: str | None = None) 
                 result[source] = slugs
         else:
             result[source] = []
+
+    for source, entries in result.items():
+        if not isinstance(entries, list):
+            # A phase filter selecting a non-list value (e.g. a scalar phase
+            # entry) leaves `entries` as that raw value -- a string iterates
+            # character-by-character, and every single-char "slug" is a str,
+            # so the entry-level check below would silently pass.
+            raise ConfigError(
+                f"company_list.yaml: source {source!r} did not resolve to a list "
+                f"(got {type(entries).__name__}: {entries!r})"
+            )
+        for entry in entries:
+            if not isinstance(entry, str):
+                raise ConfigError(
+                    f"company_list.yaml: source '{source}' has a non-string entry: {entry!r}"
+                )
+
     return result
 
 
