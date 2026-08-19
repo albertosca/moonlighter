@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "moonlighter-apply"
-version = "0.1.1"
+version = "0.1.2"
 description = "LLM-composed application answers from your profile, rendered as one reviewable sheet — you paste and submit; the answering slice of moonlighter"
 readme = "README.md"
 license = {text = "AGPL-3.0-only"}
