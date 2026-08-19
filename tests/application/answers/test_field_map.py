@@ -522,6 +522,14 @@ def test_salary_question_contracted_lead():
     assert answers["What's your expected salary (BRL, monthly)?"] == "BRL 35.000/month"
 
 
+def test_salary_question_typographic_apostrophe():
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(
+        ["What’s your expected salary (BRL, monthly)?"], profile, {}, None, None
+    )
+    assert answers["What’s your expected salary (BRL, monthly)?"] == "BRL 35.000/month"
+
+
 def test_salary_question_ptbr_lead():
     profile = {"preferences": {"salary_target_brl_monthly": 35000}}
     answers = pre_populate_answers(["Qual a sua pretensão salarial?"], profile, {}, None, None)

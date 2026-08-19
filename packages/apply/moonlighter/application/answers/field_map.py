@@ -102,7 +102,7 @@ _RULES: list[tuple[str, _RuleFn]] = [
     # ("What is your view on salary transparency?") still never reach `$`.
     # See the field_map test file for every regression case.
     (
-        r"^(?:(?:what\s+is|what's|what\s+are)\s+your\s+|qual\s+(?:é\s+)?(?:a\s+)?sua\s+)?"
+        r"^(?:(?:what\s+is|what[’']s|what\s+are)\s+your\s+|qual\s+(?:é\s+)?(?:a\s+)?sua\s+)?"
         r"(?:(?:desired|expected|current|target|minimum|base|total)\s+)?"
         r"(?:salary|compensation|pay|pretens\w*|remunera\w*|sal[aá]rio|faixa\s+salarial)"
         r"(?:\s+(?:expectations?|requirements?|range|salari\w*|pretendid\w*|desejad\w*"
