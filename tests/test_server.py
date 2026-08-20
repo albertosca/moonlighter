@@ -1781,6 +1781,29 @@ async def test_add_job_tool_delegates_to_service(tmp_db):
     assert "Stripe" in result or "NEW" in result
 
 
+async def test_verify_job_tool_delegates_to_service(tmp_db):
+    """O wrapper MCP verify_job delega ao scan_service e devolve o resultado."""
+    init_db()
+    from moonlighter.server import verify_job
+
+    job = Job.create(
+        source="inhire",
+        company="Alice",
+        title="Squad Manager",
+        url="https://alice.inhire.app/vagas/2",
+        status="needs_review",
+        score=None,
+    )
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=make_eval_result(8.0)),
+    ):
+        result = await verify_job(
+            job_id=job.id, page_text="Full page text.", ctx=make_test_context()
+        )
+    assert "Alice" in result or "NEW" in result
+
+
 # ── archive_stale_jobs (MCP tool) ───────────────────────────────────────────
 
 
