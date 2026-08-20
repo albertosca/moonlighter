@@ -22,6 +22,7 @@ def test_is_iterable_over_all_sources():
         "workable",
         "smartrecruiters",
         "recruitee",
+        "inhire",
         "gupy",
         "remoteok",
         "remotive",
