@@ -415,7 +415,7 @@ def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
     )
     verify_note = (
         f"\n\n⚠️  {needs_verification} job(s) need manual verification — "
-        f"list_jobs(status='needs_review') to see them."
+        f"list_jobs(status='needs_review') to see them, verify_job(job_id, page_text) to score one."
         if needs_verification
         else ""
     )
@@ -581,6 +581,12 @@ async def verify_job(
     if job.status != "needs_review":
         return f"Job #{job_id} is not pending verification (status: {job.status!r})."
 
+    if _is_description_insufficient(page_text):
+        return (
+            f"That paste is too short to score ({len(page_text.strip())} chars — need at least "
+            f"30). Job #{job_id} stays pending — open {job.url} and copy the whole page."
+        )
+
     threshold = config["score_threshold"]
     result = await evaluate_job(
         company=job.company,
@@ -636,7 +642,15 @@ def _existing_job_message(url: str) -> str | None:
         job = Job.get(Job.url == url)
     except Job.DoesNotExist:
         return None
-    return f"Job already in the database (id={job.id}, score={job.score:.1f}, status={job.status})."
+    score_str = f"{job.score:.1f}" if job.score is not None else "—"
+    hint = (
+        " Use verify_job(job_id, page_text) to score it from the real page."
+        if job.status == "needs_review"
+        else ""
+    )
+    return (
+        f"Job already in the database (id={job.id}, score={score_str}, status={job.status}).{hint}"
+    )
 
 
 def _persist_manual(

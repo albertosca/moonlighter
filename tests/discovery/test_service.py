@@ -74,6 +74,7 @@ async def test_format_report_counts_needs_review_separately_from_below(tmp_db):
     assert "1 below threshold" in report
     assert "1 job(s) need manual verification" in report
     assert "list_jobs(status='needs_review')" in report
+    assert "verify_job(job_id, page_text)" in report
 
 
 async def test_format_report_no_verify_line_when_nothing_pending(tmp_db):
@@ -199,7 +200,7 @@ async def test_add_job_dedup_existing_job(tmp_db):
         company="Stripe",
         title="Eng",
         url="https://x.com/5",
-        score=8.0,
+        score=7.2,
         status="new",
     )
     ScanLog.create(job_url="https://x.com/5", source="manual")
@@ -207,6 +208,27 @@ async def test_add_job_dedup_existing_job(tmp_db):
         "https://x.com/5", "Stripe", "Eng", "desc", CONFIG, PROFILE, MagicMock()
     )
     assert "already in the database" in result
+    assert "score=7.2" in result
+    assert "verify_job" not in result
+
+
+async def test_add_job_dedup_needs_review_job_does_not_crash_on_none_score(tmp_db):
+    init_db()
+    Job.create(
+        source="manual",
+        company="Stripe",
+        title="Eng",
+        url="https://x.com/5b",
+        score=None,
+        status="needs_review",
+    )
+    ScanLog.create(job_url="https://x.com/5b", source="manual")
+    result = await scan_service.add_job(
+        "https://x.com/5b", "Stripe", "Eng", "desc", CONFIG, PROFILE, MagicMock()
+    )
+    assert "already in the database" in result
+    assert "score=—" in result
+    assert "verify_job" in result
 
 
 async def test_add_job_scanlog_without_job_proceeds_to_eval(tmp_db):
@@ -318,6 +340,26 @@ async def test_verify_job_rejects_a_job_not_pending_verification(tmp_db):
     assert "new" in result
 
 
+async def test_verify_job_rejects_a_too_short_paste_and_leaves_job_pending(tmp_db):
+    init_db()
+    job = Job.create(
+        source="inhire",
+        company="Alice",
+        title="Squad Manager",
+        url="https://alice.inhire.app/vagas/9",
+        status="needs_review",
+        score=None,
+    )
+    eval_mock = AsyncMock(return_value=_eval(8.0))
+    with patch("moonlighter.discovery.service.evaluate_job", new=eval_mock):
+        result = await scan_service.verify_job(job.id, "  ", CONFIG, PROFILE, MagicMock())
+    eval_mock.assert_not_called()
+    assert "too short" in result
+    assert "0 chars" in result
+    assert "stays pending" in result
+    assert Job.get_by_id(job.id).status == "needs_review"
+
+
 async def test_verify_job_updates_the_same_row_and_scores_above_threshold(tmp_db):
     init_db()
     job = Job.create(
@@ -345,6 +387,37 @@ async def test_verify_job_updates_the_same_row_and_scores_above_threshold(tmp_db
     assert "Alice" in result
 
 
+async def test_verify_job_scores_a_row_that_scan_actually_produced(tmp_db):
+    """Crosses the scan -> verify_job seam: builds the needs_review row through the
+    real _run_scan pipeline (Task 1), then scores it through verify_job (Task 3) --
+    proving the two sides agree on the row's shape (e.g. caveats='[]'), not just
+    that each works against a hand-built Job in isolation."""
+    init_db()
+    raw = RawJob(
+        source="greenhouse",
+        company="co",
+        title="Engineer",
+        url="https://x.com/scan/seam",
+        description=None,
+    )
+    await _run_scan([raw])
+    job = Job.get(Job.url == "https://x.com/scan/seam")
+    assert job.status == "needs_review"
+    assert job.caveats == "[]"
+
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(8.0)),
+    ):
+        result = await scan_service.verify_job(
+            job.id, "Full page text with the real job description.", CONFIG, PROFILE, MagicMock()
+        )
+    refreshed = Job.get_by_id(job.id)
+    assert refreshed.status == "new"
+    assert refreshed.description == "Full page text with the real job description."
+    assert "NEW" in result
+
+
 async def test_verify_job_below_threshold_archives(tmp_db):
     init_db()
     job = Job.create(
@@ -359,7 +432,9 @@ async def test_verify_job_below_threshold_archives(tmp_db):
         "moonlighter.discovery.service.evaluate_job",
         new=AsyncMock(return_value=_eval(3.0)),
     ):
-        result = await scan_service.verify_job(job.id, "text", CONFIG, PROFILE, MagicMock())
+        result = await scan_service.verify_job(
+            job.id, "Full page text with the real job description.", CONFIG, PROFILE, MagicMock()
+        )
     refreshed = Job.get_by_id(job.id)
     assert refreshed.status == "archived"
     assert "archived" in result

@@ -1782,7 +1782,7 @@ async def test_add_job_tool_delegates_to_service(tmp_db):
 
 
 async def test_verify_job_tool_delegates_to_service(tmp_db):
-    """O wrapper MCP verify_job delega ao scan_service e devolve o resultado."""
+    """The verify_job MCP wrapper delegates to scan_service and returns the result."""
     init_db()
     from moonlighter.server import verify_job
 
@@ -1799,7 +1799,9 @@ async def test_verify_job_tool_delegates_to_service(tmp_db):
         new=AsyncMock(return_value=make_eval_result(8.0)),
     ):
         result = await verify_job(
-            job_id=job.id, page_text="Full page text.", ctx=make_test_context()
+            job_id=job.id,
+            page_text="Full page text with the real job description.",
+            ctx=make_test_context(),
         )
     assert "Alice" in result or "NEW" in result
 
