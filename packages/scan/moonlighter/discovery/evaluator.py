@@ -117,13 +117,13 @@ async def evaluate_job(
         logger.debug("→ score %.1f (%s)", result.score, company)
         return result
     except json.JSONDecodeError:
-        logger.warning("evaluator: parse error for %s/%s", company, title)
+        logger.warning("evaluator: parse error for %s/%s", company, title, exc_info=True)
         return EvaluationResult(score=0.0, score_notes="parse error: LLM returned non-JSON")
     except Exception as e:
         if is_spend_limit(e):
             record_spend_limit_hit()
             raise  # quota exhausted — the caller decides to stop; not the job's fault
-        logger.warning("evaluator: error for %s/%s — %s", company, title, e)
+        logger.warning("evaluator: error for %s/%s — %s", company, title, e, exc_info=True)
         return EvaluationResult(score=0.0, score_notes=f"evaluation error: {e}")
 
 
@@ -273,7 +273,7 @@ async def evaluate_jobs_batch(
         if is_spend_limit(e):
             record_spend_limit_hit()
             raise
-        logger.warning("batch eval: call error — fallback per-job: %s", e)
+        logger.warning("batch eval: call error — fallback per-job: %s", e, exc_info=True)
         return await _eval_each(jobs, profile, model, caller)
 
     parsed = _parse_batch(raw, len(jobs))

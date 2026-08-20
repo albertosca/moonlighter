@@ -50,7 +50,7 @@ async def find_stale_jobs(
             try:
                 await checkers[source](company, jobs, config, result)
             except Exception as e:
-                logger.warning("staleness: %s checker failed for %s — %s", source, company, e)
+                logger.warning("staleness: %s checker failed for %s — %s", source, company, e, exc_info=True)
                 if company not in result.failed_companies:
                     result.failed_companies.append(company)
         else:
@@ -73,7 +73,7 @@ async def _check_via_listing(
     try:
         raw = await scanner.scan([company])
     except Exception as e:
-        logger.warning("staleness: %s scan failed for %s — %s", source, company, e)
+        logger.warning("staleness: %s scan failed for %s — %s", source, company, e, exc_info=True)
         result.failed_companies.append(company)
         return
     if not isinstance(raw, list):
