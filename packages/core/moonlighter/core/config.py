@@ -99,6 +99,10 @@ DEFAULTS: dict[str, Any] = {
         "credentials_path": "gmail-client.json",
         "token_path": "gmail-token.json",
     },
+    # Portal-feed jobs (RemoteOK, HN Who Is Hiring, ...) can never be
+    # staleness-checked at their source; past this age they archive as aged
+    # out. 0 disables age-based archiving.
+    "portal_max_age_days": 30,
 }
 
 _PATH_KEYS = ("browser_session_dir", "screenshots_dir")
@@ -134,6 +138,7 @@ _CONFIG_SCHEMA: dict[str, tuple[type, ...]] = {
     "scan_remotive": (bool,),
     "scan_wwr": (bool,),
     "scan_hn_whoishiring": (bool,),
+    "portal_max_age_days": _INT,
 }
 
 _CV_SCHEMA: dict[str, tuple[type, ...]] = {"default": (str,), "by_company": (dict,)}
