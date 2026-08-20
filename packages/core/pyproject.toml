@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "moonlighter-core"
-version = "0.1.2"
+version = "0.1.3"
 description = "Storage, config, profile and the shared LLM client — the foundation slice of moonlighter"
 readme = "README.md"
 license = {text = "AGPL-3.0-only"}
