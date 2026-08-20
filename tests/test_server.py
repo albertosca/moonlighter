@@ -144,7 +144,7 @@ async def test_scan_all_below_threshold(tmp_db):
     from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
-        source="greenhouse", company="co", title="Eng", url="https://x.com/1", description="desc"
+        source="greenhouse", company="co", title="Eng", url="https://x.com/1", description="A detailed job description that goes on."
     )
     with (
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
@@ -180,7 +180,7 @@ async def test_scan_above_threshold_shows_table(tmp_db):
         company="Stripe",
         title="Sr Eng",
         url="https://x.com/2",
-        description="desc",
+        description="A detailed job description that goes on.",
     )
     with (
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
@@ -239,7 +239,7 @@ async def test_scan_linkedin_failure_doesnt_block(tmp_db):
     from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
-        source="greenhouse", company="co", title="Eng", url="https://x.com/4", description="desc"
+        source="greenhouse", company="co", title="Eng", url="https://x.com/4", description="A detailed job description that goes on."
     )
     with (
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
@@ -273,7 +273,7 @@ async def test_scan_saves_salary_fields(tmp_db):
         company="Stripe",
         title="Eng",
         url="https://x.com/5",
-        description="desc",
+        description="A detailed job description that goes on.",
     )
     eval_result = EvaluationResult(
         score=8.0,
@@ -315,7 +315,7 @@ async def test_scan_saves_caveats_as_json(tmp_db):
     from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
-        source="greenhouse", company="co", title="Eng", url="https://x.com/6", description="desc"
+        source="greenhouse", company="co", title="Eng", url="https://x.com/6", description="A detailed job description that goes on."
     )
     eval_result = EvaluationResult(
         score=7.0, score_notes="ok", caveats=["US only", "requires visa"]
@@ -350,7 +350,7 @@ async def test_scan_status_archived_if_below_threshold(tmp_db):
     from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
-        source="greenhouse", company="co", title="Eng", url="https://x.com/7", description="desc"
+        source="greenhouse", company="co", title="Eng", url="https://x.com/7", description="A detailed job description that goes on."
     )
     with (
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
@@ -877,7 +877,7 @@ async def test_scan_concurrent_batch_all_processed(tmp_db):
             company=f"Co{i}",
             title="Eng",
             url=f"https://x.com/batch/{i}",
-            description="desc",
+            description="A detailed job description that goes on.",
         )
         for i in range(15)
     ]
@@ -926,7 +926,7 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(tmp_db):
             company=f"Co{i}",
             title="Eng",
             url=f"https://x.com/orphan/{i}",
-            description="desc",
+            description="A detailed job description that goes on.",
         )
         for i in range(8)
     ]
@@ -982,7 +982,7 @@ async def test_scan_spend_limit_stops_further_batches(tmp_db):
             company=f"Co{i}",
             title="Eng",
             url=f"https://x.com/stop/{i}",
-            description="desc",
+            description="A detailed job description that goes on.",
         )
         for i in range(15)  # 3 batches of 5 with scan_batch_size=5
     ]
@@ -1041,14 +1041,14 @@ async def test_scan_non_spend_error_keeps_title_filtered_in_report(tmp_db):
             company="co",
             title="Staff Accountant",
             url="https://x.com/nonspend/1",
-            description="desc",
+            description="A detailed job description that goes on.",
         ),
         RawJob(
             source="greenhouse",
             company="co",
             title="Eng",
             url="https://x.com/nonspend/2",
-            description="desc",
+            description="A detailed job description that goes on.",
         ),
     ]
     mock_batch = AsyncMock(side_effect=Exception("unexpected LLM error"))
@@ -1104,7 +1104,7 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tmp
             company="co",
             title="Eng",
             url="https://x.com/crash/1",
-            description="desc",
+            description="A detailed job description that goes on.",
         ),
     ]
 
@@ -1371,7 +1371,7 @@ async def test_scan_registered_scanner_session_expired_does_not_block_http_resul
         company="Stripe",
         title="Eng",
         url="https://x.com/li-exp-1",
-        description="desc",
+        description="A detailed job description that goes on.",
     )
 
     with (
@@ -1675,7 +1675,7 @@ async def test_scan_concurrent_calls_evaluate_same_url_only_once(tmp_db):
     from moonlighter.server import scan_and_evaluate
 
     url = "https://x.com/race-1"
-    raw = RawJob(source="greenhouse", company="Co", title="Eng", url=url, description="desc")
+    raw = RawJob(source="greenhouse", company="Co", title="Eng", url=url, description="A detailed job description that goes on.")
     eval_mock = AsyncMock(return_value=make_eval_result(score=8.0))
 
     with _scan_patches([raw], eval_mock):
@@ -1698,7 +1698,7 @@ async def test_scan_spend_limit_releases_scan_log_claim(tmp_db):
     from moonlighter.server import scan_and_evaluate
 
     url = "https://x.com/spend-limit-1"
-    raw = RawJob(source="greenhouse", company="Co", title="Eng", url=url, description="desc")
+    raw = RawJob(source="greenhouse", company="Co", title="Eng", url=url, description="A detailed job description that goes on.")
     spend_limit_err = Exception(
         "claude CLI exited with code 1: You've hit your monthly spend limit"
     )
@@ -1747,7 +1747,7 @@ async def test_add_job_tool_delegates_to_service(tmp_db):
             url="https://x.com/manual/tool/1",
             company="Stripe",
             title="Eng",
-            description="desc",
+            description="A detailed job description that goes on.",
             ctx=make_test_context(),
         )
     assert "Stripe" in result or "NEW" in result
@@ -1852,7 +1852,7 @@ async def test_scan_and_evaluate_logs_one_metrics_summary(tmp_db, caplog):
             company=f"Co{i}",
             title="Eng",
             url=f"https://x.com/metrics/{i}",
-            description="desc",
+            description="A detailed job description that goes on.",
         )
         for i in range(3)
     ]
@@ -1903,7 +1903,7 @@ async def test_scan_and_evaluate_spend_limit_abort_increments_hits(tmp_db, caplo
             company="co",
             title="Eng",
             url="https://x.com/quota/1",
-            description="desc",
+            description="A detailed job description that goes on.",
         )
     ]
 

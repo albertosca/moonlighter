@@ -254,7 +254,7 @@ def _raw(i, title="Engineer", source="greenhouse"):
         company=f"Co{i}",
         title=title,
         url=f"https://x.com/scan/{i}",
-        description="desc",
+        description="A detailed job description that goes on.",
     )
 
 
@@ -338,7 +338,7 @@ async def test_scan_linkedin_jobs_are_evaluated(tmp_db):
         company="LinkedInCo",
         title="Engineer",
         url="https://x.com/li/1",
-        description="desc",
+        description="A detailed job description that goes on.",
     )
     result = await _run_scan([], linkedin_jobs=[li_raw])
     assert Job.get(Job.url == "https://x.com/li/1").company == "LinkedInCo"
@@ -353,6 +353,51 @@ async def test_scan_title_filtered_archives_with_score_zero(tmp_db):
     assert job.score == 0.0
     assert "title filtered" in job.score_notes
     assert "filtered by title" in result.lower()
+
+
+async def test_scan_empty_description_skips_llm_and_needs_review(tmp_db):
+    init_db()
+    eval_mock = AsyncMock(return_value=_eval(8.0))
+    raw = RawJob(
+        source="greenhouse",
+        company="co",
+        title="Engineer",
+        url="https://x.com/scan/10",
+        description=None,
+    )
+    result = await _run_scan([raw], eval_mock=eval_mock)
+    job = Job.get(Job.url == "https://x.com/scan/10")
+    assert job.status == "needs_review"
+    assert job.score is None
+    assert job.score_notes == "description unavailable — needs manual verification"
+    eval_mock.assert_not_called()
+    assert "need manual verification" in result
+
+
+async def test_scan_short_description_also_needs_review(tmp_db):
+    init_db()
+    raw = RawJob(
+        source="greenhouse",
+        company="co",
+        title="Squad Manager",
+        url="https://x.com/scan/11",
+        description="too short",
+    )
+    result = await _run_scan([raw])
+    job = Job.get(Job.url == "https://x.com/scan/11")
+    assert job.status == "needs_review"
+    assert "need manual verification" in result
+
+
+async def test_scan_real_description_still_evaluates_normally(tmp_db):
+    init_db()
+    eval_mock = AsyncMock(return_value=_eval(8.0))
+    result = await _run_scan([_raw(12)], eval_mock=eval_mock)
+    job = Job.get(Job.url == "https://x.com/scan/12")
+    assert job.status == "new"
+    assert job.score == 8.0
+    eval_mock.assert_called_once()
+    assert "need manual verification" not in result
 
 
 async def test_scan_registered_scanner_session_expired_adds_warning(tmp_db):

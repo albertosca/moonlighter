@@ -45,6 +45,14 @@ def _model_for(config: dict[str, Any]) -> str:
     return model
 
 
+def _is_description_insufficient(description: str | None) -> bool:
+    """True when there isn't enough text to evaluate honestly — the scanner
+    couldn't fetch a real description (e.g. InHire has no per-job detail
+    endpoint, verified 2026-08-18). These jobs skip the LLM and wait for a
+    human to paste the real page instead of scoring a guess."""
+    return not description or len(description.strip()) < 30
+
+
 def _claim(raw: RawJob) -> bool:
     """Reserves the URL in ScanLog before any work. ScanLog.create is synchronous,
     so asyncio doesn't switch context between the insert and the return — the
@@ -287,6 +295,16 @@ async def _evaluate_and_store(
                         score_notes=f"title filtered: {matched!r}",
                         caveats="[]",
                         status="archived",
+                    )
+                    if job is not None:
+                        results.append(job)
+                elif _is_description_insufficient(raw.description):
+                    job = _persist(
+                        raw,
+                        score=None,
+                        score_notes="description unavailable — needs manual verification",
+                        caveats="[]",
+                        status="needs_review",
                     )
                     if job is not None:
                         results.append(job)
