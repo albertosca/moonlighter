@@ -144,7 +144,11 @@ async def test_scan_all_below_threshold(tmp_db):
     from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
-        source="greenhouse", company="co", title="Eng", url="https://x.com/1", description="A detailed job description that goes on."
+        source="greenhouse",
+        company="co",
+        title="Eng",
+        url="https://x.com/1",
+        description="A detailed job description that goes on.",
     )
     with (
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
@@ -239,7 +243,11 @@ async def test_scan_linkedin_failure_doesnt_block(tmp_db):
     from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
-        source="greenhouse", company="co", title="Eng", url="https://x.com/4", description="A detailed job description that goes on."
+        source="greenhouse",
+        company="co",
+        title="Eng",
+        url="https://x.com/4",
+        description="A detailed job description that goes on.",
     )
     with (
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
@@ -315,7 +323,11 @@ async def test_scan_saves_caveats_as_json(tmp_db):
     from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
-        source="greenhouse", company="co", title="Eng", url="https://x.com/6", description="A detailed job description that goes on."
+        source="greenhouse",
+        company="co",
+        title="Eng",
+        url="https://x.com/6",
+        description="A detailed job description that goes on.",
     )
     eval_result = EvaluationResult(
         score=7.0, score_notes="ok", caveats=["US only", "requires visa"]
@@ -350,7 +362,11 @@ async def test_scan_status_archived_if_below_threshold(tmp_db):
     from moonlighter.server import scan_and_evaluate
 
     raw = RawJob(
-        source="greenhouse", company="co", title="Eng", url="https://x.com/7", description="A detailed job description that goes on."
+        source="greenhouse",
+        company="co",
+        title="Eng",
+        url="https://x.com/7",
+        description="A detailed job description that goes on.",
     )
     with (
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
@@ -1675,7 +1691,13 @@ async def test_scan_concurrent_calls_evaluate_same_url_only_once(tmp_db):
     from moonlighter.server import scan_and_evaluate
 
     url = "https://x.com/race-1"
-    raw = RawJob(source="greenhouse", company="Co", title="Eng", url=url, description="A detailed job description that goes on.")
+    raw = RawJob(
+        source="greenhouse",
+        company="Co",
+        title="Eng",
+        url=url,
+        description="A detailed job description that goes on.",
+    )
     eval_mock = AsyncMock(return_value=make_eval_result(score=8.0))
 
     with _scan_patches([raw], eval_mock):
@@ -1698,7 +1720,13 @@ async def test_scan_spend_limit_releases_scan_log_claim(tmp_db):
     from moonlighter.server import scan_and_evaluate
 
     url = "https://x.com/spend-limit-1"
-    raw = RawJob(source="greenhouse", company="Co", title="Eng", url=url, description="A detailed job description that goes on.")
+    raw = RawJob(
+        source="greenhouse",
+        company="Co",
+        title="Eng",
+        url=url,
+        description="A detailed job description that goes on.",
+    )
     spend_limit_err = Exception(
         "claude CLI exited with code 1: You've hit your monthly spend limit"
     )

@@ -445,6 +445,22 @@ async def test_scan_title_filtered_integrity_error_skips_silently(tmp_db):
     assert "processed" in result or "No new jobs found" in result
 
 
+async def test_scan_needs_review_integrity_error_skips_silently(tmp_db):
+    init_db()
+    # Insufficient description + pre-existing Job (no ScanLog) → the needs_review branch
+    # attempts Job.create needs_review, collides → IntegrityError → skipped (return None).
+    Job.create(source="x", company="x", title="x", url="https://x.com/scan/8", status="new")
+    raw = RawJob(
+        source="greenhouse",
+        company="co",
+        title="Engineer",
+        url="https://x.com/scan/8",
+        description=None,
+    )
+    result = await _run_scan([raw])
+    assert "processed" in result or "No new jobs found" in result
+
+
 # ── concurrency with semaphore ───────────────────────────────────────────────
 
 
