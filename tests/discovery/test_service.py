@@ -306,8 +306,12 @@ async def test_verify_job_not_found_returns_message(tmp_db):
 async def test_verify_job_rejects_a_job_not_pending_verification(tmp_db):
     init_db()
     job = Job.create(
-        source="manual", company="Acme", title="Eng", url="https://x.com/vj/1",
-        status="new", score=8.0,
+        source="manual",
+        company="Acme",
+        title="Eng",
+        url="https://x.com/vj/1",
+        status="new",
+        score=8.0,
     )
     result = await scan_service.verify_job(job.id, "text", CONFIG, PROFILE, MagicMock())
     assert "not pending verification" in result
