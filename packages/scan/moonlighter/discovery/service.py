@@ -565,6 +565,45 @@ async def add_job(
     return _format_add_result(job, company, title, result, threshold, status)
 
 
+async def verify_job(
+    job_id: int,
+    page_text: str,
+    config: dict[str, Any],
+    profile: dict[str, Any],
+    caller: LLMCaller,
+) -> str:
+    """Re-scores a job flagged needs_review (empty description) using text
+    pasted from its real page. Updates the same row in place."""
+    try:
+        job = Job.get_by_id(job_id)
+    except Job.DoesNotExist:
+        return f"Job #{job_id} not found."
+    if job.status != "needs_review":
+        return f"Job #{job_id} is not pending verification (status: {job.status!r})."
+
+    threshold = config["score_threshold"]
+    result = await evaluate_job(
+        company=job.company,
+        title=job.title,
+        description=page_text,
+        profile=profile,
+        model=_model_for(config),
+        _caller=caller,
+    )
+    status = "new" if result.score >= threshold else "archived"
+    job.description = page_text
+    job.score = result.score
+    job.score_notes = result.score_notes
+    job.caveats = json.dumps(result.caveats)
+    job.salary_min = result.salary_min
+    job.salary_max = result.salary_max
+    job.salary_currency = result.salary_currency
+    job.salary_source = result.salary_source
+    job.status = status
+    job.save()
+    return _format_add_result(job, job.company, job.title, result, threshold, status)
+
+
 async def _fetch_description(url: str) -> tuple[str | None, str | None]:
     """Fetches and cleans (strips HTML from) the job description. Returns (description,
     error) — only one of the two is non-null. Doesn't work on pages that require login."""

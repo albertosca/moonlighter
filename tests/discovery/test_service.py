@@ -294,6 +294,73 @@ async def test_add_job_integrity_conflict_on_create(tmp_db):
     assert "URL conflict" in result
 
 
+# ── verify_job ───────────────────────────────────────────────────────
+
+
+async def test_verify_job_not_found_returns_message(tmp_db):
+    init_db()
+    result = await scan_service.verify_job(999, "some page text here", CONFIG, PROFILE, MagicMock())
+    assert "not found" in result.lower()
+
+
+async def test_verify_job_rejects_a_job_not_pending_verification(tmp_db):
+    init_db()
+    job = Job.create(
+        source="manual", company="Acme", title="Eng", url="https://x.com/vj/1",
+        status="new", score=8.0,
+    )
+    result = await scan_service.verify_job(job.id, "text", CONFIG, PROFILE, MagicMock())
+    assert "not pending verification" in result
+    assert "new" in result
+
+
+async def test_verify_job_updates_the_same_row_and_scores_above_threshold(tmp_db):
+    init_db()
+    job = Job.create(
+        source="inhire",
+        company="Alice",
+        title="Squad Manager",
+        url="https://alice.inhire.app/vagas/1",
+        status="needs_review",
+        score=None,
+        score_notes="description unavailable — needs manual verification",
+    )
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(8.0)),
+    ):
+        result = await scan_service.verify_job(
+            job.id, "Full page text with the real job description.", CONFIG, PROFILE, MagicMock()
+        )
+    refreshed = Job.get_by_id(job.id)
+    assert refreshed.status == "new"
+    assert refreshed.score == 8.0
+    assert refreshed.description == "Full page text with the real job description."
+    assert Job.select().where(Job.url == job.url).count() == 1
+    assert "NEW" in result
+    assert "Alice" in result
+
+
+async def test_verify_job_below_threshold_archives(tmp_db):
+    init_db()
+    job = Job.create(
+        source="inhire",
+        company="Infleet",
+        title="Elixir Engineer",
+        url="https://infleet.inhire.app/vagas/1",
+        status="needs_review",
+        score=None,
+    )
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(3.0)),
+    ):
+        result = await scan_service.verify_job(job.id, "text", CONFIG, PROFILE, MagicMock())
+    refreshed = Job.get_by_id(job.id)
+    assert refreshed.status == "archived"
+    assert "archived" in result
+
+
 # ── scan_and_evaluate edge branches ──────────────────────────────────────────
 
 from moonlighter.discovery.sources.base import RawJob  # noqa: E402
