@@ -60,7 +60,7 @@ flowchart LR
     G --> A
 ```
 
-1. **Scan** — fetches job listings from Greenhouse, Lever, Ashby, Recruitee, Workable, and SmartRecruiters for a company list you configure, plus optional remote-first boards (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring) and Gupy, both config-gated off by default. LinkedIn scanning is available as a separate, privately-distributed extension — see [Extensions (adding a new ATS scanner)](#extensions-adding-a-new-ats-scanner) below.
+1. **Scan** — fetches job listings from Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters, and InHire for a company list you configure, plus optional remote-first boards (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring) and Gupy, both config-gated off by default. LinkedIn scanning is available as a separate, privately-distributed extension — see [Extensions (adding a new ATS scanner)](#extensions-adding-a-new-ats-scanner) below.
 2. **Evaluate** — scores each job against your profile using an LLM; jobs below the threshold are archived automatically.
 3. **Prepare** — `prepare_application` reads the form's questions (from the ATS API where one publishes them, e.g. Greenhouse/Recruitee) and composes an answer for every question it can, curated from your profile. It renders one reviewable sheet — the whole application, not a screenshot of a fraction of it — with any question it couldn't answer flagged for you. When no API publishes the questions, `prepare_application_from_paste` does the same from text you copy off the page yourself. Either way, you paste the answers into the form and submit it — moonlighter never touches the form or clicks submit.
 4. **Track** — monitors your Gmail inbox for interview invitations and updates the pipeline status.

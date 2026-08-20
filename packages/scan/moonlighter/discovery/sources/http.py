@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from typing import Any
+from typing import Any, ClassVar
 
 import httpx
 from moonlighter.core.log import get_logger
@@ -29,12 +29,14 @@ class FetchError(Exception):
     """A board fetch that failed: network error, non-200, non-JSON, wrong shape."""
 
 
-async def _get_json(client: httpx.AsyncClient, url: str) -> Any:
+async def _get_json(
+    client: httpx.AsyncClient, url: str, headers: dict[str, str] | None = None
+) -> Any:
     """GET + JSON-decode, raising FetchError on any failure instead of returning
     a shape the caller must remember to test. The raise is what keeps a dead API
     distinguishable from a company with no openings (the Ashby lesson)."""
     try:
-        r = await client.get(url, headers=HEADERS)
+        r = await client.get(url, headers=headers or HEADERS)
     except Exception as e:
         raise FetchError(f"{type(e).__name__}: {e}") from e
     if r.status_code != 200:
@@ -229,6 +231,54 @@ class WorkableScanner(BaseScanner):
                     location=location,
                     remote_type=remote_type,
                     description=description,
+                )
+            )
+        return jobs
+
+
+class InHireScanner(BaseScanner):
+    """InHire (*.inhire.app) — big in the Brazilian market, no official public
+    docs. The board is a React SPA, but InHire's own embed widget exposes the
+    real endpoint: GET api.inhire.app/job-posts/public/pages with an X-Tenant
+    header naming the company slug (the subdomain). Discovered by reading the
+    shared tenant bundle for fetch() calls (2026-08-12), re-verified live
+    2026-08-18: 16 postings for tenant "alice".
+
+    No public per-job detail endpoint exists (403 without auth, verified), so
+    description stays None and evaluation falls back to "title at company".
+    """
+
+    BASE = "https://api.inhire.app/job-posts/public/pages"
+    _REMOTE: ClassVar[dict[str, str]] = {
+        "remote": "remote",
+        "hybrid": "hybrid",
+        "on-site": "onsite",
+    }
+
+    async def scan(self, company_slugs: list[str], **kwargs: Any) -> list[RawJob]:
+        return await _gather_jobs("inhire", company_slugs, self._fetch, kwargs.get("stats"))
+
+    async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
+        data = await _get_json(client, self.BASE, headers={**HEADERS, "X-Tenant": slug})
+        if not isinstance(data, dict):
+            raise FetchError("unexpected payload shape")
+        postings = data.get("jobsPage") or []
+        if not isinstance(postings, list):
+            raise FetchError("unexpected payload shape")
+        jobs = []
+        for item in postings:
+            title = str(item.get("displayName") or "").strip()
+            job_id = item.get("jobId")
+            if not title or not job_id or item.get("status") != "published":
+                continue
+            jobs.append(
+                RawJob(
+                    source="inhire",
+                    company=slug,
+                    title=title,
+                    url=f"https://{slug}.inhire.app/vagas/{job_id}",
+                    location=item.get("location"),
+                    remote_type=self._REMOTE.get(str(item.get("workplaceType") or "").lower()),
                 )
             )
         return jobs

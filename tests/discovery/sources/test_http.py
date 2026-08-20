@@ -12,6 +12,7 @@ from moonlighter.discovery.sources.http import (
     GreenhouseScanner,
     GupyScanner,
     HNWhoIsHiringScanner,
+    InHireScanner,
     LeverScanner,
     RecruiteeScanner,
     RemoteOKScanner,
@@ -2415,3 +2416,80 @@ async def test_hn_comment_fetch_failures_count_as_errors_deleted_do_not():
     s = stats["hn_whoishiring"]
     assert s.jobs == 1
     assert s.errors == 1  # the 404; the deleted comment 203 is not an error
+
+
+# ── InHire ──────────────────────────────────────────────────────────────────
+
+INHIRE_PAGE = {
+    "tenantName": "Alice",
+    "jobsPage": [
+        {
+            "jobId": "832b18f4-adf6-4c32-8e1b-18321e0b8069",
+            "displayName": " Design l Creative Design ",
+            "status": "published",
+            "workplaceType": "Hybrid",
+            "location": "São Paulo, SP, BR",
+        },
+        {
+            "jobId": "aaaa",
+            "displayName": "Backend Engineer",
+            "status": "published",
+            "workplaceType": "Remote",
+            "location": "BR",
+        },
+        {
+            "jobId": "bbbb",
+            "displayName": "Old Role",
+            "status": "draft",
+            "workplaceType": "On-site",
+            "location": "SP",
+        },
+    ],
+}
+
+
+async def test_inhire_scan_parses_published_jobs_only():
+    mock_client = _make_mock_client(INHIRE_PAGE)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await InHireScanner().scan(["alice"])
+
+    assert [j.title for j in jobs] == ["Design l Creative Design", "Backend Engineer"]
+    assert jobs[0].source == "inhire"
+    assert jobs[0].company == "alice"
+    assert jobs[0].url == "https://alice.inhire.app/vagas/832b18f4-adf6-4c32-8e1b-18321e0b8069"
+    assert jobs[0].remote_type == "hybrid"
+    assert jobs[1].remote_type == "remote"
+    assert jobs[0].description is None  # no public detail endpoint (403, verified 2026-08-18)
+
+
+async def test_inhire_sends_the_tenant_header():
+    mock_client = _make_mock_client(INHIRE_PAGE)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        await InHireScanner().scan(["alice"])
+    kwargs = mock_client.get.call_args.kwargs
+    assert kwargs["headers"]["X-Tenant"] == "alice"
+    assert mock_client.get.call_args.args[0] == "https://api.inhire.app/job-posts/public/pages"
+
+
+async def test_inhire_wrong_shape_counts_as_error():
+    mock_client = _make_mock_client(["not", "a", "dict"])
+    stats = {}
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await InHireScanner().scan(["alice"], stats=stats)
+    assert jobs == []
+    assert stats["inhire"].errors == 1
+
+
+def test_inhire_is_a_listing_source_for_staleness():
+    from moonlighter.discovery.sources.registry import LISTING_SOURCES
+
+    assert "inhire" in LISTING_SOURCES
+
+
+async def test_inhire_non_list_jobs_page_counts_as_error():
+    mock_client = _make_mock_client({"tenantName": "Alice", "jobsPage": "oops"})
+    stats = {}
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await InHireScanner().scan(["alice"], stats=stats)
+    assert jobs == []
+    assert stats["inhire"].errors == 1
