@@ -406,17 +406,25 @@ def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
     title_filtered = sum(
         1 for j in saved if j.score_notes and j.score_notes.startswith("title filtered:")
     )
-    below = len(saved) - len(above) - title_filtered
+    needs_verification = sum(1 for j in saved if j.status == "needs_review")
+    below = len(saved) - len(above) - title_filtered - needs_verification
     spend_note = (
         "\n\n⚠️  Spend limit reached — scan stopped (remaining jobs are left for the next scan)."
         if spend_hit
+        else ""
+    )
+    verify_note = (
+        f"\n\n⚠️  {needs_verification} job(s) need manual verification — "
+        f"list_jobs(status='needs_review') to see them."
+        if needs_verification
         else ""
     )
 
     if not above:
         return (
             f"{len(saved)} jobs processed. None passed the threshold of {threshold}. "
-            f"({title_filtered} filtered by title, {below} below score){spend_note}"
+            f"({title_filtered} filtered by title, {below} below score)"
+            f"{spend_note}{verify_note}"
         )
 
     table = render_jobs_table(above)
@@ -425,7 +433,8 @@ def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
         f"{below} below threshold  |  {title_filtered} filtered by title"
     )
     return (
-        f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}{spend_note}"
+        f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}"
+        f"{spend_note}{verify_note}"
     )
 
 

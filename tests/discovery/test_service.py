@@ -45,6 +45,57 @@ def _http_client(status_code=200, text="<p>Job description here</p>"):
     return acm, client
 
 
+def _saved_job(url, *, status="new", score=8.0, score_notes="match"):
+    return Job.create(
+        source="greenhouse",
+        company="Acme",
+        title="Engineer",
+        url=url,
+        status=status,
+        score=score,
+        score_notes=score_notes,
+    )
+
+
+# ── format_report tests ─────────────────────────────────────────────────────
+
+
+async def test_format_report_counts_needs_review_separately_from_below(tmp_db):
+    init_db()
+    above = _saved_job("https://x.com/fr/1", status="new", score=8.0)
+    below = _saved_job("https://x.com/fr/2", status="archived", score=3.0)
+    pending = _saved_job(
+        "https://x.com/fr/3",
+        status="needs_review",
+        score=None,
+        score_notes="description unavailable — needs manual verification",
+    )
+    report = scan_service._format_report([above, below, pending], spend_hit=False, threshold=6.5)
+    assert "1 below threshold" in report
+    assert "1 job(s) need manual verification" in report
+    assert "list_jobs(status='needs_review')" in report
+
+
+async def test_format_report_no_verify_line_when_nothing_pending(tmp_db):
+    init_db()
+    above = _saved_job("https://x.com/fr/4", status="new", score=8.0)
+    report = scan_service._format_report([above], spend_hit=False, threshold=6.5)
+    assert "need manual verification" not in report
+
+
+async def test_format_report_verify_line_shown_even_with_nothing_above_threshold(tmp_db):
+    init_db()
+    pending = _saved_job(
+        "https://x.com/fr/5",
+        status="needs_review",
+        score=None,
+        score_notes="description unavailable — needs manual verification",
+    )
+    report = scan_service._format_report([pending], spend_hit=False, threshold=6.5)
+    assert "None passed the threshold" in report
+    assert "1 job(s) need manual verification" in report
+
+
 # ── input validation ────────────────────────────────────────────────────────
 
 
