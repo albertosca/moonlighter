@@ -156,6 +156,30 @@ async def add_job(
 
 @mcp.tool()
 @tool_logged
+async def verify_job(
+    job_id: int,
+    page_text: str,
+    *,
+    ctx: Context[ServerSession, AppContext, Any],
+) -> str:
+    """Re-evaluates a job that couldn't be scored automatically because its
+    description was empty, using text you copy from its real page.
+
+    Use this when list_jobs(status="needs_review") shows a pending job: open
+    its URL, select the whole page (Cmd+A), copy it (Cmd+C), and pass that
+    text here. The job is scored with the same evaluator as any other job
+    and moves to 'new' or 'archived' depending on the configured threshold.
+
+    Args:
+        job_id: the pending job's ID (from list_jobs(status="needs_review") or get_job)
+        page_text: the copied page text — becomes the job's real description
+    """
+    app = ctx.request_context.lifespan_context
+    return await scan_service.verify_job(job_id, page_text, app.config, app.profile, app.llm_caller)
+
+
+@mcp.tool()
+@tool_logged
 async def archive_stale_jobs(
     job_id: int | None = None,
     company: str | None = None,

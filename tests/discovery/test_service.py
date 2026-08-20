@@ -45,6 +45,58 @@ def _http_client(status_code=200, text="<p>Job description here</p>"):
     return acm, client
 
 
+def _saved_job(url, *, status="new", score=8.0, score_notes="match"):
+    return Job.create(
+        source="greenhouse",
+        company="Acme",
+        title="Engineer",
+        url=url,
+        status=status,
+        score=score,
+        score_notes=score_notes,
+    )
+
+
+# ── format_report tests ─────────────────────────────────────────────────────
+
+
+async def test_format_report_counts_needs_review_separately_from_below(tmp_db):
+    init_db()
+    above = _saved_job("https://x.com/fr/1", status="new", score=8.0)
+    below = _saved_job("https://x.com/fr/2", status="archived", score=3.0)
+    pending = _saved_job(
+        "https://x.com/fr/3",
+        status="needs_review",
+        score=None,
+        score_notes="description unavailable — needs manual verification",
+    )
+    report = scan_service._format_report([above, below, pending], spend_hit=False, threshold=6.5)
+    assert "1 below threshold" in report
+    assert "1 job(s) need manual verification" in report
+    assert "list_jobs(status='needs_review')" in report
+    assert "verify_job(job_id, page_text)" in report
+
+
+async def test_format_report_no_verify_line_when_nothing_pending(tmp_db):
+    init_db()
+    above = _saved_job("https://x.com/fr/4", status="new", score=8.0)
+    report = scan_service._format_report([above], spend_hit=False, threshold=6.5)
+    assert "need manual verification" not in report
+
+
+async def test_format_report_verify_line_shown_even_with_nothing_above_threshold(tmp_db):
+    init_db()
+    pending = _saved_job(
+        "https://x.com/fr/5",
+        status="needs_review",
+        score=None,
+        score_notes="description unavailable — needs manual verification",
+    )
+    report = scan_service._format_report([pending], spend_hit=False, threshold=6.5)
+    assert "None passed the threshold" in report
+    assert "1 job(s) need manual verification" in report
+
+
 # ── input validation ────────────────────────────────────────────────────────
 
 
@@ -148,7 +200,7 @@ async def test_add_job_dedup_existing_job(tmp_db):
         company="Stripe",
         title="Eng",
         url="https://x.com/5",
-        score=8.0,
+        score=7.2,
         status="new",
     )
     ScanLog.create(job_url="https://x.com/5", source="manual")
@@ -156,6 +208,27 @@ async def test_add_job_dedup_existing_job(tmp_db):
         "https://x.com/5", "Stripe", "Eng", "desc", CONFIG, PROFILE, MagicMock()
     )
     assert "already in the database" in result
+    assert "score=7.2" in result
+    assert "verify_job" not in result
+
+
+async def test_add_job_dedup_needs_review_job_does_not_crash_on_none_score(tmp_db):
+    init_db()
+    Job.create(
+        source="manual",
+        company="Stripe",
+        title="Eng",
+        url="https://x.com/5b",
+        score=None,
+        status="needs_review",
+    )
+    ScanLog.create(job_url="https://x.com/5b", source="manual")
+    result = await scan_service.add_job(
+        "https://x.com/5b", "Stripe", "Eng", "desc", CONFIG, PROFILE, MagicMock()
+    )
+    assert "already in the database" in result
+    assert "score=—" in result
+    assert "verify_job" in result
 
 
 async def test_add_job_scanlog_without_job_proceeds_to_eval(tmp_db):
@@ -243,6 +316,130 @@ async def test_add_job_integrity_conflict_on_create(tmp_db):
     assert "URL conflict" in result
 
 
+# ── verify_job ───────────────────────────────────────────────────────
+
+
+async def test_verify_job_not_found_returns_message(tmp_db):
+    init_db()
+    result = await scan_service.verify_job(999, "some page text here", CONFIG, PROFILE, MagicMock())
+    assert "not found" in result.lower()
+
+
+async def test_verify_job_rejects_a_job_not_pending_verification(tmp_db):
+    init_db()
+    job = Job.create(
+        source="manual",
+        company="Acme",
+        title="Eng",
+        url="https://x.com/vj/1",
+        status="new",
+        score=8.0,
+    )
+    result = await scan_service.verify_job(job.id, "text", CONFIG, PROFILE, MagicMock())
+    assert "not pending verification" in result
+    assert "new" in result
+
+
+async def test_verify_job_rejects_a_too_short_paste_and_leaves_job_pending(tmp_db):
+    init_db()
+    job = Job.create(
+        source="inhire",
+        company="Alice",
+        title="Squad Manager",
+        url="https://alice.inhire.app/vagas/9",
+        status="needs_review",
+        score=None,
+    )
+    eval_mock = AsyncMock(return_value=_eval(8.0))
+    with patch("moonlighter.discovery.service.evaluate_job", new=eval_mock):
+        result = await scan_service.verify_job(job.id, "  ", CONFIG, PROFILE, MagicMock())
+    eval_mock.assert_not_called()
+    assert "too short" in result
+    assert "0 chars" in result
+    assert "stays pending" in result
+    assert Job.get_by_id(job.id).status == "needs_review"
+
+
+async def test_verify_job_updates_the_same_row_and_scores_above_threshold(tmp_db):
+    init_db()
+    job = Job.create(
+        source="inhire",
+        company="Alice",
+        title="Squad Manager",
+        url="https://alice.inhire.app/vagas/1",
+        status="needs_review",
+        score=None,
+        score_notes="description unavailable — needs manual verification",
+    )
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(8.0)),
+    ):
+        result = await scan_service.verify_job(
+            job.id, "Full page text with the real job description.", CONFIG, PROFILE, MagicMock()
+        )
+    refreshed = Job.get_by_id(job.id)
+    assert refreshed.status == "new"
+    assert refreshed.score == 8.0
+    assert refreshed.description == "Full page text with the real job description."
+    assert Job.select().where(Job.url == job.url).count() == 1
+    assert "NEW" in result
+    assert "Alice" in result
+
+
+async def test_verify_job_scores_a_row_that_scan_actually_produced(tmp_db):
+    """Crosses the scan -> verify_job seam: builds the needs_review row through the
+    real _run_scan pipeline (Task 1), then scores it through verify_job (Task 3) --
+    proving the two sides agree on the row's shape (e.g. caveats='[]'), not just
+    that each works against a hand-built Job in isolation."""
+    init_db()
+    raw = RawJob(
+        source="greenhouse",
+        company="co",
+        title="Engineer",
+        url="https://x.com/scan/seam",
+        description=None,
+    )
+    await _run_scan([raw])
+    job = Job.get(Job.url == "https://x.com/scan/seam")
+    assert job.status == "needs_review"
+    assert job.caveats == "[]"
+
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(8.0)),
+    ):
+        result = await scan_service.verify_job(
+            job.id, "Full page text with the real job description.", CONFIG, PROFILE, MagicMock()
+        )
+    refreshed = Job.get_by_id(job.id)
+    assert refreshed.status == "new"
+    assert refreshed.description == "Full page text with the real job description."
+    assert "NEW" in result
+
+
+async def test_verify_job_below_threshold_archives(tmp_db):
+    init_db()
+    job = Job.create(
+        source="inhire",
+        company="Infleet",
+        title="Elixir Engineer",
+        url="https://infleet.inhire.app/vagas/1",
+        status="needs_review",
+        score=None,
+    )
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(3.0)),
+    ):
+        result = await scan_service.verify_job(
+            job.id, "Full page text with the real job description.", CONFIG, PROFILE, MagicMock()
+        )
+    refreshed = Job.get_by_id(job.id)
+    assert refreshed.status == "archived"
+    assert "archived" in result
+
+
 # ── scan_and_evaluate edge branches ──────────────────────────────────────────
 
 from moonlighter.discovery.sources.base import RawJob  # noqa: E402
@@ -254,7 +451,7 @@ def _raw(i, title="Engineer", source="greenhouse"):
         company=f"Co{i}",
         title=title,
         url=f"https://x.com/scan/{i}",
-        description="desc",
+        description="A detailed job description that goes on.",
     )
 
 
@@ -338,7 +535,7 @@ async def test_scan_linkedin_jobs_are_evaluated(tmp_db):
         company="LinkedInCo",
         title="Engineer",
         url="https://x.com/li/1",
-        description="desc",
+        description="A detailed job description that goes on.",
     )
     result = await _run_scan([], linkedin_jobs=[li_raw])
     assert Job.get(Job.url == "https://x.com/li/1").company == "LinkedInCo"
@@ -353,6 +550,51 @@ async def test_scan_title_filtered_archives_with_score_zero(tmp_db):
     assert job.score == 0.0
     assert "title filtered" in job.score_notes
     assert "filtered by title" in result.lower()
+
+
+async def test_scan_empty_description_skips_llm_and_needs_review(tmp_db):
+    init_db()
+    eval_mock = AsyncMock(return_value=_eval(8.0))
+    raw = RawJob(
+        source="greenhouse",
+        company="co",
+        title="Engineer",
+        url="https://x.com/scan/10",
+        description=None,
+    )
+    result = await _run_scan([raw], eval_mock=eval_mock)
+    job = Job.get(Job.url == "https://x.com/scan/10")
+    assert job.status == "needs_review"
+    assert job.score is None
+    assert job.score_notes == "description unavailable — needs manual verification"
+    eval_mock.assert_not_called()
+    assert "need manual verification" in result
+
+
+async def test_scan_short_description_also_needs_review(tmp_db):
+    init_db()
+    raw = RawJob(
+        source="greenhouse",
+        company="co",
+        title="Squad Manager",
+        url="https://x.com/scan/11",
+        description="too short",
+    )
+    result = await _run_scan([raw])
+    job = Job.get(Job.url == "https://x.com/scan/11")
+    assert job.status == "needs_review"
+    assert "need manual verification" in result
+
+
+async def test_scan_real_description_still_evaluates_normally(tmp_db):
+    init_db()
+    eval_mock = AsyncMock(return_value=_eval(8.0))
+    result = await _run_scan([_raw(12)], eval_mock=eval_mock)
+    job = Job.get(Job.url == "https://x.com/scan/12")
+    assert job.status == "new"
+    assert job.score == 8.0
+    eval_mock.assert_called_once()
+    assert "need manual verification" not in result
 
 
 async def test_scan_registered_scanner_session_expired_adds_warning(tmp_db):
@@ -397,6 +639,22 @@ async def test_scan_title_filtered_integrity_error_skips_silently(tmp_db):
     # tenta Job.create archived, colide → IntegrityError → pulada (return None).
     Job.create(source="x", company="x", title="x", url="https://x.com/scan/6", status="new")
     result = await _run_scan([_raw(6, title="Staff Accountant")])
+    assert "processed" in result or "No new jobs found" in result
+
+
+async def test_scan_needs_review_integrity_error_skips_silently(tmp_db):
+    init_db()
+    # Insufficient description + pre-existing Job (no ScanLog) → the needs_review branch
+    # attempts Job.create needs_review, collides → IntegrityError → skipped (return None).
+    Job.create(source="x", company="x", title="x", url="https://x.com/scan/8", status="new")
+    raw = RawJob(
+        source="greenhouse",
+        company="co",
+        title="Engineer",
+        url="https://x.com/scan/8",
+        description=None,
+    )
+    result = await _run_scan([raw])
     assert "processed" in result or "No new jobs found" in result
 
 

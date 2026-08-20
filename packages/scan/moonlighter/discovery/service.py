@@ -45,6 +45,14 @@ def _model_for(config: dict[str, Any]) -> str:
     return model
 
 
+def _is_description_insufficient(description: str | None) -> bool:
+    """True when there isn't enough text to evaluate honestly — the scanner
+    couldn't fetch a real description (e.g. InHire has no per-job detail
+    endpoint, verified 2026-08-18). These jobs skip the LLM and wait for a
+    human to paste the real page instead of scoring a guess."""
+    return not description or len(description.strip()) < 30
+
+
 def _claim(raw: RawJob) -> bool:
     """Reserves the URL in ScanLog before any work. ScanLog.create is synchronous,
     so asyncio doesn't switch context between the insert and the return — the
@@ -290,6 +298,16 @@ async def _evaluate_and_store(
                     )
                     if job is not None:
                         results.append(job)
+                elif _is_description_insufficient(raw.description):
+                    job = _persist(
+                        raw,
+                        score=None,
+                        score_notes="description unavailable — needs manual verification",
+                        caveats="[]",
+                        status="needs_review",
+                    )
+                    if job is not None:
+                        results.append(job)
                 else:
                     to_eval.append(raw)
 
@@ -388,17 +406,25 @@ def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
     title_filtered = sum(
         1 for j in saved if j.score_notes and j.score_notes.startswith("title filtered:")
     )
-    below = len(saved) - len(above) - title_filtered
+    needs_verification = sum(1 for j in saved if j.status == "needs_review")
+    below = len(saved) - len(above) - title_filtered - needs_verification
     spend_note = (
         "\n\n⚠️  Spend limit reached — scan stopped (remaining jobs are left for the next scan)."
         if spend_hit
+        else ""
+    )
+    verify_note = (
+        f"\n\n⚠️  {needs_verification} job(s) need manual verification — "
+        f"list_jobs(status='needs_review') to see them, verify_job(job_id, page_text) to score one."
+        if needs_verification
         else ""
     )
 
     if not above:
         return (
             f"{len(saved)} jobs processed. None passed the threshold of {threshold}. "
-            f"({title_filtered} filtered by title, {below} below score){spend_note}"
+            f"({title_filtered} filtered by title, {below} below score)"
+            f"{spend_note}{verify_note}"
         )
 
     table = render_jobs_table(above)
@@ -407,7 +433,8 @@ def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
         f"{below} below threshold  |  {title_filtered} filtered by title"
     )
     return (
-        f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}{spend_note}"
+        f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}"
+        f"{spend_note}{verify_note}"
     )
 
 
@@ -538,6 +565,51 @@ async def add_job(
     return _format_add_result(job, company, title, result, threshold, status)
 
 
+async def verify_job(
+    job_id: int,
+    page_text: str,
+    config: dict[str, Any],
+    profile: dict[str, Any],
+    caller: LLMCaller,
+) -> str:
+    """Re-scores a job flagged needs_review (empty description) using text
+    pasted from its real page. Updates the same row in place."""
+    try:
+        job = Job.get_by_id(job_id)
+    except Job.DoesNotExist:
+        return f"Job #{job_id} not found."
+    if job.status != "needs_review":
+        return f"Job #{job_id} is not pending verification (status: {job.status!r})."
+
+    if _is_description_insufficient(page_text):
+        return (
+            f"That paste is too short to score ({len(page_text.strip())} chars — need at least "
+            f"30). Job #{job_id} stays pending — open {job.url} and copy the whole page."
+        )
+
+    threshold = config["score_threshold"]
+    result = await evaluate_job(
+        company=job.company,
+        title=job.title,
+        description=page_text,
+        profile=profile,
+        model=_model_for(config),
+        _caller=caller,
+    )
+    status = "new" if result.score >= threshold else "archived"
+    job.description = page_text
+    job.score = result.score
+    job.score_notes = result.score_notes
+    job.caveats = json.dumps(result.caveats)
+    job.salary_min = result.salary_min
+    job.salary_max = result.salary_max
+    job.salary_currency = result.salary_currency
+    job.salary_source = result.salary_source
+    job.status = status
+    job.save()
+    return _format_add_result(job, job.company, job.title, result, threshold, status)
+
+
 async def _fetch_description(url: str) -> tuple[str | None, str | None]:
     """Fetches and cleans (strips HTML from) the job description. Returns (description,
     error) — only one of the two is non-null. Doesn't work on pages that require login."""
@@ -570,7 +642,15 @@ def _existing_job_message(url: str) -> str | None:
         job = Job.get(Job.url == url)
     except Job.DoesNotExist:
         return None
-    return f"Job already in the database (id={job.id}, score={job.score:.1f}, status={job.status})."
+    score_str = f"{job.score:.1f}" if job.score is not None else "—"
+    hint = (
+        " Use verify_job(job_id, page_text) to score it from the real page."
+        if job.status == "needs_review"
+        else ""
+    )
+    return (
+        f"Job already in the database (id={job.id}, score={score_str}, status={job.status}).{hint}"
+    )
 
 
 def _persist_manual(
