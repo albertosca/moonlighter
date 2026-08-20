@@ -943,3 +943,27 @@ async def test_scan_company_zero_raw_jobs_does_not_claim_all_already_known(tmp_d
     assert "No open jobs found at 'stripe'" in report
     assert "all already known" not in report
     assert "company_list.yaml" in report
+
+
+async def test_aged_portal_jobs_archive_as_aged_not_closed(tmp_db):
+    import datetime
+
+    from moonlighter.discovery.archive import _format_archive_result
+
+    init_db()
+    old = Job.create(
+        source="remoteok",
+        company="acme",
+        title="Eng",
+        url="https://remoteok.com/j/1",
+        status="new",
+        found_at=datetime.datetime.now() - datetime.timedelta(days=45),
+    )
+    result = await archive_stale_jobs(None, None, {"portal_max_age_days": 30})
+
+    refreshed = Job.get_by_id(old.id)
+    assert refreshed.status == "archived"  # aged out, NOT closed-at-source
+    assert refreshed.closed_at is None
+    assert result.aged == [{"company": "acme", "title": "Eng", "url": "https://remoteok.com/j/1"}]
+    text = _format_archive_result(result)
+    assert "archived by age" in text and "30" in text

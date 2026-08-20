@@ -6,6 +6,7 @@ never raises for a single company's failure — a transient error (network, malf
 response) is reported in failed_companies, never silently treated as "zero open jobs".
 """
 
+import datetime
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -23,6 +24,9 @@ logger = get_logger(__name__)
 @dataclass
 class StalenessResult:
     stale: list[Job] = field(default_factory=list)
+    # Portal jobs past portal_max_age_days: age is the only closing signal a
+    # portal feed offers, so these archive as aged-out, never as closed-at-source.
+    stale_by_age: list[Job] = field(default_factory=list)
     failed_companies: list[str] = field(default_factory=list)
 
 
@@ -43,7 +47,14 @@ async def find_stale_jobs(
         if source in _LISTING_SOURCES:
             await _check_via_listing(source, company, jobs, scanners, result)
         elif source in PORTAL_SOURCES:
-            portal_counts[source] = portal_counts.get(source, 0) + len(jobs)
+            max_age = int(config.get("portal_max_age_days") or 0)
+            if max_age > 0:
+                cutoff = datetime.datetime.now() - datetime.timedelta(days=max_age)
+                aged = [j for j in jobs if j.found_at and j.found_at < cutoff]
+                result.stale_by_age.extend(aged)
+                jobs = [j for j in jobs if j not in aged]
+            if jobs:
+                portal_counts[source] = portal_counts.get(source, 0) + len(jobs)
         elif source in checkers:
             # Plugin-provided (untrusted, unlike the first-party listing check above) --
             # guard the call so one misbehaving checker can't abort the whole run.
