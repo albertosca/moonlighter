@@ -153,6 +153,8 @@ _EMAIL_SCHEMA: dict[str, tuple[type, ...]] = {
     "token_path": (str,),
     "processed_label": (str,),
     "mark_processed": (bool,),
+    "archive_ref_matched": (bool,),
+    "archive_all_classified": (bool,),
     "lookback_days": (int,),
     "interview_stages": (list,),
 }
