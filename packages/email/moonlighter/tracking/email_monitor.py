@@ -15,6 +15,7 @@ from moonlighter.core.metrics import record_spend_limit_hit
 from moonlighter.tracking.classification import classify_response
 from moonlighter.tracking.gmail_client import (
     _get_or_create_label,
+    archive_message,
     fetch_recent_messages,
     mark_processed,
     parse_message,
@@ -76,6 +77,9 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
     # The sync is 100% READ-ONLY on Gmail by default: dedup lives in a local table
     # (ProcessedEmail). Only writes to Gmail (read + label) if mark_processed=True.
     mutate_gmail = bool(email_cfg.get("mark_processed", False))
+    archive_all = bool(email_cfg.get("archive_all_classified", False))
+    # Layer two is a superset of layer one by design.
+    archive_ref = archive_all or bool(email_cfg.get("archive_ref_matched", False))
     label_name = email_cfg.get("processed_label", "moonlighter/processed")
     label_id = _get_or_create_label(service, label_name) if mutate_gmail else None
 
@@ -83,6 +87,16 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
         ProcessedEmail.get_or_create(message_id=message_id)
         if mutate_gmail and label_id:
             mark_processed(service, message_id, label_id)
+
+    def maybe_archive(message_id: str, eligible: bool) -> None:
+        """A Gmail archive failure must never cost the pipeline update that
+        already applied — warn and move on."""
+        if not eligible:
+            return
+        try:
+            archive_message(service, message_id)
+        except Exception as e:
+            logger.warning("sync_responses: could not archive %s — %s", message_id, e)
 
     updates = []
     for msg_ref in fetch_recent_messages(service, int(email_cfg.get("lookback_days", 30))):
@@ -120,10 +134,13 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
             _register_new_stage(classification.get("new_stage"), stages, email_cfg)
             _advance_application(app, classification, match_type, stages)
             updates.append(_make_update(classification, match_type, app))
+            maybe_archive(msg_id, archive_ref)
         elif app is not None:  # match_type == "fuzzy" — suggestion only (S-06)
             updates.append(_make_suggestion(app, classification, match_type))
+            maybe_archive(msg_id, archive_all)
         else:
             updates.append(_make_update(classification, "uncertain"))
+            maybe_archive(msg_id, archive_all)
         mark_done(msg_id)
 
     return updates
