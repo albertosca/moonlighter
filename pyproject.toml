@@ -10,7 +10,7 @@ dev = [
     # Upper bound is deliberate: ruff's formatter style changes between minor
     # versions, and an unbounded constraint silently re-drifts every file and
     # breaks CI's `ruff format --check`. Bump this on purpose, with a reformat.
-    "ruff>=0.15,<0.16",
+    "ruff>=0.16.3,<0.17",
     "mypy>=1.11",
 ]
 
