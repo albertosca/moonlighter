@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or setup help
+    url: https://github.com/albertosca/moonlighter/discussions
+    about: For "how do I…" and setup questions, Discussions travels faster than an issue.
+  - name: Security vulnerability
+    url: https://github.com/albertosca/moonlighter/blob/main/SECURITY.md
+    about: Do not open a public issue for security problems — see SECURITY.md.

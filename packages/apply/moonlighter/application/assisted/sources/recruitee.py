@@ -2,8 +2,11 @@
 
 `GET /api/offers/{offer}` nests everything under `offer`, and carries
 `open_questions`, `dynamic_fields` and a separate location question. Verified
-against a live posting on 2026-08-11. Only `<slug>.recruitee.com` is matched:
-most customers use their own domain, and those go through pasting.
+against a live posting on 2026-08-11. Custom career domains (jobs.example.com)
+serve the same offers API on their own host — proven by the discovery scanner
+(wave A) — so the offer URL's host is used verbatim. The /o/ pattern alone
+would match any site, which is why the service only routes here when
+job.source == "recruitee".
 
 `options` on a question is always an empty dict on live data, whatever the
 question's kind — it is not where the choices live. A `multi_choice`
@@ -17,10 +20,10 @@ from typing import Any
 import httpx
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 
-API = "https://{slug}.recruitee.com/api/offers/{offer}"
+API = "https://{host}/api/offers/{offer}"
 HEADERS = {"User-Agent": "moonlighter/0.1"}
 
-_URL = re.compile(r"https?://(?P<slug>[\w-]+)\.recruitee\.com/o/(?P<offer>[\w-]+)")
+_URL = re.compile(r"https?://(?P<host>[^/]+)/o/(?P<offer>[\w-]+)")
 
 # `multi_choice` is handled separately, since its options live in a sibling
 # list rather than being a fixed kind->QuestionKind mapping. Anything not
@@ -31,10 +34,35 @@ _SIMPLE_KINDS = {
     "date": QuestionKind.TEXT,
 }
 
+# The offers API publishes only the *custom* questions; the standard candidate
+# fields are declared by options_* flags ("required" | "optional" | "off") on
+# the offer instead. A sheet without them claims completeness over a form that
+# still wants name, email and a CV — and gives the tracking alias no email
+# question to land on (found live on the Curotec gate application, 2026-08-13).
+# Name and email carry no flag: every Recruitee form asks them.
+_STANDARD_FLAGS = (
+    ("options_phone", "Phone", QuestionKind.TEXT),
+    ("options_photo", "Photo", QuestionKind.FILE),
+    ("options_cv", "CV", QuestionKind.FILE),
+    ("options_cover_letter", "Cover letter", QuestionKind.LONG_TEXT),
+)
 
-def slug_and_offer_from_url(url: str) -> tuple[str, str] | None:
+
+def _standard_fields(offer: dict[str, Any]) -> list[FormQuestion]:
+    questions = [
+        FormQuestion(label="Full name", kind=QuestionKind.TEXT, required=True),
+        FormQuestion(label="Email", kind=QuestionKind.TEXT, required=True),
+    ]
+    for flag, label, kind in _STANDARD_FLAGS:
+        value = str(offer.get(flag) or "off")
+        if value != "off":
+            questions.append(FormQuestion(label=label, kind=kind, required=value == "required"))
+    return questions
+
+
+def host_and_offer_from_url(url: str) -> tuple[str, str] | None:
     match = _URL.search(url)
-    return (match["slug"], match["offer"]) if match else None
+    return (match["host"], match["offer"]) if match else None
 
 
 def _choice_options(item: dict[str, Any]) -> tuple[str, ...]:
@@ -70,8 +98,13 @@ def _question(item: dict[str, Any]) -> FormQuestion | None:
 
 
 def parse_recruitee_questions(payload: dict[str, Any]) -> list[FormQuestion]:
-    offer = payload.get("offer") or {}
-    questions: list[FormQuestion] = []
+    offer = payload.get("offer")
+    if not isinstance(offer, dict):
+        # A 200 without an offer object is a malformed payload, not a form with
+        # zero questions — returning [] keeps the paste-hint path reachable
+        # instead of producing a phantom name+email sheet.
+        return []
+    questions: list[FormQuestion] = _standard_fields(offer)
 
     for item in [*(offer.get("open_questions") or []), *(offer.get("dynamic_fields") or [])]:
         if isinstance(item, dict) and (question := _question(item)) is not None:
@@ -90,9 +123,9 @@ def parse_recruitee_questions(payload: dict[str, Any]) -> list[FormQuestion]:
 
 
 async def fetch_recruitee_questions(
-    slug: str, offer: str, client: httpx.AsyncClient
+    host: str, offer: str, client: httpx.AsyncClient
 ) -> list[FormQuestion]:
-    response = await client.get(API.format(slug=slug, offer=offer), headers=HEADERS)
+    response = await client.get(API.format(host=host, offer=offer), headers=HEADERS)
     if response.status_code != 200:
         return []
     payload = response.json()

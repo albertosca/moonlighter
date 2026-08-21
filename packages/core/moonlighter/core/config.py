@@ -9,6 +9,23 @@ def moonlighter_home() -> Path:
     return Path(os.environ.get("MOONLIGHTER_HOME", "~/.moonlighter")).expanduser()
 
 
+def resolve_under_home(value: str) -> Path:
+    """A config-supplied path, resolved under MOONLIGHTER_HOME when it is relative.
+
+    Same convention as cv.default (see application/answers/cv.py's
+    configured_cv_path): an absolute path, or a '~'-prefixed one, is honored
+    exactly as given; anything else is joined onto moonlighter_home(). Callers
+    are expected to reject an empty string themselves with a message naming the
+    config key -- Path("").expanduser() is ".", a directory that always exists,
+    so resolving it silently here would trade a clear "not configured" error for
+    a confusing "Is a directory" failure downstream.
+    """
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = moonlighter_home() / path
+    return path
+
+
 def _learned_blocklist_path() -> Path:
     return moonlighter_home() / "blocklist_learned.yaml"
 
@@ -31,7 +48,7 @@ def browser_executable(config: dict[str, Any]) -> str:
 NEEDS_REVIEW_SENTINEL = "__NEEDS_REVIEW__"
 
 
-DEFAULTS = {
+DEFAULTS: dict[str, Any] = {
     # Browser executable path (Chrome/Chromium/Brave). Empty by default:
     # set browser_path in config.yaml. Accepts brave_path (legacy) as a fallback.
     "browser_path": "",
@@ -58,7 +75,8 @@ DEFAULTS = {
     # 'default' used when the company has no entry, and defaults to 'cv.pdf'
     # (i.e. MOONLIGHTER_HOME/cv.pdf) — the same file the startup warning names.
     # Can be overridden in the local config.yaml. If the chosen file doesn't
-    # exist, confirm_apply aborts.
+    # exist, the composer emits a gap on the file-upload question instead of
+    # naming a file to attach.
     "cv": {
         "default": "cv.pdf",
         "by_company": {},
@@ -71,6 +89,20 @@ DEFAULTS = {
         "authorized_answer": "Yes",
         "not_authorized_answer": "No",
     },
+    # Gmail response tracking. Relative filenames, resolved under MOONLIGHTER_HOME
+    # by resolve_under_home() at the point of use (same convention as cv.default) —
+    # NOT hardcoded to ~/.moonlighter, which ignores a MOONLIGHTER_HOME override.
+    # setup_email() creates the token after the OAuth consent. NOTE: setup_email()
+    # writes (and overwrites) whatever file token_path names — point it at an
+    # absolute path elsewhere only if you own that file.
+    "email": {
+        "credentials_path": "gmail-client.json",
+        "token_path": "gmail-token.json",
+    },
+    # Portal-feed jobs (RemoteOK, HN Who Is Hiring, ...) can never be
+    # staleness-checked at their source; past this age they archive as aged
+    # out. 0 disables age-based archiving.
+    "portal_max_age_days": 30,
 }
 
 _PATH_KEYS = ("browser_session_dir", "screenshots_dir")
@@ -106,6 +138,7 @@ _CONFIG_SCHEMA: dict[str, tuple[type, ...]] = {
     "scan_remotive": (bool,),
     "scan_wwr": (bool,),
     "scan_hn_whoishiring": (bool,),
+    "portal_max_age_days": _INT,
 }
 
 _CV_SCHEMA: dict[str, tuple[type, ...]] = {"default": (str,), "by_company": (dict,)}
@@ -120,6 +153,8 @@ _EMAIL_SCHEMA: dict[str, tuple[type, ...]] = {
     "token_path": (str,),
     "processed_label": (str,),
     "mark_processed": (bool,),
+    "archive_ref_matched": (bool,),
+    "archive_all_classified": (bool,),
     "lookback_days": (int,),
     "interview_stages": (list,),
 }
@@ -212,7 +247,15 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
     }
     if config_path.exists():
         user = yaml.safe_load(config_path.read_text()) or {}
-        config.update(user)
+        for key, value in user.items():
+            # A dict-valued default (e.g. email:) merges key-by-key: a user
+            # overriding one sub-key must not silently drop the siblings'
+            # defaults, which is how a partial email: block used to lose
+            # token_path and trip the credentials guard on valid setups.
+            if isinstance(value, dict) and isinstance(config.get(key), dict):
+                config[key] = {**config[key], **value}
+            else:
+                config[key] = value
     for key in _PATH_KEYS:
         config[key] = str(Path(config[key]).expanduser())
 
@@ -246,19 +289,22 @@ def load_profile(profile_path: str | Path | None = None) -> dict[str, Any]:
 
 
 def load_company_list(path: str | Path | None = None, phase: str | None = None) -> dict[str, Any]:
-    """Load company list from YAML file, optionally filtered by phase.
+    """Load the company list from YAML, optionally filtered by phase.
 
-    O company_list.yaml organiza slugs por ATS e fase:
+    company_list.yaml groups entries by ATS and phase:
         greenhouse:
           phase1: [slug, ...]
           phase2: [slug, ...]
 
+    An entry is an ATS slug ("nubank") or, for Recruitee, optionally a full
+    custom career domain ("jobs.channable.com").
+
     Args:
-        path: Path to company_list.yaml file
-        phase: "phase1", "phase2", "phase3", ou None para todas as fases.
+        path: path to company_list.yaml.
+        phase: "phase1", "phase2", "phase3", or None for all phases combined.
 
     Returns:
-        dict: {source: [slug, ...]} (e.g., {"greenhouse": ["nubank", "ifoodcarreiras"]})
+        dict: {source: [entry, ...]}
     """
     path = Path(path) if path is not None else moonlighter_home() / "company_list.yaml"
     if not path.exists():
@@ -274,7 +320,7 @@ def load_company_list(path: str | Path | None = None, phase: str | None = None) 
             if phase:
                 result[source] = value.get(phase, [])
             else:
-                # Todas as fases concatenadas
+                # All phases concatenated
                 slugs = []
                 for slugs_in_phase in value.values():
                     if isinstance(slugs_in_phase, list):
@@ -282,6 +328,23 @@ def load_company_list(path: str | Path | None = None, phase: str | None = None) 
                 result[source] = slugs
         else:
             result[source] = []
+
+    for source, entries in result.items():
+        if not isinstance(entries, list):
+            # A phase filter selecting a non-list value (e.g. a scalar phase
+            # entry) leaves `entries` as that raw value -- a string iterates
+            # character-by-character, and every single-char "slug" is a str,
+            # so the entry-level check below would silently pass.
+            raise ConfigError(
+                f"company_list.yaml: source {source!r} did not resolve to a list "
+                f"(got {type(entries).__name__}: {entries!r})"
+            )
+        for entry in entries:
+            if not isinstance(entry, str):
+                raise ConfigError(
+                    f"company_list.yaml: source '{source}' has a non-string entry: {entry!r}"
+                )
+
     return result
 
 

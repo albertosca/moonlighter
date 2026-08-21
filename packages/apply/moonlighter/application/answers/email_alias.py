@@ -1,9 +1,10 @@
 """+ref tracking alias for the email field on the ATS form.
 
-The company replies to candidaturas+<ref>@gmail.com (monitored account),
+The company replies to <account>+<ref>@gmail.com (the configured tracking account),
 which lets email_monitor match the reply to the application by the ref.
 """
 
+import re
 import secrets
 
 # No uppercase: a mail provider may lowercase the local part of an address, and a ref
@@ -12,6 +13,12 @@ import secrets
 _REF_ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789"
 _REF_LENGTH = 8
 
+# Anchored like field_map's own email rule (`^e-?mail`), so the two definitions of
+# "the email field" cannot drift apart: the alias replaces exactly the labels the
+# field map would have filled with the profile email. The \b keeps "Emailing
+# preferences" out while letting "E-mail*" and "Email address" in.
+_EMAIL_LABEL = re.compile(r"e-?mail\b")
+
 
 def new_email_ref() -> str:
     """A tracking ref that survives the trip through a mail provider unchanged."""
@@ -19,25 +26,11 @@ def new_email_ref() -> str:
 
 
 def build_email_alias(address: str, ref: str) -> str:
-    """'candidaturas@gmail.com' + 'x7k2mp' → 'candidaturas+x7k2mp@gmail.com'"""
+    """'you@gmail.com' + 'x7k2mp' → 'you+x7k2mp@gmail.com'"""
     local, _, domain = address.partition("@")
     return f"{local}+{ref}@{domain}"
 
 
-def inject_email_alias(answers: dict[str, str], alias: str) -> bool:
-    """
-    Overwrites the form's email field with the +ref tracking alias.
-    Looks for any label containing 'email' ignoring hyphen/space — this
-    matches both 'Email' and 'E-mail' (PT). If none exists, adds an
-    'Email' key as a fallback (the most common label across ATS).
-    Returns True if some existing field was overwritten.
-    """
-    injected = False
-    for key in list(answers.keys()):
-        normalized = key.lower().replace("-", "").replace(" ", "")
-        if "email" in normalized:
-            answers[key] = alias
-            injected = True
-    if not injected:
-        answers["Email"] = alias
-    return injected
+def is_email_label(label: str) -> bool:
+    """True for a form label asking for the applicant's email address."""
+    return _EMAIL_LABEL.match(label.strip().lower()) is not None

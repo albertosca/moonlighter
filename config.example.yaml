@@ -32,6 +32,21 @@ title_blocklist:
   - "recruiter"
   - "product manager"
 
+# ─── Portal-wide job boards ──────────────────────────────────────────────
+# Unlike the per-company ATS scanners (driven by company_list.yaml), these
+# scan an entire public board in one pass. All OFF by default: an ungated
+# board floods the pipeline (and the LLM evaluation spend) with every job
+# it lists. When enabled, pass keywords to scan_and_evaluate — the feeds
+# are filtered by title before anything reaches the LLM.
+#
+# scan_remoteok: true         # remoteok.com — remote jobs, all categories
+# scan_remotive: true         # remotive.com — ToS caps polling at 4 requests/DAY;
+#                             # there is no rate limiter here, you are the control
+# scan_wwr: true              # weworkremotely.com — programming category RSS
+# scan_hn_whoishiring: true   # HN's monthly "Who is hiring?" thread; free-text
+#                             # comments, so titles/companies are best-effort
+# scan_gupy: true             # gupy.io — BR-focused portal, keyword-driven
+
 # Country-dependent work authorization. Empty -> always __NEEDS_REVIEW__ (never guesses).
 # citizenship_country accepts free forms ("Brazil"/"Brasil"/"BR"/"USA"/"United States").
 work_authorization:
@@ -49,8 +64,16 @@ cv:
 # Email monitoring (Gmail OAuth). Optional — only if you want to track replies.
 email:
   address: "your-email@gmail.com"
-  credentials_path: "~/.moonlighter/gmail-client.json"
-  token_path: "~/.moonlighter/gmail-token.json"
+  # Relative filenames resolve under MOONLIGHTER_HOME (works with a custom
+  # MOONLIGHTER_HOME too — a hardcoded ~/.moonlighter path would not).
+  credentials_path: "gmail-client.json"
+  token_path: "gmail-token.json"
+  # Post-sync cleanup (both default false; either one requires the gmail.modify
+  # scope — setup_email() re-consent if your token is readonly):
+  #   archive_ref_matched: true    # mark read + archive replies matched by alias
+  #                                # that applied a pipeline update (certainty only)
+  #   archive_all_classified: true # superset: also fuzzy/uncertain classified mail;
+  #                                # 'unrelated' mail is never touched
   processed_label: "moonlighter/processed"
   # false (default) = sync is read-only; dedup is done in a local table.
   mark_processed: false
@@ -61,3 +84,8 @@ email:
     - technical_interview
     - system_design
     - final_interview
+
+# Portal-feed jobs (RemoteOK, Remotive, WeWorkRemotely, HN Who Is Hiring) can
+# never be staleness-checked at their source; archive_stale_jobs archives them
+# once they age past this many days. 0 disables age-based archiving.
+# portal_max_age_days: 30

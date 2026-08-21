@@ -4,11 +4,21 @@ build-backend = "hatchling.build"
 
 [project]
 name = "moonlighter-scan"
-version = "0.1.0"
-description = "Job board scanning and LLM-based evaluation for moonlighter"
+version = "0.1.3"
+description = "Job discovery across six ATS platforms with LLM fit-scoring — the discovery slice of moonlighter"
+readme = "README.md"
 license = {text = "AGPL-3.0-only"}
 authors = [{name = "Alberto de Sá Cavalcanti de Albuquerque", email = "albertoalbuquerque01@gmail.com"}]
 requires-python = ">=3.14"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Office/Business",
+]
 dependencies = [
     "moonlighter-core>=0.1.0",
     "httpx>=0.27",

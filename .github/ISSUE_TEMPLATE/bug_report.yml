@@ -1,0 +1,28 @@
+name: Bug report
+description: Something behaved wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, what did you see, what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: pipeline
+    attributes:
+      label: get_pipeline output
+      description: Ask Claude to run `get_pipeline` and paste the setup-warnings part — it names most misconfigurations. Redact anything personal.
+  - type: input
+    id: version
+    attributes:
+      label: moonlighter version
+      placeholder: "0.1.1"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS / MCP client
+      placeholder: "macOS 15 / Claude Code CLI"

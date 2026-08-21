@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from moonlighter.core.config import moonlighter_home
+from moonlighter.core.config import moonlighter_home, resolve_under_home
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +38,16 @@ class GmailAuthError(Exception):
 # ── Gmail API: authentication and reading ───────────────────────────────────
 
 
+_MUTATING_FLAGS = ("mark_processed", "archive_ref_matched", "archive_all_classified")
+
+
 def _required_scope(config: dict[str, Any]) -> str:
-    """gmail.modify only when the operator opts into marking messages
-    read/labeled (email.mark_processed=true); readonly by default — the sync
-    is 100% read-only save for that opt-in (S-08, least-privilege principle)."""
+    """gmail.modify only when the operator opts into some Gmail mutation
+    (marking processed, or the program-C archive flags); readonly by default —
+    the sync is 100% read-only save for those opt-ins (S-08)."""
     email_cfg = config.get("email", {})
-    return SCOPE_MODIFY if email_cfg.get("mark_processed", False) else SCOPE_READONLY
+    mutates = any(email_cfg.get(flag, False) for flag in _MUTATING_FLAGS)
+    return SCOPE_MODIFY if mutates else SCOPE_READONLY
 
 
 def _warn_if_scope_mismatch(creds: Any, required_scope: str) -> None:
@@ -60,6 +64,15 @@ def _warn_if_scope_mismatch(creds: Any, required_scope: str) -> None:
             "Gmail token has a broader scope (%s) than required (%s). "
             "Run setup_email() to re-consent with the minimal scope.",
             ", ".join(sorted(granted_set)),
+            required_scope,
+        )
+    elif required_scope == SCOPE_MODIFY and SCOPE_MODIFY not in granted_set:
+        # The opposite direction: an archive/mark flag is on but the token is
+        # readonly — the old message told users to re-consent DOWN, which
+        # would break the very feature they enabled.
+        logger.warning(
+            "Gmail token lacks the scope this configuration needs (%s). "
+            "Run setup_email() to re-consent and grant it.",
             required_scope,
         )
 
@@ -105,7 +118,14 @@ def setup_gmail_service(config: dict[str, Any]) -> Any:
             " and then setup_email() to authorize access."
         )
 
-    token_path = Path(config["email"]["token_path"]).expanduser()
+    token_path_raw = (config.get("email") or {}).get("token_path")
+    if not token_path_raw:
+        raise GmailAuthError(
+            "email.token_path is not configured. Add an 'email:' block to "
+            "config.yaml (see config.example.yaml) and run setup_email() to "
+            "authorize access."
+        )
+    token_path = resolve_under_home(token_path_raw)
     if not token_path.exists():
         raise GmailAuthError("Gmail token not found. Run setup_email() first to authorize access.")
 
@@ -245,6 +265,16 @@ def _decode_data(data: str) -> str:
         return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace")
     except Exception:
         return ""
+
+
+def archive_message(service: Any, message_id: str) -> None:
+    """Marks read and archives (removes UNREAD and INBOX) — program C's
+    post-sync cleanup, gated by the email.archive_* flags upstream."""
+    service.users().messages().modify(
+        userId="me",
+        id=message_id,
+        body={"removeLabelIds": ["UNREAD", "INBOX"]},
+    ).execute()
 
 
 def mark_processed(service: Any, message_id: str, label_id: str) -> None:

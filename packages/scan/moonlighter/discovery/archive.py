@@ -23,6 +23,11 @@ class ArchiveResult:
     """Outcome of an archive_stale_jobs run."""
 
     archived: list[dict[str, str]] = field(default_factory=list)
+    # Portal jobs archived because they aged past portal_max_age_days -- age is
+    # the only closing signal a portal feed offers, so these are 'archived',
+    # never 'closed': closed would claim knowledge of the source we don't have.
+    aged: list[dict[str, str]] = field(default_factory=list)
+    max_age_days: int = 0
     failed_companies: list[str] = field(default_factory=list)
 
 
@@ -63,11 +68,22 @@ async def archive_stale_jobs(
         job.save()
         archived.append({"company": job.company, "title": job.title, "url": job.url})
 
-    return ArchiveResult(archived=archived, failed_companies=staleness.failed_companies)
+    aged: list[dict[str, str]] = []
+    for job in staleness.stale_by_age:
+        job.status = "archived"
+        job.save()
+        aged.append({"company": job.company, "title": job.title, "url": job.url})
+
+    return ArchiveResult(
+        archived=archived,
+        aged=aged,
+        max_age_days=int(config.get("portal_max_age_days") or 0),
+        failed_companies=staleness.failed_companies,
+    )
 
 
 def _format_archive_result(result: ArchiveResult) -> str:
-    if not result.archived and not result.failed_companies:
+    if not result.archived and not result.aged and not result.failed_companies:
         return "No closed jobs found."
     lines: list[str] = []
     if result.archived:
@@ -75,6 +91,12 @@ def _format_archive_result(result: ArchiveResult) -> str:
         lines.extend(f"  - {j['company']} / {j['title']} — {j['url']}" for j in result.archived)
     else:
         lines.append("No closed jobs found.")
+    if result.aged:
+        lines.append(
+            f"{len(result.aged)} portal job(s) archived by age "
+            f"(older than {result.max_age_days} days; a portal feed cannot be re-checked):"
+        )
+        lines.extend(f"  - {j['company']} / {j['title']} — {j['url']}" for j in result.aged)
     if result.failed_companies:
         lines.append("")
         lines.append(f"⚠️  Could not check: {', '.join(result.failed_companies)}")

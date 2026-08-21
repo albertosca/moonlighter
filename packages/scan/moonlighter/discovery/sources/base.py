@@ -29,6 +29,18 @@ class RawJob:
     salary_source: str | None = None  # 'stated' only (scanner doesn't infer)
 
 
+@dataclass
+class SourceStats:
+    """Per-source fetch accounting for one scan run (see _gather_jobs)."""
+
+    companies: int = 0  # 0 means a portal feed, not a per-company board
+    jobs: int = 0
+    errors: int = 0
+
+
+ScanStats = dict[str, SourceStats]
+
+
 def normalize_remote_type(location: str | None) -> str | None:
     if not location:
         return None

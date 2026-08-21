@@ -4,18 +4,30 @@ build-backend = "hatchling.build"
 
 [project]
 name = "moonlighter-core"
-version = "0.1.0"
-description = "Core database, configuration, browser automation and LLM primitives for moonlighter"
+version = "0.1.3"
+description = "Storage, config, profile and the shared LLM client — the foundation slice of moonlighter"
+readme = "README.md"
 license = {text = "AGPL-3.0-only"}
 authors = [{name = "Alberto de Sá Cavalcanti de Albuquerque", email = "albertoalbuquerque01@gmail.com"}]
 requires-python = ">=3.14"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Office/Business",
+]
 dependencies = [
     "peewee>=3.17",
     "pyyaml>=6.0",
     "rich>=13.7",
     "anthropic>=0.40",
-    "playwright>=1.47",
 ]
+
+[project.optional-dependencies]
+browser = ["playwright>=1.47"]
 
 [project.urls]
 Homepage = "https://github.com/albertosca/moonlighter"

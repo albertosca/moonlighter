@@ -16,6 +16,7 @@ class Source(StrEnum):
     WORKABLE = "workable"
     SMARTRECRUITERS = "smartrecruiters"
     RECRUITEE = "recruitee"
+    INHIRE = "inhire"
     GUPY = "gupy"
     REMOTEOK = "remoteok"
     REMOTIVE = "remotive"

@@ -2,7 +2,7 @@ import re
 
 from moonlighter.application.answers.email_alias import (
     build_email_alias,
-    inject_email_alias,
+    is_email_label,
     new_email_ref,
 )
 
@@ -37,24 +37,21 @@ def test_build_email_alias_different_refs():
     assert build_email_alias("a@b.com", "xyz") == "a+xyz@b.com"
 
 
-def test_inject_email_alias_matches_ptbr_e_mail_label():
-    """Label 'E-mail' (PT, with a hyphen) must receive the alias — without the hyphen
-    breaking the match or creating a phantom 'Email' field."""
-    answers = {"E-mail*": "pessoal@gmail.com", "Nome*": "Alberto"}
-    injected = inject_email_alias(answers, "candidaturas+abc123@gmail.com")
-    assert injected is True
-    assert answers["E-mail*"] == "candidaturas+abc123@gmail.com"
-    assert "Email" not in answers  # doesn't create a phantom field
+def test_is_email_label_matches_ptbr_hyphenated_required_label():
+    """'E-mail*' (PT, hyphen, required asterisk) is the live shape that once
+    needed a normalization fix — it must keep matching."""
+    assert is_email_label("E-mail*")
 
 
-def test_inject_email_alias_matches_plain_email_label():
-    answers = {"Email": "pessoal@gmail.com"}
-    inject_email_alias(answers, "x+ref@y.com")
-    assert answers["Email"] == "x+ref@y.com"
+def test_is_email_label_matches_plain_and_suffixed_labels():
+    assert is_email_label("Email")
+    assert is_email_label("Email address")
 
 
-def test_inject_email_alias_fallback_when_no_email_field():
-    answers = {"Nome*": "Alberto"}
-    injected = inject_email_alias(answers, "x+ref@y.com")
-    assert injected is False
-    assert answers["Email"] == "x+ref@y.com"  # fallback
+def test_is_email_label_rejects_labels_that_merely_start_with_the_word():
+    assert not is_email_label("Emailing preferences")
+
+
+def test_is_email_label_rejects_unrelated_labels():
+    assert not is_email_label("Nome*")
+    assert not is_email_label("Your email")  # anchored, like field_map's own rule

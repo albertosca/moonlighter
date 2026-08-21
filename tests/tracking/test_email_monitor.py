@@ -1109,6 +1109,30 @@ class TestSetupGmailService:
         assert service is not None
         mock_build.assert_called_once_with("gmail", "v1", credentials=mock_creds)
 
+    def test_resolves_a_relative_token_path_under_moonlighter_home(self, tmp_path, monkeypatch):
+        """IMPORTANT 6: token_path defaults to a relative filename now
+        ("gmail-token.json"), and setup_gmail_service must resolve it under
+        MOONLIGHTER_HOME rather than treating it as relative to the cwd."""
+        from moonlighter.tracking.gmail_client import setup_gmail_service
+
+        monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+        (tmp_path / "gmail-token.json").write_text("{}")
+
+        mock_creds = MagicMock(valid=True, expired=False)
+        config = {"email": {"token_path": "gmail-token.json"}}
+
+        with (
+            patch("moonlighter.tracking.gmail_client.Credentials") as MockCreds,
+            patch("moonlighter.tracking.gmail_client.build") as mock_build,
+        ):
+            MockCreds.from_authorized_user_file.return_value = mock_creds
+            mock_build.return_value = MagicMock()
+            setup_gmail_service(config)
+
+        MockCreds.from_authorized_user_file.assert_called_once()
+        called_path = MockCreds.from_authorized_user_file.call_args.args[0]
+        assert called_path == str(tmp_path / "gmail-token.json")
+
     def test_refreshed_token_is_persisted_when_the_file_is_ours(self, tmp_path, monkeypatch):
         from moonlighter.tracking.gmail_client import setup_gmail_service
 
@@ -1363,6 +1387,55 @@ class TestSyncResponses:
         }
         service.users().messages().modify().execute.return_value = {}
         return service
+
+    async def test_ref_match_reports_the_db_job_not_the_email_guess(self, tmp_db):
+        # The classifier reads company/title off the EMAIL and often can't
+        # (rejections rarely repeat the title) — but a ref match already knows
+        # the exact Job. The update must carry the DB truth, not "?" material.
+        init_db()
+        job = _make_job(tmp_db, company="Acme Robotics", title="Staff Engineer")
+        _make_application(job, status="submitted", email_ref="q9ref1")
+
+        messages = [
+            {
+                "to": "candidaturas+q9ref1@gmail.com",
+                "from_": "no-reply@acme.com",
+                "subject": "Your application",
+                "body": "Thank you for applying. We will not move forward.",
+            }
+        ]
+        classify_result = {
+            "type": "rejection",
+            "stage": None,
+            "new_stage": None,
+            "company": None,
+            "job_title": None,
+            "summary": "Rejection.",
+        }
+        service = self._mock_service(messages)
+
+        with (
+            patch("moonlighter.tracking.email_monitor.setup_gmail_service", return_value=service),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
+                return_value=[{"id": "msg0", "threadId": "t0"}],
+            ),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=messages[0]),
+            patch(
+                "moonlighter.tracking.email_monitor.classify_response",
+                new=AsyncMock(return_value=classify_result),
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+            ),
+        ):
+            from moonlighter.tracking.email_monitor import sync_responses
+
+            updates = await sync_responses(self.CONFIG, _make_llm_caller(classify_result))
+
+        assert len(updates) == 1
+        assert updates[0]["company"] == "Acme Robotics"
+        assert updates[0]["title"] == "Staff Engineer"
 
     async def test_email_with_ref_updates_application_status(self, tmp_db):
         init_db()
@@ -2786,3 +2859,234 @@ def test_resolve_application_fuzzy_zero_matches_is_uncertain(tmp_db):
     app, match = _resolve_application(None, {"company": "NonexistentCompany", "job_title": None})
     assert app is None
     assert match == "uncertain"
+
+
+class TestArchiveAfterSync:
+    """Program C (2026-08-18): opt-in mark-read+archive after the sync applies
+    an update. Two layers: archive_ref_matched (certainty only) and
+    archive_all_classified (superset). 'unrelated' mail is NEVER touched —
+    the tracked mailbox can hold personal mail."""
+
+    BASE_STAGES: ClassVar[list] = ["technical_interview"]
+    BASE_EMAIL = "candidaturas@gmail.com"
+
+    def _config(self, **email_flags):
+        return {
+            "email": {
+                "address": self.BASE_EMAIL,
+                "credentials_path": "gmail-client.json",
+                "token_path": "gmail-token.json",
+                "interview_stages": list(self.BASE_STAGES),
+                **email_flags,
+            },
+            "llm_model": "claude-sonnet-4-6",
+        }
+
+    def _service(self):
+        return MagicMock()
+
+    async def _run(self, config, message, classification, msg_id="msgA"):
+        from moonlighter.tracking.email_monitor import sync_responses
+
+        with (
+            patch(
+                "moonlighter.tracking.email_monitor.setup_gmail_service",
+                return_value=self._service(),
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
+                return_value=[{"id": msg_id, "threadId": "t"}],
+            ),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
+            patch(
+                "moonlighter.tracking.email_monitor.classify_response",
+                new=AsyncMock(return_value=classification),
+            ),
+            patch("moonlighter.tracking.email_monitor.archive_message") as mock_archive,
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
+            patch(
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_p"
+            ),
+        ):
+            updates = await sync_responses(config, _make_llm_caller(classification))
+        return updates, mock_archive
+
+    @pytest.mark.asyncio
+    async def test_ref_matched_archives_when_layer_one_is_on(self, tmp_db):
+        init_db()
+        job = _make_job(tmp_db)
+        _make_application(job, status="submitted", email_ref="cflag1")
+        message = {
+            "to": "candidaturas+cflag1@gmail.com",
+            "from_": "hr@x.com",
+            "subject": "s",
+            "body": "b",
+        }
+        classification = {
+            "type": "rejection",
+            "stage": None,
+            "new_stage": None,
+            "company": None,
+            "job_title": None,
+            "summary": "r",
+        }
+        _, mock_archive = await self._run(
+            self._config(archive_ref_matched=True), message, classification
+        )
+        mock_archive.assert_called_once()
+        assert mock_archive.call_args[0][1] == "msgA"
+
+    @pytest.mark.asyncio
+    async def test_uncertain_stays_in_inbox_with_only_layer_one(self, tmp_db):
+        init_db()
+        message = {"to": "candidaturas@gmail.com", "from_": "hr@x.com", "subject": "s", "body": "b"}
+        classification = {
+            "type": "rejection",
+            "stage": None,
+            "new_stage": None,
+            "company": "Nowhere",
+            "job_title": "Ghost",
+            "summary": "r",
+        }
+        _, mock_archive = await self._run(
+            self._config(archive_ref_matched=True), message, classification
+        )
+        mock_archive.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_layer_two_archives_uncertain_too(self, tmp_db):
+        init_db()
+        message = {"to": "candidaturas@gmail.com", "from_": "hr@x.com", "subject": "s", "body": "b"}
+        classification = {
+            "type": "rejection",
+            "stage": None,
+            "new_stage": None,
+            "company": "Nowhere",
+            "job_title": "Ghost",
+            "summary": "r",
+        }
+        _, mock_archive = await self._run(
+            self._config(archive_all_classified=True), message, classification
+        )
+        mock_archive.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_unrelated_mail_is_never_archived(self, tmp_db):
+        init_db()
+        message = {
+            "to": "candidaturas@gmail.com",
+            "from_": "mom@x.com",
+            "subject": "s",
+            "body": "b",
+        }
+        classification = {"type": "unrelated", "summary": ""}
+        _, mock_archive = await self._run(
+            self._config(archive_ref_matched=True, archive_all_classified=True),
+            message,
+            classification,
+        )
+        mock_archive.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_flags_off_means_zero_archive_calls(self, tmp_db):
+        init_db()
+        job = _make_job(tmp_db)
+        _make_application(job, status="submitted", email_ref="cflag2")
+        message = {
+            "to": "candidaturas+cflag2@gmail.com",
+            "from_": "hr@x.com",
+            "subject": "s",
+            "body": "b",
+        }
+        classification = {
+            "type": "rejection",
+            "stage": None,
+            "new_stage": None,
+            "company": None,
+            "job_title": None,
+            "summary": "r",
+        }
+        _, mock_archive = await self._run(self._config(), message, classification)
+        mock_archive.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_an_archive_failure_does_not_break_the_sync(self, tmp_db):
+        init_db()
+        job = _make_job(tmp_db)
+        _make_application(job, status="submitted", email_ref="cflag3")
+        message = {
+            "to": "candidaturas+cflag3@gmail.com",
+            "from_": "hr@x.com",
+            "subject": "s",
+            "body": "b",
+        }
+        classification = {
+            "type": "rejection",
+            "stage": None,
+            "new_stage": None,
+            "company": None,
+            "job_title": None,
+            "summary": "r",
+        }
+        from moonlighter.tracking.email_monitor import sync_responses
+
+        with (
+            patch(
+                "moonlighter.tracking.email_monitor.setup_gmail_service",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.fetch_recent_messages",
+                return_value=[{"id": "msgF", "threadId": "t"}],
+            ),
+            patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
+            patch(
+                "moonlighter.tracking.email_monitor.classify_response",
+                new=AsyncMock(return_value=classification),
+            ),
+            patch(
+                "moonlighter.tracking.email_monitor.archive_message",
+                side_effect=RuntimeError("modify denied"),
+            ),
+            patch("moonlighter.tracking.email_monitor.mark_processed"),
+            patch(
+                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_p"
+            ),
+        ):
+            updates = await sync_responses(
+                self._config(archive_ref_matched=True), _make_llm_caller(classification)
+            )
+        assert len(updates) == 1  # the pipeline update survived the Gmail failure
+
+    def test_required_scope_is_modify_when_any_archive_flag_is_on(self):
+        from moonlighter.tracking.gmail_client import SCOPE_MODIFY, _required_scope
+
+        assert _required_scope(self._config(archive_ref_matched=True)) == SCOPE_MODIFY
+        assert _required_scope(self._config(archive_all_classified=True)) == SCOPE_MODIFY
+
+    def test_scope_warning_points_upward_when_modify_is_missing(self, caplog):
+        from moonlighter.tracking.gmail_client import (
+            SCOPE_MODIFY,
+            SCOPE_READONLY,
+            _warn_if_scope_mismatch,
+        )
+
+        creds = MagicMock()
+        creds.scopes = [SCOPE_READONLY]
+        with caplog.at_level("WARNING"):
+            _warn_if_scope_mismatch(creds, SCOPE_MODIFY)
+        assert any(
+            "re-consent" in r.message.lower() or "grant" in r.message.lower()
+            for r in caplog.records
+        )
+
+
+def test_archive_message_removes_unread_and_inbox():
+    from moonlighter.tracking.gmail_client import archive_message
+
+    service = MagicMock()
+    archive_message(service, "m1")
+    service.users().messages().modify.assert_called_with(
+        userId="me", id="m1", body={"removeLabelIds": ["UNREAD", "INBOX"]}
+    )
+    service.users().messages().modify().execute.assert_called()

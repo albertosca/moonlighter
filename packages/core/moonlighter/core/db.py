@@ -2,10 +2,11 @@ import datetime
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 from moonlighter.core.config import moonlighter_home
 from peewee import (
+    AutoField,
     CharField,
     DateTimeField,
     FloatField,
@@ -26,7 +27,30 @@ def _db_path() -> str:
 db = SqliteDatabase(None)  # initialized in init_db()
 
 
-class BaseModel(Model):  # type: ignore[misc]  # peewee.Model is untyped (Any)
+class BaseModel(Model):
+    # peewee's ModelBase metaclass (peewee.py) synthesizes three things on every
+    # Model subclass at class-creation time, none of which peewee's own bundled
+    # stubs (site-packages/peewee-stubs, vendored since peewee 4.1.1) know about:
+    # an implicit `id` AutoField primary key when no field declares
+    # primary_key=True, a per-subclass `DoesNotExist` exception class, and an
+    # untyped `get_or_create` classmethod. Before the stubs existed, `peewee.Model`
+    # resolved to `Any` (via this project's `ignore_missing_imports` fallback for
+    # `peewee.*`), so every one of these was silently Any-typed too.
+    #
+    # `id` is declared for real: this is exactly what peewee already synthesizes
+    # for a model with no explicit primary key (see ModelBase.__new__), so it's
+    # behaviorally a no-op -- it only spells out, for the type checker, what was
+    # already happening at runtime. `DoesNotExist` and `get_or_create` are
+    # declared under TYPE_CHECKING only, since real assignments here would fight
+    # the ones peewee's metaclass makes on every subclass.
+    id = AutoField()
+
+    if TYPE_CHECKING:
+        DoesNotExist: ClassVar[type[Exception]]
+
+        @classmethod
+        def get_or_create(cls, **kwargs: Any) -> tuple[Self, bool]: ...
+
     class Meta:
         database = db
 

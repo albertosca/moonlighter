@@ -280,13 +280,13 @@ def test_english_level_from_profile():
 def test_salary_field_filled_from_preferences():
     profile = {"preferences": {"salary_target_brl_monthly": 40000}}
     out = pre_populate_answers(["Salary expectation"], profile)
-    assert out["Salary expectation"] == "40000"
+    assert out["Salary expectation"] == "BRL 40.000/month"
 
 
 def test_compensation_field_matches_too():
     profile = {"preferences": {"salary_target_brl_monthly": 40000}}
     out = pre_populate_answers(["Desired compensation"], profile)
-    assert out["Desired compensation"] == "40000"
+    assert out["Desired compensation"] == "BRL 40.000/month"
 
 
 def test_salary_field_absent_preference_yields_empty():
@@ -297,36 +297,36 @@ def test_salary_field_absent_preference_yields_empty():
 def test_expected_salary_matches():
     profile = {"preferences": {"salary_target_brl_monthly": 40000}}
     out = pre_populate_answers(["Expected salary"], profile)
-    assert out["Expected salary"] == "40000"
+    assert out["Expected salary"] == "BRL 40.000/month"
 
 
 def test_expected_pay_matches():
     profile = {"preferences": {"salary_target_brl_monthly": 40000}}
     out = pre_populate_answers(["Expected pay"], profile)
-    assert out["Expected pay"] == "40000"
+    assert out["Expected pay"] == "BRL 40.000/month"
 
 
 def test_compensation_alone_matches():
     profile = {"preferences": {"salary_target_brl_monthly": 40000}}
     out = pre_populate_answers(["Compensation"], profile)
-    assert out["Compensation"] == "40000"
+    assert out["Compensation"] == "BRL 40.000/month"
 
 
 def test_ptbr_pretensao_salarial_matches():
     profile = {"preferences": {"salary_target_brl_monthly": 40000}}
     out = pre_populate_answers(["Pretensão salarial"], profile)
-    assert out["Pretensão salarial"] == "40000"
+    assert out["Pretensão salarial"] == "BRL 40.000/month"
 
 
 def test_ptbr_remuneracao_matches():
     profile = {"preferences": {"salary_target_brl_monthly": 40000}}
     out = pre_populate_answers(["Remuneração"], profile)
-    assert out["Remuneração"] == "40000"
+    assert out["Remuneração"] == "BRL 40.000/month"
 
 
 def test_salary_transparency_essay_not_prepopulated():
     """Long interrogative label that merely mentions 'salary' mid-sentence must NOT
-    be replaced by a bare number — it should fall through to the LLM."""
+    be replaced by a salary figure — it should fall through to the LLM."""
     label = "What is your view on salary transparency?"
     out = pre_populate_answers([label], {"preferences": {"salary_target_brl_monthly": 40000}})
     assert label not in out
@@ -341,12 +341,22 @@ def test_desired_pay_essay_not_prepopulated():
 
 
 def test_salary_target_zero_yields_zero_string():
-    """An explicit salary_target_brl_monthly of 0 must yield '0', not '' — 0 is a
-    configured (if unusual) value, not 'unconfigured'."""
+    """An explicit salary_target_brl_monthly of 0 must yield a formatted 0, not ''
+    — 0 is a configured (if unusual) value, not 'unconfigured'."""
     out = pre_populate_answers(
         ["Salary expectation"], {"preferences": {"salary_target_brl_monthly": 0}}
     )
-    assert out["Salary expectation"] == "0"
+    assert out["Salary expectation"] == "BRL 0/month"
+
+
+def test_salary_answer_formats_thousands_with_dots():
+    """The answer follows the format ATS labels themselves exemplify ("MXN 9.000"):
+    currency code + dot-separated thousands + explicit period. A bare "35000" left
+    the currency and period to the reader's guess — observed live on the Nubank
+    form (2026-08-13), whose label asked "Currency + Monthly Salary" outright."""
+    profile = {"preferences": {"salary_target_brl_monthly": 9500}}
+    out = pre_populate_answers(["Salary expectation"], profile)
+    assert out["Salary expectation"] == "BRL 9.500/month"
 
 
 def test_salary_history_essay_not_prepopulated():
@@ -384,7 +394,7 @@ def test_salary_short_currency_parenthetical_still_prepopulated():
     prof = {"preferences": {"salary_target_brl_monthly": 40000}}
     for label in ("Salary expectation (BRL)", "Salary (BRL)", "Salary (monthly)"):
         out = pre_populate_answers([label], prof)
-        assert out[label] == "40000"
+        assert out[label] == "BRL 40.000/month"
 
 
 def test_ptbr_pretensoes_salariais_plural_matches():
@@ -393,7 +403,7 @@ def test_ptbr_pretensoes_salariais_plural_matches():
     out = pre_populate_answers(
         ["Pretensões salariais"], {"preferences": {"salary_target_brl_monthly": 40000}}
     )
-    assert out["Pretensões salariais"] == "40000"
+    assert out["Pretensões salariais"] == "BRL 40.000/month"
 
 
 # ── Salary Coverage E3 — wider lead words and bare PT keywords ──
@@ -410,24 +420,24 @@ class TestSalaryCoverageE3:
     # New: leading value words.
     def test_minimum_salary_fills(self):
         salary_profile = self.salary_profile()
-        assert _static_answer("Minimum salary", salary_profile) == "25000"
+        assert _static_answer("Minimum salary", salary_profile) == "BRL 25.000/month"
 
     def test_base_compensation_fills(self):
         salary_profile = self.salary_profile()
-        assert _static_answer("Base compensation", salary_profile) == "25000"
+        assert _static_answer("Base compensation", salary_profile) == "BRL 25.000/month"
 
     def test_total_compensation_fills(self):
         salary_profile = self.salary_profile()
-        assert _static_answer("Total compensation", salary_profile) == "25000"
+        assert _static_answer("Total compensation", salary_profile) == "BRL 25.000/month"
 
     # New: bare PT keywords.
     def test_ptbr_bare_salario_fills(self):
         salary_profile = self.salary_profile()
-        assert _static_answer("Salário", salary_profile) == "25000"
+        assert _static_answer("Salário", salary_profile) == "BRL 25.000/month"
 
     def test_ptbr_faixa_salarial_fills(self):
         salary_profile = self.salary_profile()
-        assert _static_answer("Faixa salarial", salary_profile) == "25000"
+        assert _static_answer("Faixa salarial", salary_profile) == "BRL 25.000/month"
 
     # Invariant: essays starting with a keyword still fall through to the LLM.
     def test_ptbr_salario_essay_not_prepopulated(self):
@@ -466,14 +476,14 @@ def test_salary_refuses_for_ptbr_annual_labels():
 def test_salary_fills_when_the_label_agrees_with_the_stored_unit():
     for label in ["Expected salary (BRL)", "Pretensão salarial mensal", "Salary (monthly)"]:
         out = pre_populate_answers([label], _SALARY_PROFILE)
-        assert out[label] == "35000", f"{label!r} deveria preencher"
+        assert out[label] == "BRL 35.000/month", f"{label!r} should be filled"
 
 
 def test_salary_still_fills_when_the_label_states_no_unit():
     """Unchanged behaviour: with nothing stated, the profile's own unit is the
     only assumption available, and it is the user's own stated target."""
     out = pre_populate_answers(["Expected salary"], _SALARY_PROFILE)
-    assert out["Expected salary"] == "35000"
+    assert out["Expected salary"] == "BRL 35.000/month"
 
 
 def test_salary_refusal_never_sends_the_field_to_the_llm():
@@ -482,6 +492,66 @@ def test_salary_refusal_never_sends_the_field_to_the_llm():
     pending), never None -- None would let the LLM answer the salary question."""
     out = pre_populate_answers(["Expected salary (annual USD)"], _SALARY_PROFILE)
     assert "Expected salary (annual USD)" in out
+
+
+# ─── Question-shaped salary labels (the 2026-08-03 Holepunch gap) ────────────
+
+
+def test_salary_question_with_foreign_units_refuses():
+    """The REAL live label that fell through to the LLM. With the interrogative
+    lead it now matches — and the currency/period guard refuses (annual USD
+    against a BRL-monthly figure)."""
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(
+        ["What is your expected salary? (annual USD)"], profile, {}, None, None
+    )
+    assert answers["What is your expected salary? (annual USD)"] == NEEDS_REVIEW_SENTINEL
+
+
+def test_salary_question_plain_answers_the_figure():
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(["What is your salary expectation?"], profile, {}, None, None)
+    assert answers["What is your salary expectation?"] == "BRL 35.000/month"
+
+
+def test_salary_question_contracted_lead():
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(
+        ["What's your expected salary (BRL, monthly)?"], profile, {}, None, None
+    )
+    assert answers["What's your expected salary (BRL, monthly)?"] == "BRL 35.000/month"
+
+
+def test_salary_question_typographic_apostrophe():
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(
+        ["What’s your expected salary (BRL, monthly)?"], profile, {}, None, None
+    )
+    assert answers["What’s your expected salary (BRL, monthly)?"] == "BRL 35.000/month"
+
+
+def test_salary_question_ptbr_lead():
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(["Qual a sua pretensão salarial?"], profile, {}, None, None)
+    assert answers["Qual a sua pretensão salarial?"] == "BRL 35.000/month"
+
+
+def test_salary_essay_with_interrogative_lead_still_falls_through():
+    """The lead must not re-open the essay over-match: 'view on salary
+    transparency' continues into non-whitelisted words and must reach the LLM."""
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(
+        ["What is your view on salary transparency?"], profile, {}, None, None
+    )
+    assert "What is your view on salary transparency?" not in answers
+
+
+def test_salary_growth_question_still_falls_through():
+    profile = {"preferences": {"salary_target_brl_monthly": 35000}}
+    answers = pre_populate_answers(
+        ["What is your expected salary growth over five years?"], profile, {}, None, None
+    )
+    assert "What is your expected salary growth over five years?" not in answers
 
 
 # ── label normalisation ───────────────────────────────────────────────────────

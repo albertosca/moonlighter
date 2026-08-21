@@ -14,13 +14,14 @@ from moonlighter.discovery.sources.registry import (
 )
 
 
-def test_registry_covers_the_six_http_sources():
+def test_registry_covers_the_http_sources():
     assert set(SOURCES) == {
         Source.GREENHOUSE,
         Source.LEVER,
         Source.ASHBY,
         Source.WORKABLE,
         Source.RECRUITEE,
+        Source.INHIRE,
         Source.SMARTRECRUITERS,
     }
     assert Source.LINKEDIN not in SOURCES  # browser-based, special-cased
@@ -34,6 +35,7 @@ def test_build_http_scanners_matches_the_old_hardcoded_dict():
         "ashby",
         "workable",
         "recruitee",
+        "inhire",
         "smartrecruiters",
     }
     assert isinstance(scanners["greenhouse"], GreenhouseScanner)
@@ -46,7 +48,9 @@ def test_build_http_scanners_matches_the_old_hardcoded_dict():
 
 def test_listing_sources_is_derived_not_hardcoded():
     assert (
-        frozenset({"greenhouse", "lever", "ashby", "workable", "recruitee", "smartrecruiters"})
+        frozenset(
+            {"greenhouse", "lever", "ashby", "workable", "recruitee", "inhire", "smartrecruiters"}
+        )
         == LISTING_SOURCES
     )
     # membership works with a plain-string source (what staleness passes)

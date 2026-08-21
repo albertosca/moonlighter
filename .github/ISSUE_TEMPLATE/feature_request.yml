@@ -1,0 +1,20 @@
+name: Feature request
+description: Something moonlighter should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to accomplish that you can't today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What would it look like from inside the Claude conversation?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Workarounds you considered

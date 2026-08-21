@@ -7,12 +7,13 @@ config/profile/caller logic, without depending on the global config loaded on im
 
 import asyncio
 from typing import ClassVar
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 from moonlighter.core.db import Job, ScanLog, init_db
 from moonlighter.discovery import service as scan_service
 from moonlighter.discovery.evaluator import EvaluationResult
+from moonlighter.discovery.posting import FetchedPosting
 
 CONFIG = {
     "score_threshold": 7.0,
@@ -42,6 +43,58 @@ def _http_client(status_code=200, text="<p>Job description here</p>"):
     acm.__aenter__ = AsyncMock(return_value=client)
     acm.__aexit__ = AsyncMock(return_value=False)
     return acm, client
+
+
+def _saved_job(url, *, status="new", score=8.0, score_notes="match"):
+    return Job.create(
+        source="greenhouse",
+        company="Acme",
+        title="Engineer",
+        url=url,
+        status=status,
+        score=score,
+        score_notes=score_notes,
+    )
+
+
+# ── format_report tests ─────────────────────────────────────────────────────
+
+
+async def test_format_report_counts_needs_review_separately_from_below(tmp_db):
+    init_db()
+    above = _saved_job("https://x.com/fr/1", status="new", score=8.0)
+    below = _saved_job("https://x.com/fr/2", status="archived", score=3.0)
+    pending = _saved_job(
+        "https://x.com/fr/3",
+        status="needs_review",
+        score=None,
+        score_notes="description unavailable — needs manual verification",
+    )
+    report = scan_service._format_report([above, below, pending], spend_hit=False, threshold=6.5)
+    assert "1 below threshold" in report
+    assert "1 job(s) need manual verification" in report
+    assert "list_jobs(status='needs_review')" in report
+    assert "verify_job(job_id, page_text)" in report
+
+
+async def test_format_report_no_verify_line_when_nothing_pending(tmp_db):
+    init_db()
+    above = _saved_job("https://x.com/fr/4", status="new", score=8.0)
+    report = scan_service._format_report([above], spend_hit=False, threshold=6.5)
+    assert "need manual verification" not in report
+
+
+async def test_format_report_verify_line_shown_even_with_nothing_above_threshold(tmp_db):
+    init_db()
+    pending = _saved_job(
+        "https://x.com/fr/5",
+        status="needs_review",
+        score=None,
+        score_notes="description unavailable — needs manual verification",
+    )
+    report = scan_service._format_report([pending], spend_hit=False, threshold=6.5)
+    assert "None passed the threshold" in report
+    assert "1 job(s) need manual verification" in report
 
 
 # ── input validation ────────────────────────────────────────────────────────
@@ -76,6 +129,45 @@ async def test_add_job_fetches_description_when_empty(tmp_db):
     assert "Real desc" in (job.description or "")
 
 
+async def test_fetch_description_drops_style_and_script_contents():
+    html_page = "<style>.a{color:red}</style><script>var x=1;</script><p>Real text</p>"
+    response = MagicMock(status_code=200, text=html_page)
+    client = AsyncMock()
+    client.get = AsyncMock(return_value=response)
+    cls = MagicMock()
+    cls.return_value.__aenter__ = AsyncMock(return_value=client)
+    cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch("httpx.AsyncClient", cls):
+        description, error = await scan_service._fetch_description("https://example.com/job")
+    assert error is None
+    assert description == "Real text"
+    assert "color" not in description and "var x" not in description
+
+
+async def test_add_job_routes_through_ats_when_fields_missing(tmp_db):
+    init_db()
+    posting = FetchedPosting(
+        company="GitLab", title="Account Executive", description="Build things."
+    )
+    url = "https://boards.greenhouse.io/gitlab/jobs/8503792002"
+    with (
+        patch(
+            "moonlighter.discovery.service.fetch_posting_via_ats",
+            new=AsyncMock(return_value=posting),
+        ),
+        patch(
+            "moonlighter.discovery.service.evaluate_job",
+            new=AsyncMock(return_value=_eval(8.0)),
+        ),
+    ):
+        result = await scan_service.add_job(url, "", "", "", CONFIG, PROFILE, MagicMock())
+    assert "NEW" in result
+    job = Job.get(Job.url == url)
+    assert job.company == "GitLab"
+    assert job.title == "Account Executive"
+    assert job.description == "Build things."
+
+
 async def test_add_job_http_non_200_returns_error(tmp_db):
     init_db()
     acm, _ = _http_client(status_code=404)
@@ -108,7 +200,7 @@ async def test_add_job_dedup_existing_job(tmp_db):
         company="Stripe",
         title="Eng",
         url="https://x.com/5",
-        score=8.0,
+        score=7.2,
         status="new",
     )
     ScanLog.create(job_url="https://x.com/5", source="manual")
@@ -116,6 +208,27 @@ async def test_add_job_dedup_existing_job(tmp_db):
         "https://x.com/5", "Stripe", "Eng", "desc", CONFIG, PROFILE, MagicMock()
     )
     assert "already in the database" in result
+    assert "score=7.2" in result
+    assert "verify_job" not in result
+
+
+async def test_add_job_dedup_needs_review_job_does_not_crash_on_none_score(tmp_db):
+    init_db()
+    Job.create(
+        source="manual",
+        company="Stripe",
+        title="Eng",
+        url="https://x.com/5b",
+        score=None,
+        status="needs_review",
+    )
+    ScanLog.create(job_url="https://x.com/5b", source="manual")
+    result = await scan_service.add_job(
+        "https://x.com/5b", "Stripe", "Eng", "desc", CONFIG, PROFILE, MagicMock()
+    )
+    assert "already in the database" in result
+    assert "score=—" in result
+    assert "verify_job" in result
 
 
 async def test_add_job_scanlog_without_job_proceeds_to_eval(tmp_db):
@@ -203,6 +316,130 @@ async def test_add_job_integrity_conflict_on_create(tmp_db):
     assert "URL conflict" in result
 
 
+# ── verify_job ───────────────────────────────────────────────────────
+
+
+async def test_verify_job_not_found_returns_message(tmp_db):
+    init_db()
+    result = await scan_service.verify_job(999, "some page text here", CONFIG, PROFILE, MagicMock())
+    assert "not found" in result.lower()
+
+
+async def test_verify_job_rejects_a_job_not_pending_verification(tmp_db):
+    init_db()
+    job = Job.create(
+        source="manual",
+        company="Acme",
+        title="Eng",
+        url="https://x.com/vj/1",
+        status="new",
+        score=8.0,
+    )
+    result = await scan_service.verify_job(job.id, "text", CONFIG, PROFILE, MagicMock())
+    assert "not pending verification" in result
+    assert "new" in result
+
+
+async def test_verify_job_rejects_a_too_short_paste_and_leaves_job_pending(tmp_db):
+    init_db()
+    job = Job.create(
+        source="inhire",
+        company="Alice",
+        title="Squad Manager",
+        url="https://alice.inhire.app/vagas/9",
+        status="needs_review",
+        score=None,
+    )
+    eval_mock = AsyncMock(return_value=_eval(8.0))
+    with patch("moonlighter.discovery.service.evaluate_job", new=eval_mock):
+        result = await scan_service.verify_job(job.id, "  ", CONFIG, PROFILE, MagicMock())
+    eval_mock.assert_not_called()
+    assert "too short" in result
+    assert "0 chars" in result
+    assert "stays pending" in result
+    assert Job.get_by_id(job.id).status == "needs_review"
+
+
+async def test_verify_job_updates_the_same_row_and_scores_above_threshold(tmp_db):
+    init_db()
+    job = Job.create(
+        source="inhire",
+        company="Alice",
+        title="Squad Manager",
+        url="https://alice.inhire.app/vagas/1",
+        status="needs_review",
+        score=None,
+        score_notes="description unavailable — needs manual verification",
+    )
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(8.0)),
+    ):
+        result = await scan_service.verify_job(
+            job.id, "Full page text with the real job description.", CONFIG, PROFILE, MagicMock()
+        )
+    refreshed = Job.get_by_id(job.id)
+    assert refreshed.status == "new"
+    assert refreshed.score == 8.0
+    assert refreshed.description == "Full page text with the real job description."
+    assert Job.select().where(Job.url == job.url).count() == 1
+    assert "NEW" in result
+    assert "Alice" in result
+
+
+async def test_verify_job_scores_a_row_that_scan_actually_produced(tmp_db):
+    """Crosses the scan -> verify_job seam: builds the needs_review row through the
+    real _run_scan pipeline (Task 1), then scores it through verify_job (Task 3) --
+    proving the two sides agree on the row's shape (e.g. caveats='[]'), not just
+    that each works against a hand-built Job in isolation."""
+    init_db()
+    raw = RawJob(
+        source="greenhouse",
+        company="co",
+        title="Engineer",
+        url="https://x.com/scan/seam",
+        description=None,
+    )
+    await _run_scan([raw])
+    job = Job.get(Job.url == "https://x.com/scan/seam")
+    assert job.status == "needs_review"
+    assert job.caveats == "[]"
+
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(8.0)),
+    ):
+        result = await scan_service.verify_job(
+            job.id, "Full page text with the real job description.", CONFIG, PROFILE, MagicMock()
+        )
+    refreshed = Job.get_by_id(job.id)
+    assert refreshed.status == "new"
+    assert refreshed.description == "Full page text with the real job description."
+    assert "NEW" in result
+
+
+async def test_verify_job_below_threshold_archives(tmp_db):
+    init_db()
+    job = Job.create(
+        source="inhire",
+        company="Infleet",
+        title="Elixir Engineer",
+        url="https://infleet.inhire.app/vagas/1",
+        status="needs_review",
+        score=None,
+    )
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(3.0)),
+    ):
+        result = await scan_service.verify_job(
+            job.id, "Full page text with the real job description.", CONFIG, PROFILE, MagicMock()
+        )
+    refreshed = Job.get_by_id(job.id)
+    assert refreshed.status == "archived"
+    assert "archived" in result
+
+
 # ── scan_and_evaluate edge branches ──────────────────────────────────────────
 
 from moonlighter.discovery.sources.base import RawJob  # noqa: E402
@@ -214,7 +451,7 @@ def _raw(i, title="Engineer", source="greenhouse"):
         company=f"Co{i}",
         title=title,
         url=f"https://x.com/scan/{i}",
-        description="desc",
+        description="A detailed job description that goes on.",
     )
 
 
@@ -264,7 +501,7 @@ async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=No
         patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
         patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
-        patch("moonlighter.discovery.service.browser") as mock_browser,
+        patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch),
         patch("moonlighter.discovery.service.discover_entry_points", return_value=registered),
         patch(
@@ -282,7 +519,7 @@ async def test_run_browser_scanner_browser_launch_failure_is_silent():
     """If browser.new_page() itself raises (no browser configured, launch error),
     the browser-scanner plugin is skipped silently -- same as any other failure,
     it must not block the HTTP results."""
-    with patch("moonlighter.discovery.service.browser") as mock_browser:
+    with patch("moonlighter.core.browser", create=True) as mock_browser:
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
         jobs, warning = await scan_service._run_browser_scanner(
             _FakeBrowserScanner, "engineer", CONFIG
@@ -298,7 +535,7 @@ async def test_scan_linkedin_jobs_are_evaluated(tmp_db):
         company="LinkedInCo",
         title="Engineer",
         url="https://x.com/li/1",
-        description="desc",
+        description="A detailed job description that goes on.",
     )
     result = await _run_scan([], linkedin_jobs=[li_raw])
     assert Job.get(Job.url == "https://x.com/li/1").company == "LinkedInCo"
@@ -313,6 +550,51 @@ async def test_scan_title_filtered_archives_with_score_zero(tmp_db):
     assert job.score == 0.0
     assert "title filtered" in job.score_notes
     assert "filtered by title" in result.lower()
+
+
+async def test_scan_empty_description_skips_llm_and_needs_review(tmp_db):
+    init_db()
+    eval_mock = AsyncMock(return_value=_eval(8.0))
+    raw = RawJob(
+        source="greenhouse",
+        company="co",
+        title="Engineer",
+        url="https://x.com/scan/10",
+        description=None,
+    )
+    result = await _run_scan([raw], eval_mock=eval_mock)
+    job = Job.get(Job.url == "https://x.com/scan/10")
+    assert job.status == "needs_review"
+    assert job.score is None
+    assert job.score_notes == "description unavailable — needs manual verification"
+    eval_mock.assert_not_called()
+    assert "need manual verification" in result
+
+
+async def test_scan_short_description_also_needs_review(tmp_db):
+    init_db()
+    raw = RawJob(
+        source="greenhouse",
+        company="co",
+        title="Squad Manager",
+        url="https://x.com/scan/11",
+        description="too short",
+    )
+    result = await _run_scan([raw])
+    job = Job.get(Job.url == "https://x.com/scan/11")
+    assert job.status == "needs_review"
+    assert "need manual verification" in result
+
+
+async def test_scan_real_description_still_evaluates_normally(tmp_db):
+    init_db()
+    eval_mock = AsyncMock(return_value=_eval(8.0))
+    result = await _run_scan([_raw(12)], eval_mock=eval_mock)
+    job = Job.get(Job.url == "https://x.com/scan/12")
+    assert job.status == "new"
+    assert job.score == 8.0
+    eval_mock.assert_called_once()
+    assert "need manual verification" not in result
 
 
 async def test_scan_registered_scanner_session_expired_adds_warning(tmp_db):
@@ -357,6 +639,22 @@ async def test_scan_title_filtered_integrity_error_skips_silently(tmp_db):
     # tenta Job.create archived, colide → IntegrityError → pulada (return None).
     Job.create(source="x", company="x", title="x", url="https://x.com/scan/6", status="new")
     result = await _run_scan([_raw(6, title="Staff Accountant")])
+    assert "processed" in result or "No new jobs found" in result
+
+
+async def test_scan_needs_review_integrity_error_skips_silently(tmp_db):
+    init_db()
+    # Insufficient description + pre-existing Job (no ScanLog) → the needs_review branch
+    # attempts Job.create needs_review, collides → IntegrityError → skipped (return None).
+    Job.create(source="x", company="x", title="x", url="https://x.com/scan/8", status="new")
+    raw = RawJob(
+        source="greenhouse",
+        company="co",
+        title="Engineer",
+        url="https://x.com/scan/8",
+        description=None,
+    )
+    result = await _run_scan([raw])
     assert "processed" in result or "No new jobs found" in result
 
 
@@ -657,7 +955,7 @@ async def test_collect_raw_jobs_calls_gupy_when_config_enabled():
     with patch("moonlighter.discovery.sources.http.GupyScanner") as MockGupy:
         MockGupy.return_value.scan = AsyncMock(return_value=[gupy_job])
         raw_jobs, _ = await _collect({"scan_gupy": True})
-    MockGupy.return_value.scan.assert_awaited_once_with(keywords="engineer")
+    MockGupy.return_value.scan.assert_awaited_once_with(keywords="engineer", stats=ANY)
     assert raw_jobs == [gupy_job]
 
 
@@ -670,11 +968,13 @@ async def test_collect_raw_jobs_skips_remoteok_by_default():
 
 
 async def test_collect_raw_jobs_calls_remoteok_when_config_enabled():
-    job = RawJob(source="remoteok", company="Acme", title="Eng", url="https://remoteok.com/1")
+    # Title must match the "engineer" keyword _collect() passes through, or the
+    # dispatcher's own keyword filter (added alongside the config gate) drops it.
+    job = RawJob(source="remoteok", company="Acme", title="Engineer", url="https://remoteok.com/1")
     with patch("moonlighter.discovery.sources.http.RemoteOKScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_remoteok": True})
-    MockScanner.return_value.scan.assert_awaited_once_with()
+    MockScanner.return_value.scan.assert_awaited_once_with(stats=ANY)
     assert raw_jobs == [job]
 
 
@@ -687,11 +987,11 @@ async def test_collect_raw_jobs_skips_remotive_by_default():
 
 
 async def test_collect_raw_jobs_calls_remotive_when_config_enabled():
-    job = RawJob(source="remotive", company="Acme", title="Eng", url="https://remotive.com/1")
+    job = RawJob(source="remotive", company="Acme", title="Engineer", url="https://remotive.com/1")
     with patch("moonlighter.discovery.sources.http.RemotiveScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_remotive": True})
-    MockScanner.return_value.scan.assert_awaited_once_with()
+    MockScanner.return_value.scan.assert_awaited_once_with(stats=ANY)
     assert raw_jobs == [job]
 
 
@@ -705,12 +1005,15 @@ async def test_collect_raw_jobs_skips_wwr_by_default():
 
 async def test_collect_raw_jobs_calls_wwr_when_config_enabled():
     job = RawJob(
-        source="weworkremotely", company="Acme", title="Eng", url="https://weworkremotely.com/1"
+        source="weworkremotely",
+        company="Acme",
+        title="Engineer",
+        url="https://weworkremotely.com/1",
     )
     with patch("moonlighter.discovery.sources.http.WeWorkRemotelyScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_wwr": True})
-    MockScanner.return_value.scan.assert_awaited_once_with()
+    MockScanner.return_value.scan.assert_awaited_once_with(stats=ANY)
     assert raw_jobs == [job]
 
 
@@ -726,11 +1029,199 @@ async def test_collect_raw_jobs_calls_hn_whoishiring_when_config_enabled():
     job = RawJob(
         source="hn_whoishiring",
         company="Acme",
-        title="Eng",
+        title="Engineer",
         url="https://news.ycombinator.com/item?id=1",
     )
     with patch("moonlighter.discovery.sources.http.HNWhoIsHiringScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_hn_whoishiring": True})
-    MockScanner.return_value.scan.assert_awaited_once_with()
+    MockScanner.return_value.scan.assert_awaited_once_with(stats=ANY)
     assert raw_jobs == [job]
+
+
+# ── Portal keyword filter ─────────────────────────────────────────────────
+
+
+def test_matches_keywords_any_term_case_insensitive():
+    assert _matches_keywords("Senior Backend Engineer", "backend, sre")
+    assert not _matches_keywords("Account Executive", "backend, sre")
+    assert _matches_keywords("Anything", "")  # no keywords = no filter
+
+
+async def test_portal_feed_is_filtered_by_keywords():
+    jobs = [
+        RawJob(source="remoteok", company="a", title="Backend Engineer", url="https://r.ok/1"),
+        RawJob(source="remoteok", company="b", title="Marketing Lead", url="https://r.ok/2"),
+    ]
+    with patch(
+        "moonlighter.discovery.sources.http.RemoteOKScanner.scan",
+        new=AsyncMock(return_value=jobs),
+    ):
+        got = await _scan_remoteok({"scan_remoteok": True}, {}, "backend")
+    assert [j.title for j in got] == ["Backend Engineer"]
+
+
+# ── Per-source warnings + dead-API canary ────────────────────────────────────
+
+from moonlighter.discovery.service import (  # noqa: E402
+    _collect_raw_jobs,
+    _drop_already_seen,
+    _matches_keywords,
+    _scan_remoteok,
+    _stats_warnings,
+)
+from moonlighter.discovery.sources.base import ScanStats, SourceStats  # noqa: E402
+
+
+def _mock_client_cls(mock_client):
+    cls = MagicMock()
+    cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+    cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    return cls
+
+
+def test_stats_warnings_flags_errors_and_empty_sources():
+    stats: ScanStats = {
+        "greenhouse": SourceStats(companies=3, jobs=17, errors=0),  # healthy → silent
+        "ashby": SourceStats(companies=39, jobs=0, errors=39),  # broken → loud
+        "workable": SourceStats(companies=12, jobs=0, errors=0),  # empty → loud
+        "remoteok": SourceStats(companies=0, jobs=0, errors=1),  # portal error → loud
+    }
+    lines = _stats_warnings(stats)
+    assert lines == [
+        "⚠️  ashby: 0 jobs from 39 companies (39 fetch errors)",
+        "⚠️  remoteok: 0 jobs (1 fetch error)",
+        "⚠️  workable: 0 jobs from 12 companies",
+    ]
+
+
+def test_stats_warnings_singularizes_one_company_and_one_error():
+    """MINOR regression: 'from 1 companies' / '1 fetch errors' read as broken
+    grammar -- singular counts must use the singular noun."""
+    stats: ScanStats = {
+        "greenhouse": SourceStats(companies=1, jobs=0, errors=1),
+    }
+    lines = _stats_warnings(stats)
+    assert lines == ["⚠️  greenhouse: 0 jobs from 1 company (1 fetch error)"]
+
+
+async def test_dead_api_reaches_the_scan_report():
+    """CANARY: the exact dead-Ashby shape (HTTP 200, error payload, no jobs key)
+    must surface in the user-visible report — this is the detector biting on the
+    failure that actually happened, silently, for weeks."""
+    dead = MagicMock(status_code=200)
+    dead.json.return_value = {"errors": [{"message": "Cannot query field"}]}
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=dead)
+    with (
+        patch("httpx.AsyncClient", _mock_client_cls(mock_client)),
+        patch("moonlighter.discovery.service.discover_entry_points", return_value=[]),
+    ):
+        raw_jobs, warning = await _collect_raw_jobs("", {}, {"ashby": ["linear", "posthog"]})
+    assert raw_jobs == []
+    assert warning is not None
+    assert "ashby: 0 jobs from 2 companies" in warning
+
+
+async def test_unknown_company_list_source_warns():
+    with patch("httpx.AsyncClient", _mock_client_cls(AsyncMock())):
+        _, warning = await _collect_raw_jobs("", {}, {"workday": ["acme"]})
+    assert warning is not None
+    assert "unknown source 'workday'" in warning
+
+
+def test_drop_already_seen_matches_across_apply_suffix(tmp_db):
+    init_db()
+    ScanLog.create(job_url="https://x.recruitee.com/o/dev/c/new", source="recruitee")
+    raw = RawJob(source="recruitee", company="x", title="Dev", url="https://x.recruitee.com/o/dev")
+    assert _drop_already_seen([raw]) == []
+
+
+# ── scan_company ─────────────────────────────────────────────────────────────
+
+from moonlighter.discovery.service import scan_company  # noqa: E402
+
+_fake_caller = MagicMock()
+
+
+async def test_scan_company_rejects_unknown_source():
+    report = await scan_company("workday", "acme", {"score_threshold": 6.5}, {}, _fake_caller)
+    assert "Unknown source 'workday'" in report
+    assert "greenhouse" in report  # names the valid ones
+
+
+async def test_scan_company_scans_evaluates_and_reports(tmp_db):
+    init_db()
+    with (
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch(
+            "moonlighter.discovery.service._evaluate_and_store",
+            new=AsyncMock(return_value=([], False)),
+        ) as ev,
+    ):
+        MockGH.return_value.scan = AsyncMock(return_value=[_raw(1, source="greenhouse")])
+        report = await scan_company(
+            "greenhouse", "stripe", {"score_threshold": 6.5}, {}, _fake_caller
+        )
+    assert ev.await_count == 1
+    assert "company_list.yaml" in report  # the recurring-scan tip
+
+
+async def test_scan_company_no_new_jobs_skips_evaluation(tmp_db):
+    init_db()
+    ScanLog.create(job_url="https://x.com/scan/1", source="greenhouse")
+    with (
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.service._evaluate_and_store", new=AsyncMock()) as ev,
+    ):
+        MockGH.return_value.scan = AsyncMock(return_value=[_raw(1, source="greenhouse")])
+        report = await scan_company(
+            "greenhouse", "stripe", {"score_threshold": 6.5}, {}, _fake_caller
+        )
+    ev.assert_not_called()
+    assert "No new jobs at 'stripe'" in report
+    assert "company_list.yaml" in report
+
+
+async def test_scan_company_zero_raw_jobs_does_not_claim_all_already_known(tmp_db):
+    """MINOR regression: an empty raw_jobs list can mean either 'company has no
+    open postings' or 'the fetch failed' -- the old '(0 found, all already
+    known)' message asserted the fetch succeeded and simply found nothing,
+    which is false when it errored."""
+    init_db()
+    with (
+        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch("moonlighter.discovery.service._evaluate_and_store", new=AsyncMock()) as ev,
+    ):
+        MockGH.return_value.scan = AsyncMock(return_value=[])
+        report = await scan_company(
+            "greenhouse", "stripe", {"score_threshold": 6.5}, {}, _fake_caller
+        )
+    ev.assert_not_called()
+    assert "No open jobs found at 'stripe'" in report
+    assert "all already known" not in report
+    assert "company_list.yaml" in report
+
+
+async def test_aged_portal_jobs_archive_as_aged_not_closed(tmp_db):
+    import datetime
+
+    from moonlighter.discovery.archive import _format_archive_result
+
+    init_db()
+    old = Job.create(
+        source="remoteok",
+        company="acme",
+        title="Eng",
+        url="https://remoteok.com/j/1",
+        status="new",
+        found_at=datetime.datetime.now() - datetime.timedelta(days=45),
+    )
+    result = await archive_stale_jobs(None, None, {"portal_max_age_days": 30})
+
+    refreshed = Job.get_by_id(old.id)
+    assert refreshed.status == "archived"  # aged out, NOT closed-at-source
+    assert refreshed.closed_at is None
+    assert result.aged == [{"company": "acme", "title": "Eng", "url": "https://remoteok.com/j/1"}]
+    text = _format_archive_result(result)
+    assert "archived by age" in text and "30" in text

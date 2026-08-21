@@ -7,11 +7,11 @@ config/profile/caller. The logic lives here, testable in isolation.
 import asyncio
 import json
 import re
+from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
 import httpx
-from moonlighter.core import browser
 from moonlighter.core.config import load_company_list
 from moonlighter.core.db import Job, ScanLog
 from moonlighter.core.llm import LLMCaller, is_spend_limit
@@ -26,8 +26,10 @@ from moonlighter.discovery.evaluator import (
     evaluate_jobs_batch,
     should_skip_by_title,
 )
-from moonlighter.discovery.sources.base import RawJob
+from moonlighter.discovery.posting import fetch_posting_via_ats
+from moonlighter.discovery.sources.base import RawJob, ScanStats
 from moonlighter.discovery.sources.registry import build_http_scanners
+from moonlighter.discovery.urls import normalize_job_url
 from moonlighter.views import render_jobs_table
 from peewee import IntegrityError
 
@@ -41,6 +43,14 @@ class _StopScan:
 def _model_for(config: dict[str, Any]) -> str:
     model: str = config.get("eval_model", config.get("llm_model", "claude-haiku-4-5-20251001"))
     return model
+
+
+def _is_description_insufficient(description: str | None) -> bool:
+    """True when there isn't enough text to evaluate honestly — the scanner
+    couldn't fetch a real description (e.g. InHire has no per-job detail
+    endpoint, verified 2026-08-18). These jobs skip the LLM and wait for a
+    human to paste the real page instead of scoring a guess."""
+    return not description or len(description.strip()) < 30
 
 
 def _claim(raw: RawJob) -> bool:
@@ -114,6 +124,8 @@ async def _run_browser_scanner(
     from moonlighter.discovery.sources.base import ScannerSessionExpiredError
 
     try:
+        from moonlighter.core import browser
+
         page = await browser.new_page(config)
     except Exception:
         return [], None
@@ -134,30 +146,41 @@ async def _collect_raw_jobs(
 ) -> tuple[list[RawJob], str | None]:
     """Collects jobs from the HTTP sources and every registered browser-scanner
     plugin (e.g. LinkedIn, if installed). Returns the raw jobs and any warnings
-    from the browser scanners, joined into one string."""
+    -- from the browser scanners plus one line per HTTP/portal source that
+    errored or came back empty -- joined into one string."""
     scanners = build_http_scanners()
+
+    warnings: list[str] = []
+    for unknown in sorted(set(companies) - set(scanners)):
+        warnings.append(
+            f"⚠️  company_list.yaml: unknown source {unknown!r} — no scanner with that name, "
+            "entries ignored"
+        )
+
+    stats: ScanStats = {}
     raw_jobs: list[RawJob] = []
     for source, scanner in scanners.items():
         slugs = companies.get(source, [])
         if slugs:
-            raw_jobs.extend(await scanner.scan(slugs))
+            raw_jobs.extend(await scanner.scan(slugs, stats=stats))
 
-    warnings: list[str] = []
     for scanner_cls in discover_entry_points("moonlighter.scanners"):
         jobs, warning = await _run_browser_scanner(scanner_cls, keywords, config)
         raw_jobs.extend(jobs)
         if warning:
             warnings.append(warning)
 
-    raw_jobs.extend(await _scan_gupy(keywords, config))
-    raw_jobs.extend(await _scan_remoteok(config))
-    raw_jobs.extend(await _scan_remotive(config))
-    raw_jobs.extend(await _scan_wwr(config))
-    raw_jobs.extend(await _scan_hn_whoishiring(config))
+    raw_jobs.extend(await _scan_gupy(keywords, config, stats))
+    raw_jobs.extend(await _scan_remoteok(config, stats, keywords))
+    raw_jobs.extend(await _scan_remotive(config, stats, keywords))
+    raw_jobs.extend(await _scan_wwr(config, stats, keywords))
+    raw_jobs.extend(await _scan_hn_whoishiring(config, stats, keywords))
+    warnings.extend(_stats_warnings(stats))
+    raw_jobs = [replace(j, url=normalize_job_url(j.url)) for j in raw_jobs]
     return raw_jobs, ("\n".join(warnings) or None)
 
 
-async def _scan_gupy(keywords: str, config: dict[str, Any]) -> list[RawJob]:
+async def _scan_gupy(keywords: str, config: dict[str, Any], stats: ScanStats) -> list[RawJob]:
     """Gupy is a portal-wide keyword feed (all companies hosted on Gupy, not a
     per-company board), so it's dispatched here like LinkedIn rather than through
     the SOURCES registry -- and gated hard behind a config flag (default off)
@@ -166,55 +189,77 @@ async def _scan_gupy(keywords: str, config: dict[str, Any]) -> list[RawJob]:
         return []
     from moonlighter.discovery.sources.http import GupyScanner
 
-    return await GupyScanner().scan(keywords=keywords or "software engineer")
+    return await GupyScanner().scan(keywords=keywords or "software engineer", stats=stats)
 
 
-async def _scan_remoteok(config: dict[str, Any]) -> list[RawJob]:
+def _matches_keywords(title: str, keywords: str) -> bool:
+    """Comma-separated terms; a title matches when ANY term is a
+    case-insensitive substring. No keywords = everything matches."""
+    terms = [t.strip().lower() for t in keywords.split(",") if t.strip()]
+    if not terms:
+        return True
+    lowered = title.lower()
+    return any(term in lowered for term in terms)
+
+
+async def _scan_remoteok(config: dict[str, Any], stats: ScanStats, keywords: str) -> list[RawJob]:
     """RemoteOK is a portal-wide remote-jobs board, dispatched like Gupy --
     config-gated (off by default) to avoid flooding scans without the
-    operator opting in."""
+    operator opting in. The feed has no server-side query, so it is filtered
+    by title keywords here before any LLM evaluation."""
     if not config.get("scan_remoteok"):
         return []
     from moonlighter.discovery.sources.http import RemoteOKScanner
 
-    return await RemoteOKScanner().scan()
+    jobs = await RemoteOKScanner().scan(stats=stats)
+    return [j for j in jobs if _matches_keywords(j.title, keywords)]
 
 
-async def _scan_remotive(config: dict[str, Any]) -> list[RawJob]:
+async def _scan_remotive(config: dict[str, Any], stats: ScanStats, keywords: str) -> list[RawJob]:
     """Remotive is a portal-wide remote-jobs board, dispatched like Gupy --
     config-gated (off by default). ToS caps usage at 4 requests/day -- no
-    rate-limiter here, the operator is responsible for scan frequency."""
+    rate-limiter here, the operator is responsible for scan frequency. The
+    feed has no server-side query, so it is filtered by title keywords here
+    before any LLM evaluation."""
     if not config.get("scan_remotive"):
         return []
     from moonlighter.discovery.sources.http import RemotiveScanner
 
-    return await RemotiveScanner().scan()
+    jobs = await RemotiveScanner().scan(stats=stats)
+    return [j for j in jobs if _matches_keywords(j.title, keywords)]
 
 
-async def _scan_wwr(config: dict[str, Any]) -> list[RawJob]:
+async def _scan_wwr(config: dict[str, Any], stats: ScanStats, keywords: str) -> list[RawJob]:
     """WeWorkRemotely is a portal-wide RSS feed, dispatched like Gupy --
-    config-gated (off by default)."""
+    config-gated (off by default). The feed has no server-side query, so it
+    is filtered by title keywords here before any LLM evaluation."""
     if not config.get("scan_wwr"):
         return []
     from moonlighter.discovery.sources.http import WeWorkRemotelyScanner
 
-    return await WeWorkRemotelyScanner().scan()
+    jobs = await WeWorkRemotelyScanner().scan(stats=stats)
+    return [j for j in jobs if _matches_keywords(j.title, keywords)]
 
 
-async def _scan_hn_whoishiring(config: dict[str, Any]) -> list[RawJob]:
+async def _scan_hn_whoishiring(
+    config: dict[str, Any], stats: ScanStats, keywords: str
+) -> list[RawJob]:
     """HN's monthly Who is hiring? thread, dispatched like Gupy -- config-gated
     (off by default). Weakest signal of the 4 new boards (free-text comments,
-    not structured fields) -- see HNWhoIsHiringScanner's docstring."""
+    not structured fields) -- see HNWhoIsHiringScanner's docstring. The feed
+    has no server-side query, so it is filtered by title keywords here before
+    any LLM evaluation."""
     if not config.get("scan_hn_whoishiring"):
         return []
     from moonlighter.discovery.sources.http import HNWhoIsHiringScanner
 
-    return await HNWhoIsHiringScanner().scan()
+    jobs = await HNWhoIsHiringScanner().scan(stats=stats)
+    return [j for j in jobs if _matches_keywords(j.title, keywords)]
 
 
 def _drop_already_seen(raw_jobs: list[RawJob]) -> list[RawJob]:
-    seen = {row.job_url for row in ScanLog.select(ScanLog.job_url)}
-    return [j for j in raw_jobs if j.url not in seen]
+    seen = {normalize_job_url(row.job_url) for row in ScanLog.select(ScanLog.job_url)}
+    return [j for j in raw_jobs if normalize_job_url(j.url) not in seen]
 
 
 async def _evaluate_and_store(
@@ -253,6 +298,16 @@ async def _evaluate_and_store(
                     )
                     if job is not None:
                         results.append(job)
+                elif _is_description_insufficient(raw.description):
+                    job = _persist(
+                        raw,
+                        score=None,
+                        score_notes="description unavailable — needs manual verification",
+                        caveats="[]",
+                        status="needs_review",
+                    )
+                    if job is not None:
+                        results.append(job)
                 else:
                     to_eval.append(raw)
 
@@ -277,7 +332,7 @@ async def _evaluate_and_store(
                     stop.set()
                     results.append(_StopScan())
                     return results
-                logger.error("scan: unexpected error in batch — %s", e)
+                logger.error("scan: unexpected error in batch — %s", e, exc_info=True)
                 # Returns results (title-filtered jobs already persisted in this chunk)
                 # instead of propagating — the raw exception would make gather() discard
                 # the whole chunk from the report, undercounting jobs already saved in the DB.
@@ -321,6 +376,27 @@ async def _evaluate_and_store(
     return saved, spend_hit
 
 
+def _stats_warnings(stats: ScanStats) -> list[str]:
+    """One report line per source that errored or came back empty. Zero-from-N
+    with no errors still earns a line: it is exactly the shape the dead Ashby
+    GraphQL API produced for weeks (HTTP 200, error payload, zero jobs). A
+    healthy source adds nothing."""
+    lines: list[str] = []
+    for source, s in sorted(stats.items()):
+        if s.errors == 0 and s.jobs > 0:
+            continue
+        scope = ""
+        if s.companies:
+            company_word = "company" if s.companies == 1 else "companies"
+            scope = f" from {s.companies} {company_word}"
+        errs = ""
+        if s.errors:
+            error_word = "error" if s.errors == 1 else "errors"
+            errs = f" ({s.errors} fetch {error_word})"
+        lines.append(f"⚠️  {source}: {s.jobs} jobs{scope}{errs}")
+    return lines
+
+
 def _with_warning(message: str, warning: str | None) -> str:
     return f"{message}\n\n{warning}" if warning else message
 
@@ -330,17 +406,25 @@ def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
     title_filtered = sum(
         1 for j in saved if j.score_notes and j.score_notes.startswith("title filtered:")
     )
-    below = len(saved) - len(above) - title_filtered
+    needs_verification = sum(1 for j in saved if j.status == "needs_review")
+    below = len(saved) - len(above) - title_filtered - needs_verification
     spend_note = (
         "\n\n⚠️  Spend limit reached — scan stopped (remaining jobs are left for the next scan)."
         if spend_hit
+        else ""
+    )
+    verify_note = (
+        f"\n\n⚠️  {needs_verification} job(s) need manual verification — "
+        f"list_jobs(status='needs_review') to see them, verify_job(job_id, page_text) to score one."
+        if needs_verification
         else ""
     )
 
     if not above:
         return (
             f"{len(saved)} jobs processed. None passed the threshold of {threshold}. "
-            f"({title_filtered} filtered by title, {below} below score){spend_note}"
+            f"({title_filtered} filtered by title, {below} below score)"
+            f"{spend_note}{verify_note}"
         )
 
     table = render_jobs_table(above)
@@ -349,7 +433,8 @@ def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
         f"{below} below threshold  |  {title_filtered} filtered by title"
     )
     return (
-        f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}{spend_note}"
+        f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}"
+        f"{spend_note}{verify_note}"
     )
 
 
@@ -372,6 +457,43 @@ async def scan_and_evaluate(
     return _with_warning(report, li_warning)
 
 
+async def scan_company(
+    source: str, company: str, config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
+) -> str:
+    """Scan every open posting at ONE company right now, without touching
+    company_list.yaml. `company` is an ATS slug, or (Recruitee) a custom
+    career domain."""
+    scanners = build_http_scanners()
+    if source not in scanners:
+        return (
+            f"Unknown source {source!r}. Valid sources: {', '.join(sorted(scanners))}. "
+            "Portal boards (gupy, remoteok, remotive, weworkremotely, hn_whoishiring) "
+            "are enabled via config flags and scanned by scan_and_evaluate."
+        )
+    stats: ScanStats = {}
+    raw_jobs = await scanners[source].scan([company], stats=stats)
+    raw_jobs = [replace(j, url=normalize_job_url(j.url)) for j in raw_jobs]
+    new_jobs = _drop_already_seen(raw_jobs)
+
+    if new_jobs:
+        saved, spend_hit = await _evaluate_and_store(new_jobs, config, profile, caller)
+        report = _format_report(saved, spend_hit, config["score_threshold"])
+    elif raw_jobs:
+        report = f"No new jobs at {company!r} ({len(raw_jobs)} found, all already known)."
+    else:
+        # An empty raw_jobs can mean the company genuinely has zero open
+        # postings OR the fetch itself failed -- "0 found, all already known"
+        # would lie in the second case. _stats_warnings (appended below via
+        # _with_warning) carries the fetch-error detail when there is one.
+        report = f"No open jobs found at {company!r} (see warnings below if the fetch failed)."
+
+    report += (
+        f"\n\nTip: add {company!r} under '{source}:' in company_list.yaml "
+        "to include it in recurring scans."
+    )
+    return _with_warning(report, "\n".join(_stats_warnings(stats)) or None)
+
+
 async def add_job(
     url: str,
     company: str,
@@ -381,6 +503,13 @@ async def add_job(
     profile: dict[str, Any],
     caller: LLMCaller,
 ) -> str:
+    url = normalize_job_url(url)
+    if not description or not company or not title:
+        posting = await fetch_posting_via_ats(url)
+        if posting is not None:
+            company = company or posting.company or ""
+            title = title or posting.title or ""
+            description = description or posting.description or ""
     if not description:
         fetched, error = await _fetch_description(url)
         if error:
@@ -436,6 +565,51 @@ async def add_job(
     return _format_add_result(job, company, title, result, threshold, status)
 
 
+async def verify_job(
+    job_id: int,
+    page_text: str,
+    config: dict[str, Any],
+    profile: dict[str, Any],
+    caller: LLMCaller,
+) -> str:
+    """Re-scores a job flagged needs_review (empty description) using text
+    pasted from its real page. Updates the same row in place."""
+    try:
+        job = Job.get_by_id(job_id)
+    except Job.DoesNotExist:
+        return f"Job #{job_id} not found."
+    if job.status != "needs_review":
+        return f"Job #{job_id} is not pending verification (status: {job.status!r})."
+
+    if _is_description_insufficient(page_text):
+        return (
+            f"That paste is too short to score ({len(page_text.strip())} chars — need at least "
+            f"30). Job #{job_id} stays pending — open {job.url} and copy the whole page."
+        )
+
+    threshold = config["score_threshold"]
+    result = await evaluate_job(
+        company=job.company,
+        title=job.title,
+        description=page_text,
+        profile=profile,
+        model=_model_for(config),
+        _caller=caller,
+    )
+    status = "new" if result.score >= threshold else "archived"
+    job.description = page_text
+    job.score = result.score
+    job.score_notes = result.score_notes
+    job.caveats = json.dumps(result.caveats)
+    job.salary_min = result.salary_min
+    job.salary_max = result.salary_max
+    job.salary_currency = result.salary_currency
+    job.salary_source = result.salary_source
+    job.status = status
+    job.save()
+    return _format_add_result(job, job.company, job.title, result, threshold, status)
+
+
 async def _fetch_description(url: str) -> tuple[str | None, str | None]:
     """Fetches and cleans (strips HTML from) the job description. Returns (description,
     error) — only one of the two is non-null. Doesn't work on pages that require login."""
@@ -446,7 +620,11 @@ async def _fetch_description(url: str) -> tuple[str | None, str | None]:
             return None, (
                 f"Could not fetch the URL (HTTP {r.status_code}). Provide 'description' manually."
             )
-        text = re.sub(r"<[^>]+>", " ", r.text).strip()
+        # Remove script/style/noscript WITH their contents first: a bare
+        # tag-strip leaves e.g. a styled-components CSS bundle as the
+        # "description" of any SPA page (job #2646, the Ziflow case).
+        text = re.sub(r"(?is)<(script|style|noscript)\b[^>]*>.*?</\1\s*>", " ", r.text)
+        text = re.sub(r"<[^>]+>", " ", text).strip()
         return re.sub(r"\s+", " ", text)[:8000], None
     except Exception as e:
         return None, (
@@ -464,7 +642,15 @@ def _existing_job_message(url: str) -> str | None:
         job = Job.get(Job.url == url)
     except Job.DoesNotExist:
         return None
-    return f"Job already in the database (id={job.id}, score={job.score:.1f}, status={job.status})."
+    score_str = f"{job.score:.1f}" if job.score is not None else "—"
+    hint = (
+        " Use verify_job(job_id, page_text) to score it from the real page."
+        if job.status == "needs_review"
+        else ""
+    )
+    return (
+        f"Job already in the database (id={job.id}, score={score_str}, status={job.status}).{hint}"
+    )
 
 
 def _persist_manual(

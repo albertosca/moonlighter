@@ -96,7 +96,7 @@ def test_validate_startup_default_cv_path_resolves_under_moonlighter_home(monkey
 
 def test_validate_startup_honours_a_configured_cv_default(tmp_path):
     """A user who points cv.default somewhere else must not be told their CV is
-    missing -- confirm_apply resolves through config, so the warning must too."""
+    missing -- the composer resolves the CV through config, so the warning must too."""
     cv = tmp_path / "resumes" / "senior.pdf"
     cv.parent.mkdir()
     cv.touch()

@@ -58,7 +58,7 @@ def _check_llm_backend(config: dict[str, Any]) -> StartupWarning | None:
         return StartupWarning(
             "error",
             "llm_backend is 'api' but ANTHROPIC_API_KEY is not in the environment. "
-            "scan_and_evaluate and apply_jobs will not work. Set the key, or switch to "
+            "scan_and_evaluate and prepare_application will not work. Set the key, or switch to "
             "llm_backend: cli in config.yaml to use your Claude subscription instead.",
         )
     if shutil.which("claude") is not None:
@@ -66,30 +66,33 @@ def _check_llm_backend(config: dict[str, Any]) -> StartupWarning | None:
     return StartupWarning(
         "error",
         "llm_backend is 'cli' but the `claude` CLI was not found on PATH. "
-        "scan_and_evaluate and apply_jobs will not work. Install Claude Code, or switch to "
+        "scan_and_evaluate and prepare_application will not work. Install Claude Code, or switch to "
         "llm_backend: api in config.yaml and set ANTHROPIC_API_KEY.",
     )
 
 
 def _check_cv(cv_path: str) -> StartupWarning | None:
-    """Missing CV → confirm_apply will fail."""
+    """Missing CV → prepare_application can't name a file to attach for the form's
+    upload question."""
     if Path(cv_path).exists():
         return None
     return StartupWarning(
         "warn",
-        f"CV file not found at {cv_path}. confirm_apply will fail. "
-        "Add your resume there, or set cv.default in config.yaml to a different path.",
+        f"CV file not found at {cv_path}. prepare_application won't be able to point you "
+        "at a file to upload. Add your resume there, or set cv.default in config.yaml to "
+        "a different path.",
     )
 
 
 def _check_browser(config: dict[str, Any]) -> StartupWarning | None:
-    """Missing browser → LinkedIn scan and browser-based applications don't work."""
+    """Missing browser → a browser-based scan extension (e.g. LinkedIn), if installed,
+    won't work. moonlighter itself never opens a browser (see DISCLAIMER.md)."""
     browser_path = browser_executable(config)
     if not browser_path or Path(browser_path).exists():
         return None
     return StartupWarning(
         "warn",
         f"Browser not found at {browser_path}. "
-        "LinkedIn scan and browser-based applications will not work. "
+        "A browser-based scan extension, if installed, will not work. "
         "Install the browser (Chrome/Chromium/Brave) or set browser_path in config.yaml.",
     )

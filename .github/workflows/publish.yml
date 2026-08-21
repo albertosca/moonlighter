@@ -3,42 +3,43 @@ name: Publish
 # One-time setup required before the first tag push:
 #
 # 1. PyPI trusted publishing must be configured per package, BEFORE the package
-#    exists on PyPI. For each of the five names -- moonlighter-core,
-#    moonlighter-scan, moonlighter-apply, moonlighter-email, moonlighter --
-#    create a "pending publisher" at https://pypi.org/manage/account/publishing/
-#    with owner `albertosca`, repository `moonlighter`, workflow `publish.yml`,
-#    and environment `pypi`. Without this, the first run fails with an OIDC
+#    exists on PyPI. A pending publisher is unique on (owner, repository,
+#    workflow, environment) -- registering the same tuple for two project names
+#    fails (pypi/warehouse#16920), which is why each package gets its own
+#    environment. For each row of the publish matrix below, create a "pending
+#    publisher" at https://pypi.org/manage/account/publishing/ with owner
+#    `albertosca`, repository `moonlighter`, workflow `publish.yml`, and that
+#    row's environment name. Without this, the first run fails with an OIDC
 #    error that does not name the missing configuration.
 #
 # 2. All five packages are versioned in lockstep, and moonlighter pins its
 #    four siblings with `==`. A release therefore requires bumping the version in
 #    all five pyproject.toml files AND the four pins in packages/full, together
-#    with the tag. The two verification steps below enforce that and stop the
-#    run before anything is uploaded -- a mismatch would otherwise produce a
-#    package that uploads cleanly and cannot resolve at install time.
+#    with the tag. The verify job enforces that and stops the run before
+#    anything is uploaded -- a mismatch would otherwise produce a package that
+#    uploads cleanly and cannot resolve at install time.
 #
 # Note: PyPI validates dependency *format*, not *existence*, so publishing all
 # five in one run is safe even though moonlighter pins siblings that upload
 # moments later. There is a brief window during upload where an install could
-# fail to resolve.
+# fail to resolve. If a single package's upload fails transiently, re-run only
+# that failed job: re-running a succeeded one would hit PyPI's
+# "file already exists" rejection.
 
 on:
   push:
     tags: ['v*']
 
 jobs:
-  publish:
+  verify:
     runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write        # PyPI trusted publishing -- no API token stored
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: '3.14'
 
-      # Both checks run before the build: PyPI uploads are irreversible, and a
+      # Both checks run before any build: PyPI uploads are irreversible, and a
       # version that is wrong is only discovered by the user who tries to
       # install it.
       - name: Verify versions and sibling pins agree across the workspace
@@ -53,8 +54,40 @@ jobs:
             exit 1
           fi
 
-      - name: Build all packages
-        run: uv build --all-packages
+  publish:
+    needs: verify
+    strategy:
+      # One package failing transiently must not cancel siblings mid-upload;
+      # the fix for a partial publish is re-running the failed jobs only.
+      fail-fast: false
+      matrix:
+        include:
+          - package: moonlighter
+            environment: pypi
+          - package: moonlighter-core
+            environment: pypi-core
+          - package: moonlighter-scan
+            environment: pypi-scan
+          - package: moonlighter-apply
+            environment: pypi-apply
+          - package: moonlighter-email
+            environment: pypi-email
+    runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}
+    permissions:
+      id-token: write        # PyPI trusted publishing -- no API token stored
+      # An explicit permissions block REPLACES the default set, dropping the
+      # implicit contents:read -- without this line, checkout of the private
+      # repo fails with "Repository not found" (hit live on the v0.1.0 run).
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.14'
 
-      - name: Publish to PyPI
+      - name: Build ${{ matrix.package }}
+        run: uv build --package ${{ matrix.package }}
+
+      - name: Publish ${{ matrix.package }} to PyPI
         run: uv publish

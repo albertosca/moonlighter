@@ -5,11 +5,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from moonlighter.discovery.sources.base import ScanStats, SourceStats
 from moonlighter.discovery.sources.http import (
     AshbyScanner,
+    FetchError,
     GreenhouseScanner,
     GupyScanner,
     HNWhoIsHiringScanner,
+    InHireScanner,
     LeverScanner,
     RecruiteeScanner,
     RemoteOKScanner,
@@ -17,6 +20,7 @@ from moonlighter.discovery.sources.http import (
     SmartRecruitersScanner,
     WeWorkRemotelyScanner,
     WorkableScanner,
+    _get_json,
 )
 
 GREENHOUSE_RESPONSE = {
@@ -729,6 +733,32 @@ async def test_recruitee_missing_offers_key_returns_empty():
     assert jobs == []
 
 
+async def test_recruitee_custom_domain_entry():
+    """An entry containing a dot is a custom career domain. Live-verified
+    2026-08-12: careers.tellent.com and jobs.channable.com serve the same
+    /api/offers/ payload as {slug}.recruitee.com."""
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = RECRUITEE_RESPONSE
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        jobs = await RecruiteeScanner().scan(["jobs.channable.com"])
+    assert len(jobs) > 0
+    called_url = mock_client.get.call_args.args[0]
+    assert called_url == "https://jobs.channable.com/api/offers/"
+    assert jobs[0].company == "jobs.channable.com"
+
+
+async def test_recruitee_slug_entry_unchanged():
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = RECRUITEE_RESPONSE
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        await RecruiteeScanner().scan(["acme"])
+    assert mock_client.get.call_args.args[0] == "https://acme.recruitee.com/api/offers/"
+
+
 # --- SmartRecruitersScanner tests ---
 
 _SR_LIST_P1 = {
@@ -758,6 +788,11 @@ _SR_LIST_P2 = {
     ],
 }
 _SR_DETAIL = {"jobAd": {"sections": {"jobDescription": {"text": "<p>Own the pipeline</p>"}}}}
+# _SR_LIST_P1 reports totalFound=2 with only 1 item on this page, so _list keeps
+# paginating; the detail-failure tests below only care about page 1, so they close
+# pagination with this empty second page rather than hand-waving it away like the
+# old blanket try/except did.
+_SR_LIST_EMPTY_P2 = {"offset": 1, "limit": 1, "totalFound": 2, "content": []}
 
 
 def _sr_response(payload, status_code=200):
@@ -948,6 +983,8 @@ async def test_smartrecruiters_detail_500_yields_none_description():
     async def fake_get(url, headers=None):
         if "postings?limit=100&offset=0" in url:
             return _sr_response(_SR_LIST_P1)
+        if "postings?limit=100&offset=1" in url:
+            return _sr_response(_SR_LIST_EMPTY_P2)
         if "postings/744000000000001" in url:
             return _sr_response({}, status_code=500)
         raise AssertionError(f"unexpected URL requested: {url}")
@@ -966,6 +1003,8 @@ async def test_smartrecruiters_detail_network_exception_yields_none_description(
     async def fake_get(url, headers=None):
         if "postings?limit=100&offset=0" in url:
             return _sr_response(_SR_LIST_P1)
+        if "postings?limit=100&offset=1" in url:
+            return _sr_response(_SR_LIST_EMPTY_P2)
         if "postings/744000000000001" in url:
             raise httpx.ConnectError("timeout")
         raise AssertionError(f"unexpected URL requested: {url}")
@@ -987,6 +1026,8 @@ async def test_smartrecruiters_detail_non_dict_response_yields_none_description(
     async def fake_get(url, headers=None):
         if "postings?limit=100&offset=0" in url:
             return _sr_response(_SR_LIST_P1)
+        if "postings?limit=100&offset=1" in url:
+            return _sr_response(_SR_LIST_EMPTY_P2)
         if "postings/744000000000001" in url:
             return _sr_response([{"jobAd": {}}])
         raise AssertionError(f"unexpected URL requested: {url}")
@@ -2131,3 +2172,324 @@ async def test_ashby_null_jobs_returns_empty():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
+
+
+async def test_ashby_non_dict_response_returns_empty():
+    mock_client = _make_mock_client([{"title": "Eng"}])
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs == []
+
+
+# --- _get_json + per-source stats counting ---
+
+
+def _mock_client_cls(mock_client):
+    cls = MagicMock()
+    cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+    cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    return cls
+
+
+@pytest.mark.asyncio
+async def test_get_json_raises_on_network_error():
+    client = AsyncMock()
+    client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
+    with pytest.raises(FetchError):
+        await _get_json(client, "https://example.test/x")
+
+
+@pytest.mark.asyncio
+async def test_get_json_raises_on_non_200():
+    client = AsyncMock()
+    response = MagicMock(status_code=500)
+    client.get = AsyncMock(return_value=response)
+    with pytest.raises(FetchError, match="HTTP 500"):
+        await _get_json(client, "https://example.test/x")
+
+
+@pytest.mark.asyncio
+async def test_get_json_raises_on_non_json_body():
+    client = AsyncMock()
+    response = MagicMock(status_code=200)
+    response.json.side_effect = ValueError("not json")
+    client.get = AsyncMock(return_value=response)
+    with pytest.raises(FetchError, match="non-JSON"):
+        await _get_json(client, "https://example.test/x")
+
+
+@pytest.mark.asyncio
+async def test_gather_jobs_counts_failures_per_source():
+    """One slug succeeds, one errors: the error is COUNTED in stats, not silently
+    dropped — [] from a broken API must stay distinguishable from no openings."""
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = GREENHOUSE_RESPONSE
+    boom = MagicMock(status_code=500)
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(side_effect=[ok, boom])
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await GreenhouseScanner().scan(["stripe", "deadco"], stats=stats)
+    assert len(jobs) == 1
+    assert stats["greenhouse"] == SourceStats(companies=2, jobs=1, errors=1)
+
+
+@pytest.mark.asyncio
+async def test_scan_without_stats_still_works():
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = GREENHOUSE_RESPONSE
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        jobs = await GreenhouseScanner().scan(["stripe"])
+    assert len(jobs) == 1
+
+
+# --- portal scanners: stats via the same helper ---
+
+
+@pytest.mark.asyncio
+async def test_remoteok_records_stats_on_failure():
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=MagicMock(status_code=503))
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await RemoteOKScanner().scan(stats=stats)
+    assert jobs == []
+    assert stats["remoteok"] == SourceStats(companies=0, jobs=0, errors=1)
+
+
+@pytest.mark.asyncio
+async def test_remoteok_records_stats_on_success():
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = _REMOTEOK_RESPONSE
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await RemoteOKScanner().scan(stats=stats)
+    assert stats["remoteok"].jobs == len(jobs) > 0
+    assert stats["remoteok"].errors == 0
+
+
+@pytest.mark.asyncio
+async def test_remotive_records_stats_on_failure():
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=MagicMock(status_code=503))
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await RemotiveScanner().scan(stats=stats)
+    assert jobs == []
+    assert stats["remotive"] == SourceStats(companies=0, jobs=0, errors=1)
+
+
+@pytest.mark.asyncio
+async def test_remotive_records_stats_on_success():
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = _REMOTIVE_RESPONSE
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await RemotiveScanner().scan(stats=stats)
+    assert stats["remotive"].jobs == len(jobs) > 0
+    assert stats["remotive"].errors == 0
+
+
+@pytest.mark.asyncio
+async def test_wwr_records_stats_on_failure():
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=MagicMock(status_code=503))
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await WeWorkRemotelyScanner().scan(stats=stats)
+    assert jobs == []
+    assert stats["weworkremotely"] == SourceStats(companies=0, jobs=0, errors=1)
+
+
+@pytest.mark.asyncio
+async def test_wwr_records_stats_on_success():
+    ok = MagicMock(status_code=200)
+    ok.text = _WWR_RSS
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await WeWorkRemotelyScanner().scan(stats=stats)
+    assert stats["weworkremotely"].jobs == len(jobs) > 0
+    assert stats["weworkremotely"].errors == 0
+
+
+@pytest.mark.asyncio
+async def test_gupy_records_stats_on_failure():
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=MagicMock(status_code=503))
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await GupyScanner().scan(keywords="eng", stats=stats)
+    assert jobs == []
+    assert stats["gupy"] == SourceStats(companies=0, jobs=0, errors=1)
+
+
+@pytest.mark.asyncio
+async def test_gupy_records_stats_on_success():
+    ok = MagicMock(status_code=200)
+    ok.json.return_value = _GUPY_P1
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=ok)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await GupyScanner().scan(keywords="eng", stats=stats)
+    assert stats["gupy"].jobs == len(jobs) > 0
+    assert stats["gupy"].errors == 0
+
+
+@pytest.mark.asyncio
+async def test_hn_records_stats_on_failure_when_no_thread_found():
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=MagicMock(status_code=503))
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await HNWhoIsHiringScanner().scan(stats=stats)
+    assert jobs == []
+    assert stats["hn_whoishiring"] == SourceStats(companies=0, jobs=0, errors=1)
+
+
+@pytest.mark.asyncio
+async def test_hn_records_stats_on_success():
+    async def fake_get(url, headers=None):
+        mock_response = MagicMock()
+        url_map = _hn_url_map()
+        if url in url_map:
+            mock_response.status_code = 200
+            mock_response.json.return_value = url_map[url]
+        else:
+            mock_response.status_code = 404
+            mock_response.json.return_value = None
+        return mock_response
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(side_effect=fake_get)
+    with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
+        stats: ScanStats = {}
+        jobs = await HNWhoIsHiringScanner().scan(stats=stats)
+    assert stats["hn_whoishiring"].jobs == len(jobs) > 0
+    # kid 203 is a deleted comment (dropped, not an error); kid 202 has no
+    # separator and falls back to the prose title (also not an error) -- only
+    # a genuine fetch/parse failure should count.
+    assert stats["hn_whoishiring"].errors == 0
+
+
+@pytest.mark.asyncio
+async def test_hn_records_stats_counts_comment_gather_exceptions():
+    """_fetch_comment already swallows its own network/HTTP failures into None
+    (a 404'd or dead comment is indistinguishable and not an error, per the
+    brief) -- but asyncio.gather(return_exceptions=True) can still surface a
+    genuine Exception object if something above that try/except blows up.
+    That's what the error-counting formula is for; force one here directly."""
+    url_map = _hn_url_map(kids=(201, 202))
+    mock_client = _make_hn_client(url_map)
+    with (
+        patch("httpx.AsyncClient", _mock_client_cls(mock_client)),
+        patch.object(
+            HNWhoIsHiringScanner,
+            "_fetch_comment",
+            new=AsyncMock(side_effect=RuntimeError("boom")),
+        ),
+    ):
+        stats: ScanStats = {}
+        jobs = await HNWhoIsHiringScanner().scan(stats=stats)
+    assert jobs == []
+    assert stats["hn_whoishiring"] == SourceStats(companies=0, jobs=0, errors=2)
+
+
+async def test_hn_comment_fetch_failures_count_as_errors_deleted_do_not():
+    # A 404 on a comment used to flatten into the same None as a deleted
+    # comment, so per-comment fetch failures never reached the stats.
+    url_map = _hn_url_map(kids=(201, 203, 999))  # 999 is absent -> 404
+    mock_client = _make_hn_client(url_map)
+    stats = {}
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan(stats=stats)
+
+    assert [j.company for j in jobs] == ["Acme"]
+    s = stats["hn_whoishiring"]
+    assert s.jobs == 1
+    assert s.errors == 1  # the 404; the deleted comment 203 is not an error
+
+
+# ── InHire ──────────────────────────────────────────────────────────────────
+
+INHIRE_PAGE = {
+    "tenantName": "Alice",
+    "jobsPage": [
+        {
+            "jobId": "832b18f4-adf6-4c32-8e1b-18321e0b8069",
+            "displayName": " Design l Creative Design ",
+            "status": "published",
+            "workplaceType": "Hybrid",
+            "location": "São Paulo, SP, BR",
+        },
+        {
+            "jobId": "aaaa",
+            "displayName": "Backend Engineer",
+            "status": "published",
+            "workplaceType": "Remote",
+            "location": "BR",
+        },
+        {
+            "jobId": "bbbb",
+            "displayName": "Old Role",
+            "status": "draft",
+            "workplaceType": "On-site",
+            "location": "SP",
+        },
+    ],
+}
+
+
+async def test_inhire_scan_parses_published_jobs_only():
+    mock_client = _make_mock_client(INHIRE_PAGE)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await InHireScanner().scan(["alice"])
+
+    assert [j.title for j in jobs] == ["Design l Creative Design", "Backend Engineer"]
+    assert jobs[0].source == "inhire"
+    assert jobs[0].company == "alice"
+    assert jobs[0].url == "https://alice.inhire.app/vagas/832b18f4-adf6-4c32-8e1b-18321e0b8069"
+    assert jobs[0].remote_type == "hybrid"
+    assert jobs[1].remote_type == "remote"
+    assert jobs[0].description is None  # no public detail endpoint (403, verified 2026-08-18)
+
+
+async def test_inhire_sends_the_tenant_header():
+    mock_client = _make_mock_client(INHIRE_PAGE)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        await InHireScanner().scan(["alice"])
+    kwargs = mock_client.get.call_args.kwargs
+    assert kwargs["headers"]["X-Tenant"] == "alice"
+    assert mock_client.get.call_args.args[0] == "https://api.inhire.app/job-posts/public/pages"
+
+
+async def test_inhire_wrong_shape_counts_as_error():
+    mock_client = _make_mock_client(["not", "a", "dict"])
+    stats = {}
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await InHireScanner().scan(["alice"], stats=stats)
+    assert jobs == []
+    assert stats["inhire"].errors == 1
+
+
+def test_inhire_is_a_listing_source_for_staleness():
+    from moonlighter.discovery.sources.registry import LISTING_SOURCES
+
+    assert "inhire" in LISTING_SOURCES
+
+
+async def test_inhire_non_list_jobs_page_counts_as_error():
+    mock_client = _make_mock_client({"tenantName": "Alice", "jobsPage": "oops"})
+    stats = {}
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await InHireScanner().scan(["alice"], stats=stats)
+    assert jobs == []
+    assert stats["inhire"].errors == 1

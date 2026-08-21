@@ -6,6 +6,7 @@ never raises for a single company's failure — a transient error (network, malf
 response) is reported in failed_companies, never silently treated as "zero open jobs".
 """
 
+import datetime
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -14,6 +15,8 @@ from moonlighter.core.log import get_logger
 from moonlighter.core.plugins import discover_entry_points_by_name
 from moonlighter.discovery.sources.base import BaseScanner
 from moonlighter.discovery.sources.registry import LISTING_SOURCES as _LISTING_SOURCES
+from moonlighter.discovery.sources.registry import PORTAL_SOURCES
+from moonlighter.discovery.urls import normalize_job_url
 
 logger = get_logger(__name__)
 
@@ -21,6 +24,9 @@ logger = get_logger(__name__)
 @dataclass
 class StalenessResult:
     stale: list[Job] = field(default_factory=list)
+    # Portal jobs past portal_max_age_days: age is the only closing signal a
+    # portal feed offers, so these archive as aged-out, never as closed-at-source.
+    stale_by_age: list[Job] = field(default_factory=list)
     failed_companies: list[str] = field(default_factory=list)
 
 
@@ -36,20 +42,36 @@ async def find_stale_jobs(
     # hardcoded here: a source with no registered listing check AND no registered
     # checker plugin falls through to the "has no listing check" branch below.
     checkers = discover_entry_points_by_name("moonlighter.staleness_checkers")
+    portal_counts: dict[str, int] = {}
     for (source, company), jobs in jobs_by_company.items():
         if source in _LISTING_SOURCES:
             await _check_via_listing(source, company, jobs, scanners, result)
+        elif source in PORTAL_SOURCES:
+            max_age = int(config.get("portal_max_age_days") or 0)
+            if max_age > 0:
+                cutoff = datetime.datetime.now() - datetime.timedelta(days=max_age)
+                aged = [j for j in jobs if j.found_at and j.found_at < cutoff]
+                result.stale_by_age.extend(aged)
+                jobs = [j for j in jobs if j not in aged]
+            if jobs:
+                portal_counts[source] = portal_counts.get(source, 0) + len(jobs)
         elif source in checkers:
             # Plugin-provided (untrusted, unlike the first-party listing check above) --
             # guard the call so one misbehaving checker can't abort the whole run.
             try:
                 await checkers[source](company, jobs, config, result)
             except Exception as e:
-                logger.warning("staleness: %s checker failed for %s — %s", source, company, e)
+                logger.warning(
+                    "staleness: %s checker failed for %s — %s", source, company, e, exc_info=True
+                )
                 if company not in result.failed_companies:
                     result.failed_companies.append(company)
         else:
             result.failed_companies.append(f"{company} (source {source!r} has no listing check)")
+    for source, count in sorted(portal_counts.items()):
+        result.failed_companies.append(
+            f"{count} {source} job(s) (portal feed, no per-company listing)"
+        )
     return result
 
 
@@ -64,12 +86,16 @@ async def _check_via_listing(
     try:
         raw = await scanner.scan([company])
     except Exception as e:
-        logger.warning("staleness: %s scan failed for %s — %s", source, company, e)
+        logger.warning("staleness: %s scan failed for %s — %s", source, company, e, exc_info=True)
         result.failed_companies.append(company)
         return
     if not isinstance(raw, list):
         logger.warning("staleness: %s scan returned unexpected type for %s", source, company)
         result.failed_companies.append(company)
         return
-    open_urls = {r.url for r in raw}
-    result.stale.extend(job for job in jobs if job.url not in open_urls)
+    # Stored job.url is normalized (Task 5 strips the Recruitee /c/new apply
+    # suffix), but the fresh listing's raw URLs are not — normalize both sides,
+    # or every freshly-stored Recruitee job compares unequal and is archived
+    # as stale on its very first re-scan.
+    open_urls = {normalize_job_url(r.url) for r in raw}
+    result.stale.extend(job for job in jobs if normalize_job_url(job.url) not in open_urls)
