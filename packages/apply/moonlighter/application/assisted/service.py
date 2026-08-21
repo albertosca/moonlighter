@@ -1,6 +1,6 @@
 """Turn a job into a sheet the candidate can paste into the form."""
 
-from typing import Any, cast
+from typing import Any
 
 import httpx
 from moonlighter.application.answers.email_alias import (
@@ -31,7 +31,7 @@ PASTE_HINT = (
 
 
 def _job(job_id: int) -> Job | None:
-    return cast(Job | None, Job.get_or_none(Job.id == job_id))
+    return Job.get_or_none(Job.id == job_id)
 
 
 async def _questions_from_api(job: Job) -> list[FormQuestion]:
