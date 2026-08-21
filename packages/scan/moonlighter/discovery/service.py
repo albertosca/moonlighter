@@ -332,7 +332,7 @@ async def _evaluate_and_store(
                     stop.set()
                     results.append(_StopScan())
                     return results
-                logger.error("scan: unexpected error in batch — %s", e)
+                logger.error("scan: unexpected error in batch — %s", e, exc_info=True)
                 # Returns results (title-filtered jobs already persisted in this chunk)
                 # instead of propagating — the raw exception would make gather() discard
                 # the whole chunk from the report, undercounting jobs already saved in the DB.

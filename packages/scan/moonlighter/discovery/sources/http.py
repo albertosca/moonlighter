@@ -416,7 +416,7 @@ class GupyScanner(BaseScanner):
                         client, self.BASE.format(kw=keywords, limit=100, offset=offset)
                     )
                 except FetchError as e:
-                    logger.warning("[gupy] fetch failed: %s", e)
+                    logger.warning("[gupy] fetch failed: %s", e, exc_info=True)
                     errors += 1
                     break
                 if not isinstance(data, dict):
@@ -481,7 +481,7 @@ class RemoteOKScanner(BaseScanner):
             try:
                 data = await _get_json(client, self.BASE)
             except FetchError as e:
-                logger.warning("[remoteok] fetch failed: %s", e)
+                logger.warning("[remoteok] fetch failed: %s", e, exc_info=True)
                 errors, data = 1, []
         if not isinstance(data, list):
             # A shape change is an error, not a silent zero.
@@ -532,7 +532,7 @@ class RemotiveScanner(BaseScanner):
             try:
                 data = await _get_json(client, self.BASE)
             except FetchError as e:
-                logger.warning("[remotive] fetch failed: %s", e)
+                logger.warning("[remotive] fetch failed: %s", e, exc_info=True)
                 errors, data = 1, {}
         if not isinstance(data, dict):
             # A shape change is an error, not a silent zero.
@@ -579,7 +579,7 @@ class WeWorkRemotelyScanner(BaseScanner):
             try:
                 r = await client.get(self.BASE, headers=HEADERS)
             except Exception as e:
-                logger.warning("[weworkremotely] fetch failed: %s", e)
+                logger.warning("[weworkremotely] fetch failed: %s", e, exc_info=True)
                 errors = 1
             else:
                 if r.status_code != 200:
@@ -601,7 +601,7 @@ class WeWorkRemotelyScanner(BaseScanner):
                 # tradeoff changes.
                 root = ET.fromstring(body)  # noqa: S314
             except ET.ParseError as e:
-                logger.warning("[weworkremotely] malformed feed: %s", e)
+                logger.warning("[weworkremotely] malformed feed: %s", e, exc_info=True)
                 errors = errors or 1
         if root is not None:
             for item in root.findall(".//item"):
