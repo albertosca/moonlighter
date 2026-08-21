@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head><title>Ashby Application</title></head>
+<body>
+<form id="ashby-app-form">
+  <label for="why_role">Why this role?</label>
+  <textarea id="why_role" name="why_role"></textarea>
+
+  <label for="name">Full Name</label>
+  <input id="name" type="text" name="name">
+
+  <input type="file" name="resume">
+  <button type="submit">Apply</button>
+</form>
+<script>
+  // Simula a confirmação do ATS: injeta o marcador de sucesso ao submeter.
+  document.querySelector('form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    document.body.insertAdjacentHTML('beforeend',
+      '<div id="confirmation">Thank you for applying! Application submitted.</div>');
+  });
+</script>
+</body>
+</html>

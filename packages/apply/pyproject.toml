@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Office/Business",
 ]
 dependencies = [
-    "moonlighter-core>=0.1.0",
+    "moonlighter-core[browser]>=0.1.0",
 ]
 
 [project.urls]

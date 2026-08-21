@@ -1,0 +1,59 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Recruitee-shaped application form</title>
+<!--
+  Mirrors the DOM of a real Recruitee posting, captured 2026-08-03. The detail
+  that matters is the NESTING: the radio group's own fieldset (whose <legend>
+  carries the question) sits inside a generic "Questions" fieldset. A discovery
+  that scopes its selectors incorrectly finds both, or neither.
+  The non-breaking space before each * is also verbatim -- label keys are matched
+  exactly, and a normal space silently fails to match.
+-->
+<form>
+  <fieldset>
+    <legend>My information</legend>
+    <label for="full-name">Full name&nbsp;*</label>
+    <input id="full-name" type="text" required>
+
+    <label for="cv">CV or resume&nbsp;*</label>
+    <input id="cv" type="file" required>
+  </fieldset>
+
+  <fieldset>
+    <legend>Questions</legend>
+
+    <!--
+      The radios are custom-styled the way Recruitee styles them: the real input
+      is transparent and a decorative box is painted on top of it. Playwright's
+      check() then fails with "<div> intercepts pointer events" even though the
+      locator resolved to the right element. Without this overlay the fixture is
+      easier than reality and the e2e test passes while the applier cannot fill
+      the form -- which is exactly what happened on 2026-08-04.
+    -->
+    <style>
+      .radio-row { position: relative; height: 2em; }
+      .radio-row input[type=radio] { position: absolute; left: 0; top: 0; opacity: 0; }
+      .radio-row .box { position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+                        background: #eee; }
+      .radio-row label { position: relative; z-index: 1; }
+    </style>
+    <fieldset>
+      <legend>How do you rate your own skills with Node.js?&nbsp;*</legend>
+      <div class="radio-row">
+        <input id="skill-0" type="radio" name="skill" value="Beginner" required>
+        <div class="box"></div><label for="skill-0">Beginner</label>
+      </div>
+      <div class="radio-row">
+        <input id="skill-1" type="radio" name="skill" value="Intermediate" required>
+        <div class="box"></div><label for="skill-1">Intermediate</label>
+      </div>
+      <div class="radio-row">
+        <input id="skill-2" type="radio" name="skill" value="Advanced" required>
+        <div class="box"></div><label for="skill-2">Advanced</label>
+      </div>
+    </fieldset>
+
+    <label for="salary">What is your expected salary? (annual USD)&nbsp;*</label>
+    <input id="salary" type="number" required>
+  </fieldset>
+</form>

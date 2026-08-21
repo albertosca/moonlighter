@@ -1,0 +1,31 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Recruitee-shaped submit</title>
+<!--
+  Reproduces what a live Recruitee submit does: clicking Send replaces the button
+  label with a spinner and leaves the form on screen for ~1.2s while the request
+  is in flight, then swaps in a confirmation. Classifying the outcome before that
+  settles reports failed:validation_errors:[] -- an empty error list, because
+  there are no errors -- on an action that cannot be undone. Observed 2026-08-04.
+-->
+<!-- Recruitee proxies hCaptcha through its own CDN, so matching on
+     "hcaptcha.com" alone does not see it. This is the real host. -->
+<iframe src="https://captcha-assets.recruiteecdn.com/captcha/v1/abc/static/hcaptcha-enclave.html#frame=enclave" title="captcha"></iframe>
+<form id="f">
+  <label for="name">Full name&nbsp;*</label>
+  <input id="name" type="text" required>
+  <button type="submit" id="send">Send</button>
+</form>
+<div id="done" hidden><h1>Application submitted</h1></div>
+<script>
+  document.getElementById('f').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('send');
+    btn.textContent = '';              // label swapped for a spinner
+    btn.setAttribute('aria-busy', 'true');
+    setTimeout(() => {
+      document.getElementById('f').hidden = true;
+      document.getElementById('done').hidden = false;
+    }, 1200);
+  });
+</script>
