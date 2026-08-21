@@ -318,10 +318,13 @@ async def get_pipeline(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
         if not apps:
             continue
         lines.append(f"## {status.capitalize()} ({len(apps)})")
-        for app in apps:
-            date = app.applied_at.strftime("%d/%m") if app.applied_at else "—"
-            next_action = f" → {app.next_action}" if app.next_action else ""
-            lines.append(f"- #{app.job.id} {app.job.company}/{app.job.title} ({date}){next_action}")
+        for application in apps:
+            date = application.applied_at.strftime("%d/%m") if application.applied_at else "—"
+            next_action = f" → {application.next_action}" if application.next_action else ""
+            lines.append(
+                f"- #{application.job.id} {application.job.company}/{application.job.title} "
+                f"({date}){next_action}"
+            )
         lines.append("")
 
     total = Application.select().count()
