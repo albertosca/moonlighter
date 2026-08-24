@@ -208,8 +208,11 @@ def _advance_application(
     summary = classification.get("summary", "")
     note = f"[{today}] {classification['type']}: {summary} (match: {match_type})"
     app.notes = f"{app.notes}\n{note}" if app.notes else note
+    from moonlighter.core.db import sync_job_status
+
     app.updated_at = datetime.datetime.now()
     app.save()
+    sync_job_status(app)
 
 
 def _make_update(

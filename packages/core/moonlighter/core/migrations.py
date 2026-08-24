@@ -47,11 +47,33 @@ def _m004_unify_closed_into_archived(db: Any) -> None:
         db.execute_sql("UPDATE job SET status = 'archived' WHERE status = 'closed'")
 
 
+def _m005_backfill_job_status_from_applications(db: Any) -> None:
+    # One-shot repair for the drift found 2026-08-21 (jobs still 'new' with a
+    # live Application). Forward writers now sync via db.sync_job_status.
+    needed = (
+        _has_column(db, "job", "status")
+        and _has_column(db, "application", "status")
+        and _has_column(db, "application", "job_id")
+    )
+    if not needed:
+        return
+    db.execute_sql(
+        "UPDATE job SET status = 'applied' WHERE id IN ("
+        "SELECT job_id FROM application WHERE status IN "
+        "('submitted', 'screening', 'interviews', 'offer'))"
+    )
+    db.execute_sql(
+        "UPDATE job SET status = 'rejected' WHERE id IN ("
+        "SELECT job_id FROM application WHERE status = 'rejected')"
+    )
+
+
 MIGRATIONS: list[tuple[int, str, Callable[[Any], None]]] = [
     (1, "application_email_ref", _m001_application_email_ref),
     (2, "application_current_stage", _m002_application_current_stage),
     (3, "job_closed_at", _m003_job_closed_at),
     (4, "unify_closed_into_archived", _m004_unify_closed_into_archived),
+    (5, "backfill_job_status_from_applications", _m005_backfill_job_status_from_applications),
 ]
 
 

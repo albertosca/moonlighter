@@ -3090,3 +3090,28 @@ def test_archive_message_removes_unread_and_inbox():
         userId="me", id="m1", body={"removeLabelIds": ["UNREAD", "INBOX"]}
     )
     service.users().messages().modify().execute.assert_called()
+
+
+# ── Job.status sync on advance ───────────────────────────────────────────────
+
+
+def test_advance_application_syncs_job_status(tmp_db, application_factory):
+    """An email-classified advance (e.g. screening) must pull Job.status to
+    'applied' — the 2026-08-21 triage found jobs still 'new' with live
+    applications, and sync_email_responses was one of the writers that never
+    told the Job."""
+    from moonlighter.core.db import Job
+    from moonlighter.tracking.email_monitor import _advance_application
+
+    app = application_factory(status="submitted")
+    job = app.job
+    job.status = "new"  # simulate the drift seen live
+    job.save()
+
+    _advance_application(
+        app,
+        {"type": "interview_invite", "summary": "let's chat"},
+        "ref",
+        ["Screening"],
+    )
+    assert Job.get_by_id(job.id).status == "applied"

@@ -468,3 +468,50 @@ def test_init_db_converges_real_db_shape_without_schema_version(tmp_db):
     init_db()
 
     assert current_version(db) == len(MIGRATIONS)
+
+
+# ── sync_job_status ──────────────────────────────────────────────────────────
+# Provenance: 2026-08-21 manual triage — 5 jobs still 'new' while their
+# Application was already submitted/rejected; a duplicate application was
+# nearly offered twice in one session. Every Application.status writer calls
+# this helper so Job.status can never drift again.
+
+
+def _sync_pair(tmp_db, app_status):
+    os.environ["MOONLIGHTER_DB_PATH"] = tmp_db
+    init_db()
+    job = _make_job(status="new")
+    app = Application.create(job=job, status=app_status)
+    return job, app
+
+
+def test_sync_job_status_submitted_marks_job_applied(tmp_db):
+    from moonlighter.core.db import sync_job_status
+
+    job, app = _sync_pair(tmp_db, "submitted")
+    sync_job_status(app)
+    assert Job.get_by_id(job.id).status == "applied"
+
+
+def test_sync_job_status_rejected_marks_job_rejected(tmp_db):
+    from moonlighter.core.db import sync_job_status
+
+    job, app = _sync_pair(tmp_db, "rejected")
+    sync_job_status(app)
+    assert Job.get_by_id(job.id).status == "rejected"
+
+
+def test_sync_job_status_interview_stages_mark_job_applied(tmp_db):
+    from moonlighter.core.db import sync_job_status
+
+    job, app = _sync_pair(tmp_db, "interviews")
+    sync_job_status(app)
+    assert Job.get_by_id(job.id).status == "applied"
+
+
+def test_sync_job_status_draft_leaves_job_alone(tmp_db):
+    from moonlighter.core.db import sync_job_status
+
+    job, app = _sync_pair(tmp_db, "draft")
+    sync_job_status(app)
+    assert Job.get_by_id(job.id).status == "new"
