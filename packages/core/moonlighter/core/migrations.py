@@ -39,10 +39,19 @@ def _m003_job_closed_at(db: Any) -> None:
         db.execute_sql("ALTER TABLE job ADD COLUMN closed_at DATETIME NULL")
 
 
+def _m004_unify_closed_into_archived(db: Any) -> None:
+    # 'closed' (gone from source) and 'archived' (triaged out) are one status
+    # from the operator's point of view (Alberto, 2026-08-24) — closed_at alone
+    # keeps recording why a job left the queue.
+    if _has_column(db, "job", "status"):
+        db.execute_sql("UPDATE job SET status = 'archived' WHERE status = 'closed'")
+
+
 MIGRATIONS: list[tuple[int, str, Callable[[Any], None]]] = [
     (1, "application_email_ref", _m001_application_email_ref),
     (2, "application_current_stage", _m002_application_current_stage),
     (3, "job_closed_at", _m003_job_closed_at),
+    (4, "unify_closed_into_archived", _m004_unify_closed_into_archived),
 ]
 
 

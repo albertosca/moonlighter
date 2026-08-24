@@ -806,7 +806,7 @@ async def test_archive_stale_jobs_marks_stale_job_closed(tmp_db, monkeypatch):
     result = await archive_stale_jobs(None, None, CONFIG)
 
     saved = Job.get_by_id(job.id)
-    assert saved.status == "closed"
+    assert saved.status == "archived"
     assert saved.closed_at is not None
     assert result.archived == [
         {"company": "acme", "title": "Engineer", "url": "https://boards.greenhouse.io/acme/jobs/1"}
@@ -871,7 +871,7 @@ async def test_archive_stale_jobs_filters_by_company_case_insensitive(tmp_db, mo
 async def test_archive_stale_jobs_excludes_resolved_statuses(tmp_db, monkeypatch):
     init_db()
     _stale_job(tmp_db, status="applied", url="https://x.com/1")
-    _stale_job(tmp_db, status="closed", url="https://x.com/2")
+    _stale_job(tmp_db, status="rejected", url="https://x.com/2")
     _stale_job(tmp_db, status="archived", url="https://x.com/3")
 
     seen_groups = []

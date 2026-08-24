@@ -112,7 +112,7 @@ async def test_scan_and_evaluate_reports_archived_stale_jobs(tmp_db):
 
     assert "archived" in result.lower()
     job = Job.get(Job.url == "https://boards.greenhouse.io/stale-co/jobs/1")
-    assert job.status == "closed"
+    assert job.status == "archived"
     assert job.closed_at is not None
 
 
