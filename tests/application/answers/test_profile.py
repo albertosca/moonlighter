@@ -62,6 +62,7 @@ def test_profile_for_answers_still_excludes_contact_details():
     sent = profile_for_answers(profile)
     assert set(sent) == {"summary"}
 
+
 def test_open_source_reaches_the_answer_prompt():
     """Seen live twice on 2026-08-21 (Supabase DevRel #8138 and Frontend #5100):
     "open source contributions" answers cited only ParallelME (2016) from the
