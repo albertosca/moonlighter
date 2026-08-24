@@ -552,6 +552,47 @@ async def test_scan_title_filtered_archives_with_score_zero(tmp_db):
     assert "filtered by title" in result.lower()
 
 
+async def test_scan_ineligible_location_archives_without_llm(tmp_db):
+    # Live 2026-08-20/21: "Bangalore, India" passed at 8.5 because the
+    # eligibility rule lived in the prompt and the LLM never saw the location
+    # field. Onsite/hybrid outside Belo Horizonte is impossible regardless of
+    # the JD — archived deterministically, no LLM call.
+    init_db()
+    raw = RawJob(
+        source="greenhouse",
+        company="Abroad Co",
+        title="Engineer",
+        url="https://x.com/scan/abroad",
+        location="Bangalore, India",
+        remote_type="onsite",
+        description="A detailed job description that goes on.",
+    )
+    boom = AsyncMock(side_effect=AssertionError("LLM must not run for ineligible locations"))
+    result = await _run_scan([raw], eval_mock=boom)
+    job = Job.get(Job.url == "https://x.com/scan/abroad")
+    assert job.status == "archived"
+    assert job.score == 0.0
+    assert "location ineligible" in job.score_notes
+    assert "location ineligible" in result.lower()
+
+
+async def test_scan_ambiguous_location_still_reaches_the_llm(tmp_db):
+    # The documented Colombia case: the field names a country, the JD may say
+    # "remote from anywhere in LATAM" — only the evaluator can read the JD.
+    init_db()
+    raw = RawJob(
+        source="greenhouse",
+        company="Andes Co",
+        title="Engineer",
+        url="https://x.com/scan/andes",
+        location="Colombia",
+        remote_type="remote",
+        description="A detailed job description that goes on.",
+    )
+    await _run_scan([raw])
+    assert Job.get(Job.url == "https://x.com/scan/andes").status == "new"
+
+
 async def test_scan_empty_description_skips_llm_and_needs_review(tmp_db):
     init_db()
     eval_mock = AsyncMock(return_value=_eval(8.0))
@@ -639,6 +680,24 @@ async def test_scan_title_filtered_integrity_error_skips_silently(tmp_db):
     # tenta Job.create archived, colide → IntegrityError → pulada (return None).
     Job.create(source="x", company="x", title="x", url="https://x.com/scan/6", status="new")
     result = await _run_scan([_raw(6, title="Staff Accountant")])
+    assert "processed" in result or "No new jobs found" in result
+
+
+async def test_scan_location_ineligible_integrity_error_skips_silently(tmp_db):
+    init_db()
+    # Ineligible location + pre-existing Job (no ScanLog) → the eligibility branch
+    # attempts Job.create archived, collides → IntegrityError → skipped (return None).
+    Job.create(source="x", company="x", title="x", url="https://x.com/scan/9", status="new")
+    raw = RawJob(
+        source="greenhouse",
+        company="co",
+        title="Engineer",
+        url="https://x.com/scan/9",
+        location="Bangalore, India",
+        remote_type="onsite",
+        description="A detailed job description that goes on.",
+    )
+    result = await _run_scan([raw])
     assert "processed" in result or "No new jobs found" in result
 
 
