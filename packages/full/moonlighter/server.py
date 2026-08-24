@@ -19,7 +19,7 @@ from moonlighter.core.config import (
     resolve_under_home,
     validate_config,
 )
-from moonlighter.core.db import Application, Job, init_db
+from moonlighter.core.db import Application, Job, init_db, sync_job_status
 from moonlighter.core.llm import LLMCaller, make_caller
 from moonlighter.core.log import setup as _setup_logging
 from moonlighter.core.metrics import operation_metrics
@@ -365,6 +365,7 @@ async def update_status(
     if next_action:
         app.next_action = next_action
     app.save()
+    sync_job_status(app)
 
     result = f"✓ Job #{job_id} ({job.company}/{job.title}): status → {status}"
     if next_action:

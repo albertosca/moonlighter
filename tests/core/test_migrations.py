@@ -125,6 +125,29 @@ def test_m004_unifies_closed_into_archived(tmp_path, monkeypatch, open_dbs):
     assert closed_at == "2026-08-24 12:00:00"
 
 
+def test_m005_backfills_job_status_from_applications(tmp_path, monkeypatch, open_dbs):
+    """One-shot repair for the drift found 2026-08-21: jobs still 'new' whose
+    Application was already submitted/rejected. Forward writers now sync via
+    sync_job_status; this folds the pre-existing rows in."""
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
+    db = _fresh_db(tmp_path / "t.db", open_dbs)
+    db.execute_sql("ALTER TABLE job ADD COLUMN status VARCHAR(32)")
+    db.execute_sql("ALTER TABLE application ADD COLUMN status VARCHAR(32)")
+    run_migrations(db)
+    db.execute_sql("INSERT INTO job (id, status) VALUES (1, 'new')")
+    db.execute_sql("INSERT INTO application (id, job_id, status) VALUES (1, 1, 'submitted')")
+    db.execute_sql("INSERT INTO job (id, status) VALUES (2, 'new')")
+    db.execute_sql("INSERT INTO application (id, job_id, status) VALUES (2, 2, 'rejected')")
+    db.execute_sql("INSERT INTO job (id, status) VALUES (3, 'new')")
+    db.execute_sql("INSERT INTO application (id, job_id, status) VALUES (3, 3, 'draft')")
+    db.execute_sql("UPDATE schema_version SET version = 4")
+
+    run_migrations(db)
+
+    rows = dict(db.execute_sql("SELECT id, status FROM job ORDER BY id").fetchall())
+    assert rows == {1: "applied", 2: "rejected", 3: "new"}
+
+
 def test_idempotence_on_real_shaped_db_never_raises(tmp_path, monkeypatch, open_dbs):
     """THE critical invariant: Alberto's real DB already has the three columns
     from the old ad-hoc ALTERs but no schema_version table (detected version 0).
@@ -138,7 +161,7 @@ def test_idempotence_on_real_shaped_db_never_raises(tmp_path, monkeypatch, open_
     applied = run_migrations(db)
 
     assert applied == [name for _, name, _ in MIGRATIONS]
-    assert current_version(db) == len(MIGRATIONS) == 4
+    assert current_version(db) == len(MIGRATIONS) == 5
     assert "email_ref" in _columns(db, "application")
     assert "current_stage" in _columns(db, "application")
     assert "closed_at" in _columns(db, "job")
@@ -213,7 +236,7 @@ def test_failed_migration_leaves_version_at_last_fully_applied(tmp_path, monkeyp
     def _boom(_db):
         raise peewee.OperationalError("simulated failure, not a lock")
 
-    broken_migrations = [*MIGRATIONS, (5, "boom", _boom)]
+    broken_migrations = [*MIGRATIONS, (6, "boom", _boom)]
     monkeypatch.setattr(migrations, "MIGRATIONS", broken_migrations)
 
     with pytest.raises(peewee.OperationalError):

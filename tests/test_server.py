@@ -705,6 +705,21 @@ async def test_update_status_success(tmp_db):
     assert "screening" in result
 
 
+async def test_update_status_syncs_job_status(tmp_db):
+    # 2026-08-21: 5 jobs sat 'new' with a real submitted Application — the
+    # queue nearly offered a duplicate application twice in one session.
+    init_db()
+    job = create_job(tmp_db, url="https://x.com/us-sync")
+    create_application(job)
+    from moonlighter.server import update_status
+
+    await update_status(job_id=job.id, status="submitted", ctx=make_test_context())
+    assert Job.get_by_id(job.id).status == "applied"
+
+    await update_status(job_id=job.id, status="rejected", ctx=make_test_context())
+    assert Job.get_by_id(job.id).status == "rejected"
+
+
 async def test_update_status_with_notes(tmp_db):
     init_db()
     job = create_job(tmp_db, url="https://x.com/us2")
