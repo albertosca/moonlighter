@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from moonlighter.application.answers.compliance import is_compliance_question
 from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.application.answers.field_map import pre_populate_answers
 from moonlighter.application.answers.option_matcher import match_option_locally
@@ -179,6 +180,21 @@ async def compose_answers(
             else:
                 reason = "upload a file yourself"
             composed.append(ComposedAnswer(question, None, reason))
+            continue
+
+        if is_compliance_question(question.label, question.options):
+            # Declaration/conflict-of-interest questions are never answered by
+            # the machine — live 2026-08-21 (gympass #3416): the model signed a
+            # false public-body affiliation. Same deterministic category as
+            # references, salary and demographics; guarded before `known` so no
+            # accidental label collision can pre-populate a declaration either.
+            composed.append(
+                ComposedAnswer(
+                    question,
+                    None,
+                    "declaration/compliance question — answer this yourself",
+                )
+            )
             continue
 
         answer: str | None
