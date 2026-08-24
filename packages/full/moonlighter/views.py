@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.table import Table
 
 
-def render_jobs_table(jobs: list[Job]) -> str:
+def render_jobs_table(jobs: list[Job], badges: dict[int, str] | None = None) -> str:
     buf = io.StringIO()
     console = Console(file=buf, width=120)
     table = Table(box=box.SIMPLE_HEAVY, show_lines=False)
@@ -21,9 +21,13 @@ def render_jobs_table(jobs: list[Job]) -> str:
     table.add_column("Caveats", min_width=20)
 
     for job in jobs:
+        badge = (badges or {}).get(job.id)
+        company_cell = f"{job.company} / {job.title}"
+        if badge:
+            company_cell += f"\n{badge}"
         table.add_row(
             str(job.id),
-            f"{job.company} / {job.title}",
+            company_cell,
             f"{job.score:.1f}" if job.score is not None else "—",
             _salary_cell(job),
             job.posted_at.strftime("%b %d") if job.posted_at else "—",

@@ -26,6 +26,7 @@ from moonlighter.core.metrics import operation_metrics
 from moonlighter.core.parsing import wrap_untrusted
 from moonlighter.discovery import service as scan_service
 from moonlighter.discovery.archive import ArchiveStaleJobsError, _format_archive_result
+from moonlighter.priority import company_rejection_ages, rejection_badge, rejection_penalty
 from moonlighter.startup import StartupWarning, validate_startup
 from moonlighter.tracking.email_monitor import sync_responses
 from moonlighter.tracking.gmail_client import GmailAuthError, _run_gmail_oauth, setup_gmail_service
@@ -211,11 +212,25 @@ async def archive_stale_jobs(
 async def list_jobs(
     status: str = "new", limit: int = 20, *, ctx: Context[ServerSession, AppContext, Any]
 ) -> str:
-    """List jobs from DB filtered by status."""
+    """List jobs from DB filtered by status.
+
+    Ordering is rejection-aware (see priority.py): a company that recently
+    rejected an application sinks toward the end and carries a warning badge —
+    the persisted score is untouched and nothing is hidden."""
     jobs = list(Job.select().where(Job.status == status).order_by(Job.score.desc()).limit(limit))
     if not jobs:
         return f"No jobs with status='{status}'."
-    return render_jobs_table(jobs)
+    ages = company_rejection_ages()
+    jobs.sort(
+        key=lambda j: (j.score or 0.0) - rejection_penalty(ages.get(j.company.lower(), [])),
+        reverse=True,
+    )
+    badges = {
+        j.id: badge
+        for j in jobs
+        if (badge := rejection_badge(ages.get(j.company.lower(), []))) is not None
+    }
+    return render_jobs_table(jobs, badges)
 
 
 @mcp.tool()
