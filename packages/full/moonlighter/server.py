@@ -186,7 +186,7 @@ async def archive_stale_jobs(
     *,
     ctx: Context[ServerSession, AppContext, Any],
 ) -> str:
-    """Detect and archive (status='closed') jobs that disappeared from their source.
+    """Detect and archive (status='archived', closed_at set) jobs that disappeared from their source.
 
     Checks jobs currently in new/reviewed/applying/needs_review against the source's
     current listing (Greenhouse/Lever/Ashby API, or a LinkedIn page revisit). A company

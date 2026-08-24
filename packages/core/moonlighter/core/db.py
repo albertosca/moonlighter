@@ -74,7 +74,7 @@ class Job(BaseModel):
     salary_notes = TextField(null=True)
     status = CharField(
         default="new"
-    )  # 'new'|'reviewed'|'applying'|'needs_review'|'applied'|'rejected'|'archived'|'closed'
+    )  # 'new'|'reviewed'|'applying'|'needs_review'|'applied'|'rejected'|'archived' (closed_at set = was live, gone from source)
     found_at = DateTimeField(default=datetime.datetime.now)
     closed_at = DateTimeField(null=True)
 

@@ -1,5 +1,5 @@
 """archive_stale_jobs: detects jobs whose source posting disappeared and marks
-them closed. Extracted from discovery/service.py (pure move, no behavior
+them archived with closed_at set. Extracted from discovery/service.py (pure move, no behavior
 change)."""
 
 import datetime
@@ -25,7 +25,7 @@ class ArchiveResult:
     archived: list[dict[str, str]] = field(default_factory=list)
     # Portal jobs archived because they aged past portal_max_age_days -- age is
     # the only closing signal a portal feed offers, so these are 'archived',
-    # never 'closed': closed would claim knowledge of the source we don't have.
+    # closed_at stays NULL: setting it would claim knowledge of the source we don't have.
     aged: list[dict[str, str]] = field(default_factory=list)
     max_age_days: int = 0
     failed_companies: list[str] = field(default_factory=list)
@@ -50,7 +50,7 @@ def _group_by_source_company(jobs: list[Job]) -> dict[tuple[str, str], list[Job]
 async def archive_stale_jobs(
     job_id: int | None, company: str | None, config: dict[str, Any]
 ) -> ArchiveResult:
-    """Detects and archives (status='closed') eligible jobs that disappeared from
+    """Detects and archives (status='archived', closed_at set) eligible jobs that disappeared from
     their source. Mutually exclusive filters: job_id, company, or neither (all)."""
     if job_id is not None and company is not None:
         raise ArchiveStaleJobsError("Provide job_id OR company, not both.")
@@ -63,7 +63,7 @@ async def archive_stale_jobs(
     now = datetime.datetime.now()
     archived: list[dict[str, str]] = []
     for job in staleness.stale:
-        job.status = "closed"
+        job.status = "archived"
         job.closed_at = now
         job.save()
         archived.append({"company": job.company, "title": job.title, "url": job.url})

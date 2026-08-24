@@ -105,6 +105,26 @@ def test_fresh_db_applies_all_migrations(tmp_path, monkeypatch, open_dbs):
     assert "closed_at" in _columns(db, "job")
 
 
+def test_m004_unifies_closed_into_archived(tmp_path, monkeypatch, open_dbs):
+    """'closed' (good job gone from source) and 'archived' (triaged out) are one
+    status from the operator's point of view — closed_at alone keeps recording
+    WHY a job left the queue. m004 folds the existing 'closed' rows in."""
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
+    db = _fresh_db(tmp_path / "t.db", open_dbs)
+    db.execute_sql("ALTER TABLE job ADD COLUMN status VARCHAR(32)")
+    run_migrations(db)
+    db.execute_sql(
+        "INSERT INTO job (id, status, closed_at) VALUES (1, 'closed', '2026-08-24 12:00:00')"
+    )
+    db.execute_sql("UPDATE schema_version SET version = 3")
+
+    run_migrations(db)
+
+    status, closed_at = db.execute_sql("SELECT status, closed_at FROM job WHERE id = 1").fetchone()
+    assert status == "archived"
+    assert closed_at == "2026-08-24 12:00:00"
+
+
 def test_idempotence_on_real_shaped_db_never_raises(tmp_path, monkeypatch, open_dbs):
     """THE critical invariant: Alberto's real DB already has the three columns
     from the old ad-hoc ALTERs but no schema_version table (detected version 0).
@@ -118,7 +138,7 @@ def test_idempotence_on_real_shaped_db_never_raises(tmp_path, monkeypatch, open_
     applied = run_migrations(db)
 
     assert applied == [name for _, name, _ in MIGRATIONS]
-    assert current_version(db) == len(MIGRATIONS) == 3
+    assert current_version(db) == len(MIGRATIONS) == 4
     assert "email_ref" in _columns(db, "application")
     assert "current_stage" in _columns(db, "application")
     assert "closed_at" in _columns(db, "job")
@@ -193,7 +213,7 @@ def test_failed_migration_leaves_version_at_last_fully_applied(tmp_path, monkeyp
     def _boom(_db):
         raise peewee.OperationalError("simulated failure, not a lock")
 
-    broken_migrations = [*MIGRATIONS, (4, "boom", _boom)]
+    broken_migrations = [*MIGRATIONS, (5, "boom", _boom)]
     monkeypatch.setattr(migrations, "MIGRATIONS", broken_migrations)
 
     with pytest.raises(peewee.OperationalError):

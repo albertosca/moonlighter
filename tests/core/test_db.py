@@ -4,6 +4,7 @@ import os
 
 import pytest
 from moonlighter.core.db import Application, Job, ScanLog, init_db
+from moonlighter.core.migrations import MIGRATIONS
 from peewee import IntegrityError
 
 
@@ -155,9 +156,9 @@ def test_job_closed_at_stored_and_retrieved(tmp_db):
     os.environ["MOONLIGHTER_DB_PATH"] = tmp_db
     init_db()
     when = datetime.datetime(2026, 7, 1, 12, 0, 0)
-    job = _make_job(status="closed", closed_at=when)
+    job = _make_job(status="archived", closed_at=when)
     saved = Job.get_by_id(job.id)
-    assert saved.status == "closed"
+    assert saved.status == "archived"
     assert saved.closed_at == when
 
 
@@ -414,7 +415,7 @@ def test_db_path_follows_moonlighter_home(monkeypatch, tmp_path):
 # --- init_db delegates schema evolution to run_migrations (E7 T2) ─────────────
 
 
-def test_init_db_fresh_db_reaches_version_3_with_all_columns(tmp_db):
+def test_init_db_fresh_db_reaches_latest_version_with_all_columns(tmp_db):
     """A fresh temp DB, after init_db(), is at schema_version 3 and has every
     column the migrations add (behavior-preserving vs. the old inline ALTERs)."""
     from moonlighter.core.db import db
@@ -422,7 +423,7 @@ def test_init_db_fresh_db_reaches_version_3_with_all_columns(tmp_db):
 
     init_db()
 
-    assert current_version(db) == 3
+    assert current_version(db) == len(MIGRATIONS)
     app_cols = {row[1] for row in db.execute_sql("PRAGMA table_info(application)").fetchall()}
     assert "email_ref" in app_cols
     assert "current_stage" in app_cols
@@ -430,7 +431,7 @@ def test_init_db_fresh_db_reaches_version_3_with_all_columns(tmp_db):
     assert "closed_at" in job_cols
 
 
-def test_init_db_called_twice_stays_at_version_3(tmp_db):
+def test_init_db_called_twice_stays_at_latest_version(tmp_db):
     """Calling init_db() a second time is a no-op: no error, version unchanged."""
     from moonlighter.core.db import db
     from moonlighter.core.migrations import current_version
@@ -438,7 +439,7 @@ def test_init_db_called_twice_stays_at_version_3(tmp_db):
     init_db()
     init_db()
 
-    assert current_version(db) == 3
+    assert current_version(db) == len(MIGRATIONS)
 
 
 def test_init_db_converges_real_db_shape_without_schema_version(tmp_db):
@@ -466,4 +467,4 @@ def test_init_db_converges_real_db_shape_without_schema_version(tmp_db):
 
     init_db()
 
-    assert current_version(db) == 3
+    assert current_version(db) == len(MIGRATIONS)
