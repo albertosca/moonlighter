@@ -80,6 +80,9 @@ _RULES: list[tuple[str, _RuleFn]] = [
     (r"^(phone|telephone|mobile|cel)", lambda p: p.get("phone") or ""),
     (r"^e-?mail", lambda p: p.get("email") or ""),
     (r"linkedin", lambda p: p.get("linkedin") or ""),
+    # A "Github" field became a gap on the live Resend form (2026-08-20):
+    # linkedin and website had rules, github never did.
+    (r"github", lambda p: p.get("github") or ""),
     (r"^(website|portfolio|personal\s+site)", lambda p: p.get("website") or ""),
     # Compensation — filled statically so the salary figure never reaches the LLM (E2).
     # The label must be a short *value* question: an optional lead (desired/expected/…/minimum/base/total),

@@ -15,6 +15,7 @@ def test_profile_for_answers_keeps_only_prose_keys():
         "education": [{"b": 2}],
         "languages": ["pt"],
         "publications": ["p"],
+        "open_source": [{"name": "moonlighter"}],
         "preferences": {"salary_target_brl_monthly": 40000},
         "criteria": {"priority_targets": ["Nubank"]},
     }
@@ -27,6 +28,7 @@ def test_profile_for_answers_keeps_only_prose_keys():
         "education",
         "languages",
         "publications",
+        "open_source",
     }
     # The secrets are gone.
     assert "phone" not in reduced and "email" not in reduced
@@ -59,3 +61,12 @@ def test_profile_for_answers_still_excludes_contact_details():
     profile = {"name": "X", "email": "a@b.c", "phone": "1", "linkedin": "u", "summary": "s"}
     sent = profile_for_answers(profile)
     assert set(sent) == {"summary"}
+
+def test_open_source_reaches_the_answer_prompt():
+    """Seen live twice on 2026-08-21 (Supabase DevRel #8138 and Frontend #5100):
+    "open source contributions" answers cited only ParallelME (2016) from the
+    experience list and ignored the projects in profile.yaml's open_source: —
+    the whitelist never let them through. Public by nature; prose content, not
+    contact data (links stay on the deterministic field-map track)."""
+    profile = {"open_source": [{"name": "moonlighter"}], "summary": "s"}
+    assert profile_for_answers(profile)["open_source"] == [{"name": "moonlighter"}]

@@ -24,6 +24,11 @@ _ANSWER_PROFILE_KEYS = (
     "education",
     "languages",
     "publications",
+    # Seen live twice on 2026-08-21 (Supabase #8138/#5100): "open source
+    # contributions" answers ignored the projects in open_source: because the
+    # whitelist never let them through. Prose content, public by nature —
+    # links stay on the deterministic field-map track.
+    "open_source",
 )
 
 
