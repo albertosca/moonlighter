@@ -15,7 +15,7 @@ dev = [
     # if it rewrites anything, that reformat belongs in the SAME PR, so the style
     # change lands as one reviewable commit instead of surprising the next branch.
     # 0.15 -> 0.16.3 needed none, verified 2026-08-21.
-    "ruff>=0.16.3,<0.17",
+    "ruff>=0.16.4,<0.17",
     "mypy>=1.11",
 ]
 
