@@ -421,6 +421,30 @@ async def test_list_jobs_default_new(tmp_db):
     assert "Stripe" in result
 
 
+async def test_list_jobs_reorders_and_badges_recently_rejected_companies(tmp_db):
+    # 2026-08-24: Holepunch #3197 was offered with no hint that the same
+    # company rejected #3200 eight days earlier. Same persisted score, but the
+    # rejected company's job sorts after and carries the badge.
+    import datetime
+
+    init_db()
+    create_job(tmp_db, company="CleanCo", url="https://x.com/lj/clean", score=8.0)
+    rejected_job = create_job(
+        tmp_db, company="Holepunch", url="https://x.com/lj/old", score=8.0, status="rejected"
+    )
+    create_application(
+        rejected_job,
+        status="rejected",
+        updated_at=datetime.datetime.now() - datetime.timedelta(days=8),
+    )
+    create_job(tmp_db, company="Holepunch", url="https://x.com/lj/new", score=8.0)
+    from moonlighter.server import list_jobs
+
+    result = await list_jobs(ctx=make_test_context())
+    assert "rejected 1x" in result
+    assert result.index("CleanCo") < result.index("Holepunch")
+
+
 async def test_list_jobs_filtered_by_status(tmp_db):
     init_db()
     create_job(tmp_db, url="https://x.com/lj2", status="reviewed", score=7.0, company="Linear")
