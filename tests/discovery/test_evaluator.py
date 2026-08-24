@@ -773,6 +773,23 @@ async def test_evaluate_job_prompt_carries_location_and_remote_type():
     assert "Regional eligibility" in seen["prefix"]
 
 
+async def test_eval_prefixes_carry_the_mandatory_requirement_rule():
+    # Live 2026-08-21 (gympass #3404 vs #3416): a posting mandating
+    # Kotlin/Go/Java (none in the profile) outscored its twin mandating Python
+    # (8y in the profile) — the evaluator saw the requirement and explained it
+    # away as "inconsistent with the rest of the description". The rule must
+    # be in BOTH prompt prefixes, must forbid that rationalization, must
+    # require an "unmet mandatory:" caveat, and must NOT be a hard filter
+    # (an Elixir-mandatory posting is attractive, never eliminated).
+    from moonlighter.discovery.evaluator import EVAL_BATCH_PREFIX, EVAL_PREFIX
+
+    for prefix in (EVAL_PREFIX, EVAL_BATCH_PREFIX):
+        assert "## Mandatory requirements" in prefix
+        assert "unmet mandatory:" in prefix
+        assert "inconsistent" in prefix  # the named forbidden rationalization
+        assert "NOT a hard filter" in prefix
+
+
 async def test_evaluate_job_omits_location_lines_when_absent():
     seen = {}
 

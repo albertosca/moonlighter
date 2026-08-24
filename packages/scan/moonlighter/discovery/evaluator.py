@@ -62,6 +62,16 @@ Horizonte itself. When a Location line names another country, region or city and
 description grants such coverage, that is a triggered hard filter — do not reinterpret the stated
 location as an inconsistency to discount; score it ≤ 2.0 and record the reason in `caveats`.
 
+## Mandatory requirements
+When the posting marks a requirement as mandatory/required/must-have/non-negotiable and the
+candidate's profile does not meet it, weigh that unmet mandatory requirement MORE heavily than any
+relative weakness elsewhere in the profile — an employer's stated dealbreaker outranks a
+documented-but-present skill gap. Never explain the requirement away: do not reinterpret an explicit
+mandatory requirement as "inconsistent with the rest of the description" or otherwise discount it
+because the surrounding text emphasizes different skills. List every unmet mandatory requirement in
+`caveats`, prefixed "unmet mandatory:". This weighs the score DOWN; it is NOT a hard filter — do not
+cap the score at 2.0 for unmet mandatory requirements alone (only `criteria.hard_filters` do that).
+
 ## Instructions
 Return a JSON object with ONLY these keys (no markdown, no explanation):
 - score: float 0.0-10.0 (10 = perfect match for this candidate)
@@ -256,6 +266,16 @@ coverage that includes Brazil (Brazil/LATAM/Americas/global/worldwide), or on-si
 Horizonte itself. When a Location line names another country, region or city and neither it nor the
 description grants such coverage, that is a triggered hard filter — do not reinterpret the stated
 location as an inconsistency to discount; score it ≤ 2.0 and record the reason in `caveats`.
+
+## Mandatory requirements
+When the posting marks a requirement as mandatory/required/must-have/non-negotiable and the
+candidate's profile does not meet it, weigh that unmet mandatory requirement MORE heavily than any
+relative weakness elsewhere in the profile — an employer's stated dealbreaker outranks a
+documented-but-present skill gap. Never explain the requirement away: do not reinterpret an explicit
+mandatory requirement as "inconsistent with the rest of the description" or otherwise discount it
+because the surrounding text emphasizes different skills. List every unmet mandatory requirement in
+`caveats`, prefixed "unmet mandatory:". This weighs the score DOWN; it is NOT a hard filter — do not
+cap the score at 2.0 for unmet mandatory requirements alone (only `criteria.hard_filters` do that).
 
 ## Job postings
 You will be given {n} job postings, numbered and delimited, after these instructions. Evaluate EACH independently.
