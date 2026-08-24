@@ -6,6 +6,7 @@ PROFILE = {
     "phone": "11912345678",
     "email": "maria.pereira@example.com",
     "linkedin": "https://www.linkedin.com/in/mariapereira/",
+    "github": "https://github.com/mariapereira",
     "location": "São Paulo, SP, Brasil",
     # generic location/language/availability fields
     "country_en": "Brazil",
@@ -73,6 +74,13 @@ def test_email():
 def test_linkedin():
     r = pre_populate_answers(["LinkedIn Profile"], PROFILE)
     assert r["LinkedIn Profile"] == "https://www.linkedin.com/in/mariapereira/"
+
+
+def test_github():
+    # A "Github" field became a gap on the live Resend form (2026-08-20):
+    # linkedin and website had static rules, github never did.
+    r = pre_populate_answers(["GitHub Profile"], PROFILE)
+    assert r["GitHub Profile"] == "https://github.com/mariapereira"
 
 
 def test_location_city():
