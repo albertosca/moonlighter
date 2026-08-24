@@ -20,6 +20,7 @@ from moonlighter.core.metrics import record_spend_limit_hit
 from moonlighter.core.plugins import discover_entry_points
 from moonlighter.discovery.archive import _format_archive_result
 from moonlighter.discovery.archive import archive_stale_jobs as archive_stale_jobs
+from moonlighter.discovery.eligibility import Eligibility, classify_location
 from moonlighter.discovery.evaluator import (
     EvalInput,
     evaluate_job,
@@ -298,6 +299,18 @@ async def _evaluate_and_store(
                     )
                     if job is not None:
                         results.append(job)
+                elif classify_location(raw.location, raw.remote_type) is Eligibility.INELIGIBLE:
+                    # Onsite/hybrid outside Belo Horizonte: no JD wording can fix
+                    # that — archived without spending an LLM call (see eligibility.py).
+                    job = _persist(
+                        raw,
+                        score=0.0,
+                        score_notes=f"location ineligible: {raw.location!r}",
+                        caveats="[]",
+                        status="archived",
+                    )
+                    if job is not None:
+                        results.append(job)
                 elif _is_description_insufficient(raw.description):
                     job = _persist(
                         raw,
@@ -317,7 +330,13 @@ async def _evaluate_and_store(
             try:
                 evals = await evaluate_jobs_batch(
                     [
-                        EvalInput(r.company, r.title, r.description or f"{r.title} at {r.company}")
+                        EvalInput(
+                            r.company,
+                            r.title,
+                            r.description or f"{r.title} at {r.company}",
+                            location=r.location,
+                            remote_type=r.remote_type,
+                        )
                         for r in to_eval
                     ],
                     profile,
@@ -406,8 +425,11 @@ def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
     title_filtered = sum(
         1 for j in saved if j.score_notes and j.score_notes.startswith("title filtered:")
     )
+    location_ineligible = sum(
+        1 for j in saved if j.score_notes and j.score_notes.startswith("location ineligible:")
+    )
     needs_verification = sum(1 for j in saved if j.status == "needs_review")
-    below = len(saved) - len(above) - title_filtered - needs_verification
+    below = len(saved) - len(above) - title_filtered - location_ineligible - needs_verification
     spend_note = (
         "\n\n⚠️  Spend limit reached — scan stopped (remaining jobs are left for the next scan)."
         if spend_hit
@@ -423,14 +445,16 @@ def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
     if not above:
         return (
             f"{len(saved)} jobs processed. None passed the threshold of {threshold}. "
-            f"({title_filtered} filtered by title, {below} below score)"
+            f"({title_filtered} filtered by title, {location_ineligible} location ineligible, "
+            f"{below} below score)"
             f"{spend_note}{verify_note}"
         )
 
     table = render_jobs_table(above)
     footer = (
         f"\n∗ = salary estimated by the LLM  |  "
-        f"{below} below threshold  |  {title_filtered} filtered by title"
+        f"{below} below threshold  |  {title_filtered} filtered by title  |  "
+        f"{location_ineligible} location ineligible"
     )
     return (
         f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}"

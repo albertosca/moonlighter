@@ -748,6 +748,50 @@ async def test_evaluate_job_non_list_caveats_becomes_empty():
     assert result.caveats == []
 
 
+async def test_evaluate_job_prompt_carries_location_and_remote_type():
+    # The 32/32 gitlab false positives happened because the LLM judged
+    # eligibility without ever seeing the structured location field.
+    seen = {}
+
+    async def spy(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        seen["prompt"] = prompt
+        seen["prefix"] = cache_prefix
+        return MOCK_LLM_RESPONSE
+
+    await evaluate_job(
+        company="Acme",
+        title="Eng",
+        description=JD,
+        profile=PROFILE,
+        model="claude-sonnet-4-6",
+        _caller=spy,
+        location="Bangalore, India",
+        remote_type="remote",
+    )
+    assert "Location: Bangalore, India" in seen["prompt"]
+    assert "Remote type: remote" in seen["prompt"]
+    assert "Regional eligibility" in seen["prefix"]
+
+
+async def test_evaluate_job_omits_location_lines_when_absent():
+    seen = {}
+
+    async def spy(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        seen["prompt"] = prompt
+        return MOCK_LLM_RESPONSE
+
+    await evaluate_job(
+        company="Acme",
+        title="Eng",
+        description=JD,
+        profile=PROFILE,
+        model="claude-sonnet-4-6",
+        _caller=spy,
+    )
+    assert "Location:" not in seen["prompt"]
+    assert "Remote type:" not in seen["prompt"]
+
+
 # ── EvalInput ────────────────────────────────────────────────────────────────
 
 
