@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "moonlighter-scan"
-version = "0.1.3"
+version = "0.1.4"
 description = "Job discovery across six ATS platforms with LLM fit-scoring — the discovery slice of moonlighter"
 readme = "README.md"
 license = {text = "AGPL-3.0-only"}

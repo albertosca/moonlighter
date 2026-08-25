@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "moonlighter"
-version = "0.1.3"
+version = "0.1.4"
 description = "AI-powered job application pipeline as an MCP server for Claude — scan boards, score fit, compose every answer; you review and submit"
 readme = "README.md"
 license = {text = "AGPL-3.0-only"}
@@ -20,10 +20,10 @@ classifiers = [
     "Topic :: Office/Business",
 ]
 dependencies = [
-    "moonlighter-core==0.1.3",
-    "moonlighter-scan==0.1.3",
-    "moonlighter-apply==0.1.3",
-    "moonlighter-email==0.1.3",
+    "moonlighter-core==0.1.4",
+    "moonlighter-scan==0.1.4",
+    "moonlighter-apply==0.1.4",
+    "moonlighter-email==0.1.4",
     "fastmcp>=2.0",
 ]
 
