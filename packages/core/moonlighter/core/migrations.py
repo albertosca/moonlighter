@@ -68,12 +68,39 @@ def _m005_backfill_job_status_from_applications(db: Any) -> None:
     )
 
 
+def _m006_fix_invented_onsite_remote_types(db: Any) -> None:
+    # The old normalize_remote_type invented 'onsite' for any unrecognized
+    # location (English-only vocabulary + onsite default) — live bug iFood
+    # #2811 ("Remoto" → onsite). Since the regional filter cuts onsite/hybrid
+    # outside Belo Horizonte deterministically, an invented onsite is an
+    # invented archive. Only 'onsite' rows are touched: the API remote flags
+    # never produced that value. SQL mirrors the fixed normalizer's order.
+    if not (_has_column(db, "job", "remote_type") and _has_column(db, "job", "location")):
+        return
+    db.execute_sql(
+        "UPDATE job SET remote_type = 'hybrid' WHERE remote_type = 'onsite' AND ("
+        "lower(location) LIKE '%hybrid%' OR location LIKE '%íbrido%' "
+        "OR lower(location) LIKE '%hibrido%')"
+    )
+    db.execute_sql(
+        "UPDATE job SET remote_type = 'remote' WHERE remote_type = 'onsite' AND ("
+        "lower(location) LIKE '%remote%' OR lower(location) LIKE '%remoto%')"
+    )
+    db.execute_sql(
+        "UPDATE job SET remote_type = NULL WHERE remote_type = 'onsite' AND NOT ("
+        "lower(location) LIKE '%on-site%' OR lower(location) LIKE '%onsite%' "
+        "OR lower(location) LIKE '%presencial%' OR lower(location) LIKE '%in office%' "
+        "OR lower(location) LIKE '%in-office%')"
+    )
+
+
 MIGRATIONS: list[tuple[int, str, Callable[[Any], None]]] = [
     (1, "application_email_ref", _m001_application_email_ref),
     (2, "application_current_stage", _m002_application_current_stage),
     (3, "job_closed_at", _m003_job_closed_at),
     (4, "unify_closed_into_archived", _m004_unify_closed_into_archived),
     (5, "backfill_job_status_from_applications", _m005_backfill_job_status_from_applications),
+    (6, "fix_invented_onsite_remote_types", _m006_fix_invented_onsite_remote_types),
 ]
 
 

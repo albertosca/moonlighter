@@ -592,7 +592,7 @@ async def test_workable_no_telecommuting_uses_location():
     mock_client = _make_mock_client(response)
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WorkableScanner().scan(["acme"])
-    assert jobs[0].remote_type == "onsite"
+    assert jobs[0].remote_type is None  # bare city: unknown, never invented onsite
 
 
 async def test_workable_missing_location_parts():
@@ -668,7 +668,7 @@ async def test_recruitee_maps_fields_and_strips_html():
     assert j.title == "Backend Dev"
     assert j.url == "https://x.recruitee.com/o/backend-dev/c/new"
     assert j.location == "Amsterdam, Netherlands"
-    assert j.remote_type == "onsite"  # remote False, falls back to location text
+    assert j.remote_type is None  # remote False + bare city: unknown, never invented onsite
     assert j.description == "Go"
 
 
@@ -1089,7 +1089,7 @@ async def test_smartrecruiters_no_remote_or_hybrid_flags_uses_location_text():
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs[0].location == "Berlin, Germany"
-    assert jobs[0].remote_type == "onsite"
+    assert jobs[0].remote_type is None  # bare city: unknown, never invented onsite
 
 
 async def test_smartrecruiters_missing_location_dict():
@@ -2085,7 +2085,7 @@ async def test_ashby_is_remote_flag_false_uses_location():
     mock_client = _make_mock_client(_ashby_response(job))
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
-    assert jobs[0].remote_type == "onsite"
+    assert jobs[0].remote_type is None  # bare city: unknown, never invented onsite
 
 
 async def test_ashby_unlisted_job_is_skipped():

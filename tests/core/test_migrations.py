@@ -148,6 +148,37 @@ def test_m005_backfills_job_status_from_applications(tmp_path, monkeypatch, open
     assert rows == {1: "applied", 2: "rejected", 3: "new"}
 
 
+def test_m006_fixes_invented_onsite_remote_types(tmp_path, monkeypatch, open_dbs):
+    """The old normalize_remote_type invented 'onsite' for any location it did
+    not recognize (English-only vocabulary + onsite default). Live bug iFood
+    #2811: location 'Remoto', remote_type 'onsite' — and since 2026-08-24 an
+    invented onsite outside Belo Horizonte is an invented deterministic
+    archive. m006 re-derives the stored 'onsite' rows: PT/EN explicit terms
+    win, a bare place name becomes NULL (unknown, the evaluator decides)."""
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
+    db = _fresh_db(tmp_path / "t.db", open_dbs)
+    db.execute_sql("ALTER TABLE job ADD COLUMN location VARCHAR(255)")
+    db.execute_sql("ALTER TABLE job ADD COLUMN remote_type VARCHAR(32)")
+    run_migrations(db)
+    rows = [
+        (1, "Remoto", "onsite", "remote"),  # the iFood case
+        (2, "Híbrido - São Paulo", "onsite", "hybrid"),
+        (3, "São Paulo", "onsite", None),  # bare place: unknown
+        (4, "Presencial - Recife", "onsite", "onsite"),  # explicit stays
+        (5, "Remote - US", "remote", "remote"),  # non-onsite rows untouched
+    ]
+    for jid, loc, rt, _ in rows:
+        db.execute_sql(
+            "INSERT INTO job (id, location, remote_type) VALUES (?, ?, ?)", (jid, loc, rt)
+        )
+    db.execute_sql("UPDATE schema_version SET version = 5")
+
+    run_migrations(db)
+
+    got = dict(db.execute_sql("SELECT id, remote_type FROM job ORDER BY id").fetchall())
+    assert got == {jid: want for jid, _, _, want in rows}
+
+
 def test_idempotence_on_real_shaped_db_never_raises(tmp_path, monkeypatch, open_dbs):
     """THE critical invariant: Alberto's real DB already has the three columns
     from the old ad-hoc ALTERs but no schema_version table (detected version 0).
@@ -161,7 +192,7 @@ def test_idempotence_on_real_shaped_db_never_raises(tmp_path, monkeypatch, open_
     applied = run_migrations(db)
 
     assert applied == [name for _, name, _ in MIGRATIONS]
-    assert current_version(db) == len(MIGRATIONS) == 5
+    assert current_version(db) == len(MIGRATIONS) == 6
     assert "email_ref" in _columns(db, "application")
     assert "current_stage" in _columns(db, "application")
     assert "closed_at" in _columns(db, "job")
@@ -236,7 +267,7 @@ def test_failed_migration_leaves_version_at_last_fully_applied(tmp_path, monkeyp
     def _boom(_db):
         raise peewee.OperationalError("simulated failure, not a lock")
 
-    broken_migrations = [*MIGRATIONS, (6, "boom", _boom)]
+    broken_migrations = [*MIGRATIONS, (7, "boom", _boom)]
     monkeypatch.setattr(migrations, "MIGRATIONS", broken_migrations)
 
     with pytest.raises(peewee.OperationalError):
