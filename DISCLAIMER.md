@@ -93,7 +93,7 @@ that applier.
 The shipped product never drives a browser to fill in or submit a form — see the LinkedIn bullet
 above and [PRIVACY.md](PRIVACY.md) for how `prepare_application` composes answers for you to paste
 in and submit yourself. Browser-driven form fill/submit was built and then deliberately moved off
-the distributed product, onto a separate, paused branch (`feat/ats-automation`) not included in
+the distributed product, onto a separate, paused branch (currently `feat/ats-automation`) not included in
 any release.
 
 The browser automation that *does* ship is narrower: the optional `moonlighter-core[browser]`

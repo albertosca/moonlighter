@@ -8,7 +8,7 @@ Monorepo of 5 PEP 420 namespace packages under `packages/*/moonlighter/` — nev
 
 `main` is protected: PR + 3 passing checks (`test`, `cla`, `security-audit`). A direct `git push` to main is rejected — branch, open a PR, `gh pr merge --auto --merge`.
 
-`feat/ats-automation` holds the browser appliers deliberately removed from `main` in the assisted pivot (`37b1ac2`, 2026-08-12); that merge is not planned. Two traps: don't "restore" appliers to `main`, and don't plain-merge `main` into that branch — its tip was once an ancestor of `main`, so a fast-forward would have silently erased the code it exists to keep.
+`feat/ats-automation` holds the browser appliers deliberately removed from `main` in the assisted pivot (`37b1ac2`, 2026-08-12); that merge is not planned. Two traps: don't "restore" appliers to `main`, and don't plain-merge `main` into that branch — its tip was once an ancestor of `main`, so a fast-forward would have silently erased the code it exists to keep. A third trap: `DISCLAIMER.md` names this branch — renaming or deleting it stales that document; update both together.
 
 ## Commands
 
