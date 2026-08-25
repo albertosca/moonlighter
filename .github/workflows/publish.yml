@@ -29,6 +29,12 @@ name: Publish
 on:
   push:
     tags: ['v*']
+  # Changes to this workflow used to land on main having NEVER executed —
+  # publish only fires on tags, so a broken edit was first exercised by the
+  # next release. A PR touching this file now runs verify + a build of all
+  # five packages (no upload, no OIDC): the smoke test is the PR itself.
+  pull_request:
+    paths: ['.github/workflows/publish.yml']
 
 jobs:
   verify:
@@ -46,6 +52,7 @@ jobs:
         run: uv run pytest tests/test_packaging.py --no-cov -q
 
       - name: Verify the tag matches the packaged version
+        if: github.ref_type == 'tag'
         run: |
           version=$(uv run python -c \
             "import tomllib,pathlib;print(tomllib.loads(pathlib.Path('packages/full/pyproject.toml').read_text())['project']['version'])")
@@ -54,8 +61,26 @@ jobs:
             exit 1
           fi
 
+  # PR smoke: prove every package still builds, without touching PyPI.
+  build:
+    needs: verify
+    if: github.ref_type != 'tag'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [moonlighter, moonlighter-core, moonlighter-scan, moonlighter-apply, moonlighter-email]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.14'
+      - name: Build ${{ matrix.package }}
+        run: uv build --package ${{ matrix.package }}
+
   publish:
     needs: verify
+    if: github.ref_type == 'tag'
     strategy:
       # One package failing transiently must not cancel siblings mid-upload;
       # the fix for a partial publish is re-running the failed jobs only.
