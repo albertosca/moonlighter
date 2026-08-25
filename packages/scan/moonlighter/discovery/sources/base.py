@@ -42,14 +42,31 @@ ScanStats = dict[str, SourceStats]
 
 
 def normalize_remote_type(location: str | None) -> str | None:
+    """Derive remote_type from a location string — explicit terms only.
+
+    EN and PT-BR vocabularies (live bug iFood #2811, 2026-08-24: "Remoto"
+    derived 'onsite'). A bare place name returns None, never 'onsite': the
+    old default invented on-site for anything unrecognized, and once the
+    regional eligibility filter began cutting onsite/hybrid outside Belo
+    Horizonte deterministically, an invented 'onsite' became an invented
+    archive. Unknown stays unknown and the evaluator decides, seeing both
+    fields."""
     if not location:
         return None
     loc = location.lower()
-    if "hybrid" in loc:
+    if "hybrid" in loc or "híbrido" in loc or "hibrido" in loc:
         return "hybrid"
-    if "remote" in loc:
+    if "remote" in loc or "remoto" in loc:
         return "remote"
-    return "onsite"
+    if (
+        "on-site" in loc
+        or "onsite" in loc
+        or "presencial" in loc
+        or "in office" in loc
+        or "in-office" in loc
+    ):
+        return "onsite"
+    return None
 
 
 class BaseScanner(ABC):

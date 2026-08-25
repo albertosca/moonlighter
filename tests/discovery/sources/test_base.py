@@ -16,8 +16,31 @@ def test_rawjob_defaults():
 def test_normalize_remote_type():
     assert normalize_remote_type("Remote - US") == "remote"
     assert normalize_remote_type("Hybrid, São Paulo") == "hybrid"
-    assert normalize_remote_type("New York, NY") == "onsite"
     assert normalize_remote_type(None) is None
+
+
+def test_normalize_remote_type_speaks_portuguese():
+    # Live bug (iFood #2811, seen 2026-08-24): location said "Remoto" and the
+    # derived remote_type said 'onsite' — the vocabulary was English-only.
+    assert normalize_remote_type("Remoto") == "remote"
+    assert normalize_remote_type("Híbrido - São Paulo") == "hybrid"
+    assert normalize_remote_type("Hibrido") == "hybrid"
+    assert normalize_remote_type("Presencial - São Paulo") == "onsite"
+
+
+def test_a_bare_place_name_is_unknown_not_onsite():
+    # The old default invented 'onsite' for any unrecognized location. Once
+    # the regional eligibility filter started cutting onsite/hybrid outside
+    # Belo Horizonte deterministically (2026-08-24), an invented 'onsite'
+    # became an invented archive — remote_type must be explicit or None.
+    assert normalize_remote_type("New York, NY") is None
+    assert normalize_remote_type("São Paulo") is None
+
+
+def test_onsite_only_when_explicit():
+    assert normalize_remote_type("On-site, Austin") == "onsite"
+    assert normalize_remote_type("Onsite - Berlin") == "onsite"
+    assert normalize_remote_type("In office, NYC") == "onsite"
 
 
 def test_normalize_remote_case_insensitive():
@@ -42,12 +65,12 @@ def test_normalize_empty_string_returns_none():
     assert normalize_remote_type("") is None
 
 
-def test_normalize_unknown_string_returns_onsite():
-    assert normalize_remote_type("negotiable") == "onsite"
+def test_normalize_unknown_string_is_none():
+    assert normalize_remote_type("negotiable") is None
 
 
 def test_normalize_us_only_string():
-    assert normalize_remote_type("United States") == "onsite"
+    assert normalize_remote_type("United States") is None
 
 
 def test_rawjob_with_all_fields():
