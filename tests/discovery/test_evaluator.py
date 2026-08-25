@@ -790,6 +790,20 @@ async def test_eval_prefixes_carry_the_mandatory_requirement_rule():
         assert "NOT a hard filter" in prefix
 
 
+async def test_eval_prefixes_carry_the_engagement_type_rule():
+    # Alberto, 2026-08-24: contract/freelance/fixed-term postings (make #3264
+    # freelance ago-dez/2026, Flywheel "Contract" in the title) competed at the
+    # same score as permanent roles. He still wants them in the queue, just
+    # lower — a discount, never a cut, same philosophy as the stale-Elixir
+    # discount and the unmet-mandatory rule.
+    from moonlighter.discovery.evaluator import EVAL_BATCH_PREFIX, EVAL_PREFIX
+
+    for prefix in (EVAL_PREFIX, EVAL_BATCH_PREFIX):
+        assert "## Engagement type" in prefix
+        assert "contract-based:" in prefix
+        assert "NOT a hard filter" in prefix.split("## Engagement type")[1]
+
+
 async def test_evaluate_job_omits_location_lines_when_absent():
     seen = {}
 

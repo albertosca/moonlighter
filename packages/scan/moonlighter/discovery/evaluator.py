@@ -72,6 +72,13 @@ because the surrounding text emphasizes different skills. List every unmet manda
 `caveats`, prefixed "unmet mandatory:". This weighs the score DOWN; it is NOT a hard filter — do not
 cap the score at 2.0 for unmet mandatory requirements alone (only `criteria.hard_filters` do that).
 
+## Engagement type
+The candidate targets permanent full-time positions. When the posting is contract-based, freelance,
+fixed-term, or hourly-gig work (including "Contract" or "Freelance" in the title), discount the
+score: these postings stay in the queue but must rank below comparable permanent roles. This is a
+discount, NOT a hard filter — never cap the score at 2.0 for engagement type alone. Record the
+finding in `caveats`, prefixed "contract-based:".
+
 ## Instructions
 Return a JSON object with ONLY these keys (no markdown, no explanation):
 - score: float 0.0-10.0 (10 = perfect match for this candidate)
@@ -276,6 +283,13 @@ mandatory requirement as "inconsistent with the rest of the description" or othe
 because the surrounding text emphasizes different skills. List every unmet mandatory requirement in
 `caveats`, prefixed "unmet mandatory:". This weighs the score DOWN; it is NOT a hard filter — do not
 cap the score at 2.0 for unmet mandatory requirements alone (only `criteria.hard_filters` do that).
+
+## Engagement type
+The candidate targets permanent full-time positions. When the posting is contract-based, freelance,
+fixed-term, or hourly-gig work (including "Contract" or "Freelance" in the title), discount the
+score: these postings stay in the queue but must rank below comparable permanent roles. This is a
+discount, NOT a hard filter — never cap the score at 2.0 for engagement type alone. Record the
+finding in `caveats`, prefixed "contract-based:".
 
 ## Job postings
 You will be given {n} job postings, numbered and delimited, after these instructions. Evaluate EACH independently.
