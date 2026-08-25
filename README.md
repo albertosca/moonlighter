@@ -1,4 +1,4 @@
-> **[Leia em Português](README.pt.md)**
+🇺🇸 [English](README.md) · 🇧🇷 [Português](README.pt.md)
 
 # moonlighter
 
@@ -6,6 +6,8 @@
 [![Python](https://img.shields.io/badge/python-3.14%2B-blue)](https://pypi.org/project/moonlighter/)
 [![CI](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml/badge.svg)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![Lint: ruff](https://img.shields.io/badge/lint-ruff-261230)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml)
+[![Coverage: 100%](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml)
 
 AI-powered job application pipeline. Scans job boards, scores candidate fit via LLM, and composes every answer a job application form asks for — all driven from Claude through a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server. moonlighter never opens a browser to fill or submit a form, and never submits an application on your behalf — see [How it works](#how-it-works) below and [DISCLAIMER.md](DISCLAIMER.md).
 
