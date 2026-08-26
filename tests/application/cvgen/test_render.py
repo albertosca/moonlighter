@@ -64,7 +64,8 @@ class TestEscape:
         assert escape_latex("with **10+ years** shipping") == r"with \textbf{10+ years} shipping"
 
     def test_backslash_input_cannot_inject(self):
-        assert "\\input" not in escape_latex(r"\input{evil}")
+        # Exact output: backslash and braces all escaped, no cascade re-escaping
+        assert escape_latex(r"\input{evil}") == r"\textbackslash{}input\{evil\}"
 
 
 class TestRender:
@@ -103,3 +104,18 @@ class TestRender:
         )
         assert r"Fiz \textbf{A}" in tex
         assert r"Did \textbf{A}" not in tex
+
+    def test_open_source_heading_stays_english_in_pt(self):
+        # Domain jargon: "Open Source" is untranslated in PT (same convention
+        # as pool job titles like "Full Stack Engineer").
+        tex = render_cv(
+            TEMPLATE,
+            _selection(
+                language="pt",
+                open_source=("oss-m",),
+                translations={"oss-m": r"Contribuições em \textbf{moonlighter}"},
+            ),
+            POOL,
+        )
+        assert r"\section{Open Source}" in tex
+        assert r"Contribuições em \textbf{moonlighter}" in tex

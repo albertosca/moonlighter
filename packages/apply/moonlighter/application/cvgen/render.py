@@ -13,25 +13,27 @@ from dataclasses import dataclass
 
 from moonlighter.application.cvgen.pool import CVPool, PoolExperience
 
-# Order matters: backslash first, then the rest, then ** -> \textbf.
-_SPECIALS = [
-    ("\\", r"\textbackslash{}"),
-    ("&", r"\&"),
-    ("%", r"\%"),
-    ("$", r"\$"),
-    ("#", r"\#"),
-    ("_", r"\_"),
-    ("{", r"\{"),
-    ("}", r"\}"),
-    ("~", r"\textasciitilde{}"),
-    ("^", r"\textasciicircum{}"),
-]
+# Single-pass lookup table prevents cascade re-escaping: braces produced by
+# \textbackslash{} cannot be re-escaped on a subsequent pass.
+_LATEX_ESCAPE_TABLE = {
+    "\\": r"\textbackslash{}",
+    "&": r"\&",
+    "%": r"\%",
+    "$": r"\$",
+    "#": r"\#",
+    "_": r"\_",
+    "{": r"\{",
+    "}": r"\}",
+    "~": r"\textasciitilde{}",
+    "^": r"\textasciicircum{}",
+}
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
 
 
 def escape_latex(text: str) -> str:
-    for char, repl in _SPECIALS:
-        text = text.replace(char, repl)
+    # Single-pass regex prevents cascade: braces in \textbackslash{} won't
+    # be re-escaped to \{ and \}.
+    text = re.sub(r"[\\&%$#_{}~^]", lambda m: _LATEX_ESCAPE_TABLE[m.group()], text)
     return _BOLD.sub(r"\\textbf{\1}", text)
 
 
@@ -72,6 +74,9 @@ def _open_source_block(selection: CVSelection, pool: CVPool) -> str:
     chosen = [b for bid in selection.open_source for b in pool.open_source if b.id == bid]
     if not chosen:
         return ""
+    # Domain jargon, deliberately untranslated in both PT and EN:
+    # "Open Source" is used as-is in Brazilian tech CVs, same convention as
+    # the pool's job titles (e.g., "Full Stack Engineer" stays untranslated).
     heading = "Open Source"
     items = "\n".join(f"\\cvlistitem{{{_bullet_text(b.id, b.latex, selection)}}}" for b in chosen)
     return f"\\section{{{heading}}}\n{items}"
