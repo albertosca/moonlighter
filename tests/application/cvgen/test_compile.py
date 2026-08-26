@@ -26,7 +26,12 @@ def test_runs_two_passes_in_the_tex_dir(tmp_path):
         result = compile_pdf(tex)
     assert result == tmp_path / "cv.pdf"
     assert run.call_count == 2
+    # Verify command contract: args and kwargs
+    expected_cmd = ["/usr/bin/pdflatex", "-interaction=nonstopmode", "-halt-on-error", "cv.tex"]
+    assert run.call_args.args[0] == expected_cmd
     assert run.call_args.kwargs["cwd"] == tmp_path
+    assert run.call_args.kwargs["capture_output"] is True
+    assert run.call_args.kwargs["timeout"] == 120
 
 
 def test_failed_compile_returns_none_keeps_tex(tmp_path):
@@ -41,6 +46,10 @@ def test_failed_compile_returns_none_keeps_tex(tmp_path):
     ):
         assert compile_pdf(tex) is None
     assert tex.exists()
+    # Verify command contract even on failure
+    expected_cmd = ["/usr/bin/pdflatex", "-interaction=nonstopmode", "-halt-on-error", "cv.tex"]
+    assert run.call_args.args[0] == expected_cmd
+    assert run.call_args.kwargs["timeout"] == 120
 
 
 def test_timeout_returns_none_keeps_tex(tmp_path):
@@ -55,6 +64,23 @@ def test_timeout_returns_none_keeps_tex(tmp_path):
     ):
         assert compile_pdf(tex) is None
     assert tex.exists()
+
+
+def test_custom_timeout_reaches_subprocess(tmp_path):
+    tex = tmp_path / "cv.tex"
+    tex.write_text("x")
+    run = MagicMock(return_value=MagicMock(returncode=0))
+    custom_timeout = 300
+    with (
+        patch(
+            "moonlighter.application.cvgen.compile.shutil.which", return_value="/usr/bin/pdflatex"
+        ),
+        patch("moonlighter.application.cvgen.compile.subprocess.run", run),
+    ):
+        (tmp_path / "cv.pdf").write_bytes(b"%PDF")
+        compile_pdf(tex, timeout_s=custom_timeout)
+    # Verify custom timeout reaches subprocess.run on both passes
+    assert run.call_args.kwargs["timeout"] == custom_timeout
 
 
 @pytest.mark.e2e
