@@ -66,7 +66,6 @@ _OPERATOR_MARKERS = (
     "please upload",
     "material provided",
     "before submitting",
-    "note to",
 )
 
 

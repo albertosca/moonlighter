@@ -124,7 +124,7 @@ async def test_operator_directed_summary_degrades_to_none():
         {
             "decision": "GENERATE",
             "language": "en",
-            "summary": "Note to the operator: adjust this before sending",
+            "summary": "Please provide this summary before submitting",
             "technical_expertise": "Elixir",
             "bullets": ["t-a"],
             "open_source": [],
@@ -150,7 +150,7 @@ async def test_operator_directed_expertise_degrades_to_none():
             "decision": "GENERATE",
             "language": "en",
             "summary": "Expert in Elixir",
-            "technical_expertise": "Note to the operator: please review before sending",
+            "technical_expertise": "The candidate cannot supply this section",
             "bullets": ["t-a"],
             "open_source": [],
         }
