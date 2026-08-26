@@ -118,6 +118,21 @@ async def test_a_file_gap_still_appears_when_no_cv_is_configured():
 
 
 @pytest.mark.asyncio
+async def test_a_cv_file_gap_names_the_tailored_pdf_with_review_instruction(tmp_path):
+    tailored = tmp_path / "7"
+    tailored.mkdir()
+    cv = tailored / "cv.pdf"
+    cv.write_bytes(b"%PDF-1.4")
+    question = FormQuestion(label="Resume/CV", kind=QuestionKind.FILE, required=True)
+    job = {**JOB, "id": 7}
+    composed = await compose_answers(
+        [question], PROFILE, {"cv": {"generated_dir": str(tmp_path)}}, job, answers_anything
+    )
+    assert str(cv) in composed[0].gap_reason
+    assert "tailored for this job — review it before uploading" in composed[0].gap_reason
+
+
+@pytest.mark.asyncio
 async def test_an_empty_generated_answer_becomes_a_gap_rather_than_an_empty_field():
     async def returns_nothing(prompt: str, model: str, cache_prefix: str | None = None) -> str:
         return "   "

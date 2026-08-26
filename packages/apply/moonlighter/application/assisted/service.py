@@ -20,6 +20,7 @@ from moonlighter.application.assisted.sources.recruitee import (
     fetch_recruitee_questions,
     host_and_offer_from_url,
 )
+from moonlighter.application.cvgen.service import ensure_tailored_cv
 from moonlighter.core.db import Application, Job
 from moonlighter.core.llm import make_caller
 
@@ -82,11 +83,18 @@ def _with_tracking_alias(composed: list[ComposedAnswer], alias: str) -> list[Com
 async def _sheet(
     job: Job, questions: list[FormQuestion], config: dict[str, Any], profile: dict[str, Any]
 ) -> str:
+    tailored = await ensure_tailored_cv(
+        {"id": job.id, "title": job.title, "company": job.company, "description": job.description},
+        config,
+        profile,
+        make_caller(config),
+    )
     composed = await compose_answers(
         questions,
         profile,
         config,
         {
+            "id": job.id,
             "title": job.title,
             "company": job.company,
             "description": job.description,
@@ -104,6 +112,11 @@ async def _sheet(
         # that omits standard fields) — the alias must reach the operator anyway,
         # or the company's reply lands in a mailbox the monitor never reads.
         sheet += f"\n\nWhere the form asks for an email address, use: {alias}"
+    if tailored is not None and not tailored.compiled:
+        sheet += (
+            f"\n\nA tailored CV was generated but pdflatex is not installed —"
+            f" compile it yourself: cd {tailored.path.parent} && pdflatex {tailored.path.name}"
+        )
     return sheet
 
 

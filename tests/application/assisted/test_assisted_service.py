@@ -122,6 +122,53 @@ async def test_a_greenhouse_job_with_questions_returns_a_sheet_not_the_paste_hin
     assert "a generated answer" in out
 
 
+async def test_sheet_generates_the_tailored_cv_before_composing(job_factory, monkeypatch):
+    job = job_factory(source="greenhouse", url="https://job-boards.greenhouse.io/gitlab/jobs/9")
+    question = FormQuestion(label="Favorite language", kind=QuestionKind.TEXT, required=False)
+    seen = {}
+
+    async def one_question(board: str, job_id: str, client: Any) -> list[FormQuestion]:
+        return [question]
+
+    async def spy_ensure(job_dict: Any, config: Any, profile: Any, caller: Any) -> Any:
+        seen["job"] = job_dict
+        return None
+
+    monkeypatch.setattr(service, "fetch_greenhouse_questions", one_question)
+    monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
+    monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
+    monkeypatch.setattr(service, "ensure_tailored_cv", spy_ensure)
+
+    await service.prepare_application(job.id, {}, {})
+
+    assert seen["job"]["id"] == job.id
+    assert seen["job"]["company"] == job.company
+
+
+async def test_sheet_notes_the_uncompiled_tex(job_factory, monkeypatch, tmp_path):
+    from moonlighter.application.cvgen.service import TailoredCV
+
+    job = job_factory(source="greenhouse", url="https://job-boards.greenhouse.io/gitlab/jobs/9")
+    question = FormQuestion(label="Favorite language", kind=QuestionKind.TEXT, required=False)
+    tex = tmp_path / "cv.tex"
+    tex.write_text("x")
+
+    async def one_question(board: str, job_id: str, client: Any) -> list[FormQuestion]:
+        return [question]
+
+    async def uncompiled(job_dict: Any, config: Any, profile: Any, caller: Any) -> Any:
+        return TailoredCV(path=tex, compiled=False)
+
+    monkeypatch.setattr(service, "fetch_greenhouse_questions", one_question)
+    monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
+    monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
+    monkeypatch.setattr(service, "ensure_tailored_cv", uncompiled)
+
+    out = await service.prepare_application(job.id, {}, {})
+
+    assert "pdflatex" in out and "cv.tex" in out
+
+
 async def test_a_recruitee_job_with_questions_returns_a_sheet_not_the_paste_hint(
     job_factory, monkeypatch
 ):
