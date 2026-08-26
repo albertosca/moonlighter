@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from moonlighter.application.cvgen.generate import decide_cv
+from moonlighter.application.cvgen.generate import USE_BASE, decide_cv
 from moonlighter.application.cvgen.pool import CVPool, PoolBullet, PoolExperience
 
 POOL = CVPool(
@@ -68,8 +68,15 @@ async def test_generate_returns_selection_with_unknown_ids_dropped():
 
 
 @pytest.mark.asyncio
-async def test_use_base_returns_none():
+async def test_use_base_returns_sentinel():
     call, _ = _caller(json.dumps({"decision": "USE_BASE"}))
+    result = await decide_cv(JOB, POOL, PROFILE, "base sum", "base te", call)
+    assert result == USE_BASE  # a genuine model answer, distinct from degradation's None
+
+
+@pytest.mark.asyncio
+async def test_unrecognized_decision_degrades_to_none():
+    call, _ = _caller(json.dumps({"decision": "MAYBE"}))
     assert await decide_cv(JOB, POOL, PROFILE, "base sum", "base te", call) is None
 
 
@@ -107,6 +114,12 @@ async def test_pt_language_carries_translations():
 @pytest.mark.asyncio
 async def test_malformed_json_degrades_to_none():
     call, _ = _caller("not json at all")
+    assert await decide_cv(JOB, POOL, PROFILE, "b", "b", call) is None
+
+
+@pytest.mark.asyncio
+async def test_valid_json_non_dict_degrades_to_none():
+    call, _ = _caller(json.dumps(["not", "a", "dict"]))
     assert await decide_cv(JOB, POOL, PROFILE, "b", "b", call) is None
 
 

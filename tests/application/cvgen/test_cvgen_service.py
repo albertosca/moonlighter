@@ -114,6 +114,17 @@ async def test_no_latex_returns_tex_uncompiled(cfg):
 async def test_generation_failure_degrades_to_none(cfg):
     call, _ = _caller("garbage")
     assert await ensure_tailored_cv(JOB, cfg, {}, call) is None
+    # A transient malformed response must NOT write the permanent USE_BASE
+    # marker — that would disable tailored-CV generation for this job forever.
+    assert not (generated_dir_for(cfg, 42) / "USE_BASE").exists()
+    good_call, good_calls = _caller()
+    with patch(
+        "moonlighter.application.cvgen.service.compile_pdf",
+        side_effect=lambda tex: tex.with_suffix(".pdf"),
+    ):
+        retry = await ensure_tailored_cv(JOB, cfg, {}, good_call)
+    assert isinstance(retry, TailoredCV) and retry.compiled
+    assert good_calls["n"] == 1  # proves the retry actually happened
 
 
 async def test_broken_pool_degrades_to_none_with_warning(cfg, tmp_path, caplog):

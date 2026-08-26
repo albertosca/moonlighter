@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from moonlighter.application.cvgen.compile import compile_pdf
-from moonlighter.application.cvgen.generate import decide_cv
+from moonlighter.application.cvgen.generate import USE_BASE, decide_cv
 from moonlighter.application.cvgen.pool import PoolError, load_pool
 from moonlighter.application.cvgen.render import render_cv
 from moonlighter.core.config import resolve_under_home
@@ -87,8 +87,10 @@ async def ensure_tailored_cv(
             logger.warning("spend limit during cv generation — using default CV")
             return None
         raise
-    out.mkdir(parents=True, exist_ok=True)
     if selection is None:
+        return None  # degraded generation — nothing written, next prepare retries
+    out.mkdir(parents=True, exist_ok=True)
+    if selection == USE_BASE:
         (out / "USE_BASE").write_text("decided by the generation call\n")
         return None
 

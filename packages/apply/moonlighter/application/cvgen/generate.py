@@ -5,7 +5,7 @@ across jobs; the suffix is the posting, untrusted-wrapped. Deterministic
 validation keeps the model inside the pool: an id it invents is dropped,
 never rendered (specs/2026-08-25-tailored-cv-design.md)."""
 
-from typing import Any
+from typing import Any, Final, Literal
 
 from moonlighter.application.answers.profile import profile_for_answers
 from moonlighter.application.cvgen.pool import CVPool
@@ -15,6 +15,12 @@ from moonlighter.core.log import get_logger
 from moonlighter.core.parsing import parse_llm_json, wrap_untrusted
 
 logger = get_logger(__name__)
+
+# Sentinel for a genuine {"decision": "USE_BASE"} answer, distinct from None
+# (degradation — parse failure, unrecognized output, operator-directed prose).
+# The orchestrator (service.py) only writes its permanent USE_BASE marker file
+# for this sentinel; None must let the next prepare retry.
+USE_BASE: Final = "use_base"
 
 _PREFIX = """You are tailoring a CV for one specific job posting.
 
@@ -81,7 +87,7 @@ async def decide_cv(
     base_summary: str,
     base_expertise: str,
     caller: LLMCaller,
-) -> CVSelection | None:
+) -> CVSelection | Literal["use_base"] | None:
     suffix = wrap_untrusted(
         "job_posting",
         f"Company: {job.get('company')}\nTitle: {job.get('title')}\n"
@@ -96,8 +102,13 @@ async def decide_cv(
             raise  # quota is the orchestrator's call, not a silent degrade
         logger.warning("cv generation failed, using default CV — %s", e)
         return None
-    if not isinstance(data, dict) or data.get("decision") != "GENERATE":
-        return None  # USE_BASE, or anything unrecognizable — both mean the base CV
+    if not isinstance(data, dict):
+        return None  # unparseable shape — degrade, don't lock in
+    decision = data.get("decision")
+    if decision == "USE_BASE":
+        return USE_BASE  # a genuine model answer, not a degradation
+    if decision != "GENERATE":
+        return None  # unrecognized decision — degrade, don't lock in
     known = pool.bullet_ids()
     bullets = tuple(b for b in data.get("bullets") or () if b in known)
     open_source = tuple(b for b in data.get("open_source") or () if b in known)
