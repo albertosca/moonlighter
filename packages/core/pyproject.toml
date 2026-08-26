@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Office/Business",
 ]
 dependencies = [
-    "peewee>=3.17",
+    "peewee>=4.4.0",
     "pyyaml>=6.0",
     "rich>=13.7",
     "anthropic>=0.40",
