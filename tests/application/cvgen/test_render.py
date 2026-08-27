@@ -105,6 +105,36 @@ class TestRender:
         assert r"Fiz \textbf{A}" in tex
         assert r"Did \textbf{A}" not in tex
 
+    def test_a_translation_outside_the_grammar_falls_back_to_the_pool_latex(self, caplog):
+        # Defence in depth. decide_cv validates too, but _bullet_text is the
+        # chokepoint EVERY model-controlled unescaped string passes just before
+        # substitution — validating here makes the curated fallback the default
+        # instead of something each future producer of a CVSelection must
+        # remember. '^^5c' is a backslash to TeX's tokenizer, so this is
+        # \input{/etc/passwd} by the time pdflatex reads it.
+        poisoned = "^^5cinput^^7b/etc/passwd^^7d"
+        tex = render_cv(TEMPLATE, _selection(translations={"t-a": poisoned}), POOL)
+        assert poisoned not in tex
+        assert r"Did \textbf{A}" in tex  # the curated bullet, untouched
+        assert any("translation" in r.message for r in caplog.records)
+
+    def test_the_render_time_fallback_covers_bullets_prose_and_open_source(self):
+        # All three paths go through _bullet_text; a fix reconciling only one
+        # is how the previous silent regression happened.
+        poisoned = "^^5cinput^^7b/etc/passwd^^7d"
+        tex = render_cv(
+            TEMPLATE,
+            _selection(
+                open_source=("oss-m",),
+                translations={"t-a": poisoned, "igti-prose": poisoned, "oss-m": poisoned},
+            ),
+            POOL,
+        )
+        assert "^^" not in tex and "input" not in tex
+        assert r"Did \textbf{A}" in tex  # bullet path fell back
+        assert "Taught ML." in tex  # prose path fell back
+        assert r"\textbf{moonlighter}" in tex  # open-source path fell back
+
     def test_open_source_heading_stays_english_in_pt(self):
         # Domain jargon: "Open Source" is untranslated in PT (same convention
         # as pool job titles like "Full Stack Engineer").

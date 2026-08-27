@@ -5,12 +5,11 @@ across jobs; the suffix is the posting, untrusted-wrapped. Deterministic
 validation keeps the model inside the pool: an id it invents is dropped,
 never rendered (specs/2026-08-25-tailored-cv-design.md)."""
 
-import re
 from typing import Any, Final, Literal
 
 from moonlighter.application.answers.profile import profile_for_answers
 from moonlighter.application.cvgen.pool import CVPool
-from moonlighter.application.cvgen.render import CVSelection
+from moonlighter.application.cvgen.render import CVSelection, is_safe_translation
 from moonlighter.core.llm import LLMCaller, is_spend_limit
 from moonlighter.core.log import get_logger
 from moonlighter.core.parsing import parse_llm_json, wrap_untrusted
@@ -22,23 +21,6 @@ logger = get_logger(__name__)
 # The orchestrator (service.py) only writes its permanent USE_BASE marker file
 # for this sentinel; None must let the next prepare retry.
 USE_BASE: Final = "use_base"
-
-# A translation replaces a pool bullet's LaTeX verbatim (render._bullet_text),
-# so it cannot be escaped without destroying the pool's own \textbf{} style —
-# it is allow-listed instead. Arguments must be brace- and backslash-free so
-# \textbf{\input{...}} cannot smuggle a command through. Anything else drops
-# the translation and the bullet keeps its pool latex: safe by construction.
-_ALLOWED_MARKUP = re.compile(r"\\text(?:bf|it)\{[^{}\\]*\}")
-
-# What survives the allow-list must contain neither character. The caret is not
-# decoration: '^' is catcode 7, and TeX replaces '^^hh' with the byte hh during
-# TOKENIZATION, before any macro is seen — so '^^5c' IS a backslash, and
-# '^^5cinput{/etc/secret}' compiles rc=0 and embeds that file into the PDF the
-# sheet then tells the operator to upload. '^^hh' is the only ASCII route to a
-# control sequence without a literal backslash, so rejecting '^' closes the
-# class. Do not "simplify" it back out: a translation carrying $x^2$ falls back
-# to its pool bullet, which is the design's own safe default.
-_FORBIDDEN = re.compile(r"[\\^]")
 
 _PREFIX = """You are tailoring a CV for one specific job posting.
 
@@ -144,7 +126,10 @@ async def decide_cv(
         if key not in known:
             continue
         text = str(value)
-        if _FORBIDDEN.search(_ALLOWED_MARKUP.sub("", text)):
+        # Positive full-match grammar (render.is_safe_translation) — read the
+        # comment there before changing anything here: the two previous guards
+        # were subtractive and both were bypassed.
+        if not is_safe_translation(text):
             logger.warning("translation for %s carried latex markup — keeping the pool bullet", key)
             continue
         if _operator_directed(text) is not None:

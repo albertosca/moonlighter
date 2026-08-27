@@ -251,6 +251,57 @@ async def test_caret_hex_backslash_is_dropped_whatever_command_follows():
     assert sel.translations == {}
 
 
+# The guard is a POSITIVE full-match grammar, not a blocklist, and every string
+# below is why. Each one reached the .tex under the previous subtractive check
+# (delete the \textbf{...} spans, then scan the residue): sub() removed the span
+# before anything looked inside it, and TeX's '^^hh' notation spells a backslash
+# and braces without using either character. Payload 1 was compiled with real
+# pdflatex and put a file from outside the compile directory into the PDF.
+BYPASSES = {
+    "caret hex inside a bold span": "\\textbf{^^5cinput^^7b/etc/passwd^^7d}",
+    "caret hex inside an italic span": "\\textit{^^5cinput^^7b/etc/passwd^^7d}",
+    "space-delimited filename, no braces": "\\textbf{^^5cinput /etc/passwd }",
+    "uppercase hex": "\\textbf{^^5CINPUT^^7b/etc/passwd^^7d}",
+    "raw 0x1c after the carets": "\\textbf{^^\x1cinput^^7b/etc/passwd^^7d}",
+    "payload split across two spans": "\\textbf{^^5cin}\\textit{put^^7b/etc/passwd^^7d}",
+    "char92 as the backslash": "\\textbf{^^5cchar92 relax}",
+    # Not injection, but outside the grammar all the same: a stray brace breaks
+    # the \cventry group, and a raw '%' comments out the rest of the line.
+    "unbalanced brace": "Fiz A}",
+    "raw percent": "Reduziu 30% do tempo",
+    "raw ampersand": "P&D e testes",
+    "raw underscore": "job_id do sistema",
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", BYPASSES.values(), ids=list(BYPASSES))
+async def test_a_translation_outside_the_grammar_never_reaches_the_tex(payload):
+    call, _ = _caller(_pt_response(payload))
+    sel = await decide_cv(JOB, POOL, PROFILE, "b", "b", call)
+    assert sel.translations == {}
+    tex = render_cv(TEMPLATE, sel, POOL)
+    assert payload not in tex
+    assert "^^" not in tex
+    assert "\\item C" in tex  # the pool's own latex for igti-b, untouched
+
+
+LEGITIMATE = {
+    "bold and italic": "Fiz \\textbf{C} com \\textit{Elixir}",
+    "plain PT prose with accents": "Liderou a adoção de IA em cinco times",
+    "an en-dash year range": "Liderou (2019--2023)",
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", LEGITIMATE.values(), ids=list(LEGITIMATE))
+async def test_a_legitimate_translation_still_survives_the_grammar(payload):
+    call, _ = _caller(_pt_response(payload))
+    sel = await decide_cv(JOB, POOL, PROFILE, "b", "b", call)
+    assert sel.translations == {"igti-b": payload}
+    assert payload in render_cv(TEMPLATE, sel, POOL)
+
+
 @pytest.mark.asyncio
 async def test_an_operator_directed_translation_is_dropped():
     # Summary and expertise already pass this guard; a translation bypassed it.
