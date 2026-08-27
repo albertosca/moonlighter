@@ -134,6 +134,32 @@ def test_experience_missing_field_raises(tmp_path):
         load_pool(_write(tmp_path, broken))
 
 
+def test_non_mapping_experience_raises_pool_error(tmp_path):
+    # The pool is hand-curated YAML: a stray '-' turns an entry into a bare
+    # string. raw.get() would raise AttributeError, which escapes the caller's
+    # `except PoolError` and takes the whole MCP tool call down.
+    broken = textwrap.dedent("""
+        experiences:
+          - just a string
+    """)
+    with pytest.raises(PoolError, match="experience is not a mapping"):
+        load_pool(_write(tmp_path, broken))
+
+
+def test_non_mapping_bullet_raises_pool_error(tmp_path):
+    broken = textwrap.dedent("""
+        experiences:
+          - company: X
+            title: T
+            period: P
+            location: L
+            bullets:
+              - just a string
+    """)
+    with pytest.raises(PoolError, match="bullet is not a mapping"):
+        load_pool(_write(tmp_path, broken))
+
+
 def test_pool_with_no_experiences_raises(tmp_path):
     broken = textwrap.dedent("""
         open_source: []

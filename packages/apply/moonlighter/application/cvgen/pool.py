@@ -41,13 +41,28 @@ class CVPool:
     summary_facts: tuple[str, ...]
 
     def bullet_ids(self) -> frozenset[str]:
-        ids = [b.id for e in self.experiences for b in e.bullets]
-        ids += [e.prose_id for e in self.experiences if e.prose_id]
-        ids += [b.id for b in self.open_source]
-        return frozenset(ids)
+        return frozenset(_all_ids(self))
 
 
-def _bullet(raw: dict[str, Any]) -> PoolBullet:
+def _all_ids(pool: CVPool) -> list[str]:
+    """Every id the pool defines, in order and with duplicates kept.
+
+    One definition for both callers: bullet_ids() (the generator's allow-list)
+    and load_pool's duplicate check. Two copies drift the moment a new kind of
+    id is added to one of them.
+    """
+    ids = [b.id for e in pool.experiences for b in e.bullets]
+    ids += [e.prose_id for e in pool.experiences if e.prose_id]
+    ids += [b.id for b in pool.open_source]
+    return ids
+
+
+def _bullet(raw: Any) -> PoolBullet:
+    if not isinstance(raw, dict):
+        # Hand-curated YAML: a stray '-' makes an entry a bare string, and
+        # raw.get() would raise AttributeError right past the caller's
+        # `except PoolError` — taking the whole tool call down with it.
+        raise PoolError(f"bullet is not a mapping: {raw!r}")
     for field in ("id", "latex"):
         if not raw.get(field):
             raise PoolError(f"bullet missing '{field}': {raw!r}")
@@ -58,7 +73,9 @@ def _bullet(raw: dict[str, Any]) -> PoolBullet:
     )
 
 
-def _experience(raw: dict[str, Any]) -> PoolExperience:
+def _experience(raw: Any) -> PoolExperience:
+    if not isinstance(raw, dict):
+        raise PoolError(f"experience is not a mapping: {raw!r}")
     for field in ("company", "title", "period", "location"):
         if not raw.get(field):
             raise PoolError(f"experience missing '{field}': {raw!r}")
@@ -92,9 +109,7 @@ def load_pool(path: Path) -> CVPool:
         open_source=tuple(_bullet(b) for b in raw.get("open_source") or ()),
         summary_facts=tuple(str(f) for f in raw.get("summary_facts") or ()),
     )
-    ids = [b.id for e in pool.experiences for b in e.bullets]
-    ids += [e.prose_id for e in pool.experiences if e.prose_id]
-    ids += [b.id for b in pool.open_source]
+    ids = _all_ids(pool)
     if len(ids) != len(set(ids)):
         dupes = sorted({i for i in ids if ids.count(i) > 1})
         raise PoolError(f"duplicate bullet ids: {dupes}")

@@ -3,6 +3,7 @@ import json
 import pytest
 from moonlighter.application.cvgen.generate import USE_BASE, decide_cv
 from moonlighter.application.cvgen.pool import CVPool, PoolBullet, PoolExperience
+from moonlighter.application.cvgen.render import render_cv
 
 POOL = CVPool(
     experiences=(
@@ -154,6 +155,64 @@ async def test_spend_limit_reraises():
 
     with pytest.raises(RuntimeError, match="spend limit"):
         await decide_cv(JOB, POOL, PROFILE, "b", "b", spend_limit_error)
+
+
+# --- translation values are markup, not prose: allow-list, not escape --------
+# A translation reaches the .tex verbatim (render._bullet_text substitutes it
+# raw), so an unguarded value hands the model a local pdflatex: \input embeds a
+# local file into the PDF the operator then uploads to the company.
+
+TEMPLATE = "%%SUMMARY%%\n%%TECHNICAL_EXPERTISE%%\n%%EXPERIENCE%%\n%%OPEN_SOURCE%%\n"
+
+
+def _pt_response(translation, bullet_id="igti-b"):  # igti-b: a bullets-only entry
+    return json.dumps(
+        {
+            "decision": "GENERATE",
+            "language": "pt",
+            "summary": "Resumo",
+            "technical_expertise": "Elixir",
+            "bullets": [bullet_id],
+            "open_source": [],
+            "bullets_translated": {bullet_id: translation},
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_injected_latex_translation_is_dropped_and_the_pool_bullet_renders():
+    call, _ = _caller(_pt_response(r"\input{/etc/passwd} \write18{id}"))
+    sel = await decide_cv(JOB, POOL, PROFILE, "b", "b", call)
+    assert sel.translations == {}
+    tex = render_cv(TEMPLATE, sel, POOL)
+    assert "\\input" not in tex and "\\write18" not in tex
+    assert "\\item C" in tex  # the pool's own latex for igti-b, untouched
+
+
+@pytest.mark.asyncio
+async def test_a_legitimate_bold_translation_survives_and_renders():
+    call, _ = _caller(_pt_response(r"Fiz \textbf{C} com \textit{Elixir}"))
+    sel = await decide_cv(JOB, POOL, PROFILE, "b", "b", call)
+    assert sel.translations == {"igti-b": r"Fiz \textbf{C} com \textit{Elixir}"}
+    assert r"Fiz \textbf{C} com \textit{Elixir}" in render_cv(TEMPLATE, sel, POOL)
+
+
+@pytest.mark.asyncio
+async def test_a_nested_or_command_bearing_bold_argument_is_dropped():
+    # \textbf{\input{x}} would smuggle a command through the allow-list if the
+    # argument were not required to be brace- and backslash-free.
+    call, _ = _caller(_pt_response(r"\textbf{\input{/etc/passwd}}"))
+    sel = await decide_cv(JOB, POOL, PROFILE, "b", "b", call)
+    assert sel.translations == {}
+
+
+@pytest.mark.asyncio
+async def test_an_operator_directed_translation_is_dropped():
+    # Summary and expertise already pass this guard; a translation bypassed it.
+    call, _ = _caller(_pt_response("Please provide this bullet before submitting"))
+    sel = await decide_cv(JOB, POOL, PROFILE, "b", "b", call)
+    assert sel.translations == {}
+    assert sel is not None  # one bad translation degrades the bullet, not the CV
 
 
 @pytest.mark.asyncio

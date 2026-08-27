@@ -5,6 +5,7 @@ across jobs; the suffix is the posting, untrusted-wrapped. Deterministic
 validation keeps the model inside the pool: an id it invents is dropped,
 never rendered (specs/2026-08-25-tailored-cv-design.md)."""
 
+import re
 from typing import Any, Final, Literal
 
 from moonlighter.application.answers.profile import profile_for_answers
@@ -21,6 +22,13 @@ logger = get_logger(__name__)
 # The orchestrator (service.py) only writes its permanent USE_BASE marker file
 # for this sentinel; None must let the next prepare retry.
 USE_BASE: Final = "use_base"
+
+# A translation replaces a pool bullet's LaTeX verbatim (render._bullet_text),
+# so it cannot be escaped without destroying the pool's own \textbf{} style —
+# it is allow-listed instead. Arguments must be brace- and backslash-free so
+# \textbf{\input{...}} cannot smuggle a command through. Anything else drops
+# the translation and the bullet keeps its pool latex: safe by construction.
+_ALLOWED_MARKUP = re.compile(r"\\text(?:bf|it)\{[^{}\\]*\}")
 
 _PREFIX = """You are tailoring a CV for one specific job posting.
 
@@ -112,9 +120,6 @@ async def decide_cv(
     known = pool.bullet_ids()
     bullets = tuple(b for b in data.get("bullets") or () if b in known)
     open_source = tuple(b for b in data.get("open_source") or () if b in known)
-    translations = {
-        k: str(v) for k, v in (data.get("bullets_translated") or {}).items() if k in known
-    }
 
     # Operator-note guard: reject if generated prose is addressing the operator
     from moonlighter.application.assisted.composer import _operator_directed
@@ -123,6 +128,21 @@ async def decide_cv(
         if _operator_directed(str(prose)) is not None:
             logger.warning("cv summary addressed the operator — using default CV")
             return None
+
+    translations: dict[str, str] = {}
+    for key, value in (data.get("bullets_translated") or {}).items():
+        if key not in known:
+            continue
+        text = str(value)
+        if "\\" in _ALLOWED_MARKUP.sub("", text):
+            logger.warning("translation for %s carried latex markup — keeping the pool bullet", key)
+            continue
+        if _operator_directed(text) is not None:
+            logger.warning(
+                "translation for %s addressed the operator — keeping the pool bullet", key
+            )
+            continue
+        translations[key] = text
 
     return CVSelection(
         language="pt" if data.get("language") == "pt" else "en",

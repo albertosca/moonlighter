@@ -75,6 +75,8 @@ Quando `cv.pool` no `config.yaml` aponta para um banco de bullets curado (`cv-po
 
 Chaves de config: `cv.pool`, `cv.template_dir` (contendo `cv-template.en.tex`, opcionalmente `cv-template.pt.tex` para vagas em português), `cv.generated_dir` (padrão `~/.moonlighter/cv-generated`).
 
+O resultado de cada vaga fica em cache em `<generated_dir>/<job_id>/`, então nenhuma vaga é gerada duas vezes — depois de editar seu banco ou seu template, apague esse diretório para que o próximo `prepare_application` regenere o CV daquela vaga.
+
 ## Arquitetura
 
 Um [workspace uv](https://docs.astral.sh/uv/concepts/workspaces/) com 5 namespace packages (`moonlighter.*`), organizados por feature:

@@ -58,8 +58,13 @@ async def ensure_tailored_cv(
     pool_path = (config.get("cv") or {}).get("pool")
     if not pool_path or not resolve_under_home(pool_path).exists():
         return None
-    job_id = int(job["id"])
-    out = generated_dir_for(config, job_id)
+    raw_id = job.get("id")
+    if raw_id is None:
+        # "never raises" is only total if an id-less job dict degrades too:
+        # the cache is keyed on the job id, so there is nothing to generate.
+        logger.warning("job has no id — using default CV")
+        return None
+    out = generated_dir_for(config, int(raw_id))
     if (out / "cv.pdf").exists():
         return TailoredCV(out / "cv.pdf", True)
     if (out / "USE_BASE").exists():

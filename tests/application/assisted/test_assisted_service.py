@@ -167,6 +167,71 @@ async def test_sheet_notes_the_uncompiled_tex(job_factory, monkeypatch, tmp_path
     out = await service.prepare_application(job.id, {}, {})
 
     assert "pdflatex" in out and "cv.tex" in out
+    # The CV gap names the DEFAULT CV in the tex-only case (resolve_cv_path
+    # refuses a dir with no pdf), so "compile it" without "then upload that
+    # one" leaves the operator compiling a tailored CV and uploading the
+    # generic one.
+    assert "then upload the resulting cv.pdf instead of the CV named above" in out
+
+
+async def test_a_compiled_cv_reaches_the_sheet_when_no_cv_question_exists(
+    job_factory, monkeypatch, tmp_path
+):
+    # The compiled path otherwise surfaces only through the composer's CV FILE
+    # branch, which needs a FILE question with a CV-shaped label. A paste that
+    # missed the resume field produces a tailored PDF nobody is told about --
+    # and the spec's "the sheet always instructs human review" is not met.
+    from moonlighter.application.cvgen.service import TailoredCV
+
+    job = job_factory(source="greenhouse", url="https://job-boards.greenhouse.io/gitlab/jobs/9")
+    pdf = tmp_path / "cv.pdf"
+    pdf.write_bytes(b"%PDF")
+
+    async def one_question(board: str, job_id: str, client: Any) -> list[FormQuestion]:
+        return [FormQuestion(label="Favorite language", kind=QuestionKind.TEXT, required=False)]
+
+    async def compiled(job_dict: Any, config: Any, profile: Any, caller: Any) -> Any:
+        return TailoredCV(path=pdf, compiled=True)
+
+    monkeypatch.setattr(service, "fetch_greenhouse_questions", one_question)
+    monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
+    monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
+    monkeypatch.setattr(service, "ensure_tailored_cv", compiled)
+
+    out = await service.prepare_application(job.id, {}, {})
+
+    assert str(pdf) in out
+    assert "review it before uploading" in out
+
+
+async def test_a_compiled_cv_already_named_by_a_cv_gap_is_not_repeated(
+    job_factory, monkeypatch, tmp_path
+):
+    from moonlighter.application.cvgen.service import TailoredCV
+
+    job = job_factory(source="greenhouse", url="https://job-boards.greenhouse.io/gitlab/jobs/9")
+    generated = tmp_path / "generated"
+    out_dir = generated / str(job.id)
+    out_dir.mkdir(parents=True)
+    pdf = out_dir / "cv.pdf"
+    pdf.write_bytes(b"%PDF")
+    config = {"cv": {"generated_dir": str(generated)}}
+
+    async def one_question(board: str, job_id: str, client: Any) -> list[FormQuestion]:
+        return [FormQuestion(label="Resume", kind=QuestionKind.FILE, required=True)]
+
+    async def compiled(job_dict: Any, config: Any, profile: Any, caller: Any) -> Any:
+        return TailoredCV(path=pdf, compiled=True)
+
+    monkeypatch.setattr(service, "fetch_greenhouse_questions", one_question)
+    monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
+    monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
+    monkeypatch.setattr(service, "ensure_tailored_cv", compiled)
+
+    out = await service.prepare_application(job.id, config, {})
+
+    assert out.count(str(pdf)) == 1  # the CV gap already names it
+    assert "Upload this CV for this job" not in out
 
 
 async def test_a_recruitee_job_with_questions_returns_a_sheet_not_the_paste_hint(

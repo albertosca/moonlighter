@@ -135,6 +135,25 @@ async def test_broken_pool_degrades_to_none_with_warning(cfg, tmp_path, caplog):
     assert any("pool" in r.message for r in caplog.records)
 
 
+async def test_malformed_pool_entry_degrades_to_none_with_warning(cfg, caplog):
+    # End-to-end degradation contract for the operator's most likely typo: a
+    # stray '-' making an experience a bare string. Anything other than
+    # PoolError here escapes prepare_application and kills the tool call.
+    Path(cfg["cv"]["pool"]).write_text("experiences:\n  - just a string\n")
+    call, calls = _caller()
+    assert await ensure_tailored_cv(JOB, cfg, {}, call) is None
+    assert calls["n"] == 0
+    assert any("pool" in r.message for r in caplog.records)
+
+
+async def test_a_job_without_an_id_degrades_to_none(cfg):
+    # "never raises" is only total if a caller passing an id-less job dict
+    # degrades instead of dying on int(job["id"]).
+    call, calls = _caller()
+    assert await ensure_tailored_cv({"title": "Eng"}, cfg, {}, call) is None
+    assert calls["n"] == 0
+
+
 # --- extra coverage beyond the brief's verbatim cases: other degrade/branch paths ---
 
 
