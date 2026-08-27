@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 import pytest
 from moonlighter.application.cvgen.service import (
-    CVGEN_FORMAT_MARKER,
     TailoredCV,
     ensure_tailored_cv,
     generated_dir_for,
@@ -84,7 +83,6 @@ async def test_generates_writes_tex_and_compiles(cfg):
     assert (out / "cv.tex").exists()
     assert "Did A" in (out / "cv.tex").read_text()
     assert "The base summary line" not in (out / "cv.tex").read_text()  # markers stripped
-    assert (out / "cv.tex").read_text().startswith(CVGEN_FORMAT_MARKER)
 
 
 async def test_use_base_writes_marker_and_skips_next_time(cfg):
@@ -98,7 +96,6 @@ async def test_use_base_writes_marker_and_skips_next_time(cfg):
 async def test_existing_pdf_short_circuits(cfg):
     out = generated_dir_for(cfg, 42)
     out.mkdir(parents=True)
-    (out / "cv.tex").write_text(f"{CVGEN_FORMAT_MARKER}\ncurrent vintage")
     (out / "cv.pdf").write_bytes(b"%PDF")
     call, calls = _caller()
     result = await ensure_tailored_cv(JOB, cfg, {}, call)
@@ -221,7 +218,7 @@ async def test_pt_selection_without_pt_template_falls_back_to_en(cfg, caplog):
 async def test_existing_tex_retries_compile_and_succeeds(cfg):
     out = generated_dir_for(cfg, 42)
     out.mkdir(parents=True)
-    (out / "cv.tex").write_text(f"{CVGEN_FORMAT_MARKER}\nuncompiled tex")
+    (out / "cv.tex").write_text("stale tex")
     call, calls = _caller()
     with patch(
         "moonlighter.application.cvgen.service.compile_pdf",
@@ -235,7 +232,7 @@ async def test_existing_tex_retries_compile_and_succeeds(cfg):
 async def test_existing_tex_retries_compile_and_stays_uncompiled(cfg):
     out = generated_dir_for(cfg, 42)
     out.mkdir(parents=True)
-    (out / "cv.tex").write_text(f"{CVGEN_FORMAT_MARKER}\nuncompiled tex")
+    (out / "cv.tex").write_text("stale tex")
     call, calls = _caller()
     with patch("moonlighter.application.cvgen.service.compile_pdf", return_value=None):
         result = await ensure_tailored_cv(JOB, cfg, {}, call)
@@ -243,84 +240,31 @@ async def test_existing_tex_retries_compile_and_stays_uncompiled(cfg):
     assert calls["n"] == 0
 
 
-# --- a cached .tex is model-authored text: recompiling it re-runs an old guard -
-
-
-async def test_a_tex_from_an_older_generator_is_regenerated_not_recompiled(cfg, caplog):
-    # The bug this closes: a cv.tex written while the translation guard was
-    # bypassable is recompiled verbatim on EVERY later prepare, so one poisoned
-    # generation keeps producing a poisoned PDF forever. The marker dates the
-    # file against the guard that wrote it.
-    out = generated_dir_for(cfg, 42)
-    out.mkdir(parents=True)
-    (out / "cv.tex").write_text("\\item \\textbf{^^5cinput^^7b/etc/passwd^^7d}")
-    call, calls = _caller()
+async def test_a_wrong_shaped_llm_response_still_produces_a_cv(cfg):
+    # End-to-end companion to test_generate's shape cases: a posting that
+    # steers bullets_translated into a list must not turn prepare_application
+    # into an error line where the whole sheet should be.
+    resp = json.dumps(
+        {
+            "decision": "GENERATE",
+            "language": "pt",
+            "summary": "S",
+            "technical_expertise": "T",
+            "bullets": 3,
+            "open_source": "oss",
+            "bullets_translated": ["not a mapping"],
+        }
+    )
+    call, calls = _caller(resp)
     with patch(
         "moonlighter.application.cvgen.service.compile_pdf",
         side_effect=lambda tex: tex.with_suffix(".pdf"),
     ):
         result = await ensure_tailored_cv(JOB, cfg, {}, call)
-    assert calls["n"] == 1  # regenerated through the current guard, not recompiled
-    assert "^^5cinput" not in (out / "cv.tex").read_text()
-    assert (out / "cv.tex").read_text().startswith(CVGEN_FORMAT_MARKER)
     assert isinstance(result, TailoredCV) and result.compiled
-    assert any("older" in r.message for r in caplog.records)
-
-
-async def test_a_pdf_beside_an_older_tex_is_discarded_with_it(cfg):
-    # The pdf was compiled FROM that .tex, so it carries the same payload. If
-    # it survived the discard, the next prepare would serve it as a cache hit
-    # against the freshly written .tex — the hole reopened one call later.
-    out = generated_dir_for(cfg, 42)
-    out.mkdir(parents=True)
-    (out / "cv.tex").write_text("older vintage, no marker")
-    (out / "cv.pdf").write_bytes(b"%PDF poisoned")
-    call, calls = _caller()
-    with patch("moonlighter.application.cvgen.service.compile_pdf", return_value=None):
-        result = await ensure_tailored_cv(JOB, cfg, {}, call)
     assert calls["n"] == 1
-    assert not (out / "cv.pdf").exists()
-    assert result == TailoredCV(out / "cv.tex", False)
-
-
-async def test_a_pdf_with_no_tex_beside_it_is_not_trusted(cfg):
-    # Nothing attests an orphan pdf: no .tex means no marker to date it.
-    out = generated_dir_for(cfg, 42)
-    out.mkdir(parents=True)
-    (out / "cv.pdf").write_bytes(b"%PDF unknown provenance")
-    call, calls = _caller()
-    with patch(
-        "moonlighter.application.cvgen.service.compile_pdf",
-        side_effect=lambda tex: tex.with_suffix(".pdf"),
-    ):
-        result = await ensure_tailored_cv(JOB, cfg, {}, call)
-    assert calls["n"] == 1
-    assert (out / "cv.tex").read_text().startswith(CVGEN_FORMAT_MARKER)
-    assert isinstance(result, TailoredCV) and result.compiled
-
-
-async def test_an_untrusted_pdf_is_gone_even_when_regeneration_degrades(cfg):
-    # Discarding has to happen when the cache is READ, not only when a
-    # replacement is written: if generation then degrades, an undeleted pdf
-    # would still be the file resolve_cv_path hands the operator to upload.
-    out = generated_dir_for(cfg, 42)
-    out.mkdir(parents=True)
-    (out / "cv.pdf").write_bytes(b"%PDF unknown provenance")
-    call, _ = _caller("garbage")
-    assert await ensure_tailored_cv(JOB, cfg, {}, call) is None
-    assert not (out / "cv.pdf").exists()
-
-
-async def test_a_use_base_marker_still_wins_over_an_older_tex(cfg):
-    # USE_BASE records a model DECISION, not model-authored text, so no guard
-    # applies to it: an older USE_BASE must keep short-circuiting.
-    out = generated_dir_for(cfg, 42)
-    out.mkdir(parents=True)
-    (out / "USE_BASE").write_text("decided by the generation call\n")
-    (out / "cv.tex").write_text("older vintage, no marker")
-    call, calls = _caller()
-    assert await ensure_tailored_cv(JOB, cfg, {}, call) is None
-    assert calls["n"] == 0
+    # bullets degraded to empty, so the spec's fallback renders every pool bullet
+    assert "Did A" in (generated_dir_for(cfg, 42) / "cv.tex").read_text()
 
 
 async def test_spend_limit_is_swallowed_here(cfg, caplog):

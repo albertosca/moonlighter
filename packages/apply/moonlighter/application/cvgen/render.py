@@ -3,18 +3,17 @@
 The template is a complete moderncv document owned by the operator (header,
 contact block, Education, section headings — one file per language, pre-
 translated) carrying four marker lines: %%SUMMARY%%, %%TECHNICAL_EXPERTISE%%,
-%%EXPERIENCE%%, %%OPEN_SOURCE%%. Pool bullets are stored as LaTeX and pass
-through untouched (modulo PT translations); generated prose (summary,
-technical expertise) is mechanically escaped here — the model never emits
-markup beyond **bold**."""
+%%EXPERIENCE%%, %%OPEN_SOURCE%%. The operator's curated pool bullets are
+stored as LaTeX and pass through untouched. EVERY model-authored string —
+summary, technical expertise, and PT translations alike — is mechanically
+escaped here instead: the model is asked for plaintext and emits no markup
+beyond **bold**, so escaping is lossless and nothing it writes can become a
+command in the .tex."""
 
 import re
 from dataclasses import dataclass
 
 from moonlighter.application.cvgen.pool import CVPool, PoolExperience
-from moonlighter.core.log import get_logger
-
-logger = get_logger(__name__)
 
 # Single-pass lookup table prevents cascade re-escaping: braces produced by
 # \textbackslash{} cannot be re-escaped on a subsequent pass.
@@ -32,10 +31,18 @@ _LATEX_ESCAPE_TABLE = {
 }
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
 
+# Control characters are not TeX specials, so escaping leaves them untouched —
+# and a raw one in the .tex is a FATAL pdflatex error ("Unicode character not
+# set up for use with LaTeX"), producing no PDF at all. Measured, not assumed.
+# They carry no meaning in a CV, so they are dropped here rather than escaped;
+# tab and newline are ordinary whitespace and survive.
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
 
 def escape_latex(text: str) -> str:
     # Single-pass regex prevents cascade: braces in \textbackslash{} won't
     # be re-escaped to \{ and \}.
+    text = _CONTROL.sub("", text)
     text = re.sub(r"[\\&%$#_{}~^]", lambda m: _LATEX_ESCAPE_TABLE[m.group()], text)
     return _BOLD.sub(r"\\textbf{\1}", text)
 
@@ -50,57 +57,27 @@ class CVSelection:
     translations: dict[str, str]
 
 
-# --- the translation guard: a POSITIVE full-match grammar, never a blocklist --
-#
-# A PT translation replaces a pool bullet's LaTeX verbatim (_bullet_text below)
-# and the result is compiled by a local pdflatex into a PDF the operator uploads
-# to an employer. It is markup, not prose, so it cannot be escaped without
-# destroying the pool's own \textbf{} style — it has to be validated. What the
-# validation must NOT be is a blocklist, and two earlier attempts were:
-#
-#   1. They were subtractive — delete the allowed \textbf{...}/\textit{...}
-#      spans with sub(), then scan what is left for forbidden characters. But
-#      sub() REMOVES those spans, so nothing inside one was ever inspected:
-#      \textbf{<anything>} was a free pass through the very check meant to gate
-#      it. You cannot scan what you deleted.
-#   2. TeX turns '^^hh' into the byte hh during TOKENIZATION, before any macro
-#      exists, so '^^5c' IS a backslash and '^^7b'/'^^7d' ARE braces (and '^^'
-#      plus a raw 0x1c is a backslash too). A check hunting for a literal
-#      backslash finds none in '^^5cinput^^7b/etc/secret^^7d' — which pdflatex
-#      reads as \input{/etc/secret} and embeds that file in the uploaded PDF.
-#      Measured, not theorised: rc=0, canary text inside the compiled PDF.
-#
-# Hence: the whole string must MATCH end to end, and the only backslash the
-# grammar can produce is the '\textbf'/'\textit' it spells out itself. Every TeX
-# special is excluded from the argument class as well as from the text around
-# it — '^' above all, as the caret route to a control sequence.
-#
-# Do NOT "simplify" this back into sub()-then-search, and do not widen the
-# character class to let a stray '%', '&' or '$' through: a translation that
-# fails the grammar simply keeps its curated pool latex, which is the design's
-# own safe default for a dropped translation.
-_SAFE_TEXT = r"[^{}\\^~$&#%_]*"
-_TRANSLATION_OK = re.compile(rf"\A{_SAFE_TEXT}(?:\\text(?:bf|it)\{{{_SAFE_TEXT}\}}{_SAFE_TEXT})*\Z")
-
-
-def is_safe_translation(text: str) -> bool:
-    """True when a model-authored translation may reach the .tex verbatim."""
-    return _TRANSLATION_OK.fullmatch(text) is not None
-
-
 def _bullet_text(bullet_id: str, latex: str, selection: CVSelection) -> str:
-    # The render-time chokepoint: every model-controlled unescaped string
-    # passes here just before substitution. decide_cv applies the same
-    # predicate, and is today the only producer of a CVSelection — validating
-    # again here is what makes the curated fallback the DEFAULT rather than
-    # something each future producer has to remember.
+    """The pool's curated latex, or a model translation escaped into plaintext.
+
+    The two arguments are NOT the same kind of text, which is the whole point:
+    `latex` is operator-curated markup and must pass through untouched (escaping
+    it would print \\textbf{...} as visible characters in the CV), while a
+    translation is model prose in the same **bold** dialect the summary uses and
+    is escaped here.
+
+    This is where every model-controlled string meets the .tex, and escaping is
+    what makes the content of that string irrelevant. Two earlier designs tried
+    to let translations carry LaTeX and VALIDATE them instead; both were
+    bypassed, most instructively via '^^hh' — TeX turns it into the byte hh at
+    TOKENIZATION, so '^^5c' is a backslash that no check for a literal backslash
+    can see, and \\input{/etc/secret} then embedded a local file into the PDF the
+    operator uploads to an employer. escape_latex has no such blind spot: it
+    rewrites every TeX special, '^' included, so there is nothing left to hunt
+    for. Do not reintroduce a "trusted markup" path for model output here.
+    """
     text = selection.translations.get(bullet_id)
-    if text is None:
-        return latex
-    if not is_safe_translation(text):
-        logger.warning("unsafe translation for %s — rendering the pool bullet", bullet_id)
-        return latex
-    return text
+    return latex if text is None else escape_latex(text)
 
 
 def _entry(exp: PoolExperience, selection: CVSelection) -> str:

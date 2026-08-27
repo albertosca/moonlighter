@@ -63,6 +63,16 @@ class TestEscape:
     def test_bold_markers_become_textbf(self):
         assert escape_latex("with **10+ years** shipping") == r"with \textbf{10+ years} shipping"
 
+    def test_control_characters_are_stripped(self):
+        # Measured with real pdflatex: a raw 0x1c in the .tex is a FATAL
+        # "Unicode character not set up for use with LaTeX" and no PDF comes
+        # out at all. It is not a TeX special, so escaping alone leaves it in
+        # place — and an untrusted posting can steer the model into emitting
+        # one, costing the operator the compiled CV on every prepare. Tabs and
+        # newlines are ordinary whitespace and stay.
+        assert escape_latex("a\x1cb\x00c\x7fd") == "abcd"
+        assert escape_latex("keeps\ttab\nand newline") == "keeps\ttab\nand newline"
+
     def test_backslash_input_cannot_inject(self):
         # Exact output: backslash and braces all escaped, no cascade re-escaping
         assert escape_latex(r"\input{evil}") == r"\textbackslash{}input\{evil\}"
@@ -97,28 +107,30 @@ class TestRender:
         assert r"\textbf{moonlighter}" in with_oss
 
     def test_pt_translations_replace_bullet_text(self):
+        # The translation is plaintext in the **bold** dialect; the pool's own
+        # \textbf{A} is markup and is what gets replaced.
         tex = render_cv(
             TEMPLATE,
-            _selection(language="pt", translations={"t-a": r"Fiz \textbf{A}"}),
+            _selection(language="pt", translations={"t-a": "Fiz **A**"}),
             POOL,
         )
         assert r"Fiz \textbf{A}" in tex
         assert r"Did \textbf{A}" not in tex
 
-    def test_a_translation_outside_the_grammar_falls_back_to_the_pool_latex(self, caplog):
-        # Defence in depth. decide_cv validates too, but _bullet_text is the
-        # chokepoint EVERY model-controlled unescaped string passes just before
-        # substitution — validating here makes the curated fallback the default
-        # instead of something each future producer of a CVSelection must
-        # remember. '^^5c' is a backslash to TeX's tokenizer, so this is
-        # \input{/etc/passwd} by the time pdflatex reads it.
+    def test_a_translation_is_escaped_while_the_pool_latex_is_not(self):
+        # The two strings are not the same kind of text and must not be treated
+        # alike: the pool's latex is operator-curated markup and passes through
+        # untouched, while a translation is model prose in the **bold** dialect
+        # and is escaped here, at the render chokepoint. '^^5c' would be a
+        # backslash to TeX's tokenizer, so this is \input{/etc/passwd} unless
+        # every one of those characters is neutralised.
         poisoned = "^^5cinput^^7b/etc/passwd^^7d"
         tex = render_cv(TEMPLATE, _selection(translations={"t-a": poisoned}), POOL)
-        assert poisoned not in tex
-        assert r"Did \textbf{A}" in tex  # the curated bullet, untouched
-        assert any("translation" in r.message for r in caplog.records)
+        assert "^^" not in tex and "\\input" not in tex
+        assert r"\textasciicircum{}\textasciicircum{}5cinput" in tex  # literal, inert
+        assert r"Did \textbf{B}" in tex  # the untranslated pool bullet, untouched
 
-    def test_the_render_time_fallback_covers_bullets_prose_and_open_source(self):
+    def test_escaping_covers_bullets_prose_and_open_source(self):
         # All three paths go through _bullet_text; a fix reconciling only one
         # is how the previous silent regression happened.
         poisoned = "^^5cinput^^7b/etc/passwd^^7d"
@@ -130,10 +142,23 @@ class TestRender:
             ),
             POOL,
         )
-        assert "^^" not in tex and "input" not in tex
-        assert r"Did \textbf{A}" in tex  # bullet path fell back
-        assert "Taught ML." in tex  # prose path fell back
-        assert r"\textbf{moonlighter}" in tex  # open-source path fell back
+        assert "^^" not in tex and "\\input" not in tex and "{/etc/passwd}" not in tex
+        assert tex.count(r"\textasciicircum{}\textasciicircum{}5cinput") == 3
+
+    def test_bold_markers_in_a_translation_become_textbf(self):
+        # The same **bold** dialect the summary already uses — that is what the
+        # prompt now asks translations for, so it has to survive escaping.
+        tex = render_cv(
+            TEMPLATE, _selection(translations={"t-a": "Fiz **C** em 30% do tempo"}), POOL
+        )
+        assert r"Fiz \textbf{C} em 30\% do tempo" in tex
+
+    def test_an_absent_translation_leaves_the_pool_latex_unescaped(self):
+        # Escaping the pool's own latex would render \textbf{A} as visible
+        # characters in the operator's CV; only a PRESENT translation is escaped.
+        tex = render_cv(TEMPLATE, _selection(translations={}), POOL)
+        assert r"Did \textbf{A}" in tex
+        assert "textbackslash" not in tex
 
     def test_open_source_heading_stays_english_in_pt(self):
         # Domain jargon: "Open Source" is untranslated in PT (same convention
@@ -143,7 +168,7 @@ class TestRender:
             _selection(
                 language="pt",
                 open_source=("oss-m",),
-                translations={"oss-m": r"Contribuições em \textbf{moonlighter}"},
+                translations={"oss-m": "Contribuições em **moonlighter**"},
             ),
             POOL,
         )
