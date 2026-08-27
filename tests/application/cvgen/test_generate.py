@@ -206,6 +206,51 @@ async def test_a_nested_or_command_bearing_bold_argument_is_dropped():
     assert sel.translations == {}
 
 
+# TeX replaces ^^hh with the byte hh during TOKENIZATION, before any macro
+# runs: ^^5c IS a backslash. A guard that only looks for a literal backslash
+# lets "^^5cinput{...}" through, and pdflatex then embeds a file from outside
+# the project into the PDF the sheet tells the operator to upload.
+CARET_BACKSLASH = "^^5cinput{/etc/passwd}"
+
+
+@pytest.mark.asyncio
+async def test_caret_hex_backslash_is_dropped_on_bullet_prose_and_open_source():
+    resp = json.dumps(
+        {
+            "decision": "GENERATE",
+            "language": "pt",
+            "summary": "Resumo",
+            "technical_expertise": "Elixir",
+            "bullets": ["igti-b"],
+            "open_source": ["oss-m"],
+            # All three translation paths reach the .tex verbatim, so all three
+            # are proven here: a fix reconciling only one is how the last silent
+            # regression happened.
+            "bullets_translated": {
+                "igti-b": CARET_BACKSLASH,
+                "trybe-prose": CARET_BACKSLASH,
+                "oss-m": CARET_BACKSLASH,
+            },
+        }
+    )
+    call, _ = _caller(resp)
+    sel = await decide_cv(JOB, POOL, PROFILE, "b", "b", call)
+    assert sel.translations == {}
+    tex = render_cv(TEMPLATE, sel, POOL)
+    assert "^^" not in tex and "input{" not in tex
+    assert "\\item C" in tex  # bullet path fell back to the pool latex
+    assert "Taught ML" in tex  # prose path fell back
+    assert "\\cvlistitem{M}" in tex  # open-source path fell back
+
+
+@pytest.mark.asyncio
+async def test_caret_hex_backslash_is_dropped_whatever_command_follows():
+    # The class is closed, not the \input instance.
+    call, _ = _caller(_pt_response("^^5cnewpage"))
+    sel = await decide_cv(JOB, POOL, PROFILE, "b", "b", call)
+    assert sel.translations == {}
+
+
 @pytest.mark.asyncio
 async def test_an_operator_directed_translation_is_dropped():
     # Summary and expertise already pass this guard; a translation bypassed it.

@@ -30,6 +30,16 @@ USE_BASE: Final = "use_base"
 # the translation and the bullet keeps its pool latex: safe by construction.
 _ALLOWED_MARKUP = re.compile(r"\\text(?:bf|it)\{[^{}\\]*\}")
 
+# What survives the allow-list must contain neither character. The caret is not
+# decoration: '^' is catcode 7, and TeX replaces '^^hh' with the byte hh during
+# TOKENIZATION, before any macro is seen — so '^^5c' IS a backslash, and
+# '^^5cinput{/etc/secret}' compiles rc=0 and embeds that file into the PDF the
+# sheet then tells the operator to upload. '^^hh' is the only ASCII route to a
+# control sequence without a literal backslash, so rejecting '^' closes the
+# class. Do not "simplify" it back out: a translation carrying $x^2$ falls back
+# to its pool bullet, which is the design's own safe default.
+_FORBIDDEN = re.compile(r"[\\^]")
+
 _PREFIX = """You are tailoring a CV for one specific job posting.
 
 ## The candidate's profile
@@ -134,7 +144,7 @@ async def decide_cv(
         if key not in known:
             continue
         text = str(value)
-        if "\\" in _ALLOWED_MARKUP.sub("", text):
+        if _FORBIDDEN.search(_ALLOWED_MARKUP.sub("", text)):
             logger.warning("translation for %s carried latex markup — keeping the pool bullet", key)
             continue
         if _operator_directed(text) is not None:
