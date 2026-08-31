@@ -23,7 +23,7 @@ dependencies = [
     "peewee>=3.17",
     "pyyaml>=6.0",
     "rich>=13.7",
-    "anthropic>=0.40",
+    "anthropic>=1.2.0",
 ]
 
 [project.optional-dependencies]
