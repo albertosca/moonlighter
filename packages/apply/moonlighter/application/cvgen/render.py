@@ -11,6 +11,7 @@ beyond **bold**, so escaping is lossless and nothing it writes can become a
 command in the .tex."""
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
 from moonlighter.application.cvgen.pool import CVPool, PoolExperience
@@ -31,18 +32,32 @@ _LATEX_ESCAPE_TABLE = {
 }
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
 
-# Control characters are not TeX specials, so escaping leaves them untouched —
-# and a raw one in the .tex is a FATAL pdflatex error ("Unicode character not
-# set up for use with LaTeX"), producing no PDF at all. Measured, not assumed.
-# They carry no meaning in a CV, so they are dropped here rather than escaped;
-# tab and newline are ordinary whitespace and survive.
-_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+# Three classes of character are not TeX specials, so escaping leaves them
+# untouched, and each is a FATAL pdflatex error that yields no PDF at all
+# (measured, not assumed):
+#   - a blank line inside \cventry's argument — "! Paragraph ended before
+#     \cventry was complete". An ordinary "\n\n" from the model triggers it.
+#   - U+2028/U+2029 and exotic spaces (U+2002...) — "Unicode character not set
+#     up for use with LaTeX".
+#   - control (Cc) and format (Cf: U+200B, U+200E, soft hyphen) characters.
+# All three carry no text, so collapsing and dropping them mangles nothing.
+# Whitespace collapsing runs first and absorbs everything Python calls
+# whitespace (newlines, tabs, Zl, Zp, Zs); the category pass then removes what
+# is left, which is the non-whitespace Cc and every Cf.
+#
+# What is deliberately NOT dropped: letters LaTeX cannot typeset (CJK, Greek,
+# emoji). Those carry meaning, and silently deleting one REWRITES a factual
+# claim in a document the candidate signs. The compile fails instead, and
+# service._after_compile turns that into an honest degrade-and-regenerate.
+_WHITESPACE = re.compile(r"\s+")
+_DROPPED_CATEGORIES = frozenset({"Cc", "Cf"})
 
 
 def escape_latex(text: str) -> str:
     # Single-pass regex prevents cascade: braces in \textbackslash{} won't
     # be re-escaped to \{ and \}.
-    text = _CONTROL.sub("", text)
+    text = _WHITESPACE.sub(" ", text).strip()
+    text = "".join(c for c in text if unicodedata.category(c) not in _DROPPED_CATEGORIES)
     text = re.sub(r"[\\&%$#_{}~^]", lambda m: _LATEX_ESCAPE_TABLE[m.group()], text)
     return _BOLD.sub(r"\\textbf{\1}", text)
 

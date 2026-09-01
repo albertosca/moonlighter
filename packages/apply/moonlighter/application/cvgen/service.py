@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from moonlighter.application.cvgen.compile import compile_pdf
+from moonlighter.application.cvgen.compile import compile_pdf, latex_available
 from moonlighter.application.cvgen.generate import USE_BASE, decide_cv
 from moonlighter.application.cvgen.pool import PoolError, load_pool
 from moonlighter.application.cvgen.render import render_cv
@@ -28,6 +28,27 @@ _MARKER_LINES = re.compile(r"^%%BASE_(SUMMARY|EXPERTISE): .+\n", re.MULTILINE)
 class TailoredCV:
     path: Path
     compiled: bool
+
+
+def _after_compile(tex: Path) -> TailoredCV | None:
+    """A compile attempt turned into a result — discarding a .tex that cannot compile.
+
+    compile_pdf returns None for two very different reasons, and conflating
+    them is what made one unlucky generation permanent. With no pdflatex on the
+    machine the .tex may be perfectly good: it is kept, and the next prepare
+    retries the compile without spending an LLM call. With pdflatex present the
+    failure belongs to the DOCUMENT and will repeat identically forever, so the
+    .tex is deleted — the next prepare regenerates instead of re-failing, and
+    this application proceeds with the default CV like any other failure.
+    """
+    pdf = compile_pdf(tex)
+    if pdf is not None:
+        return TailoredCV(pdf, True)
+    if not latex_available():
+        return TailoredCV(tex, False)  # honest tex-only path; compile it later
+    logger.warning("the generated CV does not compile — discarding %s, using default CV", tex)
+    tex.unlink(missing_ok=True)
+    return None
 
 
 def generated_dir_for(config: dict[str, Any], job_id: int) -> Path:
@@ -73,8 +94,7 @@ async def ensure_tailored_cv(
     if (out / "USE_BASE").exists():
         return None
     if (out / "cv.tex").exists():
-        pdf = compile_pdf(out / "cv.tex")  # a machine that gained latex since
-        return TailoredCV(pdf, True) if pdf else TailoredCV(out / "cv.tex", False)
+        return _after_compile(out / "cv.tex")  # a machine that gained latex since
 
     try:
         pool = load_pool(resolve_under_home(pool_path))
@@ -105,5 +125,4 @@ async def ensure_tailored_cv(
     template = _template(config, selection.language) or en_template
     tex = _MARKER_LINES.sub("", render_cv(template, selection, pool))
     (out / "cv.tex").write_text(tex)
-    pdf = compile_pdf(out / "cv.tex")
-    return TailoredCV(pdf, True) if pdf else TailoredCV(out / "cv.tex", False)
+    return _after_compile(out / "cv.tex")

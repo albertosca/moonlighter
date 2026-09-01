@@ -2,7 +2,20 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
-from moonlighter.application.cvgen.compile import compile_pdf
+from moonlighter.application.cvgen.compile import compile_pdf, latex_available
+
+
+def test_latex_available_reports_whether_the_machine_can_compile():
+    # service._after_compile reads a failed compile through this: with no
+    # pdflatex the failure says nothing about the document (keep the .tex),
+    # with pdflatex present it says the document is broken (discard it). A
+    # function stuck on one answer would silently pick one of those forever.
+    with patch("moonlighter.application.cvgen.compile.shutil.which", return_value=None):
+        assert latex_available() is False
+    with patch(
+        "moonlighter.application.cvgen.compile.shutil.which", return_value="/usr/bin/pdflatex"
+    ):
+        assert latex_available() is True
 
 
 def test_no_pdflatex_returns_none(tmp_path):

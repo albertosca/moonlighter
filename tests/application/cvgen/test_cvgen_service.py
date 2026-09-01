@@ -105,7 +105,10 @@ async def test_existing_pdf_short_circuits(cfg):
 
 async def test_no_latex_returns_tex_uncompiled(cfg):
     call, _ = _caller()
-    with patch("moonlighter.application.cvgen.service.compile_pdf", return_value=None):
+    with (
+        patch("moonlighter.application.cvgen.service.compile_pdf", return_value=None),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=False),
+    ):
         result = await ensure_tailored_cv(JOB, cfg, {}, call)
     assert result is not None and not result.compiled
     assert result.path.suffix == ".tex"
@@ -234,7 +237,10 @@ async def test_existing_tex_retries_compile_and_stays_uncompiled(cfg):
     out.mkdir(parents=True)
     (out / "cv.tex").write_text("stale tex")
     call, calls = _caller()
-    with patch("moonlighter.application.cvgen.service.compile_pdf", return_value=None):
+    with (
+        patch("moonlighter.application.cvgen.service.compile_pdf", return_value=None),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=False),
+    ):
         result = await ensure_tailored_cv(JOB, cfg, {}, call)
     assert result == TailoredCV(out / "cv.tex", False)
     assert calls["n"] == 0
@@ -265,6 +271,57 @@ async def test_a_wrong_shaped_llm_response_still_produces_a_cv(cfg):
     assert calls["n"] == 1
     # bullets degraded to empty, so the spec's fallback renders every pool bullet
     assert "Did A" in (generated_dir_for(cfg, 42) / "cv.tex").read_text()
+
+
+# --- a .tex that cannot compile must never become a permanent cache hit -----
+
+
+async def test_a_tex_that_cannot_compile_is_discarded_not_cached(cfg, caplog):
+    # compile_pdf returning None means two different things. With pdflatex on
+    # the machine it means THIS DOCUMENT does not compile — it will fail
+    # identically forever, so keeping the .tex turns one unlucky generation
+    # into a permanently broken tailored CV for this job.
+    call, _ = _caller()
+    with (
+        patch("moonlighter.application.cvgen.service.compile_pdf", return_value=None),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=True),
+    ):
+        result = await ensure_tailored_cv(JOB, cfg, {}, call)
+    assert result is None  # degrades to the default CV, per the spec
+    assert not (generated_dir_for(cfg, 42) / "cv.tex").exists()
+
+
+async def test_three_consecutive_prepares_regenerate_instead_of_re_failing(cfg):
+    # The measured bug: prepares 2 and 3 made ZERO llm calls and re-failed on
+    # the cached .tex. Regeneration is what makes the failure transient.
+    call, calls = _caller()
+    with (
+        patch("moonlighter.application.cvgen.service.compile_pdf", return_value=None),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=True),
+    ):
+        for _ in range(3):
+            assert await ensure_tailored_cv(JOB, cfg, {}, call) is None
+    assert calls["n"] == 3
+
+
+async def test_a_tex_kept_for_a_missing_latex_compiles_later_without_an_llm_call(cfg):
+    # The legitimate case the short-circuit exists for, preserved end to end:
+    # prepare 1 on a machine with no pdflatex keeps the .tex; prepare 2, after
+    # latex is installed, compiles that same file and spends nothing.
+    call, calls = _caller()
+    with (
+        patch("moonlighter.application.cvgen.service.compile_pdf", return_value=None),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=False),
+    ):
+        first = await ensure_tailored_cv(JOB, cfg, {}, call)
+    assert first is not None and not first.compiled
+    with patch(
+        "moonlighter.application.cvgen.service.compile_pdf",
+        side_effect=lambda tex: tex.with_suffix(".pdf"),
+    ):
+        second = await ensure_tailored_cv(JOB, cfg, {}, call)
+    assert second is not None and second.compiled
+    assert calls["n"] == 1  # the second prepare reused the cached .tex
 
 
 async def test_spend_limit_is_swallowed_here(cfg, caplog):

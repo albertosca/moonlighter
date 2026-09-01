@@ -63,15 +63,38 @@ class TestEscape:
     def test_bold_markers_become_textbf(self):
         assert escape_latex("with **10+ years** shipping") == r"with \textbf{10+ years} shipping"
 
-    def test_control_characters_are_stripped(self):
-        # Measured with real pdflatex: a raw 0x1c in the .tex is a FATAL
-        # "Unicode character not set up for use with LaTeX" and no PDF comes
-        # out at all. It is not a TeX special, so escaping alone leaves it in
-        # place — and an untrusted posting can steer the model into emitting
-        # one, costing the operator the compiled CV on every prepare. Tabs and
-        # newlines are ordinary whitespace and stay.
-        assert escape_latex("a\x1cb\x00c\x7fd") == "abcd"
-        assert escape_latex("keeps\ttab\nand newline") == "keeps\ttab\nand newline"
+    def test_characters_that_carry_no_text_are_dropped(self):
+        # Measured with real pdflatex: each of these is a FATAL error that
+        # produces no PDF at all ("Unicode character not set up for use with
+        # LaTeX"). None is a TeX special, so escaping alone leaves them in
+        # place. They carry no text, so dropping them mangles nothing.
+        # Cc splits two ways, and both are fine: Python counts \x1c as
+        # whitespace so it collapses to a space, while \x00 and \x7f are not
+        # whitespace and are dropped outright. Neither survives into the .tex.
+        assert escape_latex("a\x1cb") == "a b"
+        assert escape_latex("a\x00b\x7fc") == "abc"
+        assert escape_latex("a\u00adb\u200bc\u200ed") == "abcd"  # Cf
+
+    def test_whitespace_runs_collapse_to_a_single_space(self):
+        # A blank line inside \cventry's argument is a hard stop: "! Paragraph
+        # ended before \cventry was complete", no PDF. The model writing an
+        # ordinary "\n\n" is not an attack, so this must not be fatal.
+        assert escape_latex("Primeira linha\n\nSegunda linha") == "Primeira linha Segunda linha"
+        assert escape_latex("keeps\ttab\nand newline") == "keeps tab and newline"
+        # U+2028/U+2029 (Zl/Zp) and exotic spaces are whitespace to Python and
+        # fatal to inputenc; collapsing covers them in the same pass.
+        assert escape_latex("a\u2028b\u2029c\u2002d") == "a b c d"
+
+    def test_letters_latex_cannot_typeset_are_kept_not_dropped(self):
+        # DELIBERATE, and the opposite of the rule above: these carry meaning.
+        # A pdflatex document cannot typeset them and the compile dies — but
+        # silently deleting a Japanese term or a Greek symbol REWRITES a
+        # factual claim in a CV the candidate signs, which the spec forbids
+        # outright. The honest outcome is the failed compile, which now
+        # degrades to the default CV and regenerates (service._after_compile)
+        # instead of being cached forever. Do not "fix" this by dropping them.
+        for ch in ("\u65e5", "\u03a3", "\U0001f680"):
+            assert ch in escape_latex(f"prefix {ch} suffix")
 
     def test_backslash_input_cannot_inject(self):
         # Exact output: backslash and braces all escaped, no cascade re-escaping

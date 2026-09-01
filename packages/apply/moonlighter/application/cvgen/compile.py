@@ -13,8 +13,21 @@ from moonlighter.core.log import get_logger
 logger = get_logger(__name__)
 
 
+_PDFLATEX = "pdflatex"
+
+
+def latex_available() -> bool:
+    """Whether this machine can compile at all.
+
+    The caller needs this to read a failed compile correctly: with no pdflatex
+    installed a failure says nothing about the document, while with pdflatex
+    present it says the document itself is broken.
+    """
+    return shutil.which(_PDFLATEX) is not None
+
+
 def compile_pdf(tex_path: Path, timeout_s: int = 120) -> Path | None:
-    pdflatex = shutil.which("pdflatex")
+    pdflatex = shutil.which(_PDFLATEX)
     if pdflatex is None:
         logger.warning("pdflatex not found — keeping %s uncompiled", tex_path)
         return None
