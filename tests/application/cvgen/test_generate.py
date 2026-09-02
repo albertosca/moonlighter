@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from moonlighter.application.cvgen.generate import USE_BASE, decide_cv
+from moonlighter.application.cvgen.generate import MAX_BULLETS, MAX_OPEN_SOURCE, USE_BASE, decide_cv
 from moonlighter.application.cvgen.pool import CVPool, PoolBullet, PoolExperience
 from moonlighter.application.cvgen.render import render_cv
 
@@ -323,3 +323,97 @@ async def test_operator_directed_expertise_degrades_to_none():
     )
     call, _ = _caller(resp)
     assert await decide_cv(JOB, POOL, PROFILE, "b", "b", call) is None
+
+
+WIDE_POOL = CVPool(
+    experiences=(
+        PoolExperience(
+            company="Trybe",
+            title="Dev",
+            period="2023 -- 2026",
+            location="BH",
+            bullets=tuple(PoolBullet(f"b-{i}", ("backend",), f"B{i}") for i in range(12)),
+            prose=None,
+            prose_id=None,
+            angles=(),
+        ),
+        POOL.experiences[0],  # carries trybe-prose
+    ),
+    open_source=(PoolBullet("oss-1", ("ai",), "M1"), PoolBullet("oss-2", ("ai",), "M2")),
+    summary_facts=(),
+)
+
+
+@pytest.mark.asyncio
+async def test_prompt_states_the_one_page_budget_and_the_latin_rule():
+    call, calls = _caller(json.dumps({"decision": "USE_BASE"}))
+    await decide_cv(JOB, POOL, PROFILE, "b", "b", call)
+    assert "one page" in calls["prefix"]
+    assert f"at most {MAX_BULLETS}" in calls["prefix"]
+    assert "no emoji" in calls["prefix"]
+
+
+@pytest.mark.asyncio
+async def test_bullets_are_capped_in_the_models_order_and_prose_ids_do_not_count():
+    ids = [f"b-{i}" for i in range(12)]
+    resp = json.dumps(
+        {
+            "decision": "GENERATE",
+            "language": "en",
+            "summary": "S",
+            "technical_expertise": "T",
+            "bullets": ["trybe-prose", *ids],
+            "open_source": ["oss-2", "oss-1"],
+        }
+    )
+    call, _ = _caller(resp)
+    sel = await decide_cv(JOB, WIDE_POOL, PROFILE, "b", "b", call)
+    assert sel.bullets == ("trybe-prose", *ids[:MAX_BULLETS])
+    assert sel.open_source == ("oss-2",)
+    assert MAX_OPEN_SOURCE == 1
+
+
+@pytest.mark.asyncio
+async def test_a_summary_outside_the_latin_allow_list_falls_back_to_the_base_summary(caplog):
+    resp = json.dumps(
+        {
+            "decision": "GENERATE",
+            "language": "en",
+            "summary": "Ships fast \U0001f680 every sprint",
+            "technical_expertise": "Elixir → Phoenix",
+            "bullets": ["t-a"],
+            "open_source": [],
+        }
+    )
+    call, _ = _caller(resp)
+    sel = await decide_cv(JOB, POOL, PROFILE, "base sum", "base te", call)
+    assert sel.summary == "base sum"
+    assert sel.technical_expertise == "base te"
+    assert any("Latin" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_a_translation_outside_the_latin_allow_list_is_dropped_not_stripped():
+    # The bullet keeps its curated English text; the model's "5★" is never
+    # turned into "5" — that would rewrite a claim.
+    call, _ = _caller(_pt_response("Avaliado com 5★ pelos alunos"))
+    sel = await decide_cv(JOB, POOL, PROFILE, "b", "b", call)
+    assert sel.translations == {}
+    assert "C" in render_cv(TEMPLATE, sel, POOL)
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_summary_with_no_base_text_degrades_to_none():
+    # A template without %%BASE_SUMMARY has nothing curated to fall back to.
+    resp = json.dumps(
+        {
+            "decision": "GENERATE",
+            "language": "en",
+            "summary": "日本語",
+            "technical_expertise": "T",
+            "bullets": ["t-a"],
+            "open_source": [],
+        }
+    )
+    call, _ = _caller(resp)
+    assert await decide_cv(JOB, POOL, PROFILE, "", "base te", call) is None
