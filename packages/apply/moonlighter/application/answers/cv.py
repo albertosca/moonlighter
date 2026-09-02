@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-from moonlighter.core.config import moonlighter_home
+from moonlighter.core.config import resolve_under_home
 
 
 class CVNotFoundError(Exception):
@@ -14,7 +14,7 @@ def configured_cv_path(config: dict[str, Any], company: str = "") -> Path | None
     """
     The CV path config points at, without checking whether it exists.
     Company matching is case-insensitive; falls back to 'default'. Relative
-    paths are resolved from MOONLIGHTER_HOME. Returns None when nothing is
+    paths are resolved from MOONLIGHTER_HOME; `~` expands. Returns None when nothing is
     mapped at all.
 
     Shared with the startup check so that a warning can never name a different
@@ -25,10 +25,7 @@ def configured_cv_path(config: dict[str, Any], company: str = "") -> Path | None
     rel = by_company.get((company or "").lower(), cv_cfg.get("default"))
     if not rel:
         return None
-    path = Path(rel)
-    if not path.is_absolute():
-        path = moonlighter_home() / path
-    return path
+    return resolve_under_home(str(rel))
 
 
 def resolve_cv_path(company: str, config: dict[str, Any], job_id: int | None = None) -> str:

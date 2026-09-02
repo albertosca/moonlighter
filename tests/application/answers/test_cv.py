@@ -87,3 +87,13 @@ def test_tex_only_generated_dir_does_not_win(tmp_path):
 def test_no_job_id_keeps_todays_behavior(tmp_path):
     config, company_cv = _tailored_config(tmp_path)
     assert resolve_cv_path("nubank", config) == str(company_cv)
+
+
+def test_tilde_in_cv_default_expands_like_the_tailored_cv_keys(monkeypatch, tmp_path):
+    # Before: "~/cvs/x.pdf" became "<MOONLIGHTER_HOME>/~/cvs/x.pdf" while the
+    # three cv.* keys next to it expanded "~". One convention for the block.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    cv = tmp_path / "cvs" / "x.pdf"
+    cv.parent.mkdir()
+    cv.write_bytes(b"%PDF")
+    assert resolve_cv_path("acme", {"cv": {"default": "~/cvs/x.pdf"}}) == str(cv)
