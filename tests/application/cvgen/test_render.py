@@ -309,6 +309,39 @@ class TestGrouping:
         assert tex.count("{Trybe}") == 2
         assert "{}{}{}{" not in tex
 
+    def test_period_bounds_handles_a_period_without_a_dash(self):
+        # A grouped role's period lacking "--" (e.g. a single year) must not
+        # crash _period_bounds -- it stands as both its own start and end.
+        pool = CVPool(
+            experiences=(
+                PoolExperience(
+                    company="SoloCo",
+                    title="Engineer",
+                    period="Jan 2020 -- Dec 2021",
+                    location="Remote",
+                    bullets=(PoolBullet("s-1", ("backend",), "Did X"),),
+                    prose=None,
+                    prose_id=None,
+                    angles=(),
+                ),
+                PoolExperience(
+                    company="SoloCo",
+                    title="Intern",
+                    period="2019",
+                    location="Remote",
+                    bullets=(PoolBullet("s-2", ("backend",), "Did Y"),),
+                    prose=None,
+                    prose_id=None,
+                    angles=(),
+                ),
+            ),
+            open_source=(),
+            summary_facts=(),
+        )
+        tex = render_cv(TEMPLATE, _selection(bullets=("s-1", "s-2")), pool)
+        assert r"\cventry{Jan 2020 -- Dec 2021}{Engineer}{SoloCo}{2019 -- Dec 2021}{Remote}{" in tex
+        assert r"\cventry{2019}{Intern}{}{}{}{" in tex
+
 
 class TestFallback:
     def test_experience_with_no_selected_bullets_renders_its_first_pool_bullet(self):
