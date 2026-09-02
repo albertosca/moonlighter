@@ -19,13 +19,19 @@ class PoolError(Exception):
 # A fixed field is pasted into \cventry{} as-is (it is operator LaTeX, like the
 # bullets), so a bare special breaks EVERY compile. The draft's "R&D Engineer"
 # did exactly that, silently, until someone compiled it.
-_UNESCAPED_SPECIAL = re.compile(r"(?<!\\)[&%$#_]")
+# A single backslash escapes the special; an even number of backslashes leaves
+# it unescaped (e.g., \\& is line-break + unescaped ampersand, which breaks).
+_SPECIAL_WITH_BACKSLASHES = re.compile(r"(\\*)([&%$#_])")
 
 
 def _fixed_field(raw: dict[str, Any], field: str) -> str:
     value = str(raw[field])
-    if m := _UNESCAPED_SPECIAL.search(value):
-        raise PoolError(f"unescaped '{m.group()}' in '{field}': {value!r} (write \\{m.group()})")
+    for m in _SPECIAL_WITH_BACKSLASHES.finditer(value):
+        backslashes = m.group(1)
+        special = m.group(2)
+        # Even number of backslashes (including 0) means the special is unescaped
+        if len(backslashes) % 2 == 0:
+            raise PoolError(f"unescaped '{special}' in '{field}': {value!r} (write \\{special})")
     return value
 
 

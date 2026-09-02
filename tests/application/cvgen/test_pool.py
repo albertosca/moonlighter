@@ -202,6 +202,34 @@ def test_unescaped_tex_special_in_a_fixed_field_raises(tmp_path, field, value):
         load_pool(_write(tmp_path, broken))
 
 
+def test_single_backslash_escapes_the_special(tmp_path):
+    # \& = escaped ampersand (safe)
+    ok = VALID.replace('title: "Professor"', 'title: "R\\\\&D"')
+    pool = load_pool(_write(tmp_path, ok))
+    assert pool.experiences[1].title == r"R\&D"
+
+
+def test_double_backslash_leaves_special_unescaped(tmp_path):
+    # \\& = line break + unescaped ampersand (breaks LaTeX, must be caught)
+    broken = textwrap.dedent("""
+        experiences:
+          - company: X
+            title: "R\\\\\\\\&D"
+            period: P
+            location: L
+            prose: "Some prose"
+    """)
+    with pytest.raises(PoolError, match="unescaped"):
+        load_pool(_write(tmp_path, broken))
+
+
+def test_triple_backslash_escapes_after_line_break(tmp_path):
+    # \\\& = line break + escaped ampersand (safe)
+    ok = VALID.replace('title: "Professor"', 'title: "R\\\\\\\\\\\\&D"')
+    pool = load_pool(_write(tmp_path, ok))
+    assert pool.experiences[1].title == r"R\\\&D"
+
+
 def test_escaped_specials_in_a_fixed_field_are_fine(tmp_path):
     ok = VALID.replace('title: "Professor"', 'title: "R\\\\&D \\\\& 100\\\\% Professor"')
     pool = load_pool(_write(tmp_path, ok))
