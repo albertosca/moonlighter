@@ -4,6 +4,7 @@ Two passes (moderncv references), run in the .tex's own directory, bounded by
 a timeout. No pdflatex on the machine, or a failed run: the caller keeps the
 .tex and tells the operator how to compile it themselves."""
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -14,6 +15,7 @@ logger = get_logger(__name__)
 
 
 _PDFLATEX = "pdflatex"
+_PAGES = re.compile(r"^Output written on .+\.pdf \((\d+) pages?", re.MULTILINE)
 
 
 def latex_available() -> bool:
@@ -60,3 +62,17 @@ def compile_pdf(tex_path: Path, timeout_s: int = 120) -> Path | None:
         return None
     pdf = tex_path.with_suffix(".pdf")
     return pdf if pdf.exists() else None
+
+
+def page_count(tex_path: Path) -> int | None:
+    """How many pages the last compile produced, read from pdflatex's own log.
+
+    The log is the honest source: it is written by the process that laid the
+    pages out. None when there is no log (no compile happened) or no output
+    line (the compile died before producing pages).
+    """
+    log = tex_path.with_suffix(".log")
+    if not log.exists():
+        return None
+    m = _PAGES.search(log.read_text(errors="replace"))
+    return int(m.group(1)) if m else None
