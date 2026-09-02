@@ -48,6 +48,12 @@ def _after_compile(tex: Path) -> TailoredCV | None:
         return TailoredCV(tex, False)  # honest tex-only path; compile it later
     logger.warning("the generated CV does not compile — discarding %s, using default CV", tex)
     tex.unlink(missing_ok=True)
+    # The sibling .pdf goes too. A compile that dies partway can leave a
+    # truncated one behind, and the cache short-circuits on cv.pdf BEFORE any
+    # compile — so a survivor would be served forever, at zero LLM calls, with
+    # the source .tex already gone. compile_pdf clears its own remains; this is
+    # the layer that owns the cache entry, and it must not depend on that.
+    tex.with_suffix(".pdf").unlink(missing_ok=True)
     return None
 
 

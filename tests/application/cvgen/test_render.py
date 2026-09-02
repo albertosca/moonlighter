@@ -168,6 +168,14 @@ class TestRender:
         assert "^^" not in tex and "\\input" not in tex and "{/etc/passwd}" not in tex
         assert tex.count(r"\textasciicircum{}\textasciicircum{}5cinput") == 3
 
+    def test_an_empty_translation_falls_back_to_the_pool_latex(self):
+        # Whitespace-only or zero-width-only input escapes to "", and the
+        # fallback triggered on None alone — so the bullet rendered EMPTY,
+        # silently deleting a line from the CV. Empty is not a translation.
+        for blank in ("\u200b\u200b", "   ", "\n\n", "\u00ad"):
+            tex = render_cv(TEMPLATE, _selection(translations={"t-a": blank}), POOL)
+            assert r"Did \textbf{A}" in tex, f"lost the bullet for {blank!r}"
+
     def test_bold_markers_in_a_translation_become_textbf(self):
         # The same **bold** dialect the summary already uses — that is what the
         # prompt now asks translations for, so it has to survive escaping.

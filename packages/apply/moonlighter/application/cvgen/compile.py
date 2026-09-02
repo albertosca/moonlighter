@@ -26,6 +26,19 @@ def latex_available() -> bool:
     return shutil.which(_PDFLATEX) is not None
 
 
+def _discard_partial(tex_path: Path) -> None:
+    """Remove a PDF left behind by a compile that did not succeed.
+
+    pdflatex writes the PDF incrementally, and a timeout SIGKILLs it mid-write
+    so it never cleans up after itself — measured at 303KB with a %PDF-1.7
+    header and no %%EOF. compile_pdf spawned that process, so it clears the
+    remains here: the invariant "a compile that failed leaves no PDF" then
+    holds for every caller, present and future, not just the one that
+    remembers to check.
+    """
+    tex_path.with_suffix(".pdf").unlink(missing_ok=True)
+
+
 def compile_pdf(tex_path: Path, timeout_s: int = 120) -> Path | None:
     pdflatex = shutil.which(_PDFLATEX)
     if pdflatex is None:
@@ -39,9 +52,11 @@ def compile_pdf(tex_path: Path, timeout_s: int = 120) -> Path | None:
             )
             if result.returncode != 0:
                 logger.warning("pdflatex failed for %s (rc=%s)", tex_path, result.returncode)
+                _discard_partial(tex_path)
                 return None
     except subprocess.TimeoutExpired:
         logger.warning("pdflatex timed out for %s", tex_path)
+        _discard_partial(tex_path)
         return None
     pdf = tex_path.with_suffix(".pdf")
     return pdf if pdf.exists() else None

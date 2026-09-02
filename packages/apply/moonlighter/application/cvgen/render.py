@@ -92,7 +92,12 @@ def _bullet_text(bullet_id: str, latex: str, selection: CVSelection) -> str:
     for. Do not reintroduce a "trusted markup" path for model output here.
     """
     text = selection.translations.get(bullet_id)
-    return latex if text is None else escape_latex(text)
+    if text is None:
+        return latex
+    # Whitespace-only or zero-width-only input escapes to "", and rendering
+    # that silently deletes the bullet from the CV. Empty is not a
+    # translation: fall back to the curated latex, same as an absent one.
+    return escape_latex(text) or latex
 
 
 def _entry(exp: PoolExperience, selection: CVSelection) -> str:

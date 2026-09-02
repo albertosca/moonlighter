@@ -96,6 +96,44 @@ def test_custom_timeout_reaches_subprocess(tmp_path):
     assert run.call_args.kwargs["timeout"] == custom_timeout
 
 
+def test_a_failed_compile_removes_a_partial_pdf(tmp_path):
+    # pdflatex writes the PDF incrementally, so a run that dies partway leaves
+    # a truncated file. compile_pdf spawned it, so it clears it: a compile that
+    # did not succeed must leave no PDF for any caller to serve.
+    tex = tmp_path / "cv.tex"
+    tex.write_text("x")
+    partial = tmp_path / "cv.pdf"
+    partial.write_bytes(b"%PDF-1.7\ntruncated, no EOF marker")
+    run = MagicMock(return_value=MagicMock(returncode=1))
+    with (
+        patch(
+            "moonlighter.application.cvgen.compile.shutil.which", return_value="/usr/bin/pdflatex"
+        ),
+        patch("moonlighter.application.cvgen.compile.subprocess.run", run),
+    ):
+        assert compile_pdf(tex) is None
+    assert not partial.exists()
+    assert tex.exists()  # the source is the caller's to keep or discard
+
+
+def test_a_timed_out_compile_removes_a_partial_pdf(tmp_path):
+    # The measured case: subprocess.run SIGKILLs pdflatex on timeout, so it
+    # never gets to clean up after itself.
+    tex = tmp_path / "cv.tex"
+    tex.write_text("x")
+    partial = tmp_path / "cv.pdf"
+    partial.write_bytes(b"%PDF-1.7\ntruncated, no EOF marker")
+    run = MagicMock(side_effect=subprocess.TimeoutExpired("pdflatex", 120))
+    with (
+        patch(
+            "moonlighter.application.cvgen.compile.shutil.which", return_value="/usr/bin/pdflatex"
+        ),
+        patch("moonlighter.application.cvgen.compile.subprocess.run", run),
+    ):
+        assert compile_pdf(tex) is None
+    assert not partial.exists()
+
+
 @pytest.mark.e2e
 def test_real_pdflatex_compiles_a_minimal_document(tmp_path):
     import shutil as real_shutil

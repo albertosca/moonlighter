@@ -324,6 +324,37 @@ async def test_a_tex_kept_for_a_missing_latex_compiles_later_without_an_llm_call
     assert calls["n"] == 1  # the second prepare reused the cached .tex
 
 
+async def test_a_partial_pdf_left_by_a_failed_compile_is_discarded_with_the_tex(cfg):
+    # A timeout SIGKILLs pdflatex mid-write, so a truncated cv.pdf survives on
+    # disk while compile_pdf still returns None. Leaving it there is worse than
+    # the bug round 5 fixed, because the cache short-circuits on cv.pdf BEFORE
+    # any compile: every later prepare hands the operator a corrupt file at
+    # zero LLM calls, with the source .tex already deleted. 12 tests in this
+    # file patch compile_pdf and not one staged a .pdf beside it, which is why
+    # the suite could not see this.
+    def timeout_like(tex):
+        # Exactly what a timeout does: pdflatex is SIGKILLed mid-write, so a
+        # truncated .pdf is on disk while compile_pdf still answers None.
+        tex.with_suffix(".pdf").write_bytes(b"%PDF-1.7\ntruncated, no EOF marker")
+
+    call, calls = _caller()
+    with (
+        patch("moonlighter.application.cvgen.service.compile_pdf", side_effect=timeout_like),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=True),
+    ):
+        assert await ensure_tailored_cv(JOB, cfg, {}, call) is None
+    out = generated_dir_for(cfg, 42)
+    assert not (out / "cv.tex").exists()
+    assert not (out / "cv.pdf").exists()  # the corrupt file must not survive
+    with patch(
+        "moonlighter.application.cvgen.service.compile_pdf",
+        side_effect=lambda tex: tex.with_suffix(".pdf"),
+    ):
+        second = await ensure_tailored_cv(JOB, cfg, {}, call)
+    assert second is not None and second.compiled
+    assert calls["n"] == 2  # one call per prepare: nothing was served from cache
+
+
 async def test_spend_limit_is_swallowed_here(cfg, caplog):
     async def spend_limit_call(prompt, model, cache_prefix=None):
         raise RuntimeError("You've hit your session spend limit")
