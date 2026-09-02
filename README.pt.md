@@ -69,6 +69,14 @@ flowchart LR
 
 Todas as etapas são expostas como ferramentas MCP e orquestradas pelo Claude numa conversa.
 
+### CV adaptado por vaga (opcional)
+
+Quando `cv.pool` no `config.yaml` aponta para um banco de bullets curado (`cv-pool.yaml`), `prepare_application` também adapta seu CV à vaga: uma chamada de LLM seleciona e ordena bullets do seu banco (ele também consegue responder "o CV base já serve" e não mudar nada), o resultado renderiza pelo seu próprio template LaTeX e compila com `pdflatex` quando instalado. O modelo nunca faz uma afirmação factual — só seleciona do que você já curou — e a folha sempre avisa pra revisar o PDF gerado antes de fazer upload. Sem arquivo de banco a funcionalidade fica inteiramente desligada: sem chamadas extra, sem mudanças.
+
+Chaves de config: `cv.pool`, `cv.template_dir` (contendo `cv-template.en.tex`, opcionalmente `cv-template.pt.tex` para vagas em português), `cv.generated_dir` (padrão `~/.moonlighter/cv-generated`).
+
+O resultado de cada vaga fica em cache em `<generated_dir>/<job_id>/`, então nenhuma vaga é gerada duas vezes — depois de editar seu banco ou seu template, apague esse diretório para que o próximo `prepare_application` regenere o CV daquela vaga.
+
 ## Arquitetura
 
 Um [workspace uv](https://docs.astral.sh/uv/concepts/workspaces/) com 5 namespace packages (`moonlighter.*`), organizados por feature:

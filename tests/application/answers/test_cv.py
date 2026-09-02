@@ -51,3 +51,39 @@ def test_resolve_cv_path_relative_resolved_from_moonlighter_home(monkeypatch, tm
     result = resolve_cv_path("stripe", config)
     assert result == str(moonlighter_home() / "cvs" / "general.pdf")
     assert Path(result).exists()
+
+
+def _tailored_config(tmp_path):
+    company_cv = tmp_path / "nu.pdf"
+    company_cv.write_bytes(b"x")
+    default_cv = tmp_path / "def.pdf"
+    default_cv.write_bytes(b"x")
+    return {
+        "cv": {
+            "default": str(default_cv),
+            "by_company": {"nubank": str(company_cv)},
+            "generated_dir": str(tmp_path / "generated"),
+        }
+    }, company_cv
+
+
+def test_job_generated_pdf_wins_over_company_and_default(tmp_path):
+    config, _ = _tailored_config(tmp_path)
+    generated = tmp_path / "generated" / "42"
+    generated.mkdir(parents=True)
+    (generated / "cv.pdf").write_bytes(b"%PDF")
+    assert resolve_cv_path("nubank", config, job_id=42) == str(generated / "cv.pdf")
+
+
+def test_tex_only_generated_dir_does_not_win(tmp_path):
+    # Nothing uploadable in a tex-only dir — the sheet's compile note covers it.
+    config, company_cv = _tailored_config(tmp_path)
+    generated = tmp_path / "generated" / "42"
+    generated.mkdir(parents=True)
+    (generated / "cv.tex").write_text("x")
+    assert resolve_cv_path("nubank", config, job_id=42) == str(company_cv)
+
+
+def test_no_job_id_keeps_todays_behavior(tmp_path):
+    config, company_cv = _tailored_config(tmp_path)
+    assert resolve_cv_path("nubank", config) == str(company_cv)

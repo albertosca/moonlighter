@@ -141,7 +141,15 @@ _CONFIG_SCHEMA: dict[str, tuple[type, ...]] = {
     "portal_max_age_days": _INT,
 }
 
-_CV_SCHEMA: dict[str, tuple[type, ...]] = {"default": (str,), "by_company": (dict,)}
+_CV_SCHEMA: dict[str, tuple[type, ...]] = {
+    "default": (str,),
+    "by_company": (dict,),
+    # Tailored-CV feature (specs/2026-08-25-tailored-cv-design.md). All three
+    # optional: the feature activates only when `pool` names an existing file.
+    "pool": (str,),
+    "template_dir": (str,),
+    "generated_dir": (str,),
+}
 _WORK_AUTH_SCHEMA: dict[str, tuple[type, ...]] = {
     "citizenship_country": (str,),
     "authorized_answer": (str,),

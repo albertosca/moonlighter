@@ -1173,10 +1173,14 @@ version = "0.1.4"
 source = { editable = "packages/apply" }
 dependencies = [
     { name = "moonlighter-core" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "moonlighter-core", editable = "packages/core" }]
+requires-dist = [
+    { name = "moonlighter-core", editable = "packages/core" },
+    { name = "pyyaml", specifier = ">=6.0" },
+]
 
 [[package]]
 name = "moonlighter-core"
