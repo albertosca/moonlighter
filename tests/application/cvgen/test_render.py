@@ -1,7 +1,12 @@
 import textwrap
 
 from moonlighter.application.cvgen.pool import CVPool, PoolBullet, PoolExperience
-from moonlighter.application.cvgen.render import CVSelection, escape_latex, render_cv
+from moonlighter.application.cvgen.render import (
+    CVSelection,
+    escape_latex,
+    is_typesettable,
+    render_cv,
+)
 
 POOL = CVPool(
     experiences=(
@@ -87,12 +92,12 @@ class TestEscape:
 
     def test_letters_latex_cannot_typeset_are_kept_not_dropped(self):
         # DELIBERATE, and the opposite of the rule above: these carry meaning.
-        # A pdflatex document cannot typeset them and the compile dies — but
-        # silently deleting a Japanese term or a Greek symbol REWRITES a
+        # Silently deleting a Japanese term or a Greek symbol REWRITES a
         # factual claim in a CV the candidate signs, which the spec forbids
-        # outright. The honest outcome is the failed compile, which now
-        # degrades to the default CV and regenerates (service._after_compile)
-        # instead of being cached forever. Do not "fix" this by dropping them.
+        # outright. escape_latex itself does not judge typesettability — that
+        # is is_typesettable's job (called by the generation layer), which
+        # rejects the whole field before it ever reaches this renderer. Do not
+        # "fix" this by dropping them here.
         for ch in ("\u65e5", "\u03a3", "\U0001f680"):
             assert ch in escape_latex(f"prefix {ch} suffix")
 
@@ -110,13 +115,6 @@ class TestRender:
         tex = render_cv(TEMPLATE, _selection(), POOL)
         assert tex.index(r"Did \textbf{B}") < tex.index(r"Did \textbf{A}")
         assert r"\cventry{}{Senior Software Developer}{Trybe}" in tex
-
-    def test_experience_with_no_selected_bullets_falls_back_to_all(self):
-        # Spec: an experience whose validated list is empty falls back to the
-        # base bullets — dropping a whole employment gap from a CV is worse
-        # than generic emphasis.
-        tex = render_cv(TEMPLATE, _selection(bullets=("igti-prose",)), POOL)
-        assert r"Did \textbf{A}" in tex and r"Did \textbf{B}" in tex
 
     def test_prose_entry_renders_when_selected(self):
         tex = render_cv(TEMPLATE, _selection(), POOL)
@@ -235,3 +233,105 @@ class TestRender:
         )
         assert r"\section{Open Source}" in tex
         assert r"Contribuições em \textbf{moonlighter}" in tex
+
+
+GROUPED_POOL = CVPool(
+    experiences=(
+        PoolExperience(
+            company="Trybe",
+            title="Senior Software Developer",
+            period="Jan 2023 -- Jul 2026",
+            location="BH, Brazil",
+            bullets=(PoolBullet("t-ic", ("backend",), "IC work"),),
+            prose=None,
+            prose_id=None,
+            angles=(),
+        ),
+        PoolExperience(
+            company="Trybe",
+            title="Engineering Manager",
+            period="Sep 2019 -- Dec 2022",
+            location="BH, Brazil",
+            bullets=(PoolBullet("t-em", ("leadership",), "EM work"),),
+            prose=None,
+            prose_id=None,
+            angles=(),
+        ),
+        PoolExperience(
+            company="AppProva",
+            title="Full Stack Engineer / Tech Lead",
+            period="Jun 2017 -- Sep 2019",
+            location="BH, Brazil",
+            bullets=(PoolBullet("a-1", ("backend",), "Built X"),),
+            prose=None,
+            prose_id=None,
+            angles=(),
+        ),
+    ),
+    open_source=(),
+    summary_facts=(),
+)
+
+
+class TestGrouping:
+    def test_consecutive_roles_at_one_company_render_as_one_block(self):
+        # moderncv banking's own multi-role form: company, overall span and
+        # location on the first entry's bold line, each role's own period in
+        # the first argument (the italic line); following roles omit company,
+        # span and location so the bold line is skipped.
+        tex = render_cv(TEMPLATE, _selection(bullets=("t-ic", "t-em", "a-1")), GROUPED_POOL)
+        assert (
+            r"\cventry{Jan 2023 -- Jul 2026}{Senior Software Developer}{Trybe}"
+            r"{Sep 2019 -- Jul 2026}{BH, Brazil}{" in tex
+        )
+        assert r"\cventry{Sep 2019 -- Dec 2022}{Engineering Manager}{}{}{}{" in tex
+        assert tex.count("{Trybe}") == 1
+
+    def test_a_single_role_company_keeps_the_plain_form(self):
+        tex = render_cv(TEMPLATE, _selection(bullets=("t-ic", "t-em", "a-1")), GROUPED_POOL)
+        assert (
+            r"\cventry{}{Full Stack Engineer / Tech Lead}{AppProva}{Jun 2017 -- Sep 2019}"
+            r"{BH, Brazil}{" in tex
+        )
+
+    def test_grouping_needs_adjacency(self):
+        # Trybe, AppProva, Trybe: the two Trybe entries are not one block.
+        shuffled = CVPool(
+            experiences=(
+                GROUPED_POOL.experiences[0],
+                GROUPED_POOL.experiences[2],
+                GROUPED_POOL.experiences[1],
+            ),
+            open_source=(),
+            summary_facts=(),
+        )
+        tex = render_cv(TEMPLATE, _selection(bullets=("t-ic", "t-em", "a-1")), shuffled)
+        assert tex.count("{Trybe}") == 2
+        assert "{}{}{}{" not in tex
+
+
+class TestFallback:
+    def test_experience_with_no_selected_bullets_renders_its_first_pool_bullet(self):
+        # Replaces the old "falls back to all": with a one-page budget,
+        # rendering every bullet would fight the shrink loop (dropping the last
+        # selected bullet of an experience would GROW the document). The period
+        # is still never dropped — its first curated bullet stands for it.
+        tex = render_cv(TEMPLATE, _selection(bullets=("igti-prose",)), POOL)
+        assert r"Did \textbf{A}" in tex
+        assert r"Did \textbf{B}" not in tex
+
+
+class TestTypesettable:
+    def test_latin_text_and_common_punctuation_pass(self):
+        for text in (
+            "Liderou a adoção de IA — 40+ pessoas, ‘pt’ “en” … 100% · Elixir",
+            "plain ascii with **bold**",
+            "",
+        ):
+            assert is_typesettable(text), text
+
+    def test_anything_outside_the_latin_allow_list_fails(self):
+        # Alberto: "não queremos glifo nenhum no latex, ele tem que ser bem
+        # sério". Emoji, CJK, Greek, arrows, check marks, bullets: rejected.
+        for ch in ("\U0001f680", "日", "Σ", "→", "✓", "•", "Ł"):
+            assert not is_typesettable(f"ok {ch} ok"), repr(ch)
