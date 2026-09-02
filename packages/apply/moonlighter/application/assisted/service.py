@@ -1,5 +1,6 @@
 """Turn a job into a sheet the candidate can paste into the form."""
 
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -20,6 +21,7 @@ from moonlighter.application.assisted.sources.recruitee import (
     fetch_recruitee_questions,
     host_and_offer_from_url,
 )
+from moonlighter.application.cvgen.service import ensure_tailored_cv
 from moonlighter.core.db import Application, Job
 from moonlighter.core.llm import make_caller
 
@@ -79,14 +81,26 @@ def _with_tracking_alias(composed: list[ComposedAnswer], alias: str) -> list[Com
     ]
 
 
+def _names_path(composed: list[ComposedAnswer], path: Path) -> bool:
+    """Whether some gap already tells the operator to upload this exact file."""
+    return any(item.gap_reason is not None and str(path) in item.gap_reason for item in composed)
+
+
 async def _sheet(
     job: Job, questions: list[FormQuestion], config: dict[str, Any], profile: dict[str, Any]
 ) -> str:
+    tailored = await ensure_tailored_cv(
+        {"id": job.id, "title": job.title, "company": job.company, "description": job.description},
+        config,
+        profile,
+        make_caller(config),
+    )
     composed = await compose_answers(
         questions,
         profile,
         config,
         {
+            "id": job.id,
             "title": job.title,
             "company": job.company,
             "description": job.description,
@@ -104,6 +118,25 @@ async def _sheet(
         # that omits standard fields) — the alias must reach the operator anyway,
         # or the company's reply lands in a mailbox the monitor never reads.
         sheet += f"\n\nWhere the form asks for an email address, use: {alias}"
+    if tailored is not None and not tailored.compiled:
+        # The CV gap names the DEFAULT CV here (resolve_cv_path refuses a dir
+        # with no pdf), so "compile it" alone leaves the operator compiling a
+        # tailored CV and then uploading the generic one.
+        sheet += (
+            f"\n\nA tailored CV was generated but pdflatex is not installed —"
+            f" compile it yourself: cd {tailored.path.parent} && pdflatex {tailored.path.name}"
+            f" — then upload the resulting cv.pdf instead of the CV named above"
+            f" (review it first)"
+        )
+    if tailored is not None and tailored.compiled and not _names_path(composed, tailored.path):
+        # Same shape as the alias footer above: the compiled CV otherwise
+        # surfaces only through the composer's CV FILE branch, which needs a
+        # FILE question with a CV-shaped label. A paste that missed the resume
+        # field would leave a tailored PDF nobody is told to review or upload.
+        sheet += (
+            f"\n\nUpload this CV for this job: {tailored.path}"
+            f" (tailored for this job — review it before uploading)"
+        )
     return sheet
 
 

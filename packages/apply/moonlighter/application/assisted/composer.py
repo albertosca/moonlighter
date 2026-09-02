@@ -7,6 +7,7 @@ defensible answer becomes a visible gap. Never an invented answer, never silence
 import logging
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from moonlighter.application.answers.compliance import is_compliance_question
@@ -172,9 +173,20 @@ async def compose_answers(
             # letter" gap naming the CV instructs the operator to attach the
             # wrong document (found on the GitLab gate sheet, 2026-08-13).
             if _CV_LABEL.search(question.label):
+                # Local import, same cycle-avoidance as answers/cv.py's resolve_cv_path:
+                # answers/assisted must not import cvgen at module level.
+                from moonlighter.application.cvgen.service import generated_dir_for
+
                 try:
-                    path = resolve_cv_path(str(job.get("company") or ""), config)
+                    path = resolve_cv_path(
+                        str(job.get("company") or ""), config, job_id=job.get("id")
+                    )
                     reason = f"upload this file yourself: {path}"
+                    tailored_root = (
+                        generated_dir_for(config, int(job["id"])) if job.get("id") else None
+                    )
+                    if tailored_root and Path(path).is_relative_to(tailored_root):
+                        reason += " (tailored for this job — review it before uploading)"
                 except CVNotFoundError:
                     reason = "upload a file yourself — no CV is configured"
             else:

@@ -548,3 +548,19 @@ def test_load_config_full_email_block_still_overrides_both(tmp_path):
     config = load_config(config_path=str(cfg_file))
     assert config["email"]["credentials_path"] == "a.json"
     assert config["email"]["token_path"] == "b.json"
+
+
+def test_cv_schema_accepts_tailored_cv_keys(tmp_path, monkeypatch):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "config.yaml").write_text(
+        "cv:\n"
+        "  default: cv.pdf\n"
+        "  pool: /somewhere/cv-pool.yaml\n"
+        "  template_dir: /somewhere/templates\n"
+        "  generated_dir: /somewhere/generated\n"
+    )
+    config = load_config()
+    validate_config(config)
+    assert config["cv"]["pool"] == "/somewhere/cv-pool.yaml"
+    assert config["cv"]["template_dir"] == "/somewhere/templates"
+    assert config["cv"]["generated_dir"] == "/somewhere/generated"

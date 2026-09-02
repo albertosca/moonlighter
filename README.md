@@ -69,6 +69,14 @@ flowchart LR
 
 All steps are exposed as MCP tools and orchestrated by Claude in a conversation.
 
+### Tailored CV per job (optional)
+
+When `cv.pool` in `config.yaml` points at a curated bullet pool (`cv-pool.yaml`), `prepare_application` also tailors your CV to the posting: one LLM call selects and orders bullets from your pool (it can also answer "the base CV already fits" and change nothing), the result renders through your own LaTeX template and compiles with `pdflatex` when installed. The model never authors a factual claim — it only selects from what you curated — and the sheet always tells you to review the generated PDF before uploading. Without a pool file the feature is entirely off: no extra calls, no changes.
+
+Config keys: `cv.pool`, `cv.template_dir` (holding `cv-template.en.tex`, optionally `cv-template.pt.tex` for Portuguese postings), `cv.generated_dir` (default `~/.moonlighter/cv-generated`).
+
+Each job's result is cached under `<generated_dir>/<job_id>/`, so no job is ever generated twice — after editing your pool or template, delete that directory to have the next `prepare_application` regenerate that job's CV.
+
 ## Architecture
 
 A [uv workspace](https://docs.astral.sh/uv/concepts/workspaces/) of 5 namespace packages (`moonlighter.*`), feature-sliced:

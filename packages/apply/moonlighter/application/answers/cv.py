@@ -31,14 +31,20 @@ def configured_cv_path(config: dict[str, Any], company: str = "") -> Path | None
     return path
 
 
-def resolve_cv_path(company: str, config: dict[str, Any]) -> str:
+def resolve_cv_path(company: str, config: dict[str, Any], job_id: int | None = None) -> str:
     """
-    Resolves the CV path for the company from config['cv'].
-    Company matching is case-insensitive. Falls back to 'default' when there's
-    no mapping. Relative paths are resolved from MOONLIGHTER_HOME.
-    Raises CVNotFoundError if the chosen file does not exist (never silently
-    uploads the wrong CV).
+    Resolves the CV path to upload: the job's own tailored PDF when one exists,
+    else the company mapping, else 'default'. Company matching is case-insensitive.
+    Relative paths are resolved from MOONLIGHTER_HOME. Raises CVNotFoundError if
+    the chosen file does not exist (never silently uploads the wrong CV).
     """
+    if job_id is not None:
+        from moonlighter.application.cvgen.service import generated_dir_for
+
+        tailored = generated_dir_for(config, job_id) / "cv.pdf"
+        if tailored.exists():
+            return str(tailored)
+
     path = configured_cv_path(config, company)
     if path is None:
         raise CVNotFoundError(
