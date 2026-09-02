@@ -3,6 +3,7 @@
 The pool is the factual boundary of CV generation: the LLM selects ids from
 it, never authors content (specs/2026-08-25-tailored-cv-design.md)."""
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,19 @@ import yaml
 class PoolError(Exception):
     """The pool file is missing or malformed — named precisely so the operator
     can fix the YAML instead of silently losing the tailored-CV feature."""
+
+
+# A fixed field is pasted into \cventry{} as-is (it is operator LaTeX, like the
+# bullets), so a bare special breaks EVERY compile. The draft's "R&D Engineer"
+# did exactly that, silently, until someone compiled it.
+_UNESCAPED_SPECIAL = re.compile(r"(?<!\\)[&%$#_]")
+
+
+def _fixed_field(raw: dict[str, Any], field: str) -> str:
+    value = str(raw[field])
+    if m := _UNESCAPED_SPECIAL.search(value):
+        raise PoolError(f"unescaped '{m.group()}' in '{field}': {value!r} (write \\{m.group()})")
+    return value
 
 
 @dataclass(frozen=True)
@@ -42,6 +56,9 @@ class CVPool:
 
     def bullet_ids(self) -> frozenset[str]:
         return frozenset(_all_ids(self))
+
+    def prose_ids(self) -> frozenset[str]:
+        return frozenset(e.prose_id for e in self.experiences if e.prose_id)
 
 
 def _all_ids(pool: CVPool) -> list[str]:
@@ -83,11 +100,13 @@ def _experience(raw: Any) -> PoolExperience:
     prose = raw.get("prose")
     if not bullets and not prose:
         raise PoolError(f"experience '{raw['company']}' has neither bullets or prose")
+    if bullets and prose:
+        raise PoolError(f"experience '{raw['company']}' has both prose and bullets")
     return PoolExperience(
-        company=str(raw["company"]),
-        title=str(raw["title"]),
-        period=str(raw["period"]),
-        location=str(raw["location"]),
+        company=_fixed_field(raw, "company"),
+        title=_fixed_field(raw, "title"),
+        period=_fixed_field(raw, "period"),
+        location=_fixed_field(raw, "location"),
         bullets=bullets,
         prose=str(prose) if prose else None,
         prose_id=str(raw["id"]) if raw.get("id") else None,
