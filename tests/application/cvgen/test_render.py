@@ -172,9 +172,39 @@ class TestRender:
         # Whitespace-only or zero-width-only input escapes to "", and the
         # fallback triggered on None alone — so the bullet rendered EMPTY,
         # silently deleting a line from the CV. Empty is not a translation.
-        for blank in ("\u200b\u200b", "   ", "\n\n", "\u00ad"):
-            tex = render_cv(TEMPLATE, _selection(translations={"t-a": blank}), POOL)
+        #
+        # The MIXED forms are why the strip has to run last. Whitespace is
+        # collapsed and stripped first, then Cc/Cf are dropped — so a ZWSP on
+        # either side of a space leaves a lone ' ' AFTER the drop, which is
+        # truthy, so the fallback never fires and "\item " renders. That is
+        # legal LaTeX, so the compile-failure net never catches it either: a
+        # line silently vanishes from a document the candidate signs.
+        blanks = (
+            "\u200b\u200b",
+            "   ",
+            "\n\n",
+            "\u00ad",
+            "",
+            "\u200b \u200b",  # ZWSP  space  ZWSP
+            "\u00ad \u00ad",  # SHY   space  SHY
+            "\u200e \u200e",  # LRM   space  LRM
+            "\u200b\n\u200b",  # around a newline
+            "\u200b\t\u200b",  # around a tab
+        )
+        for blank in blanks:
+            tex = render_cv(
+                TEMPLATE,
+                _selection(
+                    open_source=("oss-m",),
+                    translations={"t-a": blank, "igti-prose": blank, "oss-m": blank},
+                ),
+                POOL,
+            )
+            # all three render paths go through _bullet_text, so all three
+            # must keep their curated content
             assert r"Did \textbf{A}" in tex, f"lost the bullet for {blank!r}"
+            assert "Taught ML." in tex, f"lost the prose for {blank!r}"
+            assert r"\textbf{moonlighter}" in tex, f"lost the open-source item for {blank!r}"
 
     def test_bold_markers_in_a_translation_become_textbf(self):
         # The same **bold** dialect the summary already uses — that is what the

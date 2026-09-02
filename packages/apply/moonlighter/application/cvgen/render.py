@@ -57,7 +57,13 @@ def escape_latex(text: str) -> str:
     # Single-pass regex prevents cascade: braces in \textbackslash{} won't
     # be re-escaped to \{ and \}.
     text = _WHITESPACE.sub(" ", text).strip()
-    text = "".join(c for c in text if unicodedata.category(c) not in _DROPPED_CATEGORIES)
+    # .strip() LAST, not only after the collapse: dropping Cc/Cf re-exposes
+    # whitespace that was interior a moment ago ("<ZWSP> <ZWSP>" leaves a lone
+    # space), and a truthy " " defeats the empty-translation fallback in
+    # _bullet_text — "\item " is legal LaTeX, so nothing downstream notices the
+    # line has silently vanished. Also trims that residue from the summary and
+    # technical-expertise fields, which have no fallback at all.
+    text = "".join(c for c in text if unicodedata.category(c) not in _DROPPED_CATEGORIES).strip()
     text = re.sub(r"[\\&%$#_{}~^]", lambda m: _LATEX_ESCAPE_TABLE[m.group()], text)
     return _BOLD.sub(r"\\textbf{\1}", text)
 
