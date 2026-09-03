@@ -6,8 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from mcp.server.fastmcp import Context, FastMCP
-from mcp.server.session import ServerSession
+from mcp.server.mcpserver import Context, MCPServer
 from moonlighter._tool_logging import tool_logged
 from moonlighter.application.assisted import service as assisted_service
 from moonlighter.core.config import (
@@ -44,8 +43,8 @@ class AppContext:
 
 
 @contextlib.asynccontextmanager
-async def lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
-    """FastMCP lifespan: loads+validates config, inits DB, hardens permissions,
+async def lifespan(server: MCPServer) -> AsyncIterator[AppContext]:
+    """MCPServer lifespan: loads+validates config, inits DB, hardens permissions,
     runs startup checks, and yields the AppContext. Raises ConfigError before
     yielding on an invalid config, refusing to boot."""
     _setup_logging()
@@ -75,13 +74,13 @@ async def lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     )
 
 
-mcp = FastMCP("moonlighter", lifespan=lifespan)
+mcp = MCPServer("moonlighter", lifespan=lifespan)
 
 
 @mcp.tool()
 @tool_logged
 async def scan_and_evaluate(
-    keywords: str = "", phase: str = "phase1", *, ctx: Context[ServerSession, AppContext, Any]
+    keywords: str = "", phase: str = "phase1", *, ctx: Context[AppContext, Any]
 ) -> str:
     """Scan job boards, evaluate with LLM, return new jobs above threshold.
 
@@ -102,9 +101,7 @@ async def scan_and_evaluate(
 
 @mcp.tool()
 @tool_logged
-async def scan_company(
-    source: str, company: str, *, ctx: Context[ServerSession, AppContext, Any]
-) -> str:
+async def scan_company(source: str, company: str, *, ctx: Context[AppContext, Any]) -> str:
     """Scan every open posting at ONE company right now and evaluate the new ones.
 
     Does not touch company_list.yaml — use it for ad-hoc checks ("what is open
@@ -130,7 +127,7 @@ async def add_job(
     title: str = "",
     description: str = "",
     *,
-    ctx: Context[ServerSession, AppContext, Any],
+    ctx: Context[AppContext, Any],
 ) -> str:
     """Evaluates a manually provided job and saves it to the database.
 
@@ -161,7 +158,7 @@ async def verify_job(
     job_id: int,
     page_text: str,
     *,
-    ctx: Context[ServerSession, AppContext, Any],
+    ctx: Context[AppContext, Any],
 ) -> str:
     """Re-evaluates a job that couldn't be scored automatically because its
     description was empty, using text you copy from its real page.
@@ -185,7 +182,7 @@ async def archive_stale_jobs(
     job_id: int | None = None,
     company: str | None = None,
     *,
-    ctx: Context[ServerSession, AppContext, Any],
+    ctx: Context[AppContext, Any],
 ) -> str:
     """Detect and archive (status='archived', closed_at set) jobs that disappeared from their source.
 
@@ -209,9 +206,7 @@ async def archive_stale_jobs(
 
 @mcp.tool()
 @tool_logged
-async def list_jobs(
-    status: str = "new", limit: int = 20, *, ctx: Context[ServerSession, AppContext, Any]
-) -> str:
+async def list_jobs(status: str = "new", limit: int = 20, *, ctx: Context[AppContext, Any]) -> str:
     """List jobs from DB filtered by status.
 
     Ordering is rejection-aware (see priority.py): a company that recently
@@ -235,7 +230,7 @@ async def list_jobs(
 
 @mcp.tool()
 @tool_logged
-async def get_job(id: int, *, ctx: Context[ServerSession, AppContext, Any]) -> str:
+async def get_job(id: int, *, ctx: Context[AppContext, Any]) -> str:
     """Get full details of a job posting."""
     try:
         job = Job.get_by_id(id)
@@ -270,7 +265,7 @@ async def get_job(id: int, *, ctx: Context[ServerSession, AppContext, Any]) -> s
 
 @mcp.tool()
 @tool_logged
-async def prepare_application(job_id: int, *, ctx: Context[ServerSession, AppContext, Any]) -> str:
+async def prepare_application(job_id: int, *, ctx: Context[AppContext, Any]) -> str:
     """
     Produce the full set of answers for a job application, for you to paste into
     the form yourself. Reads the questions from the ATS API when it publishes them
@@ -285,7 +280,7 @@ async def prepare_application(job_id: int, *, ctx: Context[ServerSession, AppCon
 @mcp.tool()
 @tool_logged
 async def prepare_application_from_paste(
-    job_id: int, page_text: str, *, ctx: Context[ServerSession, AppContext, Any]
+    job_id: int, page_text: str, *, ctx: Context[AppContext, Any]
 ) -> str:
     """
     Same as prepare_application, for a page whose questions no API publishes:
@@ -302,7 +297,7 @@ async def prepare_application_from_paste(
 
 @mcp.tool()
 @tool_logged
-async def get_pipeline(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
+async def get_pipeline(*, ctx: Context[AppContext, Any]) -> str:
     """Show full application funnel: counts and list by status."""
     app = ctx.request_context.lifespan_context
     warnings = validate_startup(app.config, app.profile)
@@ -355,7 +350,7 @@ async def update_status(
     notes: str = "",
     next_action: str = "",
     *,
-    ctx: Context[ServerSession, AppContext, Any],
+    ctx: Context[AppContext, Any],
 ) -> str:
     """
     Update application status manually.
@@ -390,7 +385,7 @@ async def update_status(
 
 @mcp.tool()
 @tool_logged
-async def setup_email(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
+async def setup_email(*, ctx: Context[AppContext, Any]) -> str:
     """
     Configure Gmail authentication for the account that receives application replies.
     Run only once. Opens the browser to authorize access.
@@ -436,7 +431,7 @@ async def setup_email(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
 
 @mcp.tool()
 @tool_logged
-async def sync_email_responses(*, ctx: Context[ServerSession, AppContext, Any]) -> str:
+async def sync_email_responses(*, ctx: Context[AppContext, Any]) -> str:
     """
     Read recent emails in the configured Gmail account, whether read or unread,
     classify them with the LLM, and update the applications database.
