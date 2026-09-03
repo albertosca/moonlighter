@@ -12,10 +12,11 @@ def moonlighter_home() -> Path:
 def resolve_under_home(value: str) -> Path:
     """A config-supplied path, resolved under MOONLIGHTER_HOME when it is relative.
 
-    Same convention as cv.default (see application/answers/cv.py's
-    configured_cv_path): an absolute path, or a '~'-prefixed one, is honored
-    exactly as given; anything else is joined onto moonlighter_home(). Callers
-    are expected to reject an empty string themselves with a message naming the
+    An absolute path, or a '~'-prefixed one, is honored exactly as given;
+    anything else is joined onto moonlighter_home(). Every cv.* config key
+    (default, by_company, pool, template_dir, generated_dir) shares this
+    convention by delegating here. Callers are expected to reject an empty
+    string themselves with a message naming the
     config key -- Path("").expanduser() is ".", a directory that always exists,
     so resolving it silently here would trade a clear "not configured" error for
     a confusing "Is a directory" failure downstream.

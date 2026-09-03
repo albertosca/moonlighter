@@ -2,7 +2,7 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
-from moonlighter.application.cvgen.compile import compile_pdf, latex_available
+from moonlighter.application.cvgen.compile import compile_pdf, latex_available, page_count
 
 
 def test_latex_available_reports_whether_the_machine_can_compile():
@@ -144,3 +144,27 @@ def test_real_pdflatex_compiles_a_minimal_document(tmp_path):
     tex.write_text("\\documentclass{article}\\begin{document}hi\\end{document}")
     pdf = compile_pdf(tex)
     assert pdf is not None and pdf.read_bytes()[:4] == b"%PDF"
+
+
+def test_page_count_reads_the_pdflatex_log(tmp_path):
+    tex = tmp_path / "cv.tex"
+    tex.write_text("x")
+    (tmp_path / "cv.log").write_text(
+        "This is pdfTeX\nOutput written on cv.pdf (2 pages, 205028 bytes).\nTranscript written on cv.log.\n"
+    )
+    assert page_count(tex) == 2
+
+
+def test_page_count_handles_the_singular_form(tmp_path):
+    tex = tmp_path / "cv.tex"
+    tex.write_text("x")
+    (tmp_path / "cv.log").write_text("Output written on cv.pdf (1 page, 195857 bytes).\n")
+    assert page_count(tex) == 1
+
+
+def test_page_count_is_none_without_a_log_or_without_the_line(tmp_path):
+    tex = tmp_path / "cv.tex"
+    tex.write_text("x")
+    assert page_count(tex) is None
+    (tmp_path / "cv.log").write_text("! Emergency stop.\nNo pages of output.\n")
+    assert page_count(tex) is None

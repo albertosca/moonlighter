@@ -5,14 +5,14 @@ feature is off and this function is a cheap None. Every failure path degrades
 to None so the application always proceeds with the default CV."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from moonlighter.application.cvgen.compile import compile_pdf, latex_available
+from moonlighter.application.cvgen.compile import compile_pdf, latex_available, page_count
 from moonlighter.application.cvgen.generate import USE_BASE, decide_cv
-from moonlighter.application.cvgen.pool import PoolError, load_pool
-from moonlighter.application.cvgen.render import render_cv
+from moonlighter.application.cvgen.pool import CVPool, PoolError, load_pool
+from moonlighter.application.cvgen.render import CVSelection, render_cv
 from moonlighter.core.config import resolve_under_home
 from moonlighter.core.llm import LLMCaller, is_spend_limit
 from moonlighter.core.log import get_logger
@@ -30,30 +30,91 @@ class TailoredCV:
     compiled: bool
 
 
-def _after_compile(tex: Path) -> TailoredCV | None:
-    """A compile attempt turned into a result — discarding a .tex that cannot compile.
-
-    compile_pdf returns None for two very different reasons, and conflating
-    them is what made one unlucky generation permanent. With no pdflatex on the
-    machine the .tex may be perfectly good: it is kept, and the next prepare
-    retries the compile without spending an LLM call. With pdflatex present the
-    failure belongs to the DOCUMENT and will repeat identically forever, so the
-    .tex is deleted — the next prepare regenerates instead of re-failing, and
-    this application proceeds with the default CV like any other failure.
-    """
-    pdf = compile_pdf(tex)
-    if pdf is not None:
-        return TailoredCV(pdf, True)
-    if not latex_available():
-        return TailoredCV(tex, False)  # honest tex-only path; compile it later
-    logger.warning("the generated CV does not compile — discarding %s, using default CV", tex)
+def _discard(tex: Path) -> None:
     tex.unlink(missing_ok=True)
-    # The sibling .pdf goes too. A compile that dies partway can leave a
-    # truncated one behind, and the cache short-circuits on cv.pdf BEFORE any
-    # compile — so a survivor would be served forever, at zero LLM calls, with
-    # the source .tex already gone. compile_pdf clears its own remains; this is
-    # the layer that owns the cache entry, and it must not depend on that.
+    # The sibling .pdf goes too (see the round-6 comment): the cache
+    # short-circuits on cv.pdf BEFORE any compile, so a survivor would be
+    # served forever at zero LLM calls with the source .tex already gone.
     tex.with_suffix(".pdf").unlink(missing_ok=True)
+    # The .log goes too: page_count (compile.py) reads it, and a stale one
+    # left behind after the .tex it describes is gone is a landmine for any
+    # future caller that reads the log without a fresh compile_pdf call first.
+    tex.with_suffix(".log").unlink(missing_ok=True)
+
+
+def _after_compile_failure(tex: Path) -> TailoredCV | None:
+    """compile_pdf returned None. No pdflatex: keep the .tex, retry later at
+    no LLM cost. pdflatex present: the DOCUMENT is broken and will fail
+    identically forever — discard, regenerate next time."""
+    if not latex_available():
+        return TailoredCV(tex, False)
+    logger.warning("the generated CV does not compile — discarding %s, using default CV", tex)
+    _discard(tex)
+    return None
+
+
+def _after_compile(tex: Path) -> TailoredCV | None:
+    """The cached-.tex path (a machine that gained latex): compile, and enforce
+    the one-page rule with nothing left to shrink — an overflowing cached
+    document is discarded so the next prepare regenerates under the budget."""
+    pdf = compile_pdf(tex)
+    if pdf is None:
+        return _after_compile_failure(tex)
+    pages = page_count(tex)
+    if pages is not None and pages > 1:
+        logger.warning("the cached CV does not fit one page — discarding %s, using default CV", tex)
+        _discard(tex)
+        return None
+    return TailoredCV(pdf, True)
+
+
+def _shrunk(selection: CVSelection, pool: CVPool) -> CVSelection | None:
+    """The same selection with one less thing on the page, or None when nothing
+    can go: the last experience bullet whose experience keeps at least one other
+    selected bullet, then the last open-source id."""
+    # Only EXPERIENCE bullets are droppable: prose ids only carry a
+    # translation, and an open-source id the model misfiled under "bullets"
+    # (both pass _known_ids) owns no experience — `bid in owner` skips it.
+    # Keyed on the experience's INDEX, not company+title: two stints at the
+    # same company with the same title (a gap between them) would otherwise
+    # collapse into one counter and let the "keeps another selected bullet"
+    # guard pass when it should not.
+    owner = {b.id: i for i, e in enumerate(pool.experiences) for b in e.bullets}
+    selected_per_exp: dict[int, int] = {}
+    for bid in selection.bullets:
+        if bid in owner:
+            selected_per_exp[owner[bid]] = selected_per_exp.get(owner[bid], 0) + 1
+    for i in range(len(selection.bullets) - 1, -1, -1):
+        bid = selection.bullets[i]
+        if bid in owner and selected_per_exp[owner[bid]] > 1:
+            return replace(selection, bullets=selection.bullets[:i] + selection.bullets[i + 1 :])
+    if selection.open_source:
+        return replace(selection, open_source=selection.open_source[:-1])
+    return None
+
+
+def _fit_to_one_page(
+    out: Path, template: str, selection: CVSelection, pool: CVPool
+) -> TailoredCV | None:
+    """Render, compile, and drop content from the end until pdflatex reports
+    one page. Deterministic and LLM-free: the model already ordered every list
+    most-relevant-first, so the tail is what goes."""
+    tex = out / "cv.tex"
+    current: CVSelection | None = selection
+    while current is not None:
+        tex.write_text(_MARKER_LINES.sub("", render_cv(template, current, pool)))
+        pdf = compile_pdf(tex)
+        if pdf is None:
+            return _after_compile_failure(tex)
+        pages = page_count(tex)
+        if pages is None or pages == 1:
+            return TailoredCV(pdf, True)
+        current = _shrunk(current, pool)
+    logger.warning(
+        "the generated CV does not fit one page even at minimum — discarding %s, using default CV",
+        tex,
+    )
+    _discard(tex)
     return None
 
 
@@ -74,6 +135,42 @@ def _template(config: dict[str, Any], language: str) -> str | None:
             return pt.read_text()
         logger.warning("no PT template — rendering the tailored CV in English")
     return en.read_text() if en.exists() else None
+
+
+def _relanguage_fallback_fields(
+    selection: CVSelection, template: str, en_base_summary: str, en_base_expertise: str
+) -> CVSelection | None:
+    """decide_cv parses %%BASE_SUMMARY%%/%%BASE_EXPERTISE%% out of en_template
+    before it can know the posting's language (the model reveals it only in
+    its own response), so a field it rejects as non-typesettable falls back to
+    the ENGLISH base there — harmless while that base only fed the prompt, but
+    Task 3 made it land in the rendered CV. A field equal to the English base
+    is exactly the fallback's signature: re-point it at the base text of the
+    template actually selected for rendering, or degrade the whole CV to None
+    when that language has no base of its own to offer.
+    """
+    used_en_summary = selection.summary == en_base_summary
+    used_en_expertise = selection.technical_expertise == en_base_expertise
+    if not used_en_summary and not used_en_expertise:
+        return selection
+    lang_base_summary = m.group(1) if (m := _BASE_SUMMARY.search(template)) else ""
+    lang_base_expertise = m.group(1) if (m := _BASE_EXPERTISE.search(template)) else ""
+    if (used_en_summary and not lang_base_summary) or (
+        used_en_expertise and not lang_base_expertise
+    ):
+        logger.warning(
+            "cv summary/expertise fell back to English base with no %s base to replace it — "
+            "using default CV",
+            selection.language,
+        )
+        return None
+    return replace(
+        selection,
+        summary=lang_base_summary if used_en_summary else selection.summary,
+        technical_expertise=lang_base_expertise
+        if used_en_expertise
+        else selection.technical_expertise,
+    )
 
 
 async def ensure_tailored_cv(
@@ -129,6 +226,7 @@ async def ensure_tailored_cv(
         return None
 
     template = _template(config, selection.language) or en_template
-    tex = _MARKER_LINES.sub("", render_cv(template, selection, pool))
-    (out / "cv.tex").write_text(tex)
-    return _after_compile(out / "cv.tex")
+    selection = _relanguage_fallback_fields(selection, template, base_summary, base_expertise)
+    if selection is None:
+        return None
+    return _fit_to_one_page(out, template, selection, pool)

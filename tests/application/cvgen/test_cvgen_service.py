@@ -218,6 +218,60 @@ async def test_pt_selection_without_pt_template_falls_back_to_en(cfg, caplog):
     assert any("no PT template" in r.message for r in caplog.records)
 
 
+async def test_pt_non_typesettable_summary_falls_back_to_the_pt_base_not_english(cfg):
+    # Finding 1: the base text parsed before decide_cv knows the language is
+    # always English (service.py parses it out of en_template up front, for
+    # the prompt). Task 3 made a non-typesettable field fall back to base text
+    # in the RENDERED CV, so a PT posting whose model summary carries one
+    # non-Latin glyph must not ship an English summary paragraph glued onto a
+    # Portuguese CV.
+    pt_template = TEMPLATE.replace(
+        "BASE_SUMMARY: The base summary line", "BASE_SUMMARY: Resumo base PT"
+    )
+    (Path(cfg["cv"]["template_dir"]) / "cv-template.pt.tex").write_text(pt_template)
+    pt_response = json.dumps(
+        {
+            "decision": "GENERATE",
+            "language": "pt",
+            "summary": "Entrega rapido \U0001f680 todo sprint",  # non-Latin glyph -> fallback
+            "technical_expertise": "T",
+            "bullets": ["t-a"],
+            "open_source": [],
+        }
+    )
+    call, _ = _caller(pt_response)
+    with patch(
+        "moonlighter.application.cvgen.service.compile_pdf",
+        side_effect=lambda tex: tex.with_suffix(".pdf"),
+    ):
+        result = await ensure_tailored_cv(JOB, cfg, {}, call)
+    assert isinstance(result, TailoredCV) and result.compiled
+    tex = generated_dir_for(cfg, 42).joinpath("cv.tex").read_text()
+    assert "Resumo base PT" in tex
+    assert "The base summary line" not in tex
+
+
+async def test_pt_fallback_with_no_pt_base_to_replace_it_degrades_to_none(cfg, caplog):
+    # The PT template exists but was authored without a %%BASE_SUMMARY marker
+    # — there is no language-correct base to substitute, so the whole CV
+    # degrades rather than shipping the English fallback anyway.
+    pt_template = TEMPLATE.replace("%%BASE_SUMMARY: The base summary line\n", "")
+    (Path(cfg["cv"]["template_dir"]) / "cv-template.pt.tex").write_text(pt_template)
+    pt_response = json.dumps(
+        {
+            "decision": "GENERATE",
+            "language": "pt",
+            "summary": "Entrega rapido \U0001f680 todo sprint",  # non-Latin glyph -> fallback
+            "technical_expertise": "T",
+            "bullets": ["t-a"],
+            "open_source": [],
+        }
+    )
+    call, _ = _caller(pt_response)
+    assert await ensure_tailored_cv(JOB, cfg, {}, call) is None
+    assert any("no pt base" in r.message for r in caplog.records)
+
+
 async def test_existing_tex_retries_compile_and_succeeds(cfg):
     out = generated_dir_for(cfg, 42)
     out.mkdir(parents=True)
@@ -378,3 +432,259 @@ async def test_non_spend_limit_exception_reraises(cfg):
         pytest.raises(RuntimeError, match="unrelated failure"),
     ):
         await ensure_tailored_cv(JOB, cfg, {}, call)
+
+
+# --- shrink to one page ------------------------------------------------------
+
+WIDE_POOL_YAML = """
+experiences:
+  - company: Trybe
+    title: Dev
+    period: "2023 -- 2026"
+    location: BH
+    bullets:
+      - id: t-a
+        angles: [backend]
+        latex: 'Did A'
+      - id: t-b
+        angles: [backend]
+        latex: 'Did B'
+      - id: t-c
+        angles: [backend]
+        latex: 'Did C'
+open_source:
+  - id: oss-m
+    angles: [ai]
+    latex: 'moonlighter'
+"""
+WIDE_GENERATE = json.dumps(
+    {
+        "decision": "GENERATE",
+        "language": "en",
+        "summary": "S",
+        "technical_expertise": "T",
+        "bullets": ["t-a", "t-b", "t-c"],
+        "open_source": ["oss-m"],
+    }
+)
+
+
+def _compiler_that_reports(pages_by_attempt):
+    """A compile_pdf stand-in that writes a pdflatex-shaped log and a pdf,
+    reporting the page count for each successive attempt."""
+    attempts = {"n": 0}
+
+    def compile_(tex):
+        pages = pages_by_attempt[min(attempts["n"], len(pages_by_attempt) - 1)]
+        attempts["n"] += 1
+        tex.with_suffix(".log").write_text(f"Output written on cv.pdf ({pages} pages, 1 bytes).\n")
+        tex.with_suffix(".pdf").write_bytes(b"%PDF")
+        return tex.with_suffix(".pdf")
+
+    return compile_, attempts
+
+
+async def test_a_two_page_cv_is_shrunk_until_it_fits(cfg):
+    Path(cfg["cv"]["pool"]).write_text(WIDE_POOL_YAML)
+    call, calls = _caller(WIDE_GENERATE)
+    compile_, attempts = _compiler_that_reports([2, 2, 1])
+    with (
+        patch("moonlighter.application.cvgen.service.compile_pdf", side_effect=compile_),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=True),
+    ):
+        result = await ensure_tailored_cv(JOB, cfg, {}, call)
+    assert isinstance(result, TailoredCV) and result.compiled
+    assert attempts["n"] == 3
+    assert calls["n"] == 1  # shrinking never spends another LLM call
+    tex = (generated_dir_for(cfg, 42) / "cv.tex").read_text()
+    # dropped from the end, in the model's order: t-c first, then t-b
+    assert "Did A" in tex and "Did B" not in tex and "Did C" not in tex
+    assert "moonlighter" in tex  # open source survives while a bullet could go
+
+
+async def test_open_source_goes_only_when_no_bullet_can(cfg):
+    Path(cfg["cv"]["pool"]).write_text(WIDE_POOL_YAML)
+    call, _ = _caller(WIDE_GENERATE)
+    compile_, _attempts = _compiler_that_reports([2, 2, 2, 1])
+    with (
+        patch("moonlighter.application.cvgen.service.compile_pdf", side_effect=compile_),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=True),
+    ):
+        result = await ensure_tailored_cv(JOB, cfg, {}, call)
+    assert isinstance(result, TailoredCV) and result.compiled
+    tex = (generated_dir_for(cfg, 42) / "cv.tex").read_text()
+    assert "Did A" in tex  # the experience keeps at least one bullet
+    assert "moonlighter" not in tex
+
+
+async def test_a_cv_that_never_fits_is_discarded_like_a_non_compiling_one(cfg, caplog):
+    Path(cfg["cv"]["pool"]).write_text(WIDE_POOL_YAML)
+    call, _ = _caller(WIDE_GENERATE)
+    compile_, _attempts = _compiler_that_reports([2])
+    with (
+        patch("moonlighter.application.cvgen.service.compile_pdf", side_effect=compile_),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=True),
+    ):
+        assert await ensure_tailored_cv(JOB, cfg, {}, call) is None
+    out = generated_dir_for(cfg, 42)
+    assert not (out / "cv.tex").exists() and not (out / "cv.pdf").exists()
+    assert not (out / "cv.log").exists()  # page_count reads this; no stale log survives
+    assert any("one page" in r.message for r in caplog.records)
+
+
+async def test_a_cached_tex_that_compiles_to_two_pages_is_discarded(cfg):
+    # The "machine gained latex" path has no selection to shrink; a cached
+    # document that overflows is discarded so the next prepare regenerates
+    # under the budget instead of serving two pages forever.
+    out = generated_dir_for(cfg, 42)
+    out.mkdir(parents=True)
+    (out / "cv.tex").write_text("stale tex")
+    call, calls = _caller()
+    compile_, _attempts = _compiler_that_reports([2])
+    with (
+        patch("moonlighter.application.cvgen.service.compile_pdf", side_effect=compile_),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=True),
+    ):
+        assert await ensure_tailored_cv(JOB, cfg, {}, call) is None
+    assert not (out / "cv.tex").exists() and not (out / "cv.pdf").exists()
+    assert calls["n"] == 0
+
+
+async def test_no_page_count_is_accepted_as_is(cfg):
+    # A compile_pdf that leaves no log (every existing test's stand-in) is
+    # trusted: the log is evidence of overflow, its absence is not.
+    call, _ = _caller()
+    with patch(
+        "moonlighter.application.cvgen.service.compile_pdf",
+        side_effect=lambda tex: tex.with_suffix(".pdf"),
+    ):
+        result = await ensure_tailored_cv(JOB, cfg, {}, call)
+    assert isinstance(result, TailoredCV) and result.compiled
+
+
+PROSE_POOL_YAML = """
+experiences:
+  - id: p-a
+    company: Nubank
+    title: Staff
+    period: "2020 -- 2023"
+    location: SP
+    prose: 'Led the platform team.'
+  - company: Trybe
+    title: Dev
+    period: "2023 -- 2026"
+    location: BH
+    bullets:
+      - id: t-a
+        angles: [backend]
+        latex: 'Did A'
+      - id: t-b
+        angles: [backend]
+        latex: 'Did B'
+      - id: t-c
+        angles: [backend]
+        latex: 'Did C'
+"""
+PROSE_GENERATE = json.dumps(
+    {
+        "decision": "GENERATE",
+        "language": "en",
+        "summary": "S",
+        "technical_expertise": "T",
+        "bullets": ["p-a", "t-a", "t-b", "t-c"],
+        "open_source": [],
+    }
+)
+
+
+async def test_a_prose_id_among_selected_bullets_is_never_dropped(cfg):
+    # A prose id shares the "bullets" list with real experience bullets (it
+    # carries a translation, per Task 3), but owns no experience of its own —
+    # _shrunk's `bid in owner` guard must skip it while counting, not drop it.
+    Path(cfg["cv"]["pool"]).write_text(PROSE_POOL_YAML)
+    call, _ = _caller(PROSE_GENERATE)
+    compile_, attempts = _compiler_that_reports([2, 1])
+    with (
+        patch("moonlighter.application.cvgen.service.compile_pdf", side_effect=compile_),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=True),
+    ):
+        result = await ensure_tailored_cv(JOB, cfg, {}, call)
+    assert isinstance(result, TailoredCV) and result.compiled
+    assert attempts["n"] == 2
+    tex = (generated_dir_for(cfg, 42) / "cv.tex").read_text()
+    assert "Led the platform team" in tex  # the prose entry survives the shrink
+    assert "Did C" not in tex  # the last experience bullet is what went
+
+
+TWO_EXPERIENCE_POOL_YAML = """
+experiences:
+  - company: Nubank
+    title: Staff
+    period: "2020 -- 2023"
+    location: SP
+    bullets:
+      - id: b-1
+        angles: [backend]
+        latex: 'B one'
+      - id: b-2
+        angles: [backend]
+        latex: 'B two'
+      - id: b-3
+        angles: [backend]
+        latex: 'B three'
+  - company: Trybe
+    title: Dev
+    period: "2023 -- 2026"
+    location: BH
+    bullets:
+      - id: a-1
+        angles: [backend]
+        latex: 'A only'
+"""
+# The model places A's single bullet LAST in its order — a global (non-per-
+# experience) counter would treat it as "just the tail element" and drop it
+# first, since it only checks whether MORE than one bullet remains selected
+# overall, not whether it is A's or B's. The correct per-experience bookkeeping
+# must skip it (A only has 1 selected) and keep dropping from B's tail instead.
+TWO_EXPERIENCE_GENERATE = json.dumps(
+    {
+        "decision": "GENERATE",
+        "language": "en",
+        "summary": "S",
+        "technical_expertise": "T",
+        "bullets": ["b-1", "b-2", "b-3", "a-1"],
+        "open_source": [],
+    }
+)
+
+
+async def test_shrunk_bookkeeping_is_per_experience_not_global(cfg):
+    # Reproduces the review finding: owner/selected_per_exp exist so that an
+    # experience with few selected bullets (A, here down to its only one) is
+    # never touched while another experience (B) still has more than one
+    # selected. A constant/global key would instead drop from the END of the
+    # whole selection.bullets list regardless of which experience owns it —
+    # which here means dropping A's only bullet FIRST, since it sits last in
+    # the model's order. Two clearly distinguishable bullet texts per
+    # experience make a wrong implementation produce a detectably different
+    # final .tex: "A only" would be missing and "B three" would survive.
+    Path(cfg["cv"]["pool"]).write_text(TWO_EXPERIENCE_POOL_YAML)
+    call, calls = _caller(TWO_EXPERIENCE_GENERATE)
+    compile_, attempts = _compiler_that_reports([2, 2, 1])
+    with (
+        patch("moonlighter.application.cvgen.service.compile_pdf", side_effect=compile_),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=True),
+    ):
+        result = await ensure_tailored_cv(JOB, cfg, {}, call)
+    assert isinstance(result, TailoredCV) and result.compiled
+    assert attempts["n"] == 3  # two shrinks were needed to reach one page
+    assert calls["n"] == 1  # shrinking never spends another LLM call
+    tex = (generated_dir_for(cfg, 42) / "cv.tex").read_text()
+    # A's only bullet must never be touched: dropping it would zero out A's
+    # selection while B still had more than one bullet selected.
+    assert "A only" in tex
+    # Both drops came from B's tail, in the model's order: "B three" first,
+    # then "B two" — B still keeps its first bullet.
+    assert "B one" in tex
+    assert "B two" not in tex
+    assert "B three" not in tex

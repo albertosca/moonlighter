@@ -54,8 +54,9 @@ work_authorization:
   authorized_answer: "Yes"
   not_authorized_answer: "No"
 
-# CV per company (paths relative to MOONLIGHTER_HOME). 'default' is used when a
-# company has no entry. by_company matches the company name case-insensitively.
+# CV per company (paths relative to MOONLIGHTER_HOME, or '~'-prefixed for an
+# absolute location elsewhere). 'default' is used when a company has no entry.
+# by_company matches the company name case-insensitively.
 cv:
   default: "cv.pdf"
   by_company: {}
