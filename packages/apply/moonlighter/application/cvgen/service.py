@@ -24,6 +24,10 @@ from moonlighter.core.log import get_logger
 
 logger = get_logger(__name__)
 
+# The captured text is treated as plain model prose (escape_latex + the
+# **bold** dialect, same as everything else generate.py produces) — an
+# operator writing raw LaTeX on one of these two lines (e.g. \textbf{...})
+# gets it printed literally, with the backslash and braces escaped.
 _BASE_SUMMARY = re.compile(r"^%%BASE_SUMMARY: (.+)$", re.MULTILINE)
 _BASE_EXPERTISE = re.compile(r"^%%BASE_EXPERTISE: (.+)$", re.MULTILINE)
 _MARKER_LINES = re.compile(r"^%%BASE_(SUMMARY|EXPERTISE): .+\n", re.MULTILINE)

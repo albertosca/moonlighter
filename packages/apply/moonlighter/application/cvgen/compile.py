@@ -15,6 +15,12 @@ logger = get_logger(__name__)
 
 
 _PDFLATEX = "pdflatex"
+# This regex only works because compile_pdf runs pdflatex in the .tex's own
+# directory with a bare filename — short enough to stay under pdflatex's
+# default line-wrap width, so "Output written on ..." is never split across
+# lines. page_count returning None is treated as "accept" (fails open): a
+# future change passing an absolute path here would silently wrap the line
+# and make every CV pass the one-page check unchecked.
 _PAGES = re.compile(r"^Output written on .+\.pdf \((\d+) pages?", re.MULTILINE)
 
 
