@@ -58,7 +58,7 @@ _DROPPED_CATEGORIES = frozenset({"Cc", "Cf"})
 # dashes, curly quotes and the ellipsis. Emoji, CJK, Greek, arrows, bullets
 # and the like fail the whole field; generate.py then substitutes curated text
 # for it. Nothing is stripped — stripping rewrites a claim.
-_TYPESETTABLE = re.compile(r"^[\x20-\x7e\xa0-\xff–—‘’“”…]*$")
+_TYPESETTABLE = re.compile(r"^[\x20-\x7e\xa0-\xff\u2013\u2014\u2018\u2019\u201c\u201d\u2026]*$")
 
 
 def is_typesettable(text: str) -> bool:
