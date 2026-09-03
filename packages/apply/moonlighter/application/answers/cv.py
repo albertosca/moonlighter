@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Any
 
+from moonlighter.application.cvgen.compile import looks_like_a_compiled_pdf
 from moonlighter.core.config import resolve_under_home
 
 
@@ -40,7 +41,10 @@ def resolve_cv_path(company: str, config: dict[str, Any], job_id: int | None = N
         from moonlighter.application.cvgen.service import generated_dir_for
 
         tailored = generated_dir_for(config, job_id) / "cv.pdf"
-        if tailored.exists():
+        # exists() alone would upload a stranded partial-write (round-6
+        # finding) or try to upload a directory; degrades the same way a
+        # missing file already does — fall through to the company/default CV.
+        if looks_like_a_compiled_pdf(tailored):
             return str(tailored)
 
     path = configured_cv_path(config, company)

@@ -9,7 +9,12 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from moonlighter.application.cvgen.compile import compile_pdf, latex_available, page_count
+from moonlighter.application.cvgen.compile import (
+    compile_pdf,
+    latex_available,
+    looks_like_a_compiled_pdf,
+    page_count,
+)
 from moonlighter.application.cvgen.generate import USE_BASE, decide_cv
 from moonlighter.application.cvgen.pool import CVPool, PoolError, load_pool
 from moonlighter.application.cvgen.render import CVSelection, render_cv
@@ -192,7 +197,11 @@ async def ensure_tailored_cv(
     # Nothing here is revalidated, and nothing needs to be: a cached cv.tex can
     # only contain escaped model text (render._bullet_text), so recompiling one
     # cannot produce anything its generation did not already produce.
-    if (out / "cv.pdf").exists():
+    # exists() alone is not enough (round-6 finding): a KeyboardInterrupt or an
+    # external SIGKILL of moonlighter itself, between pdflatex's exit and this
+    # check, can strand a truncated cv.pdf that would then be served forever —
+    # looks_like_a_compiled_pdf sniffs for %%EOF and also rejects a directory.
+    if looks_like_a_compiled_pdf(out / "cv.pdf"):
         return TailoredCV(out / "cv.pdf", True)
     if (out / "USE_BASE").exists():
         return None

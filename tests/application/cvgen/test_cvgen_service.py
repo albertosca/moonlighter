@@ -96,11 +96,53 @@ async def test_use_base_writes_marker_and_skips_next_time(cfg):
 async def test_existing_pdf_short_circuits(cfg):
     out = generated_dir_for(cfg, 42)
     out.mkdir(parents=True)
-    (out / "cv.pdf").write_bytes(b"%PDF")
+    (out / "cv.pdf").write_bytes(b"%PDF-1.5\n...\n%%EOF\n")  # real-shaped, not just any bytes
     call, calls = _caller()
     result = await ensure_tailored_cv(JOB, cfg, {}, call)
     assert result == TailoredCV(out / "cv.pdf", True)
     assert calls["n"] == 0  # the no-LLM-call-on-cache-hit contract
+
+
+async def test_a_truncated_cached_pdf_is_not_trusted(cfg):
+    # round-6 finding: exists() alone would serve this forever at zero LLM
+    # calls. A SIGKILL of moonlighter itself between pdflatex's exit and the
+    # next cache check can strand exactly this shape (measured in
+    # compile.py's _discard_partial docstring): a %PDF header, no %%EOF.
+    out = generated_dir_for(cfg, 42)
+    out.mkdir(parents=True)
+    (out / "cv.pdf").write_bytes(b"%PDF-1.7\n" + b"\x00" * 500)
+    call, calls = _caller(GENERATE)
+    with (
+        patch(
+            "moonlighter.application.cvgen.service.compile_pdf",
+            side_effect=lambda tex: tex.with_suffix(".pdf"),
+        ),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=True),
+    ):
+        result = await ensure_tailored_cv(JOB, cfg, {}, call)
+    # Regenerates instead of serving the truncated file — proves the cache
+    # check does not just skip the bad file, it treats it as a real miss.
+    assert calls["n"] == 1
+    assert result is not None
+
+
+async def test_a_directory_named_cv_pdf_is_not_trusted(cfg):
+    # exists() is True for a directory too; the cache check must not try to
+    # open one as a file.
+    out = generated_dir_for(cfg, 42)
+    out.mkdir(parents=True)
+    (out / "cv.pdf").mkdir()
+    call, calls = _caller(GENERATE)
+    with (
+        patch(
+            "moonlighter.application.cvgen.service.compile_pdf",
+            side_effect=lambda tex: tex.with_suffix(".pdf"),
+        ),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=True),
+    ):
+        result = await ensure_tailored_cv(JOB, cfg, {}, call)
+    assert calls["n"] == 1
+    assert result is not None
 
 
 async def test_no_latex_returns_tex_uncompiled(cfg):

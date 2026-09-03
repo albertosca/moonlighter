@@ -64,6 +64,35 @@ def compile_pdf(tex_path: Path, timeout_s: int = 120) -> Path | None:
     return pdf if pdf.exists() else None
 
 
+_TAIL_BYTES = 1024
+
+
+def looks_like_a_compiled_pdf(path: Path) -> bool:
+    """Whether `path` is a real, complete PDF — not a directory, not missing,
+    not a compile that died mid-write.
+
+    A cache trusts this file for however long the job stays in the pipeline —
+    a KeyboardInterrupt or an external SIGKILL of the moonlighter process
+    itself, between pdflatex's exit and the caller's next check, could strand
+    a truncated PDF that no _discard_partial call ever ran against. %%EOF is
+    the last non-whitespace content of any well-formed PDF (measured against
+    real pdflatex output); reading only the tail keeps this cheap even for a
+    large file, and Path.is_file() is already False for a directory, so
+    exists()-alone's other blind spot is closed in the same pass.
+    """
+    if not path.is_file():
+        return False
+    try:
+        with path.open("rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(max(0, size - _TAIL_BYTES))
+            tail = f.read()
+    except OSError:
+        return False
+    return b"%%EOF" in tail
+
+
 def page_count(tex_path: Path) -> int | None:
     """How many pages the last compile produced, read from pdflatex's own log.
 
