@@ -109,7 +109,8 @@ def _known_ids(value: Any, known: frozenset[str]) -> tuple[str, ...]:
     ensure_tailored_cv and replaces the operator's whole application sheet with
     an error line — a far worse failure than losing the tailored CV. A field of
     the wrong shape therefore degrades to empty, which the renderer already
-    handles: an experience with no validated bullets falls back to all of them.
+    handles: an experience with no validated bullets falls back to its first one
+    (render.py's _entry — the one-page budget's rule), not all of them.
     """
     if not isinstance(value, list):
         return ()

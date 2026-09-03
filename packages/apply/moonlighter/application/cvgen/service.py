@@ -36,6 +36,10 @@ def _discard(tex: Path) -> None:
     # short-circuits on cv.pdf BEFORE any compile, so a survivor would be
     # served forever at zero LLM calls with the source .tex already gone.
     tex.with_suffix(".pdf").unlink(missing_ok=True)
+    # The .log goes too: page_count (compile.py) reads it, and a stale one
+    # left behind after the .tex it describes is gone is a landmine for any
+    # future caller that reads the log without a fresh compile_pdf call first.
+    tex.with_suffix(".log").unlink(missing_ok=True)
 
 
 def _after_compile_failure(tex: Path) -> TailoredCV | None:
@@ -71,8 +75,12 @@ def _shrunk(selection: CVSelection, pool: CVPool) -> CVSelection | None:
     # Only EXPERIENCE bullets are droppable: prose ids only carry a
     # translation, and an open-source id the model misfiled under "bullets"
     # (both pass _known_ids) owns no experience — `bid in owner` skips it.
-    owner = {b.id: e.company + e.title for e in pool.experiences for b in e.bullets}
-    selected_per_exp: dict[str, int] = {}
+    # Keyed on the experience's INDEX, not company+title: two stints at the
+    # same company with the same title (a gap between them) would otherwise
+    # collapse into one counter and let the "keeps another selected bullet"
+    # guard pass when it should not.
+    owner = {b.id: i for i, e in enumerate(pool.experiences) for b in e.bullets}
+    selected_per_exp: dict[int, int] = {}
     for bid in selection.bullets:
         if bid in owner:
             selected_per_exp[owner[bid]] = selected_per_exp.get(owner[bid], 0) + 1
@@ -129,6 +137,42 @@ def _template(config: dict[str, Any], language: str) -> str | None:
     return en.read_text() if en.exists() else None
 
 
+def _relanguage_fallback_fields(
+    selection: CVSelection, template: str, en_base_summary: str, en_base_expertise: str
+) -> CVSelection | None:
+    """decide_cv parses %%BASE_SUMMARY%%/%%BASE_EXPERTISE%% out of en_template
+    before it can know the posting's language (the model reveals it only in
+    its own response), so a field it rejects as non-typesettable falls back to
+    the ENGLISH base there — harmless while that base only fed the prompt, but
+    Task 3 made it land in the rendered CV. A field equal to the English base
+    is exactly the fallback's signature: re-point it at the base text of the
+    template actually selected for rendering, or degrade the whole CV to None
+    when that language has no base of its own to offer.
+    """
+    used_en_summary = selection.summary == en_base_summary
+    used_en_expertise = selection.technical_expertise == en_base_expertise
+    if not used_en_summary and not used_en_expertise:
+        return selection
+    lang_base_summary = m.group(1) if (m := _BASE_SUMMARY.search(template)) else ""
+    lang_base_expertise = m.group(1) if (m := _BASE_EXPERTISE.search(template)) else ""
+    if (used_en_summary and not lang_base_summary) or (
+        used_en_expertise and not lang_base_expertise
+    ):
+        logger.warning(
+            "cv summary/expertise fell back to English base with no %s base to replace it — "
+            "using default CV",
+            selection.language,
+        )
+        return None
+    return replace(
+        selection,
+        summary=lang_base_summary if used_en_summary else selection.summary,
+        technical_expertise=lang_base_expertise
+        if used_en_expertise
+        else selection.technical_expertise,
+    )
+
+
 async def ensure_tailored_cv(
     job: dict[str, Any],
     config: dict[str, Any],
@@ -182,4 +226,7 @@ async def ensure_tailored_cv(
         return None
 
     template = _template(config, selection.language) or en_template
+    selection = _relanguage_fallback_fields(selection, template, base_summary, base_expertise)
+    if selection is None:
+        return None
     return _fit_to_one_page(out, template, selection, pool)

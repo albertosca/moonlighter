@@ -218,6 +218,60 @@ async def test_pt_selection_without_pt_template_falls_back_to_en(cfg, caplog):
     assert any("no PT template" in r.message for r in caplog.records)
 
 
+async def test_pt_non_typesettable_summary_falls_back_to_the_pt_base_not_english(cfg):
+    # Finding 1: the base text parsed before decide_cv knows the language is
+    # always English (service.py parses it out of en_template up front, for
+    # the prompt). Task 3 made a non-typesettable field fall back to base text
+    # in the RENDERED CV, so a PT posting whose model summary carries one
+    # non-Latin glyph must not ship an English summary paragraph glued onto a
+    # Portuguese CV.
+    pt_template = TEMPLATE.replace(
+        "BASE_SUMMARY: The base summary line", "BASE_SUMMARY: Resumo base PT"
+    )
+    (Path(cfg["cv"]["template_dir"]) / "cv-template.pt.tex").write_text(pt_template)
+    pt_response = json.dumps(
+        {
+            "decision": "GENERATE",
+            "language": "pt",
+            "summary": "Entrega rapido \U0001f680 todo sprint",  # non-Latin glyph -> fallback
+            "technical_expertise": "T",
+            "bullets": ["t-a"],
+            "open_source": [],
+        }
+    )
+    call, _ = _caller(pt_response)
+    with patch(
+        "moonlighter.application.cvgen.service.compile_pdf",
+        side_effect=lambda tex: tex.with_suffix(".pdf"),
+    ):
+        result = await ensure_tailored_cv(JOB, cfg, {}, call)
+    assert isinstance(result, TailoredCV) and result.compiled
+    tex = generated_dir_for(cfg, 42).joinpath("cv.tex").read_text()
+    assert "Resumo base PT" in tex
+    assert "The base summary line" not in tex
+
+
+async def test_pt_fallback_with_no_pt_base_to_replace_it_degrades_to_none(cfg, caplog):
+    # The PT template exists but was authored without a %%BASE_SUMMARY marker
+    # — there is no language-correct base to substitute, so the whole CV
+    # degrades rather than shipping the English fallback anyway.
+    pt_template = TEMPLATE.replace("%%BASE_SUMMARY: The base summary line\n", "")
+    (Path(cfg["cv"]["template_dir"]) / "cv-template.pt.tex").write_text(pt_template)
+    pt_response = json.dumps(
+        {
+            "decision": "GENERATE",
+            "language": "pt",
+            "summary": "Entrega rapido \U0001f680 todo sprint",  # non-Latin glyph -> fallback
+            "technical_expertise": "T",
+            "bullets": ["t-a"],
+            "open_source": [],
+        }
+    )
+    call, _ = _caller(pt_response)
+    assert await ensure_tailored_cv(JOB, cfg, {}, call) is None
+    assert any("no pt base" in r.message for r in caplog.records)
+
+
 async def test_existing_tex_retries_compile_and_succeeds(cfg):
     out = generated_dir_for(cfg, 42)
     out.mkdir(parents=True)
@@ -474,6 +528,7 @@ async def test_a_cv_that_never_fits_is_discarded_like_a_non_compiling_one(cfg, c
         assert await ensure_tailored_cv(JOB, cfg, {}, call) is None
     out = generated_dir_for(cfg, 42)
     assert not (out / "cv.tex").exists() and not (out / "cv.pdf").exists()
+    assert not (out / "cv.log").exists()  # page_count reads this; no stale log survives
     assert any("one page" in r.message for r in caplog.records)
 
 
