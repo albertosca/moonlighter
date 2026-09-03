@@ -136,22 +136,28 @@ def _curated_or_base(field: str, text: str, base: str) -> str | None:
     """Model prose for a whole-CV field, or the template's base text when the
     model's is unusable — or None when there is no base to fall back to.
 
-    Unusable = addressed to the operator, or carrying a glyph outside the Latin
-    allow-list. Both replace the field WHOLE: stripping one emoji from a
-    sentence is a rewrite of what the model said, and the candidate signs it.
+    Unusable = addressed to the operator, blank (is_typesettable("") is True,
+    so an empty or whitespace-only field would otherwise pass straight
+    through and render an empty section), or carrying a glyph outside the
+    Latin allow-list. All three replace the field WHOLE: stripping one emoji
+    from a sentence is a rewrite of what the model said, and the candidate
+    signs it.
     """
     from moonlighter.application.assisted.composer import _operator_directed
 
     if _operator_directed(text) is not None:
         logger.warning("cv %s addressed the operator — using default CV", field)
         return None
-    if is_typesettable(text):
+    if text.strip() and is_typesettable(text):
         return text
     if base:
-        logger.warning("cv %s carries non-Latin glyphs — using the base %s", field, field)
+        logger.warning(
+            "cv %s is blank or carries non-Latin glyphs — using the base %s", field, field
+        )
         return base
     logger.warning(
-        "cv %s carries non-Latin glyphs and there is no base text — using default CV", field
+        "cv %s is blank or carries non-Latin glyphs and there is no base text — using default CV",
+        field,
     )
     return None
 

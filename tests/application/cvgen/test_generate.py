@@ -136,6 +136,41 @@ async def test_llm_exception_degrades_to_none():
 
 
 @pytest.mark.asyncio
+async def test_a_blank_summary_falls_back_to_the_base_when_one_exists():
+    # is_typesettable("") is True — the allow-list regex matches empty — so
+    # without an explicit emptiness check this would pass through unchanged
+    # and the CV would render with a blank %%SUMMARY%% section.
+    resp = json.dumps(
+        {
+            "decision": "GENERATE",
+            "language": "en",
+            "summary": "   ",
+            "technical_expertise": "Elixir",
+            "bullets": ["t-a"],
+            "open_source": [],
+        }
+    )
+    call, _ = _caller(resp)
+    sel = await decide_cv(JOB, POOL, PROFILE, "base summary text", "b", call)
+    assert sel is not None
+    assert sel.summary == "base summary text"
+
+
+async def test_a_blank_expertise_with_no_base_degrades_to_none():
+    resp = json.dumps(
+        {
+            "decision": "GENERATE",
+            "language": "en",
+            "summary": "Expert in Elixir",
+            "technical_expertise": "",
+            "bullets": ["t-a"],
+            "open_source": [],
+        }
+    )
+    call, _ = _caller(resp)
+    assert await decide_cv(JOB, POOL, PROFILE, "b", "", call) is None
+
+
 async def test_operator_directed_summary_degrades_to_none():
     resp = json.dumps(
         {
