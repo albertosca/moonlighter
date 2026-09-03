@@ -32,4 +32,4 @@ Peewee's metaclass-injected attrs (`.id`, `.DoesNotExist`, `.get_or_create`) are
 
 ## Releases
 
-Versions move in lockstep BY HAND: bump all five `pyproject.toml` AND the four `==` pins in `moonlighter-full` together — nothing in CI checks this.
+Versions move in lockstep BY HAND: bump all five `pyproject.toml` AND the four `==` pins in `moonlighter-full` together. `scripts/check_version_lockstep.py` runs as the CI `test` job's first step and fails fast (before installing anything) if any of the five drift from each other.

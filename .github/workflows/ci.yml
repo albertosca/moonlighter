@@ -18,6 +18,9 @@ jobs:
         with:
           python-version: "3.14"
 
+      - name: Version lockstep check
+        run: python scripts/check_version_lockstep.py
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
