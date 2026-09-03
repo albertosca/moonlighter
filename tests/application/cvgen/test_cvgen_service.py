@@ -559,3 +559,77 @@ async def test_a_prose_id_among_selected_bullets_is_never_dropped(cfg):
     tex = (generated_dir_for(cfg, 42) / "cv.tex").read_text()
     assert "Led the platform team" in tex  # the prose entry survives the shrink
     assert "Did C" not in tex  # the last experience bullet is what went
+
+
+TWO_EXPERIENCE_POOL_YAML = """
+experiences:
+  - company: Nubank
+    title: Staff
+    period: "2020 -- 2023"
+    location: SP
+    bullets:
+      - id: b-1
+        angles: [backend]
+        latex: 'B one'
+      - id: b-2
+        angles: [backend]
+        latex: 'B two'
+      - id: b-3
+        angles: [backend]
+        latex: 'B three'
+  - company: Trybe
+    title: Dev
+    period: "2023 -- 2026"
+    location: BH
+    bullets:
+      - id: a-1
+        angles: [backend]
+        latex: 'A only'
+"""
+# The model places A's single bullet LAST in its order — a global (non-per-
+# experience) counter would treat it as "just the tail element" and drop it
+# first, since it only checks whether MORE than one bullet remains selected
+# overall, not whether it is A's or B's. The correct per-experience bookkeeping
+# must skip it (A only has 1 selected) and keep dropping from B's tail instead.
+TWO_EXPERIENCE_GENERATE = json.dumps(
+    {
+        "decision": "GENERATE",
+        "language": "en",
+        "summary": "S",
+        "technical_expertise": "T",
+        "bullets": ["b-1", "b-2", "b-3", "a-1"],
+        "open_source": [],
+    }
+)
+
+
+async def test_shrunk_bookkeeping_is_per_experience_not_global(cfg):
+    # Reproduces the review finding: owner/selected_per_exp exist so that an
+    # experience with few selected bullets (A, here down to its only one) is
+    # never touched while another experience (B) still has more than one
+    # selected. A constant/global key would instead drop from the END of the
+    # whole selection.bullets list regardless of which experience owns it —
+    # which here means dropping A's only bullet FIRST, since it sits last in
+    # the model's order. Two clearly distinguishable bullet texts per
+    # experience make a wrong implementation produce a detectably different
+    # final .tex: "A only" would be missing and "B three" would survive.
+    Path(cfg["cv"]["pool"]).write_text(TWO_EXPERIENCE_POOL_YAML)
+    call, calls = _caller(TWO_EXPERIENCE_GENERATE)
+    compile_, attempts = _compiler_that_reports([2, 2, 1])
+    with (
+        patch("moonlighter.application.cvgen.service.compile_pdf", side_effect=compile_),
+        patch("moonlighter.application.cvgen.service.latex_available", return_value=True),
+    ):
+        result = await ensure_tailored_cv(JOB, cfg, {}, call)
+    assert isinstance(result, TailoredCV) and result.compiled
+    assert attempts["n"] == 3  # two shrinks were needed to reach one page
+    assert calls["n"] == 1  # shrinking never spends another LLM call
+    tex = (generated_dir_for(cfg, 42) / "cv.tex").read_text()
+    # A's only bullet must never be touched: dropping it would zero out A's
+    # selection while B still had more than one bullet selected.
+    assert "A only" in tex
+    # Both drops came from B's tail, in the model's order: "B three" first,
+    # then "B two" — B still keeps its first bullet.
+    assert "B one" in tex
+    assert "B two" not in tex
+    assert "B three" not in tex
