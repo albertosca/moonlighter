@@ -89,11 +89,12 @@ def _names_path(composed: list[ComposedAnswer], path: Path) -> bool:
 async def _sheet(
     job: Job, questions: list[FormQuestion], config: dict[str, Any], profile: dict[str, Any]
 ) -> str:
+    caller = make_caller(config)
     tailored = await ensure_tailored_cv(
         {"id": job.id, "title": job.title, "company": job.company, "description": job.description},
         config,
         profile,
-        make_caller(config),
+        caller,
     )
     composed = await compose_answers(
         questions,
@@ -107,7 +108,7 @@ async def _sheet(
             "location": job.location,
             "remote_type": job.remote_type,
         },
-        make_caller(config),
+        caller,
     )
     alias = _tracking_alias(job, config)
     if alias is not None:

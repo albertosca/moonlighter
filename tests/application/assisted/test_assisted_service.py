@@ -145,6 +145,49 @@ async def test_sheet_generates_the_tailored_cv_before_composing(job_factory, mon
     assert seen["job"]["company"] == job.company
 
 
+async def test_sheet_builds_one_caller_and_reuses_it_for_both_llm_users(job_factory, monkeypatch):
+    # Regression for the api-mode cost bug: _sheet used to call make_caller(config)
+    # twice, instantiating a second Anthropic SDK client per sheet. One call, one
+    # caller, shared by the tailored-CV step and the composer.
+    job = job_factory(source="greenhouse", url="https://job-boards.greenhouse.io/gitlab/jobs/11")
+    question = FormQuestion(label="Favorite language", kind=QuestionKind.TEXT, required=False)
+    calls = 0
+    caller = _stub_caller()
+    seen: dict[str, Any] = {}
+
+    async def one_question(board: str, job_id: str, client: Any) -> list[FormQuestion]:
+        return [question]
+
+    def counting_make_caller(config: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            raise AssertionError("make_caller must be called at most once per _sheet")
+        return caller
+
+    async def spy_ensure(job_dict: Any, config: Any, profile: Any, cv_caller: Any) -> Any:
+        seen["cv_caller"] = cv_caller
+        return None
+
+    async def spy_compose(
+        questions: Any, profile: Any, config: Any, job_dict: Any, compose_caller: Any
+    ) -> list[Any]:
+        seen["compose_caller"] = compose_caller
+        return []
+
+    monkeypatch.setattr(service, "fetch_greenhouse_questions", one_question)
+    monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
+    monkeypatch.setattr(service, "make_caller", counting_make_caller)
+    monkeypatch.setattr(service, "ensure_tailored_cv", spy_ensure)
+    monkeypatch.setattr(service, "compose_answers", spy_compose)
+
+    await service.prepare_application(job.id, {}, {})
+
+    assert calls == 1
+    assert seen["cv_caller"] is caller
+    assert seen["compose_caller"] is caller
+
+
 async def test_sheet_notes_the_uncompiled_tex(job_factory, monkeypatch, tmp_path):
     from moonlighter.application.cvgen.service import TailoredCV
 
