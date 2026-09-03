@@ -257,7 +257,7 @@ async def test_a_compiled_cv_already_named_by_a_cv_gap_is_not_repeated(
     out_dir = generated / str(job.id)
     out_dir.mkdir(parents=True)
     pdf = out_dir / "cv.pdf"
-    pdf.write_bytes(b"%PDF")
+    pdf.write_bytes(b"%PDF-1.5\n...\n%%EOF\n")  # real-shaped: resolve_cv_path sniffs it
     config = {"cv": {"generated_dir": str(generated)}}
 
     async def one_question(board: str, job_id: str, client: Any) -> list[FormQuestion]:

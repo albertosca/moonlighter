@@ -122,7 +122,7 @@ async def test_a_cv_file_gap_names_the_tailored_pdf_with_review_instruction(tmp_
     tailored = tmp_path / "7"
     tailored.mkdir()
     cv = tailored / "cv.pdf"
-    cv.write_bytes(b"%PDF-1.4")
+    cv.write_bytes(b"%PDF-1.5\n...\n%%EOF\n")  # real-shaped: resolve_cv_path sniffs it
     question = FormQuestion(label="Resume/CV", kind=QuestionKind.FILE, required=True)
     job = {**JOB, "id": 7}
     composed = await compose_answers(

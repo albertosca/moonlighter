@@ -71,8 +71,28 @@ def test_job_generated_pdf_wins_over_company_and_default(tmp_path):
     config, _ = _tailored_config(tmp_path)
     generated = tmp_path / "generated" / "42"
     generated.mkdir(parents=True)
-    (generated / "cv.pdf").write_bytes(b"%PDF")
+    (generated / "cv.pdf").write_bytes(b"%PDF-1.5\n...\n%%EOF\n")  # real-shaped
     assert resolve_cv_path("nubank", config, job_id=42) == str(generated / "cv.pdf")
+
+
+def test_a_truncated_generated_pdf_falls_through_to_company_cv(tmp_path):
+    # round-6 finding: exists() alone would resolve to the truncated file and
+    # upload it. A stranded partial-write (compile.py's own _discard_partial
+    # docstring shape: %PDF header, no %%EOF) must degrade the same way a
+    # missing file already does — fall through to the company/default CV.
+    config, company_cv = _tailored_config(tmp_path)
+    generated = tmp_path / "generated" / "42"
+    generated.mkdir(parents=True)
+    (generated / "cv.pdf").write_bytes(b"%PDF-1.7\n" + b"\x00" * 500)
+    assert resolve_cv_path("nubank", config, job_id=42) == str(company_cv)
+
+
+def test_a_directory_named_cv_pdf_falls_through_to_company_cv(tmp_path):
+    config, company_cv = _tailored_config(tmp_path)
+    generated = tmp_path / "generated" / "42"
+    generated.mkdir(parents=True)
+    (generated / "cv.pdf").mkdir()
+    assert resolve_cv_path("nubank", config, job_id=42) == str(company_cv)
 
 
 def test_tex_only_generated_dir_does_not_win(tmp_path):
