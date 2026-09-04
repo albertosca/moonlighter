@@ -48,6 +48,17 @@ async def _get_json(
         raise FetchError("non-JSON response") from e
 
 
+def _require_dict(data: Any) -> dict[str, Any]:
+    """The JSON payload's top-level shape, or FetchError — the one-line check
+    six scanners repeated after _get_json (an API redesign, or an error page
+    that decodes as a JSON string instead of the expected object, must not
+    reach .get() and silently return nothing; it must be a visible scan
+    error, the same reasoning _get_json's own docstring gives)."""
+    if not isinstance(data, dict):
+        raise FetchError("unexpected payload shape")
+    return data
+
+
 async def _gather_jobs(
     source: str, slugs: list[str], fetch: _Fetch, stats: ScanStats | None = None
 ) -> list[RawJob]:
@@ -80,9 +91,7 @@ class GreenhouseScanner(BaseScanner):
         return await _gather_jobs("greenhouse", company_slugs, self._fetch, kwargs.get("stats"))
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
-        data = await _get_json(client, self.BASE.format(slug=slug))
-        if not isinstance(data, dict):
-            raise FetchError("unexpected payload shape")
+        data = _require_dict(await _get_json(client, self.BASE.format(slug=slug)))
         jobs = []
         for item in data.get("jobs", []):
             title = item.get("title")
@@ -164,9 +173,7 @@ class AshbyScanner(BaseScanner):
         return await _gather_jobs("ashby", company_slugs, self._fetch, kwargs.get("stats"))
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
-        data = await _get_json(client, self.BASE.format(slug=slug))
-        if not isinstance(data, dict):
-            raise FetchError("unexpected payload shape")
+        data = _require_dict(await _get_json(client, self.BASE.format(slug=slug)))
         postings = data.get("jobs") or []
         if not isinstance(postings, list):
             raise FetchError("unexpected payload shape")
@@ -206,9 +213,7 @@ class WorkableScanner(BaseScanner):
         return await _gather_jobs("workable", company_slugs, self._fetch, kwargs.get("stats"))
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
-        data = await _get_json(client, self.BASE.format(slug=slug))
-        if not isinstance(data, dict):
-            raise FetchError("unexpected payload shape")
+        data = _require_dict(await _get_json(client, self.BASE.format(slug=slug)))
         jobs = []
         for item in data.get("jobs", []):
             title, url = item.get("title"), item.get("application_url")
@@ -274,9 +279,9 @@ class InHireScanner(BaseScanner):
         return await _gather_jobs("inhire", company_slugs, self._fetch, kwargs.get("stats"))
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
-        data = await _get_json(client, self.BASE, headers={**HEADERS, "X-Tenant": slug})
-        if not isinstance(data, dict):
-            raise FetchError("unexpected payload shape")
+        data = _require_dict(
+            await _get_json(client, self.BASE, headers={**HEADERS, "X-Tenant": slug})
+        )
         postings = data.get("jobsPage") or []
         if not isinstance(postings, list):
             raise FetchError("unexpected payload shape")
@@ -340,9 +345,7 @@ class RecruiteeScanner(BaseScanner):
         return await _gather_jobs("recruitee", company_slugs, self._fetch, kwargs.get("stats"))
 
     async def _fetch(self, client: httpx.AsyncClient, slug: str) -> list[RawJob]:
-        data = await _get_json(client, self._offers_url(slug))
-        if not isinstance(data, dict):
-            raise FetchError("unexpected payload shape")
+        data = _require_dict(await _get_json(client, self._offers_url(slug)))
         jobs = []
         for item in data.get("offers", []):
             title, url = item.get("title"), item.get("careers_apply_url")
@@ -410,9 +413,9 @@ class SmartRecruitersScanner(BaseScanner):
         out: list[dict[str, Any]] = []
         offset = 0
         while True:
-            data = await _get_json(client, self.LIST.format(slug=slug, offset=offset))
-            if not isinstance(data, dict):
-                raise FetchError("unexpected payload shape")
+            data = _require_dict(
+                await _get_json(client, self.LIST.format(slug=slug, offset=offset))
+            )
             content = data.get("content") or []
             out.extend(content)
             total = data.get("totalFound", 0)
