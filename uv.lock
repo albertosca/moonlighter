@@ -1150,7 +1150,7 @@ wheels = [
 
 [[package]]
 name = "moonlighter"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "packages/full" }
 dependencies = [
     { name = "fastmcp" },
@@ -1171,7 +1171,7 @@ requires-dist = [
 
 [[package]]
 name = "moonlighter-apply"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "packages/apply" }
 dependencies = [
     { name = "moonlighter-core" },
@@ -1186,7 +1186,7 @@ requires-dist = [
 
 [[package]]
 name = "moonlighter-core"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "packages/core" }
 dependencies = [
     { name = "anthropic" },
@@ -1212,7 +1212,7 @@ provides-extras = ["browser"]
 
 [[package]]
 name = "moonlighter-email"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "packages/email" }
 dependencies = [
     { name = "google-api-python-client" },
@@ -1231,7 +1231,7 @@ requires-dist = [
 
 [[package]]
 name = "moonlighter-scan"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "packages/scan" }
 dependencies = [
     { name = "httpx" },
