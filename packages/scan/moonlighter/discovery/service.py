@@ -648,6 +648,14 @@ async def _fetch_description(url: str) -> tuple[str | None, str | None]:
         # tag-strip leaves e.g. a styled-components CSS bundle as the
         # "description" of any SPA page (job #2646, the Ziflow case).
         text = re.sub(r"(?is)<(script|style|noscript)\b[^>]*>.*?</\1\s*>", " ", r.text)
+        # The pair-matching regex above needs a real closing tag; malformed
+        # HTML with an unclosed <style>/<script>/<noscript> leaves it (and
+        # everything after it) untouched — measured directly: CSS/JS text
+        # then leaks into the description alongside real content. Every
+        # WELL-FORMED pair is already gone at this point, so any tag of these
+        # three names still present is unclosed by definition — truncate the
+        # rest of the document there rather than trust an unbounded tail.
+        text = re.split(r"(?is)<(?:script|style|noscript)\b", text, maxsplit=1)[0]
         text = re.sub(r"<[^>]+>", " ", text).strip()
         return re.sub(r"\s+", " ", text)[:8000], None
     except Exception as e:
