@@ -144,6 +144,40 @@ async def test_fetch_description_drops_style_and_script_contents():
     assert "color" not in description and "var x" not in description
 
 
+async def test_fetch_description_truncates_at_an_unclosed_style_tag():
+    # job #2646 (Ziflow): a bare tag-strip left a whole CSS bundle as the
+    # "description". The paired-tag regex fixed the well-formed case, but a
+    # malformed page with NO matching </style> anywhere lets the regex's
+    # non-greedy .*?</\1> simply fail to match — the tag and everything after
+    # it survive untouched. Measured by direct execution before this fix.
+    html_page = "<div>Real desc before</div><style>.a{color:red}<p>unreliable tail</p>"
+    response = MagicMock(status_code=200, text=html_page)
+    client = AsyncMock()
+    client.get = AsyncMock(return_value=response)
+    cls = MagicMock()
+    cls.return_value.__aenter__ = AsyncMock(return_value=client)
+    cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch("httpx.AsyncClient", cls):
+        description, error = await scan_service._fetch_description("https://example.com/job")
+    assert error is None
+    assert description == "Real desc before"
+    assert "color" not in description
+
+
+async def test_fetch_description_truncates_at_an_unclosed_script_tag():
+    html_page = "<div>Real desc</div><script>var x = 1;<p>tail</p>"
+    response = MagicMock(status_code=200, text=html_page)
+    client = AsyncMock()
+    client.get = AsyncMock(return_value=response)
+    cls = MagicMock()
+    cls.return_value.__aenter__ = AsyncMock(return_value=client)
+    cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch("httpx.AsyncClient", cls):
+        description, error = await scan_service._fetch_description("https://example.com/job")
+    assert error is None
+    assert description == "Real desc"
+
+
 async def test_add_job_routes_through_ats_when_fields_missing(tmp_db):
     init_db()
     posting = FetchedPosting(
