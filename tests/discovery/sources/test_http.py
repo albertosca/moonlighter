@@ -21,6 +21,7 @@ from moonlighter.discovery.sources.http import (
     WeWorkRemotelyScanner,
     WorkableScanner,
     _get_json,
+    _require_dict,
 )
 
 GREENHOUSE_RESPONSE = {
@@ -2216,6 +2217,30 @@ async def test_get_json_raises_on_non_json_body():
     client.get = AsyncMock(return_value=response)
     with pytest.raises(FetchError, match="non-JSON"):
         await _get_json(client, "https://example.test/x")
+
+
+def test_require_dict_returns_the_dict_unchanged():
+    payload = {"jobs": []}
+    assert _require_dict(payload) is payload
+
+
+def test_require_dict_raises_on_a_list():
+    with pytest.raises(FetchError, match="unexpected payload shape"):
+        _require_dict([1, 2, 3])
+
+
+def test_require_dict_raises_on_a_string():
+    # Measured failure shape: an API returning an HTML error page as a 200
+    # decodes as a JSON string, not a dict — the six scanners this helper
+    # collapses all relied on this exact raise to turn that into a visible
+    # scan error instead of an AttributeError on .get().
+    with pytest.raises(FetchError, match="unexpected payload shape"):
+        _require_dict("<html>error</html>")
+
+
+def test_require_dict_raises_on_none():
+    with pytest.raises(FetchError, match="unexpected payload shape"):
+        _require_dict(None)
 
 
 @pytest.mark.asyncio
