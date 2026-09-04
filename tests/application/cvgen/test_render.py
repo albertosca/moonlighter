@@ -368,3 +368,20 @@ class TestTypesettable:
         # sério". Emoji, CJK, Greek, arrows, check marks, bullets: rejected.
         for ch in ("\U0001f680", "日", "Σ", "→", "✓", "•", "Ł"):
             assert not is_typesettable(f"ok {ch} ok"), repr(ch)
+
+    def test_non_letter_symbols_in_the_latin1_block_are_rejected(self):
+        # Tightened 2026-09-04: Latin-1 Supplement admits every accented letter
+        # PT/EN need, but the SAME range also carries non-letter symbols (°, ±,
+        # §, ×, ÷, ¤, ¦, µ, ¶) that slipped through the earlier "whole block"
+        # version. Alberto's bar is "bem sério" — a symbol is no more welcome
+        # here than an emoji. € (outside the block entirely) is checked too:
+        # rejected, same as before.
+        for ch in "°±§×÷¤¦µ¶€":
+            assert not is_typesettable(f"ok {ch} ok"), repr(ch)
+
+    def test_the_middle_dot_separator_still_passes(self):
+        # · (U+00B7) is the ONE exception: it is the separator the operator's
+        # own templates already use between technical_expertise clauses
+        # ("GraphQL, REST APIs · PostgreSQL, MySQL"), and it is not the same
+        # character as • (U+2022, the bullet Alberto's rule rejects).
+        assert is_typesettable("GraphQL, REST APIs · PostgreSQL, MySQL")

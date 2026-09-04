@@ -54,11 +54,21 @@ _WHITESPACE = re.compile(r"\s+")
 _DROPPED_CATEGORIES = frozenset({"Cc", "Cf"})
 
 # Alberto's rule for the document: no glyph outside Latin text, ever. Printable
-# ASCII, Latin-1 Supplement (every accented letter PT and EN need), the two
-# dashes, curly quotes and the ellipsis. Emoji, CJK, Greek, arrows, bullets
-# and the like fail the whole field; generate.py then substitutes curated text
-# for it. Nothing is stripped — stripping rewrites a claim.
-_TYPESETTABLE = re.compile(r"^[\x20-\x7e\xa0-\xff\u2013\u2014\u2018\u2019\u201c\u201d\u2026]*$")
+# ASCII, Latin-1 Supplement LETTERS ONLY (xc0-xd6, xd8-xf6, xf8-xff — every
+# accented letter PT and EN need, skipping the two non-letter codepoints in
+# that span, U+00D7 and U+00F7), the two dashes, curly quotes and the
+# ellipsis. Tightened 2026-09-04 (Alberto): the earlier "whole Latin-1 block"
+# version also let through non-letter symbols in the same range (U+00B0,
+# U+00B1, U+00A7, U+00A4, U+00A6, U+00B5, U+00B6 and the like) — no more
+# welcome here than an emoji. The one deliberate exception is U+00B7 (NOT
+# U+2022, the bullet Alberto's rule rejects): it is the separator the
+# operator's own templates already use between technical_expertise clauses.
+# Anything else outside this set fails the whole field; generate.py then
+# substitutes curated text for it. Nothing is stripped — stripping rewrites
+# a claim.
+_TYPESETTABLE = re.compile(
+    r"^[\x20-\x7e\xc0-\xd6\xd8-\xf6\xf8-\xff\xb7\u2013\u2014\u2018\u2019\u201c\u201d\u2026]*$"
+)
 
 
 def is_typesettable(text: str) -> bool:
