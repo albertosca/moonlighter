@@ -577,6 +577,15 @@ async def test_a_submitted_bank_eligible_answer_is_available_to_a_different_job(
 
     promote_application(application1.get_form_data(), job1.id)
 
+    # A caller that always returns "Yes" (like the one above) cannot distinguish
+    # "answered from the bank" from "answered by a redundant, coincidentally
+    # identical LLM call" — swap to one that raises if invoked at all, so this
+    # assertion only passes when job2's answer genuinely came from answer_bank.
+    async def _never_llm_here(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        raise AssertionError("the LLM must not be consulted — this answer must come from the bank")
+
+    monkeypatch.setattr(service, "make_caller", lambda config: _never_llm_here)
+
     out2 = await service.prepare_application_from_paste(job2.id, "p", {}, {})
     assert label in out2
     assert "Yes" in out2
