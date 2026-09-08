@@ -3,7 +3,7 @@ import json
 import os
 
 import pytest
-from moonlighter.core.db import Application, Job, ScanLog, init_db
+from moonlighter.core.db import AnswerBankEntry, Application, Job, ScanLog, init_db
 from moonlighter.core.migrations import MIGRATIONS
 from peewee import IntegrityError
 
@@ -515,3 +515,26 @@ def test_sync_job_status_draft_leaves_job_alone(tmp_db):
     job, app = _sync_pair(tmp_db, "draft")
     sync_job_status(app)
     assert Job.get_by_id(job.id).status == "new"
+
+
+def test_answer_bank_entry_created_and_normalized_question_is_unique(tmp_db):
+    init_db()
+    AnswerBankEntry.create(
+        normalized_question="do you have 5 years of python experience",
+        kind="boolean",
+        answer="Yes",
+        source_job_id=1,
+    )
+    row = AnswerBankEntry.get(
+        AnswerBankEntry.normalized_question == "do you have 5 years of python experience"
+    )
+    assert row.answer == "Yes"
+    assert row.source_job_id == 1
+    assert row.updated_at is not None
+    with pytest.raises(IntegrityError):
+        AnswerBankEntry.create(
+            normalized_question="do you have 5 years of python experience",
+            kind="boolean",
+            answer="No",
+            source_job_id=2,
+        )
