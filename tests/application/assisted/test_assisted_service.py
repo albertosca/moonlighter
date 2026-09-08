@@ -170,7 +170,14 @@ async def test_sheet_builds_one_caller_and_reuses_it_for_both_llm_users(job_fact
         return None
 
     async def spy_compose(
-        questions: Any, profile: Any, config: Any, job_dict: Any, compose_caller: Any
+        questions: Any,
+        profile: Any,
+        config: Any,
+        job_dict: Any,
+        compose_caller: Any,
+        *,
+        job_cache: Any = None,
+        answer_bank: Any = None,
     ) -> list[Any]:
         seen["compose_caller"] = compose_caller
         return []
@@ -418,7 +425,10 @@ async def test_without_email_config_the_sheet_keeps_the_profile_email(job_factor
     )
 
     assert "personal@gmail.com" in out
-    assert Application.get_or_none(Application.job == job) is None
+    # _sheet now always ensures an Application row exists (Layer A's per-job answer
+    # cache needs one regardless of email tracking) — but with no email config, no
+    # alias is minted, so email_ref stays unset.
+    assert Application.get(Application.job == job).email_ref is None
 
 
 async def test_a_choice_question_mentioning_email_is_not_overwritten(job_factory, monkeypatch):
@@ -503,3 +513,70 @@ async def test_a_manual_job_with_a_greenhouse_url_still_gets_the_api(job_factory
 
     assert seen == {"board": "teachablecareers", "job_id": "4913809101"}
     assert "prepare_application_from_paste" not in out
+
+
+# ── answer caching (Layer A + Layer B) ───────────────────────────────────────
+
+
+async def test_preparing_the_same_job_twice_reuses_the_job_cache_and_skips_the_llm(
+    job_factory, monkeypatch
+):
+    job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+    calls = 0
+
+    async def one_essay(page_text: str, llm_caller: Any) -> list[FormQuestion]:
+        return [FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)]
+
+    async def counting_caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        nonlocal calls
+        calls += 1
+        return "a generated answer"
+
+    monkeypatch.setattr(service, "extract_questions_from_page", one_essay)
+    monkeypatch.setattr(service, "make_caller", lambda config: counting_caller)
+
+    await service.prepare_application_from_paste(job.id, "p", {}, {})
+    calls_after_first = calls
+    assert calls_after_first > 0
+
+    await service.prepare_application_from_paste(job.id, "p", {}, {})
+    assert calls == calls_after_first  # second call served entirely from the job cache
+
+
+async def test_a_submitted_bank_eligible_answer_is_available_to_a_different_job(
+    job_factory, monkeypatch
+):
+    from moonlighter.core.db import Application
+
+    job1 = job_factory(source="lever", url="https://jobs.lever.co/acme/1")
+    job2 = job_factory(source="lever", url="https://jobs.lever.co/other/2")
+    # NOT "Are you authorized to work in..." (the brief's literal example): that
+    # label matches work_auth's _AUTHORIZED_RE unconditionally, so with no
+    # work_authorization config it is intercepted by pre_populate_answers
+    # (known) as NEEDS_REVIEW_SENTINEL *before* compose_answers ever reaches
+    # the job_cache/answer_bank branch (composer.py checks `known` first, by
+    # design — see test_a_known_field_is_never_overridden_by_the_job_cache_or_
+    # answer_bank in test_composer.py). With that label, job1's LLM is never
+    # called, job_cache stays empty, and there is nothing to promote — this
+    # test would fail regardless of how _sheet wires the caches. Verified
+    # empirically (uv run python -c compose_answers(...)) before swapping to a
+    # label with no deterministic rule.
+    label = "Do you have experience with Kubernetes in production?"
+
+    async def one_boolean(page_text: str, llm_caller: Any) -> list[FormQuestion]:
+        return [FormQuestion(label=label, kind=QuestionKind.BOOLEAN, required=True)]
+
+    monkeypatch.setattr(service, "extract_questions_from_page", one_boolean)
+    monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller("Yes"))
+
+    await service.prepare_application_from_paste(job1.id, "p", {}, {})
+    application1 = Application.get(Application.job == job1)
+    # Promotion is server.py's job (Task 5) — simulate it here directly against
+    # the module this task owns, so this test does not depend on Task 5 yet.
+    from moonlighter.application.answers.answer_bank import promote_application
+
+    promote_application(application1.get_form_data(), job1.id)
+
+    out2 = await service.prepare_application_from_paste(job2.id, "p", {}, {})
+    assert label in out2
+    assert "Yes" in out2
