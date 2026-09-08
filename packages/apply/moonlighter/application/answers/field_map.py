@@ -28,6 +28,10 @@ def _last_name(profile: dict[str, Any]) -> str:
     return " ".join(parts[1:]) if len(parts) > 1 else ""
 
 
+def _demographic(profile: dict[str, Any], key: str) -> str | None:
+    return (profile.get("demographics") or {}).get(key) or None
+
+
 def _city(profile: dict[str, Any]) -> str:
     loc = profile.get("location") or ""
     return loc.split(",")[0].strip()
@@ -138,6 +142,20 @@ _RULES: list[tuple[str, _RuleFn]] = [
         r"work\s+from\s+the\s+office|office\s+at\s+least",
         lambda p: ("Yes" if p["office_available"] else "No") if "office_available" in p else None,
     ),
+    # EEO/demographic self-identification, from the `demographics:` block Alberto
+    # configured on 2026-08-04 with exactly this intent (see profile.yaml comment there):
+    # "NÃO entram no prompt da LLM ... devem ser colocadas deterministicamente, como
+    # work_authorization e salário já são". English-only, matching how he set it up —
+    # these are US EEO/compliance categories, and the forms that ask them are almost
+    # always in English regardless of the posting's own language.
+    # Race and "Hispanic or Latino" are DISTINCT US EEO questions (a form may ask both):
+    # race is White/Black/Asian/..., hispanic_latino is a separate yes/no ethnicity
+    # question. Order doesn't matter between them — the patterns don't overlap.
+    (r"\bgender\b", lambda p: _demographic(p, "gender")),
+    (r"hispanic|latino", lambda p: _demographic(p, "hispanic_latino")),
+    (r"\brace\b", lambda p: _demographic(p, "race")),
+    (r"\bveteran\b", lambda p: _demographic(p, "veteran_status")),
+    (r"disabilit", lambda p: _demographic(p, "disability_status")),
     # Current location — anchored at the start so it doesn't match confirmation
     # phrases containing "currently based" mid-sentence (e.g. "...require you to be
     # currently based...").

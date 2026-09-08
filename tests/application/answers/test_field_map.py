@@ -13,6 +13,15 @@ PROFILE = {
     "country_pt": "Brasil",
     "english_level": "Fluent",
     "office_available": True,
+    # EEO/demographic self-identification — English-only, nested under "demographics"
+    # (same shape Alberto already configured in his real profile.yaml on 2026-08-04).
+    "demographics": {
+        "gender": "Male",
+        "hispanic_latino": "Yes",
+        "race": "White",
+        "veteran_status": "No",
+        "disability_status": "No",
+    },
 }
 
 WA_CONFIG_BRAZIL = {
@@ -121,6 +130,33 @@ def test_office_availability():
 def test_english_level():
     r = pre_populate_answers(["English level"], PROFILE)
     assert r["English level"] == "Fluent"
+
+
+def test_gender():
+    r = pre_populate_answers(["Gender"], PROFILE)
+    assert r["Gender"] == "Male"
+
+
+def test_hispanic_or_latino():
+    """Race and 'Hispanic or Latino' are distinct US EEO questions — a form may ask
+    both, and this one is answered from a different demographics key than race."""
+    r = pre_populate_answers(["Are you Hispanic or Latino?"], PROFILE)
+    assert r["Are you Hispanic or Latino?"] == "Yes"
+
+
+def test_race():
+    r = pre_populate_answers(["Race"], PROFILE)
+    assert r["Race"] == "White"
+
+
+def test_veteran_status():
+    r = pre_populate_answers(["Veteran status"], PROFILE)
+    assert r["Veteran status"] == "No"
+
+
+def test_disability_status():
+    r = pre_populate_answers(["Disability status"], PROFILE)
+    assert r["Disability status"] == "No"
 
 
 def test_currently_based():
@@ -240,6 +276,40 @@ def test_english_level_absent_from_profile_not_prepopulated():
     """No english_level in the profile → 'English level' field doesn't enter the result."""
     r = pre_populate_answers(["English level"], PROFILE_NO_LOCALE)
     assert "English level" not in r
+
+
+def test_gender_absent_from_profile_not_prepopulated():
+    """No 'demographics' block at all in the profile → still no crash, no answer."""
+    r = pre_populate_answers(["Gender"], PROFILE_NO_LOCALE)
+    assert "Gender" not in r
+
+
+def test_hispanic_or_latino_absent_from_profile_not_prepopulated():
+    r = pre_populate_answers(["Are you Hispanic or Latino?"], PROFILE_NO_LOCALE)
+    assert "Are you Hispanic or Latino?" not in r
+
+
+def test_race_absent_from_profile_not_prepopulated():
+    r = pre_populate_answers(["Race"], PROFILE_NO_LOCALE)
+    assert "Race" not in r
+
+
+def test_veteran_absent_from_profile_not_prepopulated():
+    r = pre_populate_answers(["Veteran status"], PROFILE_NO_LOCALE)
+    assert "Veteran status" not in r
+
+
+def test_disability_absent_from_profile_not_prepopulated():
+    r = pre_populate_answers(["Disability status"], PROFILE_NO_LOCALE)
+    assert "Disability status" not in r
+
+
+def test_demographics_present_but_key_missing_not_prepopulated():
+    """A 'demographics' block that just doesn't have this particular key (rather than
+    the block being absent entirely) must also fall through to the LLM, not crash."""
+    profile = {**PROFILE_NO_LOCALE, "demographics": {"gender": "Male"}}
+    r = pre_populate_answers(["Race"], profile)
+    assert "Race" not in r
 
 
 def test_office_available_true_returns_yes():
