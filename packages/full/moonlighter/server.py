@@ -8,6 +8,7 @@ from typing import Any
 
 from mcp.server.mcpserver import Context, MCPServer
 from moonlighter._tool_logging import tool_logged
+from moonlighter.application.answers.answer_bank import promote_application
 from moonlighter.application.assisted import service as assisted_service
 from moonlighter.core.config import (
     DEFAULTS,
@@ -376,6 +377,8 @@ async def update_status(
         app.next_action = next_action
     app.save()
     sync_job_status(app)
+    if status == "submitted":
+        promote_application(app.get_form_data(), job_id)
 
     result = f"✓ Job #{job_id} ({job.company}/{job.title}): status → {status}"
     if next_action:
