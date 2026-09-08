@@ -6,6 +6,7 @@ Every routing assertion here is paired with proof that the branch NOT taken
 was in fact not taken (an API not called, a fake LLM never consulted).
 """
 
+import json
 from typing import Any
 
 from moonlighter.application.assisted import service
@@ -589,3 +590,32 @@ async def test_a_submitted_bank_eligible_answer_is_available_to_a_different_job(
     out2 = await service.prepare_application_from_paste(job2.id, "p", {}, {})
     assert label in out2
     assert "Yes" in out2
+
+
+async def test_a_legacy_flat_form_data_row_self_heals_into_the_new_shape(job_factory, monkeypatch):
+    # 8 rows in the live DB still hold the removed browser-automation tool's flat
+    # label->string form_data. compose_answers now ignores those on read instead
+    # of raising TypeError, but ignoring is not enough: left in place they would
+    # be re-read (and re-ignored) forever. _sheet drops anything not shaped like
+    # {"answer": str, "kind": str} before persisting, so the row heals on the
+    # first successful run.
+    legacy_label = "Full name\xa0*"
+    job = job_factory(source="lever", url="https://jobs.lever.co/legacy/1")
+    application = Application.create(
+        job=job,
+        status="draft",
+        form_data=json.dumps({legacy_label: "Alberto Albuquerque"}),
+    )
+
+    async def one_question(page_text: str, llm_caller: Any) -> list[FormQuestion]:
+        return [FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)]
+
+    monkeypatch.setattr(service, "extract_questions_from_page", one_question)
+    monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
+
+    out = await service.prepare_application_from_paste(job.id, "p", {}, {})
+
+    assert "a generated answer" in out  # the run completed instead of raising
+    healed = Application.get(Application.id == application.id).get_form_data()
+    assert legacy_label not in healed
+    assert healed == {"Why us?": {"answer": "a generated answer", "kind": "long_text"}}

@@ -1,6 +1,7 @@
 import pytest
 from moonlighter.application.answers.answer_bank import (
     is_bank_eligible,
+    is_sensitive_label,
     load_answer_bank,
     normalize_question,
     promote_application,
@@ -8,14 +9,11 @@ from moonlighter.application.answers.answer_bank import (
 from moonlighter.application.assisted.questions import QuestionKind
 from moonlighter.core.db import AnswerBankEntry, init_db
 
-
 # ── normalize_question ───────────────────────────────────────────────────────
 
 
 def test_normalize_question_lowercases_collapses_whitespace_and_strips_trailing_punctuation():
-    assert (
-        normalize_question("  Are You   Legally Authorized ?  ") == "are you legally authorized"
-    )
+    assert normalize_question("  Are You   Legally Authorized ?  ") == "are you legally authorized"
 
 
 def test_normalize_question_strips_trailing_colon_and_asterisk():
@@ -27,7 +25,12 @@ def test_normalize_question_strips_trailing_colon_and_asterisk():
 
 @pytest.mark.parametrize(
     "kind",
-    [QuestionKind.TEXT, QuestionKind.BOOLEAN, QuestionKind.SINGLE_SELECT, QuestionKind.MULTI_SELECT],
+    [
+        QuestionKind.TEXT,
+        QuestionKind.BOOLEAN,
+        QuestionKind.SINGLE_SELECT,
+        QuestionKind.MULTI_SELECT,
+    ],
 )
 def test_is_bank_eligible_true_for_eligible_kinds(kind):
     assert is_bank_eligible(kind) is True
@@ -36,6 +39,41 @@ def test_is_bank_eligible_true_for_eligible_kinds(kind):
 @pytest.mark.parametrize("kind", [QuestionKind.LONG_TEXT, QuestionKind.FILE])
 def test_is_bank_eligible_false_for_ineligible_kinds(kind):
     assert is_bank_eligible(kind) is False
+
+
+# ── is_sensitive_label ────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "Gender",
+        "What is your gender identity?",
+        "Race / Ethnicity",
+        "Raça/Cor",
+        "Are you Hispanic or Latino?",
+        "Veteran Status",
+        "Disability status",
+        "Pessoa com deficiência?",
+        "References",
+        "Please provide a professional reference",
+        "Referências profissionais",
+    ],
+)
+def test_is_sensitive_label_true_for_demographics_and_references(label):
+    assert is_sensitive_label(label) is True
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "Do you have 5+ years of Python experience?",
+        "Why do you want to work here?",
+        "Notice period",
+    ],
+)
+def test_is_sensitive_label_false_for_ordinary_screening_questions(label):
+    assert is_sensitive_label(label) is False
 
 
 # ── load_answer_bank ──────────────────────────────────────────────────────────
@@ -103,6 +141,17 @@ def test_promote_application_ignores_legacy_flat_shaped_entries(tmp_db):
     # crash when it sees this shape; it must simply skip it.
     init_db()
     promote_application({"Q": "A"}, source_job_id=1)
+    assert AnswerBankEntry.select().count() == 0
+
+
+@pytest.mark.parametrize("label", ["Gender", "Veteran Status", "References"])
+def test_promote_application_skips_a_sensitive_label(tmp_db, label):
+    # Kind alone does not protect these: a demographic or references question is
+    # usually TEXT, which IS bank-eligible. Nothing deterministic stops the LLM
+    # guessing an answer to such a label, and a guess must not be replayed at
+    # every future company from a shared table.
+    init_db()
+    promote_application({label: {"answer": "a guess", "kind": "text"}}, source_job_id=1)
     assert AnswerBankEntry.select().count() == 0
 
 

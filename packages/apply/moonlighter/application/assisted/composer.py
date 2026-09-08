@@ -10,7 +10,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from moonlighter.application.answers.answer_bank import is_bank_eligible, normalize_question
+from moonlighter.application.answers.answer_bank import (
+    is_bank_eligible,
+    is_sensitive_label,
+    normalize_question,
+)
 from moonlighter.application.answers.compliance import is_compliance_question
 from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.application.answers.field_map import pre_populate_answers
@@ -157,7 +161,7 @@ async def compose_answers(
     job: dict[str, Any],
     llm_caller: LLMCaller,
     *,
-    job_cache: dict[str, dict[str, str]] | None = None,
+    job_cache: dict[str, Any] | None = None,
     answer_bank: dict[str, str] | None = None,
 ) -> list[ComposedAnswer]:
     if job_cache is None:
@@ -237,10 +241,25 @@ async def compose_answers(
                 continue
             answer = value
         else:
-            if question.label in job_cache:
-                answer = job_cache[question.label]["answer"]
+            # Shape-checked, not just presence-checked: Application.form_data
+            # predates this feature and 8 rows in the live DB still hold the
+            # removed browser-automation tool's flat label->string shape, on
+            # which `[...]["answer"]` raises TypeError before _sheet ever gets
+            # to rewrite the column — permanently breaking those jobs. Same
+            # defensive pattern as answer_bank.promote_application. An empty
+            # "answer" counts as absent for the same reason `known`'s "" does
+            # above: it is not an answer, and treating it as a hit would paste
+            # a blank into a real form.
+            cached = job_cache.get(question.label)
+            if (
+                isinstance(cached, dict)
+                and isinstance(cached.get("answer"), str)
+                and cached["answer"]
+            ):
+                answer = cached["answer"]
             elif (
                 is_bank_eligible(question.kind)
+                and not is_sensitive_label(question.label)
                 and (bank_answer := answer_bank.get(normalize_question(question.label))) is not None
             ):
                 answer = bank_answer

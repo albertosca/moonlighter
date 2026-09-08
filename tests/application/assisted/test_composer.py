@@ -1,3 +1,6 @@
+import subprocess
+import sys
+
 import pytest
 from moonlighter.application.assisted.composer import ComposedAnswer, compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
@@ -630,6 +633,36 @@ async def test_a_known_field_is_never_overridden_by_the_job_cache_or_answer_bank
     assert composed[0].answer == "Alberto"
 
 
+@pytest.mark.asyncio
+async def test_a_legacy_flat_shaped_job_cache_entry_is_treated_as_a_miss():
+    # Application.form_data predates this feature: 8 rows in the live DB still
+    # hold the removed browser-automation tool's flat label->string shape.
+    # Indexing one of those with ["answer"] raised
+    # "TypeError: string indices must be integers" — and it raised BEFORE _sheet
+    # could rewrite the column, so those jobs stayed permanently broken.
+    label = "Do you have at least 8 years of professional experience?"
+    question = FormQuestion(label=label, kind=QuestionKind.TEXT, required=True)
+    job_cache = {label: "Yes, I have 10 years"}
+    composed = await compose_answers(
+        [question], PROFILE, {}, JOB, answers_anything, job_cache=job_cache
+    )
+    assert composed[0].answer == "a generated answer"
+
+
+@pytest.mark.asyncio
+async def test_an_empty_cached_answer_is_treated_as_a_miss():
+    # Presence is not enough, same as `known`'s deliberate "" a few lines above:
+    # a cached empty string is not an answer, and honouring it would paste a
+    # blank into a real form instead of asking the LLM again.
+    label = "Describe a challenge you overcame"
+    question = FormQuestion(label=label, kind=QuestionKind.LONG_TEXT, required=True)
+    job_cache = {label: {"answer": "", "kind": "long_text"}}
+    composed = await compose_answers(
+        [question], PROFILE, {}, JOB, answers_anything, job_cache=job_cache
+    )
+    assert composed[0].answer == "a generated answer"
+
+
 # ── answer_bank (Layer B: cross-job bank) ────────────────────────────────────
 
 
@@ -668,3 +701,35 @@ async def test_a_bank_answer_still_goes_through_option_matching():
     bank = {"which team appeals to you most": "product"}
     composed = await compose_answers([question], PROFILE, {}, JOB, never_called, answer_bank=bank)
     assert composed[0].answer == "Product"
+
+
+@pytest.mark.parametrize("label", ["Gender", "Veteran Status", "References"])
+@pytest.mark.asyncio
+async def test_a_sensitive_label_is_never_read_from_the_answer_bank(label):
+    # Demographics and references are excluded from the LLM's prompt
+    # (profile_for_answers) but nothing stops the model guessing an answer to a
+    # label like this anyway. Such an answer must never be replayed at a
+    # different company, so the bank is not consulted for these labels at all —
+    # kind alone does not protect them (TEXT is bank-eligible).
+    question = FormQuestion(label=label, kind=QuestionKind.TEXT, required=False)
+    bank = {label.lower(): "a banked answer from a different company"}
+    composed = await compose_answers(
+        [question], PROFILE, {}, JOB, answers_anything, answer_bank=bank
+    )
+    assert composed[0].answer == "a generated answer"
+
+
+def test_importing_the_composer_does_not_pull_in_the_db_layer():
+    # The plan's Global Constraint: compose_answers does no DB access, directly
+    # or via import. answer_bank.py imports AnswerBankEntry inside the two
+    # functions that need it precisely so that importing this module — which
+    # wants only the pure helpers — does not drag in peewee and the whole DB
+    # layer. Checked in a subprocess: this pytest session imported both long ago.
+    code = (
+        "import sys, moonlighter.application.assisted.composer as _;"
+        "print('peewee' in sys.modules, 'moonlighter.core.db' in sys.modules)"
+    )
+    out = subprocess.run(  # noqa: S603 - literal argv, this interpreter, no shell
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    ).stdout
+    assert out.strip() == "False False"

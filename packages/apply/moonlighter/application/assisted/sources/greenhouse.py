@@ -16,7 +16,10 @@ HEADERS = {"User-Agent": "moonlighter/0.1"}
 
 _URL = re.compile(r"greenhouse\.io/(?P<board>[^/]+)/jobs/(?P<job_id>\d+)")
 
-# Anything not listed becomes TEXT: an unknown widget must still reach the human.
+# Anything not listed becomes LONG_TEXT: an unknown widget must still reach the
+# human, and LONG_TEXT is the conservative side of the one behavioural
+# difference between the two free-text kinds — TEXT is eligible for the
+# cross-job answer bank, LONG_TEXT never is. They render and prompt identically.
 _KINDS = {
     "input_text": QuestionKind.TEXT,
     "textarea": QuestionKind.LONG_TEXT,
@@ -46,7 +49,7 @@ def parse_greenhouse_questions(payload: dict[str, Any]) -> list[FormQuestion]:
             continue
         fields = item.get("fields") or [{}]
         field = fields[0]
-        kind = _KINDS.get(str(field.get("type")), QuestionKind.TEXT)
+        kind = _KINDS.get(str(field.get("type")), QuestionKind.LONG_TEXT)
         options = _options(field)
         # A select whose options did not come through cannot be answered as a
         # select; degrade to text so the question still reaches the human.

@@ -30,7 +30,11 @@ def test_a_file_question_becomes_a_file_kind():
     assert any(q.kind is QuestionKind.FILE for q in questions)
 
 
-def test_an_unknown_field_type_falls_back_to_text_instead_of_vanishing():
+def test_an_unknown_field_type_falls_back_to_long_text_instead_of_vanishing():
+    # LONG_TEXT, not TEXT: the two render and prompt identically, and differ only
+    # in that TEXT is eligible for the cross-job answer bank. An unrecognised
+    # widget type is a question of unknown shape, so it degrades to the side that
+    # never gets replayed at a different company.
     payload = {
         "questions": [
             {
@@ -42,7 +46,7 @@ def test_an_unknown_field_type_falls_back_to_text_instead_of_vanishing():
     }
     questions = parse_greenhouse_questions(payload)
     assert len(questions) == 1
-    assert questions[0].kind is QuestionKind.TEXT
+    assert questions[0].kind is QuestionKind.LONG_TEXT
 
 
 def test_a_select_with_no_options_degrades_to_text_instead_of_raising():

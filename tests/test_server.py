@@ -867,7 +867,14 @@ async def test_update_status_non_submitted_does_not_promote(tmp_db):
     from moonlighter.server import update_status
 
     job = create_job(tmp_db, url="https://x.com/promote2")
-    create_application(job, form_data=json.dumps({"Gender": {"answer": "Male", "kind": "text"}}))
+    # Deliberately a bank-eligible, non-sensitive label: with a demographic one
+    # ("Gender") the assertion below would pass for the wrong reason —
+    # is_sensitive_label blocks promotion regardless of status — and would stop
+    # proving anything about the status gate.
+    create_application(
+        job,
+        form_data=json.dumps({"Do you know Kubernetes?": {"answer": "Yes", "kind": "boolean"}}),
+    )
 
     await update_status(job_id=job.id, status="screening", ctx=make_test_context())
 
