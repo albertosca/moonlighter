@@ -28,7 +28,10 @@ _URL = re.compile(r"https?://(?P<host>[^/]+)/o/(?P<offer>[\w-]+)")
 # `multi_choice` is handled separately, since its options live in a sibling
 # list rather than being a fixed kind->QuestionKind mapping. Anything not
 # listed here and not `multi_choice` is an unrecognised kind: it still
-# reaches the human as free text rather than vanishing.
+# reaches the human as free text rather than vanishing — as LONG_TEXT, which
+# unlike TEXT is never eligible for the cross-job answer bank. The two render
+# and prompt identically, so a question whose shape we could not read degrades
+# to the side that is never replayed at a different company.
 _SIMPLE_KINDS = {
     "boolean": QuestionKind.BOOLEAN,
     "date": QuestionKind.TEXT,
@@ -81,11 +84,11 @@ def _question(item: dict[str, Any]) -> FormQuestion | None:
     options: tuple[str, ...] = ()
     if kind_str == "multi_choice":
         options = _choice_options(item)
-        kind = QuestionKind.SINGLE_SELECT if options else QuestionKind.TEXT
+        kind = QuestionKind.SINGLE_SELECT if options else QuestionKind.LONG_TEXT
     elif kind_str in _SIMPLE_KINDS:
         kind = _SIMPLE_KINDS[kind_str]
     elif kind_str:
-        kind = QuestionKind.TEXT
+        kind = QuestionKind.LONG_TEXT
     else:
         # No kind info at all: a plain open question, answered in free text.
         kind = QuestionKind.LONG_TEXT

@@ -52,9 +52,11 @@ def parse_greenhouse_questions(payload: dict[str, Any]) -> list[FormQuestion]:
         kind = _KINDS.get(str(field.get("type")), QuestionKind.LONG_TEXT)
         options = _options(field)
         # A select whose options did not come through cannot be answered as a
-        # select; degrade to text so the question still reaches the human.
+        # select; degrade to free text so the question still reaches the human —
+        # to LONG_TEXT, the bank-ineligible one, for the reason given above the
+        # _KINDS table: an unknown shape must not become a reusable answer.
         if kind in (QuestionKind.SINGLE_SELECT, QuestionKind.MULTI_SELECT) and not options:
-            kind = QuestionKind.TEXT
+            kind = QuestionKind.LONG_TEXT
         questions.append(
             FormQuestion(
                 label=str(label),

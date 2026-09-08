@@ -110,20 +110,26 @@ def test_multi_choice_options_are_ordered_by_position_not_list_order():
     assert question.options == ("Mid", "Senior")
 
 
-def test_a_multi_choice_question_without_open_question_options_degrades_to_text():
+def test_a_multi_choice_question_without_open_question_options_degrades_to_long_text():
+    # LONG_TEXT, not TEXT: the two render and prompt identically, and differ only
+    # in that TEXT is eligible for the cross-job answer bank. A choice question
+    # whose options never arrived is of genuinely unknown shape, so it degrades
+    # to the side that is never replayed at a different company. Same fix as
+    # pasted.py's and greenhouse.py's structurally identical branches.
     payload = {"offer": {"open_questions": [{"body": "Seniority?", "kind": "multi_choice"}]}}
     question = next(q for q in parse_recruitee_questions(payload) if q.label == "Seniority?")
-    assert question.kind is QuestionKind.TEXT
+    assert question.kind is QuestionKind.LONG_TEXT
 
 
 def test_reading_the_empty_options_dict_never_yields_a_choice_question():
     # Regression guard: "options" on real data is always {}, not a list. A
     # parser that fell back to reading it must not manufacture a select.
+    # The degraded kind is LONG_TEXT for the reason given in the test above.
     payload = {
         "offer": {"open_questions": [{"body": "Seniority?", "kind": "multi_choice", "options": {}}]}
     }
     question = next(q for q in parse_recruitee_questions(payload) if q.label == "Seniority?")
-    assert question.kind is QuestionKind.TEXT
+    assert question.kind is QuestionKind.LONG_TEXT
     assert question.options == ()
 
 
@@ -144,11 +150,14 @@ def test_a_date_question_maps_to_text():
     assert dates[0].kind is QuestionKind.TEXT
 
 
-def test_an_unrecognised_kind_falls_back_to_text_instead_of_vanishing():
+def test_an_unrecognised_kind_falls_back_to_long_text_instead_of_vanishing():
+    # LONG_TEXT for the same reason as the degraded multi_choice above — and it
+    # now matches the no-kind-at-all branch, which already chose LONG_TEXT: a
+    # kind string we cannot read tells us no more than no kind string at all.
     payload = {"offer": {"open_questions": [{"body": "Odd one", "kind": "some_new_widget"}]}}
     questions = parse_recruitee_questions(payload)
     assert [q.label for q in questions] == ["Full name", "Email", "Odd one"]
-    assert questions[-1].kind is QuestionKind.TEXT
+    assert questions[-1].kind is QuestionKind.LONG_TEXT
 
 
 def test_an_empty_payload_yields_nothing():

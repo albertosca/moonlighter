@@ -49,7 +49,12 @@ def test_an_unknown_field_type_falls_back_to_long_text_instead_of_vanishing():
     assert questions[0].kind is QuestionKind.LONG_TEXT
 
 
-def test_a_select_with_no_options_degrades_to_text_instead_of_raising():
+def test_a_select_with_no_options_degrades_to_long_text_instead_of_raising():
+    # LONG_TEXT for the same reason as the unrecognised widget type above, and
+    # matching pasted.py's structurally identical branch: a select whose options
+    # did not come through is a question of unknown shape, and the only
+    # behavioural difference between the two free-text kinds is that TEXT is
+    # eligible for the cross-job answer bank.
     payload = {
         "questions": [
             {
@@ -61,7 +66,7 @@ def test_a_select_with_no_options_degrades_to_text_instead_of_raising():
     }
     questions = parse_greenhouse_questions(payload)
     assert len(questions) == 1
-    assert questions[0].kind is QuestionKind.TEXT
+    assert questions[0].kind is QuestionKind.LONG_TEXT
 
 
 def test_a_question_without_a_label_is_dropped():
