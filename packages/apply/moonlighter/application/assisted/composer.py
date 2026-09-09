@@ -10,6 +10,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from moonlighter.application.answers.answer_bank import (
+    is_bank_eligible,
+    is_sensitive_label,
+    normalize_question,
+)
 from moonlighter.application.answers.compliance import is_compliance_question
 from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.application.answers.field_map import pre_populate_answers
@@ -155,7 +160,14 @@ async def compose_answers(
     config: dict[str, Any],
     job: dict[str, Any],
     llm_caller: LLMCaller,
+    *,
+    job_cache: dict[str, Any] | None = None,
+    answer_bank: dict[str, str] | None = None,
 ) -> list[ComposedAnswer]:
+    if job_cache is None:
+        job_cache = {}
+    if answer_bank is None:
+        answer_bank = {}
     known = pre_populate_answers(
         [q.label for q in questions],
         profile,
@@ -167,6 +179,7 @@ async def compose_answers(
     composed: list[ComposedAnswer] = []
     llm_exhausted = False
     for question in questions:
+        is_llm_generated = False
         if question.kind is QuestionKind.FILE:
             # A file cannot be pasted, but naming the exact file to attach turns a
             # dead end into an instruction — only for CV-shaped labels: a "Cover
@@ -228,26 +241,50 @@ async def compose_answers(
                 continue
             answer = value
         else:
-            if llm_exhausted:
-                composed.append(ComposedAnswer(question, None, _SPEND_LIMIT_REASON))
-                continue
-            try:
-                answer = await _generate(question, profile, job, llm_caller)
-            except _GenerationError as e:
-                # After a spend-limit failure every further call is doomed the
-                # same way — one gap per remaining generated answer, no more
-                # calls. Deterministic pre-population above is unaffected.
-                cause = e.__cause__
-                if isinstance(cause, Exception) and is_spend_limit(cause):
-                    llm_exhausted = True
+            # Shape-checked, not just presence-checked: Application.form_data
+            # predates this feature and 8 rows in the live DB still hold the
+            # removed browser-automation tool's flat label->string shape, on
+            # which `[...]["answer"]` raises TypeError before _sheet ever gets
+            # to rewrite the column — permanently breaking those jobs. Same
+            # defensive pattern as answer_bank.promote_application. An empty
+            # "answer" counts as absent for the same reason `known`'s "" does
+            # above: it is not an answer, and treating it as a hit would paste
+            # a blank into a real form.
+            cached = job_cache.get(question.label)
+            if (
+                isinstance(cached, dict)
+                and isinstance(cached.get("answer"), str)
+                and cached["answer"]
+            ):
+                answer = cached["answer"]
+            elif (
+                is_bank_eligible(question.kind)
+                and not is_sensitive_label(question.label)
+                and (bank_answer := answer_bank.get(normalize_question(question.label))) is not None
+            ):
+                answer = bank_answer
+            else:
+                if llm_exhausted:
                     composed.append(ComposedAnswer(question, None, _SPEND_LIMIT_REASON))
-                else:
-                    composed.append(
-                        ComposedAnswer(
-                            question, None, "answer generation failed — answer this yourself"
+                    continue
+                try:
+                    answer = await _generate(question, profile, job, llm_caller)
+                except _GenerationError as e:
+                    # After a spend-limit failure every further call is doomed the
+                    # same way — one gap per remaining generated answer, no more
+                    # calls. Deterministic pre-population above is unaffected.
+                    cause = e.__cause__
+                    if isinstance(cause, Exception) and is_spend_limit(cause):
+                        llm_exhausted = True
+                        composed.append(ComposedAnswer(question, None, _SPEND_LIMIT_REASON))
+                    else:
+                        composed.append(
+                            ComposedAnswer(
+                                question, None, "answer generation failed — answer this yourself"
+                            )
                         )
-                    )
-                continue
+                    continue
+                is_llm_generated = True
 
         # pre_populate_answers can hand back its own review sentinel instead of a real
         # value (work-authorization/sponsorship fields when the country can't be inferred;
@@ -295,5 +332,7 @@ async def compose_answers(
                 continue
             answer = picked
 
+        if is_llm_generated:
+            job_cache[question.label] = {"answer": answer, "kind": question.kind.value}
         composed.append(ComposedAnswer(question, answer, None))
     return composed

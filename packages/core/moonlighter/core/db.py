@@ -113,6 +113,23 @@ class ProcessedEmail(BaseModel):
     processed_at = DateTimeField(default=datetime.datetime.now)
 
 
+class AnswerBankEntry(BaseModel):
+    """Cross-job cache of approved LLM answers, keyed by normalised question text.
+
+    Populated by moonlighter.application.answers.answer_bank.promote_application
+    when an Application is marked "submitted" — see that module for the
+    normalisation and kind-eligibility rules. `kind` is stored for visibility
+    and debugging only; it is not consulted on read (the label was already
+    kind-checked before the row was written).
+    """
+
+    normalized_question = CharField(unique=True)
+    kind = CharField()
+    answer = TextField()
+    source_job_id = IntegerField()
+    updated_at = DateTimeField(default=datetime.datetime.now)
+
+
 _APP_TO_JOB_STATUS = {
     "submitted": "applied",
     "screening": "applied",
@@ -144,7 +161,7 @@ def init_db() -> None:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     db.init(path)
     db.connect(reuse_if_open=True)
-    db.create_tables([Job, Application, ScanLog, ProcessedEmail], safe=True)
+    db.create_tables([Job, Application, ScanLog, ProcessedEmail, AnswerBankEntry], safe=True)
     from moonlighter.core.migrations import run_migrations
 
     run_migrations(db)

@@ -65,20 +65,25 @@ async def test_an_unparseable_reply_yields_no_questions():
 
 
 @pytest.mark.asyncio
-async def test_an_unknown_kind_falls_back_to_text():
+async def test_an_unknown_kind_falls_back_to_long_text():
+    # LONG_TEXT, not TEXT: the two are indistinguishable on the sheet and in the
+    # prompt, and differ only in that TEXT is eligible for the cross-job answer
+    # bank. A kind we could not even parse must not become a reusable answer.
     call, _ = fake_llm(
         json.dumps({"questions": [{"label": "Odd", "kind": "carousel", "required": False}]})
     )
     questions = await extract_questions_from_page(PAGE, call)
-    assert questions[0].kind is QuestionKind.TEXT
+    assert questions[0].kind is QuestionKind.LONG_TEXT
 
 
 @pytest.mark.asyncio
-async def test_a_select_without_options_degrades_to_text():
+async def test_a_select_without_options_degrades_to_long_text():
+    # Same reason as above: a claimed select with no options is a question of
+    # genuinely unknown shape, so it degrades to the bank-ineligible kind.
     call, _ = fake_llm(
         json.dumps({"questions": [{"label": "Country", "kind": "single_select", "options": []}]})
     )
-    assert (await extract_questions_from_page(PAGE, call))[0].kind is QuestionKind.TEXT
+    assert (await extract_questions_from_page(PAGE, call))[0].kind is QuestionKind.LONG_TEXT
 
 
 @pytest.mark.asyncio

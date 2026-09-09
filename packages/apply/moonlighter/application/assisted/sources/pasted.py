@@ -43,12 +43,20 @@ Rules:
 
 
 def _kind(raw: Any, options: tuple[str, ...]) -> QuestionKind:
+    """LONG_TEXT, not TEXT, is the fallback for a kind we could not read.
+
+    The two render identically on the sheet and are prompted identically; the
+    only behavioural difference is that TEXT is eligible for the cross-job
+    answer bank and LONG_TEXT never is. An unknown shape must therefore degrade
+    to the conservative side — never auto-reuse an answer we could not even
+    classify at a different company.
+    """
     try:
         kind = QuestionKind(str(raw))
     except ValueError:
-        return QuestionKind.TEXT
+        return QuestionKind.LONG_TEXT
     if kind in _CHOICE_KINDS and not options:
-        return QuestionKind.TEXT
+        return QuestionKind.LONG_TEXT
     return kind
 
 

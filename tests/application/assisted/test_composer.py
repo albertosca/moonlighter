@@ -1,3 +1,6 @@
+import subprocess
+import sys
+
 import pytest
 from moonlighter.application.assisted.composer import ComposedAnswer, compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
@@ -554,3 +557,179 @@ async def test_a_text_certification_question_is_also_guarded():
     composed = await compose_answers([question], PROFILE, {}, JOB, never_called)
     assert composed[0].answer is None
     assert "compliance" in composed[0].gap_reason
+
+
+# ── job_cache (Layer A: per-job cache) ───────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_a_job_cache_hit_skips_the_llm():
+    question = FormQuestion(
+        label="Describe a challenge you overcame", kind=QuestionKind.TEXT, required=True
+    )
+    job_cache = {"Describe a challenge you overcame": {"answer": "cached answer", "kind": "text"}}
+    composed = await compose_answers(
+        [question], PROFILE, {}, JOB, never_called, job_cache=job_cache
+    )
+    assert composed[0].answer == "cached answer"
+
+
+@pytest.mark.asyncio
+async def test_a_new_llm_answer_is_written_into_the_job_cache():
+    question = FormQuestion(
+        label="Describe a challenge you overcame", kind=QuestionKind.TEXT, required=True
+    )
+    job_cache: dict[str, dict[str, str]] = {}
+    await compose_answers([question], PROFILE, {}, JOB, answers_anything, job_cache=job_cache)
+    assert job_cache["Describe a challenge you overcame"] == {
+        "answer": "a generated answer",
+        "kind": "text",
+    }
+
+
+@pytest.mark.asyncio
+async def test_a_gap_is_not_written_into_the_job_cache():
+    question = FormQuestion(
+        label="Describe a challenge you overcame", kind=QuestionKind.TEXT, required=True
+    )
+
+    async def unknown(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        return "UNKNOWN"
+
+    job_cache: dict[str, dict[str, str]] = {}
+    composed = await compose_answers([question], PROFILE, {}, JOB, unknown, job_cache=job_cache)
+    assert composed[0].answer is None
+    assert job_cache == {}
+
+
+@pytest.mark.asyncio
+async def test_an_operator_directed_answer_is_not_written_into_the_job_cache():
+    # Proves the cache write happens at the FINAL success point, not right after
+    # the LLM call returns: an answer that later gets rejected as operator-directed
+    # must never be replayed from the cache on a second call.
+    question = FormQuestion(label="References", kind=QuestionKind.TEXT, required=True)
+
+    async def operator_directed(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        return "the candidate will provide references later"
+
+    job_cache: dict[str, dict[str, str]] = {}
+    composed = await compose_answers(
+        [question], PROFILE, {}, JOB, operator_directed, job_cache=job_cache
+    )
+    assert composed[0].answer is None
+    assert job_cache == {}
+
+
+@pytest.mark.asyncio
+async def test_a_known_field_is_never_overridden_by_the_job_cache_or_answer_bank():
+    # pre_populate_answers (known) is checked before either cache — a label it
+    # already resolves must never be shadowed by a stale/wrong cache entry.
+    question = FormQuestion(label="First Name", kind=QuestionKind.TEXT, required=True)
+    job_cache = {"First Name": {"answer": "WRONG", "kind": "text"}}
+    bank = {"first name": "ALSO WRONG"}
+    composed = await compose_answers(
+        [question], PROFILE, {}, JOB, never_called, job_cache=job_cache, answer_bank=bank
+    )
+    assert composed[0].answer == "Alberto"
+
+
+@pytest.mark.asyncio
+async def test_a_legacy_flat_shaped_job_cache_entry_is_treated_as_a_miss():
+    # Application.form_data predates this feature: 8 rows in the live DB still
+    # hold the removed browser-automation tool's flat label->string shape.
+    # Indexing one of those with ["answer"] raised
+    # "TypeError: string indices must be integers" — and it raised BEFORE _sheet
+    # could rewrite the column, so those jobs stayed permanently broken.
+    label = "Do you have at least 8 years of professional experience?"
+    question = FormQuestion(label=label, kind=QuestionKind.TEXT, required=True)
+    job_cache = {label: "Yes, I have 10 years"}
+    composed = await compose_answers(
+        [question], PROFILE, {}, JOB, answers_anything, job_cache=job_cache
+    )
+    assert composed[0].answer == "a generated answer"
+
+
+@pytest.mark.asyncio
+async def test_an_empty_cached_answer_is_treated_as_a_miss():
+    # Presence is not enough, same as `known`'s deliberate "" a few lines above:
+    # a cached empty string is not an answer, and honouring it would paste a
+    # blank into a real form instead of asking the LLM again.
+    label = "Describe a challenge you overcame"
+    question = FormQuestion(label=label, kind=QuestionKind.LONG_TEXT, required=True)
+    job_cache = {label: {"answer": "", "kind": "long_text"}}
+    composed = await compose_answers(
+        [question], PROFILE, {}, JOB, answers_anything, job_cache=job_cache
+    )
+    assert composed[0].answer == "a generated answer"
+
+
+# ── answer_bank (Layer B: cross-job bank) ────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_an_answer_bank_hit_skips_the_llm_for_an_eligible_kind():
+    question = FormQuestion(
+        label="Do you have 5+ years of Python experience?",
+        kind=QuestionKind.BOOLEAN,
+        required=True,
+    )
+    bank = {"do you have 5+ years of python experience": "Yes"}
+    composed = await compose_answers([question], PROFILE, {}, JOB, never_called, answer_bank=bank)
+    assert composed[0].answer == "Yes"
+
+
+@pytest.mark.asyncio
+async def test_the_answer_bank_is_never_consulted_for_long_text():
+    question = FormQuestion(
+        label="Why do you want to work here?", kind=QuestionKind.LONG_TEXT, required=True
+    )
+    bank = {"why do you want to work here": "a stale answer from a different company"}
+    composed = await compose_answers(
+        [question], PROFILE, {}, JOB, answers_anything, answer_bank=bank
+    )
+    assert composed[0].answer == "a generated answer"
+
+
+@pytest.mark.asyncio
+async def test_a_bank_answer_still_goes_through_option_matching():
+    question = FormQuestion(
+        label="Which team appeals to you most?",
+        kind=QuestionKind.SINGLE_SELECT,
+        required=True,
+        options=("Platform", "Product"),
+    )
+    bank = {"which team appeals to you most": "product"}
+    composed = await compose_answers([question], PROFILE, {}, JOB, never_called, answer_bank=bank)
+    assert composed[0].answer == "Product"
+
+
+@pytest.mark.parametrize("label", ["Gender", "Veteran Status", "References"])
+@pytest.mark.asyncio
+async def test_a_sensitive_label_is_never_read_from_the_answer_bank(label):
+    # Demographics and references are excluded from the LLM's prompt
+    # (profile_for_answers) but nothing stops the model guessing an answer to a
+    # label like this anyway. Such an answer must never be replayed at a
+    # different company, so the bank is not consulted for these labels at all —
+    # kind alone does not protect them (TEXT is bank-eligible).
+    question = FormQuestion(label=label, kind=QuestionKind.TEXT, required=False)
+    bank = {label.lower(): "a banked answer from a different company"}
+    composed = await compose_answers(
+        [question], PROFILE, {}, JOB, answers_anything, answer_bank=bank
+    )
+    assert composed[0].answer == "a generated answer"
+
+
+def test_importing_the_composer_does_not_pull_in_the_db_layer():
+    # The plan's Global Constraint: compose_answers does no DB access, directly
+    # or via import. answer_bank.py imports AnswerBankEntry inside the two
+    # functions that need it precisely so that importing this module — which
+    # wants only the pure helpers — does not drag in peewee and the whole DB
+    # layer. Checked in a subprocess: this pytest session imported both long ago.
+    code = (
+        "import sys, moonlighter.application.assisted.composer as _;"
+        "print('peewee' in sys.modules, 'moonlighter.core.db' in sys.modules)"
+    )
+    out = subprocess.run(  # noqa: S603 - literal argv, this interpreter, no shell
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    ).stdout
+    assert out.strip() == "False False"

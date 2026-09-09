@@ -1,9 +1,11 @@
 """Turn a job into a sheet the candidate can paste into the form."""
 
+import json
 from pathlib import Path
 from typing import Any
 
 import httpx
+from moonlighter.application.answers.answer_bank import load_answer_bank
 from moonlighter.application.answers.email_alias import (
     build_email_alias,
     is_email_label,
@@ -81,6 +83,20 @@ def _with_tracking_alias(composed: list[ComposedAnswer], alias: str) -> list[Com
     ]
 
 
+def _well_shaped(entry: Any) -> bool:
+    """Whether a per-job cache entry has this feature's {"answer": str, "kind": str}
+    shape. Rows written by the removed browser-automation tool are a flat
+    label->string mapping instead (8 of them in the live DB). compose_answers
+    ignores those on read but cannot remove them; dropping them here lets the
+    row self-heal into the new shape the first time a sheet is prepared,
+    instead of carrying the legacy junk forward forever."""
+    return (
+        isinstance(entry, dict)
+        and isinstance(entry.get("answer"), str)
+        and isinstance(entry.get("kind"), str)
+    )
+
+
 def _names_path(composed: list[ComposedAnswer], path: Path) -> bool:
     """Whether some gap already tells the operator to upload this exact file."""
     return any(item.gap_reason is not None and str(path) in item.gap_reason for item in composed)
@@ -89,6 +105,9 @@ def _names_path(composed: list[ComposedAnswer], path: Path) -> bool:
 async def _sheet(
     job: Job, questions: list[FormQuestion], config: dict[str, Any], profile: dict[str, Any]
 ) -> str:
+    application, _ = Application.get_or_create(job=job, defaults={"status": "draft"})
+    job_cache: dict[str, Any] = application.get_form_data()
+    answer_bank = load_answer_bank()
     caller = make_caller(config)
     tailored = await ensure_tailored_cv(
         {"id": job.id, "title": job.title, "company": job.company, "description": job.description},
@@ -109,7 +128,11 @@ async def _sheet(
             "remote_type": job.remote_type,
         },
         caller,
+        job_cache=job_cache,
+        answer_bank=answer_bank,
     )
+    application.form_data = json.dumps({k: v for k, v in job_cache.items() if _well_shaped(v)})
+    application.save()
     alias = _tracking_alias(job, config)
     if alias is not None:
         composed = _with_tracking_alias(composed, alias)
