@@ -255,12 +255,19 @@ OPERATOR_NOTE_ADDRESS = (
 async def test_operator_directed_prose_becomes_a_gap(note):
     """CANARY: these are the verbatim answers that shipped toward employers on
     2026-08-04 (references) and 2026-08-05 (address). The guard must bite on the
-    failures that actually happened."""
+    failures that actually happened.
+
+    The label is deliberately neutral: what this canary pins is the ANSWER TEXT
+    reaching the operator-directed guard, and the original "References" label is
+    now intercepted upstream by is_sensitive_label — which would leave this
+    passing without the operator guard ever running."""
 
     async def caller(prompt: str, model: str) -> str:
         return note
 
-    questions = [FormQuestion(label="References", kind=QuestionKind.LONG_TEXT, required=False)]
+    questions = [
+        FormQuestion(label="Anything else to add?", kind=QuestionKind.LONG_TEXT, required=False)
+    ]
     composed = await compose_answers(questions, {}, {}, {"description": "A job."}, caller)
     assert composed[0].answer is None
     assert composed[0].gap_reason is not None
@@ -559,6 +566,28 @@ async def test_a_text_certification_question_is_also_guarded():
     assert "compliance" in composed[0].gap_reason
 
 
+@pytest.mark.asyncio
+async def test_a_demographic_question_never_reaches_the_llm():
+    # profile_for_answers already keeps demographic DATA out of the prompt, but
+    # nothing stopped the model from being ASKED a demographic-shaped question
+    # and hallucinating an answer anyway — same deterministic-guard category as
+    # compliance declarations above.
+    question = FormQuestion(
+        label="Gender", kind=QuestionKind.SINGLE_SELECT, required=True, options=("Male", "Female")
+    )
+    composed = await compose_answers([question], PROFILE, {}, JOB, never_called)
+    assert composed[0].answer is None
+    assert "demographic" in composed[0].gap_reason
+
+
+@pytest.mark.asyncio
+async def test_a_references_question_never_reaches_the_llm():
+    question = FormQuestion(label="References", kind=QuestionKind.LONG_TEXT, required=True)
+    composed = await compose_answers([question], PROFILE, {}, JOB, never_called)
+    assert composed[0].answer is None
+    assert "demographic" in composed[0].gap_reason
+
+
 # ── job_cache (Layer A: per-job cache) ───────────────────────────────────────
 
 
@@ -607,16 +636,20 @@ async def test_an_operator_directed_answer_is_not_written_into_the_job_cache():
     # Proves the cache write happens at the FINAL success point, not right after
     # the LLM call returns: an answer that later gets rejected as operator-directed
     # must never be replayed from the cache on a second call.
-    question = FormQuestion(label="References", kind=QuestionKind.TEXT, required=True)
+    # The label must NOT be one is_sensitive_label catches (this test used to say
+    # "References", which the demographic/reference guard now intercepts before the
+    # LLM is ever called — the assertions still passed, for the wrong reason).
+    question = FormQuestion(label="Portfolio walkthrough", kind=QuestionKind.TEXT, required=True)
 
     async def operator_directed(prompt: str, model: str, cache_prefix: str | None = None) -> str:
-        return "the candidate will provide references later"
+        return "the candidate will provide a walkthrough later"
 
     job_cache: dict[str, dict[str, str]] = {}
     composed = await compose_answers(
         [question], PROFILE, {}, JOB, operator_directed, job_cache=job_cache
     )
     assert composed[0].answer is None
+    assert "operator" in composed[0].gap_reason
     assert job_cache == {}
 
 
@@ -705,18 +738,19 @@ async def test_a_bank_answer_still_goes_through_option_matching():
 
 @pytest.mark.parametrize("label", ["Gender", "Veteran Status", "References"])
 @pytest.mark.asyncio
-async def test_a_sensitive_label_is_never_read_from_the_answer_bank(label):
+async def test_a_sensitive_label_is_never_read_from_the_answer_bank_or_the_llm(label):
     # Demographics and references are excluded from the LLM's prompt
-    # (profile_for_answers) but nothing stops the model guessing an answer to a
-    # label like this anyway. Such an answer must never be replayed at a
-    # different company, so the bank is not consulted for these labels at all —
-    # kind alone does not protect them (TEXT is bank-eligible).
+    # (profile_for_answers), and the is_sensitive_label guard above now keeps a
+    # question SHAPED like this from ever reaching the LLM or the bank at all —
+    # a stronger property than "the bank isn't consulted" alone: kind eligibility
+    # (TEXT is bank-eligible) never even gets a chance to matter here. never_called
+    # proves the LLM path specifically is unreachable; the populated `answer_bank`
+    # proves a would-be bank hit is not served either.
     question = FormQuestion(label=label, kind=QuestionKind.TEXT, required=False)
     bank = {label.lower(): "a banked answer from a different company"}
-    composed = await compose_answers(
-        [question], PROFILE, {}, JOB, answers_anything, answer_bank=bank
-    )
-    assert composed[0].answer == "a generated answer"
+    composed = await compose_answers([question], PROFILE, {}, JOB, never_called, answer_bank=bank)
+    assert composed[0].answer is None
+    assert "demographic" in composed[0].gap_reason
 
 
 def test_importing_the_composer_does_not_pull_in_the_db_layer():

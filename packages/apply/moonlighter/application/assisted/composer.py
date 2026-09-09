@@ -222,6 +222,21 @@ async def compose_answers(
             )
             continue
 
+        if is_sensitive_label(question.label):
+            # profile_for_answers already keeps demographic/reference DATA out of
+            # the prompt, but nothing stopped the model from being ASKED a
+            # demographic/reference-shaped QUESTION and hallucinating an answer
+            # anyway — that answer would land on this job's sheet and form_data.
+            # Same deterministic-guard category as compliance above.
+            composed.append(
+                ComposedAnswer(
+                    question,
+                    None,
+                    "demographic/reference question — answer this yourself",
+                )
+            )
+            continue
+
         answer: str | None
         if question.label in known:
             # Presence, not truthiness: known can legitimately map a label to ""
@@ -259,7 +274,6 @@ async def compose_answers(
                 answer = cached["answer"]
             elif (
                 is_bank_eligible(question.kind)
-                and not is_sensitive_label(question.label)
                 and (bank_answer := answer_bank.get(normalize_question(question.label))) is not None
             ):
                 answer = bank_answer
