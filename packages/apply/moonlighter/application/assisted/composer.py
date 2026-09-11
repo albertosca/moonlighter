@@ -222,21 +222,6 @@ async def compose_answers(
             )
             continue
 
-        if is_sensitive_label(question.label):
-            # profile_for_answers already keeps demographic/reference DATA out of
-            # the prompt, but nothing stopped the model from being ASKED a
-            # demographic/reference-shaped QUESTION and hallucinating an answer
-            # anyway — that answer would land on this job's sheet and form_data.
-            # Same deterministic-guard category as compliance above.
-            composed.append(
-                ComposedAnswer(
-                    question,
-                    None,
-                    "demographic/reference question — answer this yourself",
-                )
-            )
-            continue
-
         answer: str | None
         if question.label in known:
             # Presence, not truthiness: known can legitimately map a label to ""
@@ -256,6 +241,29 @@ async def compose_answers(
                 continue
             answer = value
         else:
+            if is_sensitive_label(question.label):
+                # profile_for_answers keeps demographic/reference DATA out of the
+                # prompt, but nothing stops the model from being ASKED a question
+                # shaped like one and hallucinating an answer anyway — which would
+                # land on this job's sheet and in its form_data.
+                #
+                # Checked HERE, after `known`, and not alongside the compliance
+                # guard above: a value Alberto configured in profile.yaml's
+                # `demographics:` block is his own answer, not a model guess, and
+                # field_map should serve it. `_demographic` returns None for an
+                # unset key, so an unconfigured label never enters `known` and
+                # still lands here. The compliance guard stays above `known`
+                # because a declaration has no configured value to serve — there
+                # is nothing there but a model guess.
+                composed.append(
+                    ComposedAnswer(
+                        question,
+                        None,
+                        "demographic/reference question — answer this yourself",
+                    )
+                )
+                continue
+
             # Shape-checked, not just presence-checked: Application.form_data
             # predates this feature and 8 rows in the live DB still hold the
             # removed browser-automation tool's flat label->string shape, on

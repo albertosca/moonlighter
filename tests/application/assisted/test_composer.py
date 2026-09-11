@@ -588,6 +588,71 @@ async def test_a_references_question_never_reaches_the_llm():
     assert "demographic" in composed[0].gap_reason
 
 
+PROFILE_WITH_DEMOGRAPHICS = {
+    **PROFILE,
+    "demographics": {"gender": "Male", "race": "White", "veteran_status": "No"},
+}
+
+
+@pytest.mark.asyncio
+async def test_a_configured_demographic_value_answers_instead_of_gapping():
+    # The guard exists to stop the MODEL from inventing an answer, not to stop
+    # Alberto's own configured answer from being used. When profile.yaml's
+    # demographics block holds a value, field_map answers it deterministically —
+    # never_called proves this is not the LLM doing it.
+    question = FormQuestion(
+        label="Gender", kind=QuestionKind.SINGLE_SELECT, required=True, options=("Male", "Female")
+    )
+    composed = await compose_answers([question], PROFILE_WITH_DEMOGRAPHICS, {}, JOB, never_called)
+    assert composed[0].answer == "Male"
+    assert composed[0].gap_reason is None
+
+
+@pytest.mark.asyncio
+async def test_an_unconfigured_demographic_still_gaps_even_with_a_demographics_block():
+    # A demographics block that simply lacks THIS key must behave like no block at
+    # all: the guard fires, the LLM is never consulted. Pins the distinction the
+    # whole reorder rests on — "configured" means this key, not the block.
+    question = FormQuestion(
+        label="Disability status",
+        kind=QuestionKind.SINGLE_SELECT,
+        required=True,
+        options=("Yes", "No"),
+    )
+    composed = await compose_answers([question], PROFILE_WITH_DEMOGRAPHICS, {}, JOB, never_called)
+    assert composed[0].answer is None
+    assert "demographic" in composed[0].gap_reason
+
+
+@pytest.mark.asyncio
+async def test_a_configured_demographic_answer_is_never_written_to_the_job_cache():
+    # The privacy chain the reorder now rests on: a configured demographic is
+    # answered via `known`, and `known` answers are never cached (only
+    # is_llm_generated ones are), so it can never be promoted into the shared
+    # cross-job bank by update_status. That chain is otherwise implicit in a
+    # flag — if caching ever widened to `known`, demographics would silently
+    # start crossing companies. This test is what would go red.
+    question = FormQuestion(
+        label="Gender", kind=QuestionKind.SINGLE_SELECT, required=True, options=("Male", "Female")
+    )
+    job_cache: dict[str, dict[str, str]] = {}
+    composed = await compose_answers(
+        [question], PROFILE_WITH_DEMOGRAPHICS, {}, JOB, never_called, job_cache=job_cache
+    )
+    assert composed[0].answer == "Male"
+    assert job_cache == {}
+
+
+@pytest.mark.asyncio
+async def test_references_gap_even_when_demographics_are_configured():
+    # References are third-party data with no field_map rule by design, so they
+    # stay a gap regardless of what the demographics block holds.
+    question = FormQuestion(label="References", kind=QuestionKind.LONG_TEXT, required=True)
+    composed = await compose_answers([question], PROFILE_WITH_DEMOGRAPHICS, {}, JOB, never_called)
+    assert composed[0].answer is None
+    assert "demographic" in composed[0].gap_reason
+
+
 # ── job_cache (Layer A: per-job cache) ───────────────────────────────────────
 
 
