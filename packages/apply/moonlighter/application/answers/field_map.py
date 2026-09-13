@@ -37,20 +37,47 @@ def _last_name(profile: dict[str, Any]) -> str:
 # back answered with the LinkedIn URL). `demographic_answer` is called only from
 # inside that guard, for choice questions only.
 #
-# Anchored, unlike the substring matching the rest of this module uses for contact
-# fields: the first version of these patterns was unanchored, and `\brace\b` matched
-# "debug a race condition", answering an engineering essay with the word "White".
-# Each entry: (anchored label pattern, demographics key).
+# Anchored at BOTH ends, and matched against a closed set of real EEO phrasings —
+# not just the leading word. Two measured failures got us here:
+#   unanchored  (2026-09-11): `\brace\b` matched "debug a race condition", so an
+#                             engineering essay came back answered "White";
+#   start-only  (2026-09-13): `^race\b` matched "Race conditions: how do you debug
+#                             them?", and `^veteran\b` matched "Veteran of the
+#                             startup wars?" — same defect, one shape further in.
+# This is the same lesson the salary rule below already learned across three failed
+# widenings: a short *value* question anchors on both ends; anything that continues
+# into other words is a different question and must fall through.
+#
+# Each entry: (both-ends-anchored pattern, demographics key). The label is
+# normalised first (see `_normalise_eeo_label`): lowercased, decoration and a short
+# trailing parenthetical removed.
 _DEMOGRAPHIC_RULES: tuple[tuple[str, str], ...] = (
-    (r"^(are\s+you\s+)?hispanic|^ethnicity\s*[/:]?\s*hispanic", "hispanic_latino"),
-    (r"^gender(\s+identity)?\b", "gender"),
-    (r"^race\b|^race\s*[/&]\s*ethnicity", "race"),
     (
-        r"^(protected\s+)?veteran(\s+status)?\b|^are\s+you\s+a\s+(protected\s+)?veteran",
+        r"^(are\s+you\s+)?hispanic(\s+or\s+latino)?$|^hispanic\s*/\s*latino$"
+        r"|^ethnicity\s*[:/]\s*hispanic(\s+or\s+latino)?$",
+        "hispanic_latino",
+    ),
+    (r"^gender(\s+identity)?$|^voluntary\s+self[-\s]?identification\s+of\s+gender$", "gender"),
+    (
+        r"^race$|^ethnicity$|^race\s*(/|&|and|or)\s*ethnicity$"
+        r"|^voluntary\s+self[-\s]?identification\s+of\s+race$",
+        "race",
+    ),
+    (
+        r"^(protected\s+)?veteran(\s+status)?$|^are\s+you\s+a\s+(protected\s+)?veteran$"
+        r"|^voluntary\s+self[-\s]?identification\s+of\s+(protected\s+)?veteran(\s+status)?$",
         "veteran_status",
     ),
-    (r"^disability(\s+status)?\b|^do\s+you\s+have\s+a\s+disability", "disability_status"),
+    (
+        r"^disability(\s+status)?$|^do\s+you\s+have\s+a\s+disability$"
+        r"|^voluntary\s+self[-\s]?identification\s+of\s+disability$",
+        "disability_status",
+    ),
 )
+
+# Decoration a real form hangs off an otherwise-exact EEO label: a required marker,
+# a trailing colon/question mark, or a short note like "(optional)".
+_EEO_DECORATION = re.compile(r"\s*\([^)]{0,20}\)\s*$|[\s*:?]+$")
 
 _DEMOGRAPHIC_COMPILED: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(pattern, re.IGNORECASE), key) for pattern, key in _DEMOGRAPHIC_RULES
@@ -75,6 +102,20 @@ def _demographic(profile: dict[str, Any], key: str) -> str | None:
     return text or None
 
 
+def _normalise_eeo_label(field_label: str) -> str:
+    """The label an EEO pattern should match, with a form's decoration removed.
+
+    Applied repeatedly, because a real label stacks decoration: "Gender (optional):"
+    sheds the parenthetical and then the colon.
+    """
+    text = _clean_label(field_label).strip().lower()
+    while True:
+        stripped = _EEO_DECORATION.sub("", text).strip()
+        if stripped == text:
+            return text
+        text = stripped
+
+
 def demographic_answer(field_label: str, profile: dict[str, Any]) -> str | None:
     """The operator's own configured answer for an EEO label, or None.
 
@@ -83,7 +124,7 @@ def demographic_answer(field_label: str, profile: dict[str, Any]) -> str | None:
     wrote in profile.yaml is his answer, not a model guess, while everything
     else sensitive stays a manual gap.
     """
-    clean = _clean_label(field_label)
+    clean = _normalise_eeo_label(field_label)
     for pattern, key in _DEMOGRAPHIC_COMPILED:
         if pattern.search(clean):
             return _demographic(profile, key)

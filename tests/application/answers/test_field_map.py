@@ -190,6 +190,27 @@ def test_demographic_answer_ignores_a_label_that_merely_mentions_the_word(label)
     assert demographic_answer(label, PROFILE) is None
 
 
+@pytest.mark.parametrize(
+    "label",
+    [
+        # SECOND CANARY, same defect one shape further in: start-anchoring alone let
+        # any label that merely BEGINS with the category word through. Measured
+        # 2026-09-13 — every one of these was answered with a real EEO value.
+        # Same lesson the salary rule in this file already learned across three
+        # failed widenings: anchor both ends, don't just anchor the start.
+        "Veteran of the startup wars?",
+        "Gender-neutral design experience?",
+        "Race track preference?",
+        "Race conditions: how do you debug them?",
+        "Gender pay gap: your view?",
+        "Disability insurance provider?",
+        "Hispanic heritage month committee?",
+    ],
+)
+def test_demographic_answer_ignores_a_label_that_merely_starts_with_the_word(label):
+    assert demographic_answer(label, PROFILE) is None
+
+
 def test_demographic_answer_is_none_for_an_unset_key():
     profile = {**PROFILE, "demographics": {"gender": "Male"}}
     assert demographic_answer("Disability status", profile) is None
