@@ -211,6 +211,45 @@ def test_demographic_answer_ignores_a_label_that_merely_starts_with_the_word(lab
     assert demographic_answer(label, PROFILE) is None
 
 
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [
+        # "Are you Hispanic/Latino?" is not hypothetical: it is a literal key in
+        # Application.form_data in the live DB, alongside Gender / Veteran Status /
+        # Disability Status — the Greenhouse EEO quartet. A first pass at anchoring
+        # covered "are you hispanic or latino" and "hispanic/latino" but not the
+        # cross product, so the commonest real spelling of the question this feature
+        # exists to answer was the one it refused.
+        ("Are you Hispanic/Latino?", "Yes"),
+        ("Are you Hispanic or Latino?", "Yes"),
+        # "(select all that apply)" is 21 characters, and the parenthetical strip was
+        # bounded at 20 — off by one, on a real multi-select race question.
+        ("Race (Select all that apply)", "White"),
+        ("Race/ethnicity (select all that apply)", "White"),
+        ("Gender (optional)", "Male"),
+        ("Disability status (CC-305)", "No"),
+    ],
+)
+def test_demographic_answer_handles_real_form_decoration(label, expected):
+    assert demographic_answer(label, PROFILE) == expected
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        # The blanket "strip any short parenthetical" rule cut both ways: it also
+        # turned these into exact EEO matches. An allowlist of benign notes closes
+        # the false negatives above and this window in the same change.
+        "Disability (insurance)",
+        "Veteran (of which war?)",
+        "Gender (of your manager)",
+        "Race (of the horse)",
+    ],
+)
+def test_demographic_answer_does_not_strip_a_meaningful_parenthetical(label):
+    assert demographic_answer(label, PROFILE) is None
+
+
 def test_demographic_answer_is_none_for_an_unset_key():
     profile = {**PROFILE, "demographics": {"gender": "Male"}}
     assert demographic_answer("Disability status", profile) is None
@@ -358,38 +397,13 @@ def test_english_level_absent_from_profile_not_prepopulated():
     assert "English level" not in r
 
 
-def test_gender_absent_from_profile_not_prepopulated():
-    """No 'demographics' block at all in the profile → still no crash, no answer."""
-    r = pre_populate_answers(["Gender"], PROFILE_NO_LOCALE)
-    assert "Gender" not in r
-
-
-def test_hispanic_or_latino_absent_from_profile_not_prepopulated():
-    r = pre_populate_answers(["Are you Hispanic or Latino?"], PROFILE_NO_LOCALE)
-    assert "Are you Hispanic or Latino?" not in r
-
-
-def test_race_absent_from_profile_not_prepopulated():
-    r = pre_populate_answers(["Race"], PROFILE_NO_LOCALE)
-    assert "Race" not in r
-
-
-def test_veteran_absent_from_profile_not_prepopulated():
-    r = pre_populate_answers(["Veteran status"], PROFILE_NO_LOCALE)
-    assert "Veteran status" not in r
-
-
-def test_disability_absent_from_profile_not_prepopulated():
-    r = pre_populate_answers(["Disability status"], PROFILE_NO_LOCALE)
-    assert "Disability status" not in r
-
-
-def test_demographics_present_but_key_missing_not_prepopulated():
-    """A 'demographics' block that just doesn't have this particular key (rather than
-    the block being absent entirely) must also fall through to the LLM, not crash."""
-    profile = {**PROFILE_NO_LOCALE, "demographics": {"gender": "Male"}}
-    r = pre_populate_answers(["Race"], profile)
-    assert "Race" not in r
+# The five per-label "absent from profile" tests that used to sit here were deleted
+# rather than kept: their premise was profile-specific ("no demographics block → no
+# answer via pre_populate_answers"), but once the EEO rules moved out of _RULES the
+# assertion held for EVERY profile, configured or not — they could no longer go red.
+# test_a_demographic_label_is_not_answered_by_the_general_ladder above is the
+# strictly stronger statement of what they meant, and demographic_answer's own
+# unset-key tests cover the rest.
 
 
 def test_office_available_true_returns_yes():

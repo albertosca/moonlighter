@@ -53,8 +53,8 @@ def _last_name(profile: dict[str, Any]) -> str:
 # trailing parenthetical removed.
 _DEMOGRAPHIC_RULES: tuple[tuple[str, str], ...] = (
     (
-        r"^(are\s+you\s+)?hispanic(\s+or\s+latino)?$|^hispanic\s*/\s*latino$"
-        r"|^ethnicity\s*[:/]\s*hispanic(\s+or\s+latino)?$",
+        r"^(are\s+you\s+)?hispanic(\s*(or|/)\s*latino)?$"
+        r"|^ethnicity\s*[:/]\s*hispanic(\s*(or|/)\s*latino)?$",
         "hispanic_latino",
     ),
     (r"^gender(\s+identity)?$|^voluntary\s+self[-\s]?identification\s+of\s+gender$", "gender"),
@@ -76,8 +76,29 @@ _DEMOGRAPHIC_RULES: tuple[tuple[str, str], ...] = (
 )
 
 # Decoration a real form hangs off an otherwise-exact EEO label: a required marker,
-# a trailing colon/question mark, or a short note like "(optional)".
-_EEO_DECORATION = re.compile(r"\s*\([^)]{0,20}\)\s*$|[\s*:?]+$")
+# a trailing colon/question mark, or one of a CLOSED SET of benign notes.
+#
+# The note list is an allowlist, not a length bound. A blanket "strip any short
+# parenthetical" rule was tried first and cut both ways in the same change: it
+# swallowed "(insurance)" and "(of which war?)" — turning "Disability (insurance)"
+# into an exact EEO match answered "No" — while its 20-character bound missed
+# "(select all that apply)" by one character, refusing a real multi-select race
+# question. Naming the notes we accept closes both ends at once.
+_EEO_NOTES = (
+    r"optional",
+    r"required",
+    r"not\s+required",
+    r"select\s+all\s+that\s+apply",
+    r"choose\s+all\s+that\s+apply",
+    r"voluntary",
+    r"us\s+only",
+    r"cc[-\s]?305",
+    r"eeo(c)?",
+)
+_EEO_DECORATION = re.compile(
+    r"\s*[(\[]\s*(" + "|".join(_EEO_NOTES) + r")\s*[)\]]\s*$|[\s*:?—–-]+$",
+    re.IGNORECASE,
+)
 
 _DEMOGRAPHIC_COMPILED: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(pattern, re.IGNORECASE), key) for pattern, key in _DEMOGRAPHIC_RULES

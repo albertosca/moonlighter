@@ -625,16 +625,16 @@ async def test_an_unconfigured_demographic_still_gaps_even_with_a_demographics_b
 
 
 @pytest.mark.parametrize(
-    "label",
+    ("label", "would_leak"),
     [
-        "Describe how you would debug a race condition in a concurrent system",
-        "How would you improve our gender-neutral onboarding copy?",
-        "Tell us about your work on accessibility for users with disabilities",
-        "Professional references (name, email, LinkedIn)",
+        ("Describe how you would debug a race condition in a concurrent system", "White"),
+        ("How would you improve our gender-neutral onboarding copy?", "Male"),
+        ("Tell us about your work on accessibility for users with disabilities", "No"),
+        ("Professional references (name, email, LinkedIn)", "https://linkedin.com/in/alberto"),
     ],
 )
 @pytest.mark.asyncio
-async def test_a_free_text_question_that_merely_mentions_a_sensitive_word_is_not_answered(label):
+async def test_a_question_that_merely_mentions_a_sensitive_word_is_not_answered(label, would_leak):
     # CANARY, all four measured live on 2026-09-11 against a first version of this
     # reorder: letting `known` outrank the guard handed the bypass to every rule in
     # _RULES, not just the five EEO ones — and those five were unanchored substring
@@ -642,12 +642,24 @@ async def test_a_free_text_question_that_merely_mentions_a_sensitive_word_is_not
     # a references label came back answered with the LinkedIn URL, both with
     # gap_reason None, which makes the sheet print "nothing left for you but to
     # paste and submit". The carve-out must be scoped to real EEO questions.
+    #
+    # Two details make this canary actually bite, both found by measuring rather than
+    # reasoning. SINGLE_SELECT, not LONG_TEXT: at LONG_TEXT the is_choice condition
+    # blocks these on its own, so the test stayed green with the anchoring removed.
+    # And `would_leak` must be among the options: with options that exclude it, the
+    # value leaks out of the guard and is then filtered by option matching, which
+    # produces a gap for an unrelated reason and hides the regression again.
     profile = {
         **PROFILE,
         "linkedin": "https://linkedin.com/in/alberto",
         "demographics": {"gender": "Male", "race": "White", "disability_status": "No"},
     }
-    question = FormQuestion(label=label, kind=QuestionKind.LONG_TEXT, required=True)
+    question = FormQuestion(
+        label=label,
+        kind=QuestionKind.SINGLE_SELECT,
+        required=True,
+        options=(would_leak, "Something else"),
+    )
     composed = await compose_answers([question], profile, {}, JOB, never_called)
     assert composed[0].answer is None
     assert composed[0].gap_reason is not None
@@ -666,12 +678,13 @@ async def test_a_demographic_label_asked_as_free_text_is_not_answered():
 
 @pytest.mark.asyncio
 async def test_a_configured_demographic_answer_is_never_written_to_the_job_cache():
-    # The privacy chain the reorder now rests on: a configured demographic is
-    # answered via `known`, and `known` answers are never cached (only
-    # is_llm_generated ones are), so it can never be promoted into the shared
-    # cross-job bank by update_status. That chain is otherwise implicit in a
-    # flag — if caching ever widened to `known`, demographics would silently
-    # start crossing companies. This test is what would go red.
+    # The privacy chain this rests on: a configured demographic is answered inside
+    # the is_sensitive_label guard, which never sets is_llm_generated — and that
+    # flag is the only thing that writes to job_cache. So the value cannot reach
+    # form_data, and therefore cannot reach promote_application or the shared
+    # cross-job bank. The chain is otherwise implicit in one boolean: if the
+    # carve-out ever set that flag, or caching ever widened past it, demographics
+    # would silently start crossing companies. This test is what would go red.
     question = FormQuestion(
         label="Gender", kind=QuestionKind.SINGLE_SELECT, required=True, options=("Male", "Female")
     )
