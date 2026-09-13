@@ -28,8 +28,66 @@ def _last_name(profile: dict[str, Any]) -> str:
     return " ".join(parts[1:]) if len(parts) > 1 else ""
 
 
+# EEO/demographic self-identification, from the `demographics:` block the operator
+# configures in profile.yaml. Kept OUT of `_RULES` on purpose: a demographic label
+# is intercepted by composer's is_sensitive_label guard before `known` is consulted,
+# so a rule here would be unreachable — and putting the carve-out in the general
+# ladder is exactly what broke on 2026-09-11, when letting `known` outrank the guard
+# handed the bypass to every other rule too (a "references ... LinkedIn" label came
+# back answered with the LinkedIn URL). `demographic_answer` is called only from
+# inside that guard, for choice questions only.
+#
+# Anchored, unlike the substring matching the rest of this module uses for contact
+# fields: the first version of these patterns was unanchored, and `\brace\b` matched
+# "debug a race condition", answering an engineering essay with the word "White".
+# Each entry: (anchored label pattern, demographics key).
+_DEMOGRAPHIC_RULES: tuple[tuple[str, str], ...] = (
+    (r"^(are\s+you\s+)?hispanic|^ethnicity\s*[/:]?\s*hispanic", "hispanic_latino"),
+    (r"^gender(\s+identity)?\b", "gender"),
+    (r"^race\b|^race\s*[/&]\s*ethnicity", "race"),
+    (
+        r"^(protected\s+)?veteran(\s+status)?\b|^are\s+you\s+a\s+(protected\s+)?veteran",
+        "veteran_status",
+    ),
+    (r"^disability(\s+status)?\b|^do\s+you\s+have\s+a\s+disability", "disability_status"),
+)
+
+_DEMOGRAPHIC_COMPILED: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (re.compile(pattern, re.IGNORECASE), key) for pattern, key in _DEMOGRAPHIC_RULES
+)
+
+
 def _demographic(profile: dict[str, Any], key: str) -> str | None:
-    return (profile.get("demographics") or {}).get(key) or None
+    """The configured value for one demographics key, or None when unset.
+
+    Coerces to str deliberately: `profile.yaml` is read with `yaml.safe_load`
+    (YAML 1.1), where an unquoted `No`/`Yes` parses as a bool. Left raw, a `False`
+    read as unconfigured (silently losing a configured answer) and a `True` reached
+    `known` as a non-str, crashing the whole sheet with
+    `AttributeError: 'bool' object has no attribute 'strip'`.
+    """
+    value = (profile.get("demographics") or {}).get(key)
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def demographic_answer(field_label: str, profile: dict[str, Any]) -> str | None:
+    """The operator's own configured answer for an EEO label, or None.
+
+    Called only from composer's is_sensitive_label guard, so it never competes
+    with the general `_RULES` ladder — the point is that a value the operator
+    wrote in profile.yaml is his answer, not a model guess, while everything
+    else sensitive stays a manual gap.
+    """
+    clean = _clean_label(field_label)
+    for pattern, key in _DEMOGRAPHIC_COMPILED:
+        if pattern.search(clean):
+            return _demographic(profile, key)
+    return None
 
 
 def _city(profile: dict[str, Any]) -> str:
@@ -142,20 +200,9 @@ _RULES: list[tuple[str, _RuleFn]] = [
         r"work\s+from\s+the\s+office|office\s+at\s+least",
         lambda p: ("Yes" if p["office_available"] else "No") if "office_available" in p else None,
     ),
-    # EEO/demographic self-identification, from the `demographics:` block Alberto
-    # configured on 2026-08-04 with exactly this intent (see profile.yaml comment there):
-    # "NÃO entram no prompt da LLM ... devem ser colocadas deterministicamente, como
-    # work_authorization e salário já são". English-only, matching how he set it up —
-    # these are US EEO/compliance categories, and the forms that ask them are almost
-    # always in English regardless of the posting's own language.
-    # Race and "Hispanic or Latino" are DISTINCT US EEO questions (a form may ask both):
-    # race is White/Black/Asian/..., hispanic_latino is a separate yes/no ethnicity
-    # question. Order doesn't matter between them — the patterns don't overlap.
-    (r"\bgender\b", lambda p: _demographic(p, "gender")),
-    (r"hispanic|latino", lambda p: _demographic(p, "hispanic_latino")),
-    (r"\brace\b", lambda p: _demographic(p, "race")),
-    (r"\bveteran\b", lambda p: _demographic(p, "veteran_status")),
-    (r"disabilit", lambda p: _demographic(p, "disability_status")),
+    # EEO/demographic self-identification is NOT here — see `demographic_answer` and
+    # `_DEMOGRAPHIC_RULES` above. A demographic label never reaches this ladder,
+    # because composer's is_sensitive_label guard intercepts it first.
     # Current location — anchored at the start so it doesn't match confirmation
     # phrases containing "currently based" mid-sentence (e.g. "...require you to be
     # currently based...").

@@ -624,6 +624,46 @@ async def test_an_unconfigured_demographic_still_gaps_even_with_a_demographics_b
     assert "demographic" in composed[0].gap_reason
 
 
+@pytest.mark.parametrize(
+    "label",
+    [
+        "Describe how you would debug a race condition in a concurrent system",
+        "How would you improve our gender-neutral onboarding copy?",
+        "Tell us about your work on accessibility for users with disabilities",
+        "Professional references (name, email, LinkedIn)",
+    ],
+)
+@pytest.mark.asyncio
+async def test_a_free_text_question_that_merely_mentions_a_sensitive_word_is_not_answered(label):
+    # CANARY, all four measured live on 2026-09-11 against a first version of this
+    # reorder: letting `known` outrank the guard handed the bypass to every rule in
+    # _RULES, not just the five EEO ones — and those five were unanchored substring
+    # matches. A race-condition engineering question came back answered "White", and
+    # a references label came back answered with the LinkedIn URL, both with
+    # gap_reason None, which makes the sheet print "nothing left for you but to
+    # paste and submit". The carve-out must be scoped to real EEO questions.
+    profile = {
+        **PROFILE,
+        "linkedin": "https://linkedin.com/in/alberto",
+        "demographics": {"gender": "Male", "race": "White", "disability_status": "No"},
+    }
+    question = FormQuestion(label=label, kind=QuestionKind.LONG_TEXT, required=True)
+    composed = await compose_answers([question], profile, {}, JOB, never_called)
+    assert composed[0].answer is None
+    assert composed[0].gap_reason is not None
+
+
+@pytest.mark.asyncio
+async def test_a_demographic_label_asked_as_free_text_is_not_answered():
+    # Real EEO self-identification is always a select. A free-text field whose label
+    # happens to be exactly "Gender" is far more likely to be something else, so the
+    # carve-out requires a choice kind.
+    question = FormQuestion(label="Gender", kind=QuestionKind.LONG_TEXT, required=True)
+    composed = await compose_answers([question], PROFILE_WITH_DEMOGRAPHICS, {}, JOB, never_called)
+    assert composed[0].answer is None
+    assert "demographic" in composed[0].gap_reason
+
+
 @pytest.mark.asyncio
 async def test_a_configured_demographic_answer_is_never_written_to_the_job_cache():
     # The privacy chain the reorder now rests on: a configured demographic is

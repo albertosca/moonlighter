@@ -17,7 +17,7 @@ from moonlighter.application.answers.answer_bank import (
 )
 from moonlighter.application.answers.compliance import is_compliance_question
 from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
-from moonlighter.application.answers.field_map import pre_populate_answers
+from moonlighter.application.answers.field_map import demographic_answer, pre_populate_answers
 from moonlighter.application.answers.option_matcher import match_option_locally
 from moonlighter.application.answers.profile import profile_for_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
@@ -223,7 +223,35 @@ async def compose_answers(
             continue
 
         answer: str | None
-        if question.label in known:
+        if is_sensitive_label(question.label):
+            # profile_for_answers keeps demographic/reference DATA out of the prompt,
+            # but nothing stops the model from being ASKED a question shaped like one
+            # and hallucinating an answer anyway — which would land on this job's
+            # sheet and in its form_data. So the guard stays ABOVE `known`.
+            #
+            # The one carve-out: a value the operator wrote in profile.yaml's
+            # `demographics:` block is his own answer, not a model guess, so serve it.
+            # Scoped to `demographic_answer`'s five anchored EEO patterns and to
+            # choice questions — real self-identification is always a select.
+            #
+            # Both halves of that scoping are scar tissue from 2026-09-11, when this
+            # was implemented by simply moving the guard below `known`: that handed
+            # the bypass to EVERY rule in _RULES, so a "Professional references (name,
+            # email, LinkedIn)" label came back answered with the LinkedIn URL, and
+            # the then-unanchored `\brace\b` answered "debug a race condition" with
+            # the word "White" — gap_reason None, sheet reporting nothing left to do.
+            configured = demographic_answer(question.label, profile) if question.is_choice else None
+            if configured is None:
+                composed.append(
+                    ComposedAnswer(
+                        question,
+                        None,
+                        "demographic/reference question — answer this yourself",
+                    )
+                )
+                continue
+            answer = configured
+        elif question.label in known:
             # Presence, not truthiness: known can legitimately map a label to ""
             # (_salary_expectation with no salary_target configured, by design —
             # E2 forbids letting the figure fall through to the LLM). `known.get(...)
@@ -241,29 +269,6 @@ async def compose_answers(
                 continue
             answer = value
         else:
-            if is_sensitive_label(question.label):
-                # profile_for_answers keeps demographic/reference DATA out of the
-                # prompt, but nothing stops the model from being ASKED a question
-                # shaped like one and hallucinating an answer anyway — which would
-                # land on this job's sheet and in its form_data.
-                #
-                # Checked HERE, after `known`, and not alongside the compliance
-                # guard above: a value Alberto configured in profile.yaml's
-                # `demographics:` block is his own answer, not a model guess, and
-                # field_map should serve it. `_demographic` returns None for an
-                # unset key, so an unconfigured label never enters `known` and
-                # still lands here. The compliance guard stays above `known`
-                # because a declaration has no configured value to serve — there
-                # is nothing there but a model guess.
-                composed.append(
-                    ComposedAnswer(
-                        question,
-                        None,
-                        "demographic/reference question — answer this yourself",
-                    )
-                )
-                continue
-
             # Shape-checked, not just presence-checked: Application.form_data
             # predates this feature and 8 rows in the live DB still hold the
             # removed browser-automation tool's flat label->string shape, on
