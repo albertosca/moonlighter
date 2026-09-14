@@ -44,6 +44,24 @@ preferences:
   remote: true
   relocation: false
 
+# Optional. Your own answers to EEO/diversity self-identification questions, so the
+# assistant can fill them in for you instead of leaving a gap.
+#
+# These values never reach the LLM — neither as data (the prompt carries a strict
+# allowlist that excludes this block) nor as a question it is asked to answer. The
+# assistant serves your configured value for a self-identification SELECT and leaves
+# anything else in this category as a gap for you to fill by hand. Omit the block
+# entirely, or any single key, and those questions simply stay gaps.
+#
+# QUOTE THE VALUES. This file is parsed as YAML 1.1, where a bare No or Yes is a
+# boolean, not the string you meant.
+# demographics:
+#   gender: "Male"
+#   race: "White"
+#   hispanic_latino: "No"     # a separate US EEO question from race
+#   veteran_status: "No"
+#   disability_status: "No"
+
 # criteria drives the LLM score. hard_filters are non-negotiable dealbreakers:
 # if any is triggered by a posting, the score is forced to <= 2.0.
 criteria:
