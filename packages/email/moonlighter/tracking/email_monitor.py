@@ -132,8 +132,8 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
         app, match_type = _resolve_application(ref, classification)
         if app is not None and match_type == "ref":
             _register_new_stage(classification.get("new_stage"), stages, email_cfg)
-            _advance_application(app, classification, match_type, stages)
-            updates.append(_make_update(classification, match_type, app))
+            advanced = _advance_application(app, classification, match_type, stages)
+            updates.append(_make_update(classification, match_type, app, status_advanced=advanced))
             maybe_archive(msg_id, archive_ref)
         elif app is not None:  # match_type == "fuzzy" — suggestion only (S-06)
             updates.append(_make_suggestion(app, classification, match_type))
@@ -189,16 +189,17 @@ def _register_new_stage(
 
 def _advance_application(
     app: Any, classification: dict[str, Any], match_type: str, stages: list[str]
-) -> None:
+) -> bool:
     """Advances the Application through the funnel (forward only) and notes
-    the event.
+    the event. Returns whether the status actually moved forward.
 
     current_stage is only written if the value is in the list of known stages
     (which already includes any new_stage legitimately registered by
     _register_new_stage BEFORE this call) — a stage outside that list is
     hallucination/injection and is silently discarded (S-05)."""
     new_status = _TYPE_TO_STATUS.get(classification["type"])
-    if new_status and _status_rank(new_status) > _status_rank(app.status):
+    advanced = new_status is not None and _status_rank(new_status) > _status_rank(app.status)
+    if advanced:
         app.status = new_status
     stage = classification.get("stage")
     if stage and stage in stages:
@@ -213,15 +214,25 @@ def _advance_application(
     app.updated_at = datetime.datetime.now()
     app.save()
     sync_job_status(app)
+    return advanced
 
 
 def _make_update(
-    classification: dict[str, Any], match_type: str, app: Any = None
+    classification: dict[str, Any],
+    match_type: str,
+    app: Any = None,
+    status_advanced: bool = False,
 ) -> dict[str, Any]:
     # A ref match already knows the exact Job; the classifier's reading of the
     # email (which rarely repeats the title) is only the fallback.
+    #
+    # job_id/status_advanced exist for the composition root: this package may
+    # not import the answer bank (moonlighter-email depends on core alone), so
+    # promotion happens in server.py and this is all it has to go on.
     job = getattr(app, "job", None)
     return {
+        "job_id": getattr(app, "job_id", None),
+        "status_advanced": status_advanced,
         "company": (job.company if job else None) or classification.get("company"),
         "title": (job.title if job else None) or classification.get("job_title"),
         "type": classification["type"],

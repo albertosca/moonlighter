@@ -432,6 +432,24 @@ async def setup_email(*, ctx: Context[AppContext, Any]) -> str:
         return f"⚠️  Unexpected error configuring Gmail: {e}"
 
 
+def _promote_advanced_applications(updates: list[dict[str, Any]]) -> None:
+    """Promotes the answers of every application an email reply moved forward.
+
+    update_status(..., "submitted") is the operator-driven promotion trigger;
+    this is the email-driven one. Without it, a job whose status only ever
+    advances through an incoming reply never reached the shared bank — the
+    operator has no reason to also mark it "submitted" once the company has
+    already replied. Promotion lives here rather than in the email package
+    because moonlighter-email depends on core alone and may not import the
+    answer bank; this is the composition root, the one layer that has both.
+    """
+    for update in updates:
+        if update.get("status_advanced"):
+            job_id = update["job_id"]
+            app = Application.get(Application.job == job_id)
+            promote_application(app.get_form_data(), job_id)
+
+
 @mcp.tool()
 @tool_logged
 async def sync_email_responses(*, ctx: Context[AppContext, Any]) -> str:
@@ -446,6 +464,8 @@ async def sync_email_responses(*, ctx: Context[AppContext, Any]) -> str:
 
         if not updates:
             return "No new emails found."
+
+        _promote_advanced_applications(updates)
 
         lines = [f"# Email sync — {len(updates)} update(s)\n"]
         for u in updates:
