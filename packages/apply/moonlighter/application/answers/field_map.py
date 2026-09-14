@@ -59,7 +59,12 @@ _DEMOGRAPHIC_RULES: tuple[tuple[str, str], ...] = (
     ),
     (r"^gender(\s+identity)?$|^voluntary\s+self[-\s]?identification\s+of\s+gender$", "gender"),
     (
-        r"^race$|^ethnicity$|^race\s*(/|&|and|or)\s*ethnicity$"
+        # Bare `^ethnicity$` deliberately absent: on a US EEO form that usually means
+        # the Hispanic/Latino question, not race, so serving the race value there is
+        # a guess. The rule existed and was unreachable until "Ethnicity" became a
+        # sensitive label (2026-09-14); it was deleted rather than switched on.
+        # `Race/Ethnicity` — one combined question — stays unambiguous.
+        r"^race$|^race\s*(/|&|and|or)\s*ethnicity$"
         r"|^voluntary\s+self[-\s]?identification\s+of\s+race$",
         "race",
     ),

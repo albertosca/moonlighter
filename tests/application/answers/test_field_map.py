@@ -250,6 +250,16 @@ def test_demographic_answer_does_not_strip_a_meaningful_parenthetical(label):
     assert demographic_answer(label, PROFILE) is None
 
 
+def test_a_bare_ethnicity_label_is_not_served_the_race_value():
+    """`Race/Ethnicity` is unambiguous — one combined question, answered from
+    `race`. Bare `Ethnicity` is not: on a US EEO form it usually means the
+    Hispanic/Latino question, so serving `race` there is a guess. This rule was
+    unreachable until `Ethnicity` became a sensitive label (2026-09-14); rather
+    than let the widening switch on a guess, the bare form stays a gap."""
+    assert demographic_answer("Race/Ethnicity", PROFILE) == "White"
+    assert demographic_answer("Ethnicity", PROFILE) is None
+
+
 def test_demographic_answer_is_none_for_an_unset_key():
     profile = {**PROFILE, "demographics": {"gender": "Male"}}
     assert demographic_answer("Disability status", profile) is None
