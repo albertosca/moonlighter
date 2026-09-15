@@ -13,7 +13,7 @@ from moonlighter.application.answers.email_alias import (
 )
 from moonlighter.application.assisted.composer import ComposedAnswer, compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.sheet import render_sheet
+from moonlighter.application.assisted.results import SheetResult, render_sheet_result
 from moonlighter.application.assisted.sources.greenhouse import (
     board_and_job_from_url,
     fetch_greenhouse_questions,
@@ -104,7 +104,7 @@ def _names_path(composed: list[ComposedAnswer], path: Path) -> bool:
 
 async def _sheet(
     job: Job, questions: list[FormQuestion], config: dict[str, Any], profile: dict[str, Any]
-) -> str:
+) -> SheetResult:
     application, _ = Application.get_or_create(job=job, defaults={"status": "draft"})
     job_cache: dict[str, Any] = application.get_form_data()
     answer_bank = load_answer_bank()
@@ -136,18 +136,19 @@ async def _sheet(
     alias = _tracking_alias(job, config)
     if alias is not None:
         composed = _with_tracking_alias(composed, alias)
-    sheet = render_sheet(composed, job_title=job.title, company=job.company, apply_url=job.url)
+    alias_note = None
     if alias is not None and not any(_takes_alias(item.question) for item in composed):
         # No email question reached the sheet (a paste that missed it, a source
         # that omits standard fields) — the alias must reach the operator anyway,
         # or the company's reply lands in a mailbox the monitor never reads.
-        sheet += f"\n\nWhere the form asks for an email address, use: {alias}"
+        alias_note = f"Where the form asks for an email address, use: {alias}"
+    cv_note = None
     if tailored is not None and not tailored.compiled:
         # The CV gap names the DEFAULT CV here (resolve_cv_path refuses a dir
         # with no pdf), so "compile it" alone leaves the operator compiling a
         # tailored CV and then uploading the generic one.
-        sheet += (
-            f"\n\nA tailored CV was generated but pdflatex is not installed —"
+        cv_note = (
+            f"A tailored CV was generated but pdflatex is not installed —"
             f" compile it yourself: cd {tailored.path.parent} && pdflatex {tailored.path.name}"
             f" — then upload the resulting cv.pdf instead of the CV named above"
             f" (review it first)"
@@ -157,20 +158,42 @@ async def _sheet(
         # surfaces only through the composer's CV FILE branch, which needs a
         # FILE question with a CV-shaped label. A paste that missed the resume
         # field would leave a tailored PDF nobody is told to review or upload.
-        sheet += (
-            f"\n\nUpload this CV for this job: {tailored.path}"
+        cv_note = (
+            f"Upload this CV for this job: {tailored.path}"
             f" (tailored for this job — review it before uploading)"
         )
-    return sheet
+    return SheetResult(
+        composed=composed,
+        job_title=job.title,
+        company=job.company,
+        apply_url=job.url,
+        alias=alias,
+        alias_note=alias_note,
+        cv_note=cv_note,
+    )
 
 
-async def prepare_application(job_id: int, config: dict[str, Any], profile: dict[str, Any]) -> str:
+async def prepare_application(
+    job_id: int, config: dict[str, Any], profile: dict[str, Any]
+) -> SheetResult:
     job = _job(job_id)
     if job is None:
-        return f"Job {job_id} not found."
+        return SheetResult(
+            composed=[],
+            job_title="",
+            company="",
+            apply_url="",
+            error=f"Job {job_id} not found.",
+        )
     questions = await _questions_from_api(job)
     if not questions:
-        return PASTE_HINT.format(url=job.url, job_id=job_id)
+        return SheetResult(
+            composed=[],
+            job_title="",
+            company="",
+            apply_url="",
+            error=PASTE_HINT.format(url=job.url, job_id=job_id),
+        )
     return await _sheet(job, questions, config, profile)
 
 
@@ -183,4 +206,4 @@ async def prepare_application_from_paste(
     questions = await extract_questions_from_page(page_text, make_caller(config))
     if not questions:
         return "No questions could be found in that text. Was the whole page copied?"
-    return await _sheet(job, questions, config, profile)
+    return render_sheet_result(await _sheet(job, questions, config, profile))

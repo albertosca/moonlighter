@@ -4,6 +4,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from moonlighter.application.assisted.results import SheetResult
 from moonlighter.core.db import Application, Job, ScanLog, init_db
 from moonlighter.core.metrics import record_call
 from moonlighter.discovery.evaluator import EvaluationResult
@@ -587,7 +588,7 @@ async def test_prepare_application_tool_delegates_to_assisted_service(monkeypatc
 
     async def fake_prepare(job_id, config, profile):
         called["args"] = (job_id, config, profile)
-        return "sheet"
+        return SheetResult(composed=[], job_title="", company="", apply_url="", error="sheet")
 
     monkeypatch.setattr(server.assisted_service, "prepare_application", fake_prepare)
     result = await server.prepare_application(42, ctx=make_test_context())

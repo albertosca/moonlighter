@@ -11,6 +11,7 @@ from typing import Any
 
 from moonlighter.application.assisted import service
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.application.assisted.results import render_sheet_result
 from moonlighter.core.db import Application
 
 
@@ -41,7 +42,7 @@ async def test_an_unsupported_source_asks_the_user_to_paste(job_factory, monkeyp
     monkeypatch.setattr(service, "fetch_greenhouse_questions", _never_fetch_greenhouse)
     monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
 
-    out = await service.prepare_application(job.id, {}, {})
+    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
 
     assert "copy" in out.lower()
     assert "prepare_application_from_paste" in out
@@ -57,7 +58,7 @@ async def test_a_greenhouse_job_with_no_questions_asks_the_user_to_paste(job_fac
     monkeypatch.setattr(service, "fetch_greenhouse_questions", no_questions)
     monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
 
-    out = await service.prepare_application(job.id, {}, {})
+    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
 
     assert "prepare_application_from_paste" in out
 
@@ -71,7 +72,7 @@ async def test_a_recruitee_job_with_no_questions_asks_the_user_to_paste(job_fact
     monkeypatch.setattr(service, "fetch_recruitee_questions", no_questions)
     monkeypatch.setattr(service, "fetch_greenhouse_questions", _never_fetch_greenhouse)
 
-    out = await service.prepare_application(job.id, {}, {})
+    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
 
     assert "prepare_application_from_paste" in out
 
@@ -86,7 +87,7 @@ async def test_a_greenhouse_url_the_regex_cannot_parse_asks_the_user_to_paste(
     monkeypatch.setattr(service, "fetch_greenhouse_questions", _never_fetch_greenhouse)
     monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
 
-    out = await service.prepare_application(job.id, {}, {})
+    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
 
     assert "prepare_application_from_paste" in out
 
@@ -98,7 +99,7 @@ async def test_a_recruitee_url_the_regex_cannot_parse_asks_the_user_to_paste(
     monkeypatch.setattr(service, "fetch_greenhouse_questions", _never_fetch_greenhouse)
     monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
 
-    out = await service.prepare_application(job.id, {}, {})
+    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
 
     assert "prepare_application_from_paste" in out
 
@@ -116,7 +117,7 @@ async def test_a_greenhouse_job_with_questions_returns_a_sheet_not_the_paste_hin
     monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
 
-    out = await service.prepare_application(job.id, {}, {})
+    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
 
     assert "prepare_application_from_paste" not in out
     assert "Favorite language" in out
@@ -215,7 +216,7 @@ async def test_sheet_notes_the_uncompiled_tex(job_factory, monkeypatch, tmp_path
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
     monkeypatch.setattr(service, "ensure_tailored_cv", uncompiled)
 
-    out = await service.prepare_application(job.id, {}, {})
+    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
 
     assert "pdflatex" in out and "cv.tex" in out
     # The CV gap names the DEFAULT CV in the tex-only case (resolve_cv_path
@@ -249,7 +250,7 @@ async def test_a_compiled_cv_reaches_the_sheet_when_no_cv_question_exists(
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
     monkeypatch.setattr(service, "ensure_tailored_cv", compiled)
 
-    out = await service.prepare_application(job.id, {}, {})
+    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
 
     assert str(pdf) in out
     assert "review it before uploading" in out
@@ -279,7 +280,7 @@ async def test_a_compiled_cv_already_named_by_a_cv_gap_is_not_repeated(
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
     monkeypatch.setattr(service, "ensure_tailored_cv", compiled)
 
-    out = await service.prepare_application(job.id, config, {})
+    out = render_sheet_result(await service.prepare_application(job.id, config, {}))
 
     assert out.count(str(pdf)) == 1  # the CV gap already names it
     assert "Upload this CV for this job" not in out
@@ -298,7 +299,7 @@ async def test_a_recruitee_job_with_questions_returns_a_sheet_not_the_paste_hint
     monkeypatch.setattr(service, "fetch_greenhouse_questions", _never_fetch_greenhouse)
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
 
-    out = await service.prepare_application(job.id, {}, {})
+    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
 
     assert "prepare_application_from_paste" not in out
     assert "Favorite language" in out
@@ -306,7 +307,7 @@ async def test_a_recruitee_job_with_questions_returns_a_sheet_not_the_paste_hint
 
 
 async def test_a_missing_job_is_reported_rather_than_raising():
-    out = await service.prepare_application(999999, {}, {})
+    out = render_sheet_result(await service.prepare_application(999999, {}, {}))
     assert "999999" in out
 
 
@@ -487,7 +488,7 @@ async def test_the_api_path_carries_the_alias_too(job_factory, monkeypatch):
     monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
 
-    out = await service.prepare_application(job.id, _TRACKING_CONFIG, {})
+    out = render_sheet_result(await service.prepare_application(job.id, _TRACKING_CONFIG, {}))
 
     ref = Application.get(Application.job == job).email_ref
     assert f"track+{ref}@example.com" in out
@@ -510,7 +511,7 @@ async def test_a_manual_job_with_a_greenhouse_url_still_gets_the_api(job_factory
     monkeypatch.setattr(service, "fetch_greenhouse_questions", fake_fetch)
     monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
 
-    out = await service.prepare_application(job.id, {}, {})
+    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
 
     assert seen == {"board": "teachablecareers", "job_id": "4913809101"}
     assert "prepare_application_from_paste" not in out

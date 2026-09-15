@@ -10,6 +10,7 @@ from mcp.server.mcpserver import Context, MCPServer
 from moonlighter._tool_logging import tool_logged
 from moonlighter.application.answers.answer_bank import promote_application
 from moonlighter.application.assisted import service as assisted_service
+from moonlighter.application.assisted.results import render_sheet_result
 from moonlighter.core.config import (
     DEFAULTS,
     harden_permissions,
@@ -280,7 +281,9 @@ async def prepare_application(job_id: int, *, ctx: Context[AppContext, Any]) -> 
     """
     app = ctx.request_context.lifespan_context
     with operation_metrics("prepare_application"):
-        return await assisted_service.prepare_application(job_id, app.config, app.profile)
+        return render_sheet_result(
+            await assisted_service.prepare_application(job_id, app.config, app.profile)
+        )
 
 
 @mcp.tool()
