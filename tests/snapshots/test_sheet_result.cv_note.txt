@@ -1,0 +1,12 @@
+Staff Engineer — Acme
+https://boards.greenhouse.io/acme/jobs/3
+
+[1/2] Full name  (required)
+Jane Doe
+
+[2/2] Email  (required)
+jane@example.com
+
+All 2 answered — nothing left for you but to paste and submit.
+
+A tailored CV was generated but pdflatex is not installed — compile it yourself: cd /tmp/moonlighter-test-cv && pdflatex cv.tex — then upload the resulting cv.pdf instead of the CV named above (review it first)
