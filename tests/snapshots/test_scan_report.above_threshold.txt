@@ -1,0 +1,9 @@
+3 jobs processed. 1 above threshold:
+
+                                                                                                                  
+  #      Company / Title                Score     Salary           Posted        Remote     Caveats               
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 
+  1      Acme / Staff Engineer          9.0       n/a              —             —          —                     
+                                                                                                                  
+
+∗ = salary estimated by the LLM  |  1 below threshold  |  1 filtered by title  |  0 location ineligible

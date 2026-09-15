@@ -1,0 +1,1 @@
+2 jobs processed. None passed the threshold of 7.0. (1 filtered by title, 0 location ineligible, 1 below score)
