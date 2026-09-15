@@ -2,8 +2,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from moonlighter.core.db import Job, ScanLog, init_db
-from moonlighter.discovery.results import ScanReport, render_scan_report
-from moonlighter.discovery.service import _format_report, scan_company
+from moonlighter.discovery.results import ScanReport, _render_counts, render_scan_report
+from moonlighter.discovery.service import scan_company
 
 from tests.discovery.test_service import _raw
 
@@ -40,16 +40,19 @@ def three_jobs(tmp_db):
     ]
 
 
-def test_format_report_above_threshold_is_unchanged(three_jobs, snapshot_text):
-    snapshot_text(_format_report(three_jobs, spend_hit=False, threshold=7.0), "above_threshold")
+def test_render_counts_above_threshold_is_unchanged(three_jobs, snapshot_text):
+    report = ScanReport(saved=three_jobs, spend_hit=False, threshold=7.0)
+    snapshot_text(_render_counts(report), "above_threshold")
 
 
-def test_format_report_none_above_threshold_is_unchanged(three_jobs, snapshot_text):
-    snapshot_text(_format_report(three_jobs[1:], spend_hit=False, threshold=7.0), "none_above")
+def test_render_counts_none_above_threshold_is_unchanged(three_jobs, snapshot_text):
+    report = ScanReport(saved=three_jobs[1:], spend_hit=False, threshold=7.0)
+    snapshot_text(_render_counts(report), "none_above")
 
 
-def test_format_report_spend_hit_is_unchanged(three_jobs, snapshot_text):
-    snapshot_text(_format_report(three_jobs, spend_hit=True, threshold=7.0), "spend_hit")
+def test_render_counts_spend_hit_is_unchanged(three_jobs, snapshot_text):
+    report = ScanReport(saved=three_jobs, spend_hit=True, threshold=7.0)
+    snapshot_text(_render_counts(report), "spend_hit")
 
 
 def test_render_scan_report_reproduces_the_old_format_report(three_jobs, snapshot_text):
@@ -74,10 +77,10 @@ def test_render_scan_report_empty_saved_without_no_new_jobs_still_computes_count
     # Distinct from the case above: evaluation was attempted (e.g. a crash, a
     # spend-limit stop, or a silently-skipped IntegrityError) and zero jobs
     # survived it -- must render the computed "0 jobs processed..." counts,
-    # matching _format_report([], ...), not the "No new jobs found." literal.
+    # matching _render_counts([], ...), not the "No new jobs found." literal.
     report = ScanReport(saved=[], spend_hit=True, threshold=7.0)
     rendered = render_scan_report(report)
-    assert rendered == _format_report([], spend_hit=True, threshold=7.0)
+    assert rendered == _render_counts(ScanReport(saved=[], spend_hit=True, threshold=7.0))
     assert "jobs processed" in rendered
     assert "No new jobs found." not in rendered
 
@@ -130,14 +133,14 @@ def _patched_scanner(raw_jobs):
 async def test_scan_company_unknown_source_is_unchanged(tmp_db, snapshot_text):
     init_db()
     with _patched_scanner([]):
-        out = await scan_company("lever", "acme", CONFIG, {}, MagicMock())
+        out = render_scan_report(await scan_company("lever", "acme", CONFIG, {}, MagicMock()))
     snapshot_text(out, "company_unknown_source")
 
 
 async def test_scan_company_no_open_jobs_is_unchanged(tmp_db, snapshot_text):
     init_db()
     with _patched_scanner([]):
-        out = await scan_company("greenhouse", "acme", CONFIG, {}, MagicMock())
+        out = render_scan_report(await scan_company("greenhouse", "acme", CONFIG, {}, MagicMock()))
     snapshot_text(out, "company_no_open_jobs")
 
 
@@ -149,7 +152,7 @@ async def test_scan_company_all_already_known_is_unchanged(tmp_db, snapshot_text
     # evaluate_job() call instead of exercising the "all already known" branch.
     ScanLog.create(job_url=known.url, source="greenhouse")
     with _patched_scanner([known]):
-        out = await scan_company("greenhouse", "acme", CONFIG, {}, MagicMock())
+        out = render_scan_report(await scan_company("greenhouse", "acme", CONFIG, {}, MagicMock()))
     snapshot_text(out, "company_all_known")
 
 
@@ -163,5 +166,5 @@ async def test_scan_company_with_new_jobs_is_unchanged(tmp_db, snapshot_text, th
             new=AsyncMock(return_value=(three_jobs, False)),
         ),
     ):
-        out = await scan_company("greenhouse", "acme", CONFIG, {}, MagicMock())
+        out = render_scan_report(await scan_company("greenhouse", "acme", CONFIG, {}, MagicMock()))
     snapshot_text(out, "company_new_jobs")

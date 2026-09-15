@@ -14,7 +14,7 @@ from moonlighter.core.db import Job, ScanLog, init_db
 from moonlighter.discovery import service as scan_service
 from moonlighter.discovery.evaluator import EvaluationResult
 from moonlighter.discovery.posting import FetchedPosting
-from moonlighter.discovery.results import render_scan_report
+from moonlighter.discovery.results import ScanReport, _render_counts, render_scan_report
 
 CONFIG = {
     "score_threshold": 7.0,
@@ -58,10 +58,10 @@ def _saved_job(url, *, status="new", score=8.0, score_notes="match"):
     )
 
 
-# ── format_report tests ─────────────────────────────────────────────────────
+# ── _render_counts tests ─────────────────────────────────────────────────────
 
 
-async def test_format_report_counts_needs_review_separately_from_below(tmp_db):
+async def test_render_counts_needs_review_separately_from_below(tmp_db):
     init_db()
     above = _saved_job("https://x.com/fr/1", status="new", score=8.0)
     below = _saved_job("https://x.com/fr/2", status="archived", score=3.0)
@@ -71,21 +71,23 @@ async def test_format_report_counts_needs_review_separately_from_below(tmp_db):
         score=None,
         score_notes="description unavailable — needs manual verification",
     )
-    report = scan_service._format_report([above, below, pending], spend_hit=False, threshold=6.5)
+    report = _render_counts(
+        ScanReport(saved=[above, below, pending], spend_hit=False, threshold=6.5)
+    )
     assert "1 below threshold" in report
     assert "1 job(s) need manual verification" in report
     assert "list_jobs(status='needs_review')" in report
     assert "verify_job(job_id, page_text)" in report
 
 
-async def test_format_report_no_verify_line_when_nothing_pending(tmp_db):
+async def test_render_counts_no_verify_line_when_nothing_pending(tmp_db):
     init_db()
     above = _saved_job("https://x.com/fr/4", status="new", score=8.0)
-    report = scan_service._format_report([above], spend_hit=False, threshold=6.5)
+    report = _render_counts(ScanReport(saved=[above], spend_hit=False, threshold=6.5))
     assert "need manual verification" not in report
 
 
-async def test_format_report_verify_line_shown_even_with_nothing_above_threshold(tmp_db):
+async def test_render_counts_verify_line_shown_even_with_nothing_above_threshold(tmp_db):
     init_db()
     pending = _saved_job(
         "https://x.com/fr/5",
@@ -93,7 +95,7 @@ async def test_format_report_verify_line_shown_even_with_nothing_above_threshold
         score=None,
         score_notes="description unavailable — needs manual verification",
     )
-    report = scan_service._format_report([pending], spend_hit=False, threshold=6.5)
+    report = _render_counts(ScanReport(saved=[pending], spend_hit=False, threshold=6.5))
     assert "None passed the threshold" in report
     assert "1 job(s) need manual verification" in report
 
@@ -1240,7 +1242,9 @@ _fake_caller = MagicMock()
 
 
 async def test_scan_company_rejects_unknown_source():
-    report = await scan_company("workday", "acme", {"score_threshold": 6.5}, {}, _fake_caller)
+    report = render_scan_report(
+        await scan_company("workday", "acme", {"score_threshold": 6.5}, {}, _fake_caller)
+    )
     assert "Unknown source 'workday'" in report
     assert "greenhouse" in report  # names the valid ones
 
@@ -1255,8 +1259,8 @@ async def test_scan_company_scans_evaluates_and_reports(tmp_db):
         ) as ev,
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[_raw(1, source="greenhouse")])
-        report = await scan_company(
-            "greenhouse", "stripe", {"score_threshold": 6.5}, {}, _fake_caller
+        report = render_scan_report(
+            await scan_company("greenhouse", "stripe", {"score_threshold": 6.5}, {}, _fake_caller)
         )
     assert ev.await_count == 1
     assert "company_list.yaml" in report  # the recurring-scan tip
@@ -1270,8 +1274,8 @@ async def test_scan_company_no_new_jobs_skips_evaluation(tmp_db):
         patch("moonlighter.discovery.service._evaluate_and_store", new=AsyncMock()) as ev,
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[_raw(1, source="greenhouse")])
-        report = await scan_company(
-            "greenhouse", "stripe", {"score_threshold": 6.5}, {}, _fake_caller
+        report = render_scan_report(
+            await scan_company("greenhouse", "stripe", {"score_threshold": 6.5}, {}, _fake_caller)
         )
     ev.assert_not_called()
     assert "No new jobs at 'stripe'" in report
@@ -1289,8 +1293,8 @@ async def test_scan_company_zero_raw_jobs_does_not_claim_all_already_known(tmp_d
         patch("moonlighter.discovery.service._evaluate_and_store", new=AsyncMock()) as ev,
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[])
-        report = await scan_company(
-            "greenhouse", "stripe", {"score_threshold": 6.5}, {}, _fake_caller
+        report = render_scan_report(
+            await scan_company("greenhouse", "stripe", {"score_threshold": 6.5}, {}, _fake_caller)
         )
     ev.assert_not_called()
     assert "No open jobs found at 'stripe'" in report

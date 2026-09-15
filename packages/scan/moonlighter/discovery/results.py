@@ -23,16 +23,22 @@ class ScanReport:
     error: str | None = None
     # Only scan_company can distinguish "nothing new, but N were found and are
     # already known" from "nothing found at all" -- an empty raw_jobs there may
-    # mean zero open postings OR a failed fetch. Declared here so Task 2 does
-    # not have to widen this dataclass.
+    # mean zero open postings OR a failed fetch.
     found_but_known: int = 0
+    # Set only by scan_company, only on its two "nothing new" shapes (never on
+    # its own "new jobs found" shape, and never by scan_and_evaluate, which has
+    # no single company to name). This is the signal _render_counts uses to
+    # pick one of scan_company's literal sentences instead of the generic
+    # "N jobs processed..." counts -- found_but_known alone can't do it, since
+    # 0 is also scan_and_evaluate's default and would collide with "no open
+    # jobs found at <company>" for zero raw_jobs.
+    company: str | None = None
     # True only when there were zero candidate jobs to evaluate in the first
     # place (no_new_jobs is the ONLY thing distinguishing that from "evaluated
     # some candidates but zero survived" -- a crash, a spend-limit stop, or a
     # silently-skipped IntegrityError all also leave saved=[], and those must
     # still render the computed "N jobs processed..." counts, not this literal.
-    # scan_and_evaluate is the only caller that sets it; _format_report's
-    # thin wrapper never does, so its own three pinned snapshots are untouched.
+    # scan_and_evaluate is the only caller that sets it.
     no_new_jobs: bool = False
 
 
@@ -50,6 +56,16 @@ def render_scan_report(report: ScanReport) -> str:
 
 
 def _render_counts(report: ScanReport) -> str:
+    if report.company is not None:
+        # scan_company's two "nothing new" shapes: no evaluation was attempted
+        # (new_jobs was empty), so there are no counts to compute at all.
+        if report.found_but_known:
+            return (
+                f"No new jobs at {report.company!r} "
+                f"({report.found_but_known} found, all already known)."
+            )
+        return f"No open jobs found at {report.company!r} (see warnings below if the fetch failed)."
+
     saved = report.saved
     spend_hit = report.spend_hit
     threshold = report.threshold

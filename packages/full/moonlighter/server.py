@@ -118,8 +118,10 @@ async def scan_company(source: str, company: str, *, ctx: Context[AppContext, An
     """
     app = ctx.request_context.lifespan_context
     with operation_metrics("scan_company"):
-        return await scan_service.scan_company(
-            source, company, app.config, app.profile, app.llm_caller
+        return render_scan_report(
+            await scan_service.scan_company(
+                source, company, app.config, app.profile, app.llm_caller
+            )
         )
 
 

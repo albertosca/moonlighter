@@ -27,7 +27,7 @@ from moonlighter.discovery.evaluator import (
     should_skip_by_title,
 )
 from moonlighter.discovery.posting import fetch_posting_via_ats
-from moonlighter.discovery.results import ScanReport, _render_counts
+from moonlighter.discovery.results import ScanReport
 from moonlighter.discovery.sources.base import RawJob, ScanStats
 from moonlighter.discovery.sources.registry import build_http_scanners
 from moonlighter.discovery.urls import normalize_job_url
@@ -415,17 +415,6 @@ def _stats_warnings(stats: ScanStats) -> list[str]:
     return lines
 
 
-def _with_warning(message: str, warning: str | None) -> str:
-    return f"{message}\n\n{warning}" if warning else message
-
-
-def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
-    # Delegates to the ScanReport renderer (moonlighter.discovery.results) so
-    # the counts/table/footer logic lives in exactly one place. scan_company
-    # still calls this directly; scan_and_evaluate builds a ScanReport itself.
-    return _render_counts(ScanReport(saved=saved, spend_hit=spend_hit, threshold=threshold))
-
-
 async def scan_and_evaluate(
     keywords: str, phase: str, config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
 ) -> ScanReport:
@@ -448,39 +437,53 @@ async def scan_and_evaluate(
 
 async def scan_company(
     source: str, company: str, config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
-) -> str:
+) -> ScanReport:
     """Scan every open posting at ONE company right now, without touching
     company_list.yaml. `company` is an ATS slug, or (Recruitee) a custom
     career domain."""
+    threshold = config["score_threshold"]
     scanners = build_http_scanners()
     if source not in scanners:
-        return (
-            f"Unknown source {source!r}. Valid sources: {', '.join(sorted(scanners))}. "
-            "Portal boards (gupy, remoteok, remotive, weworkremotely, hn_whoishiring) "
-            "are enabled via config flags and scanned by scan_and_evaluate."
+        return ScanReport(
+            saved=[],
+            spend_hit=False,
+            threshold=threshold,
+            error=(
+                f"Unknown source {source!r}. Valid sources: {', '.join(sorted(scanners))}. "
+                "Portal boards (gupy, remoteok, remotive, weworkremotely, hn_whoishiring) "
+                "are enabled via config flags and scanned by scan_and_evaluate."
+            ),
         )
     stats: ScanStats = {}
     raw_jobs = await scanners[source].scan([company], stats=stats)
     raw_jobs = [replace(j, url=normalize_job_url(j.url)) for j in raw_jobs]
     new_jobs = _drop_already_seen(raw_jobs)
+    tip = (
+        f"Tip: add {company!r} under '{source}:' in company_list.yaml "
+        "to include it in recurring scans."
+    )
+    warning = "\n".join(_stats_warnings(stats)) or None
 
     if new_jobs:
         saved, spend_hit = await _evaluate_and_store(new_jobs, config, profile, caller)
-        report = _format_report(saved, spend_hit, config["score_threshold"])
-    elif raw_jobs:
-        report = f"No new jobs at {company!r} ({len(raw_jobs)} found, all already known)."
-    else:
-        # An empty raw_jobs can mean the company genuinely has zero open
-        # postings OR the fetch itself failed -- "0 found, all already known"
-        # would lie in the second case. _stats_warnings (appended below via
-        # _with_warning) carries the fetch-error detail when there is one.
-        report = f"No open jobs found at {company!r} (see warnings below if the fetch failed)."
+        return ScanReport(
+            saved=saved, spend_hit=spend_hit, threshold=threshold, tip=tip, warning=warning
+        )
 
-    report += (
-        f"\n\nTip: add {company!r} under '{source}:' in company_list.yaml "
-        "to include it in recurring scans."
+    # An empty raw_jobs can mean the company genuinely has zero open postings
+    # OR the fetch itself failed -- found_but_known (0 here, len(raw_jobs)
+    # otherwise) lets the renderer pick the right sentence without lying about
+    # which happened; `warning` (via _stats_warnings) carries the fetch-error
+    # detail when there is one.
+    return ScanReport(
+        saved=[],
+        spend_hit=False,
+        threshold=threshold,
+        tip=tip,
+        warning=warning,
+        company=company,
+        found_but_known=len(raw_jobs),
     )
-    return _with_warning(report, "\n".join(_stats_warnings(stats)) or None)
 
 
 async def add_job(
