@@ -89,11 +89,41 @@ async def test_prepare_application_appends_the_uncompiled_cv_note(tmp_db, snapsh
     snapshot_text(out, "cv_note")
 
 
+async def test_prepare_application_appends_the_compiled_cv_note(tmp_db, snapshot_text):
+    # Compiled CV, no CV/FILE question on the sheet to name it -- _names_path is
+    # False since none of QUESTIONS carries a gap_reason mentioning this path.
+    job = _job(tmp_db, url="https://boards.greenhouse.io/acme/jobs/4")
+    compiled = TailoredCV(Path("/tmp/moonlighter-test-cv/cv.pdf"), True)
+    with (
+        patch(
+            "moonlighter.application.assisted.service._questions_from_api",
+            new=AsyncMock(return_value=QUESTIONS),
+        ),
+        patch(
+            "moonlighter.application.assisted.service.ensure_tailored_cv",
+            new=AsyncMock(return_value=compiled),
+        ),
+        patch("moonlighter.application.assisted.service._tracking_alias", return_value=None),
+    ):
+        out = render_sheet_result(await prepare_application(job.id, CONFIG, PROFILE))
+    snapshot_text(out, "compiled_cv_note")
+
+
 async def test_prepare_application_job_not_found_is_unchanged(tmp_db, snapshot_text):
     init_db()
     snapshot_text(
         render_sheet_result(await prepare_application(4242, CONFIG, PROFILE)), "job_not_found"
     )
+
+
+async def test_prepare_application_with_no_questions_returns_the_paste_hint(tmp_db, snapshot_text):
+    job = _job(tmp_db, url="https://boards.greenhouse.io/acme/jobs/5")
+    with patch(
+        "moonlighter.application.assisted.service._questions_from_api",
+        new=AsyncMock(return_value=[]),
+    ):
+        out = render_sheet_result(await prepare_application(job.id, CONFIG, PROFILE))
+    snapshot_text(out, "paste_hint")
 
 
 @pytest.fixture
