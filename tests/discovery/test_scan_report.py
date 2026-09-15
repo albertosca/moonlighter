@@ -1,7 +1,11 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from moonlighter.core.db import Job, init_db
+from moonlighter.core.db import Job, ScanLog, init_db
 from moonlighter.discovery.results import ScanReport, render_scan_report
-from moonlighter.discovery.service import _format_report
+from moonlighter.discovery.service import _format_report, scan_company
+
+from tests.discovery.test_service import _raw
 
 
 @pytest.fixture
@@ -106,3 +110,58 @@ def test_render_scan_report_appends_the_tip_before_archive_and_warning(three_job
     archive_at = rendered.index("No closed jobs found.")
     warning_at = rendered.index("⚠️  linkedin: 0 jobs")
     assert tip_at < archive_at < warning_at
+
+
+# ── scan_company's four output shapes (baseline, pinned before restructuring) ─
+
+CONFIG = {"score_threshold": 7.0, "scan_concurrency": 2}
+
+
+def _patched_scanner(raw_jobs):
+    """build_http_scanners() returns {source: scanner}; scanner.scan() is async."""
+    scanner = MagicMock()
+    scanner.scan = AsyncMock(return_value=list(raw_jobs))
+    return patch(
+        "moonlighter.discovery.service.build_http_scanners",
+        return_value={"greenhouse": scanner},
+    )
+
+
+async def test_scan_company_unknown_source_is_unchanged(tmp_db, snapshot_text):
+    init_db()
+    with _patched_scanner([]):
+        out = await scan_company("lever", "acme", CONFIG, {}, MagicMock())
+    snapshot_text(out, "company_unknown_source")
+
+
+async def test_scan_company_no_open_jobs_is_unchanged(tmp_db, snapshot_text):
+    init_db()
+    with _patched_scanner([]):
+        out = await scan_company("greenhouse", "acme", CONFIG, {}, MagicMock())
+    snapshot_text(out, "company_no_open_jobs")
+
+
+async def test_scan_company_all_already_known_is_unchanged(tmp_db, snapshot_text):
+    init_db()
+    known = _raw(1)  # url is https://x.com/scan/1
+    # _drop_already_seen only checks ScanLog, not Job -- a Job row alone would
+    # NOT dedupe this URL and the test would silently fall through to a real
+    # evaluate_job() call instead of exercising the "all already known" branch.
+    ScanLog.create(job_url=known.url, source="greenhouse")
+    with _patched_scanner([known]):
+        out = await scan_company("greenhouse", "acme", CONFIG, {}, MagicMock())
+    snapshot_text(out, "company_all_known")
+
+
+async def test_scan_company_with_new_jobs_is_unchanged(tmp_db, snapshot_text, three_jobs):
+    init_db()
+    fresh = _raw(99)
+    with (
+        _patched_scanner([fresh]),
+        patch(
+            "moonlighter.discovery.service._evaluate_and_store",
+            new=AsyncMock(return_value=(three_jobs, False)),
+        ),
+    ):
+        out = await scan_company("greenhouse", "acme", CONFIG, {}, MagicMock())
+    snapshot_text(out, "company_new_jobs")
