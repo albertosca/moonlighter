@@ -14,6 +14,7 @@ from moonlighter.core.db import Job, ScanLog, init_db
 from moonlighter.discovery import service as scan_service
 from moonlighter.discovery.evaluator import EvaluationResult
 from moonlighter.discovery.posting import FetchedPosting
+from moonlighter.discovery.results import render_scan_report
 
 CONFIG = {
     "score_threshold": 7.0,
@@ -546,7 +547,8 @@ async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=No
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(return_value=AsyncMock())
-        return await scan_service.scan_and_evaluate("", "all", cfg, PROFILE, MagicMock())
+        report = await scan_service.scan_and_evaluate("", "all", cfg, PROFILE, MagicMock())
+        return render_scan_report(report)
 
 
 async def test_run_browser_scanner_browser_launch_failure_is_silent():

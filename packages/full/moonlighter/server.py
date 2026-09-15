@@ -26,6 +26,7 @@ from moonlighter.core.metrics import operation_metrics
 from moonlighter.core.parsing import wrap_untrusted
 from moonlighter.discovery import service as scan_service
 from moonlighter.discovery.archive import ArchiveStaleJobsError, _format_archive_result
+from moonlighter.discovery.results import render_scan_report
 from moonlighter.priority import company_rejection_ages, rejection_badge, rejection_penalty
 from moonlighter.startup import StartupWarning, validate_startup
 from moonlighter.tracking.email_monitor import sync_responses
@@ -95,8 +96,10 @@ async def scan_and_evaluate(
     """
     app = ctx.request_context.lifespan_context
     with operation_metrics("scan_and_evaluate"):
-        return await scan_service.scan_and_evaluate(
-            keywords, phase, app.config, app.profile, app.llm_caller
+        return render_scan_report(
+            await scan_service.scan_and_evaluate(
+                keywords, phase, app.config, app.profile, app.llm_caller
+            )
         )
 
 

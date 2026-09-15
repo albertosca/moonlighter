@@ -18,7 +18,6 @@ from moonlighter.core.llm import LLMCaller, is_spend_limit
 from moonlighter.core.log import get_logger
 from moonlighter.core.metrics import record_spend_limit_hit
 from moonlighter.core.plugins import discover_entry_points
-from moonlighter.discovery.archive import _format_archive_result
 from moonlighter.discovery.archive import archive_stale_jobs as archive_stale_jobs
 from moonlighter.discovery.eligibility import Eligibility, classify_location
 from moonlighter.discovery.evaluator import (
@@ -28,10 +27,10 @@ from moonlighter.discovery.evaluator import (
     should_skip_by_title,
 )
 from moonlighter.discovery.posting import fetch_posting_via_ats
+from moonlighter.discovery.results import ScanReport, _render_counts
 from moonlighter.discovery.sources.base import RawJob, ScanStats
 from moonlighter.discovery.sources.registry import build_http_scanners
 from moonlighter.discovery.urls import normalize_job_url
-from moonlighter.views import render_jobs_table
 from peewee import IntegrityError
 
 logger = get_logger(__name__)
@@ -421,64 +420,30 @@ def _with_warning(message: str, warning: str | None) -> str:
 
 
 def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
-    above = [j for j in saved if j.status == "new"]
-    title_filtered = sum(
-        1 for j in saved if j.score_notes and j.score_notes.startswith("title filtered:")
-    )
-    location_ineligible = sum(
-        1 for j in saved if j.score_notes and j.score_notes.startswith("location ineligible:")
-    )
-    needs_verification = sum(1 for j in saved if j.status == "needs_review")
-    below = len(saved) - len(above) - title_filtered - location_ineligible - needs_verification
-    spend_note = (
-        "\n\n⚠️  Spend limit reached — scan stopped (remaining jobs are left for the next scan)."
-        if spend_hit
-        else ""
-    )
-    verify_note = (
-        f"\n\n⚠️  {needs_verification} job(s) need manual verification — "
-        f"list_jobs(status='needs_review') to see them, verify_job(job_id, page_text) to score one."
-        if needs_verification
-        else ""
-    )
-
-    if not above:
-        return (
-            f"{len(saved)} jobs processed. None passed the threshold of {threshold}. "
-            f"({title_filtered} filtered by title, {location_ineligible} location ineligible, "
-            f"{below} below score)"
-            f"{spend_note}{verify_note}"
-        )
-
-    table = render_jobs_table(above)
-    footer = (
-        f"\n∗ = salary estimated by the LLM  |  "
-        f"{below} below threshold  |  {title_filtered} filtered by title  |  "
-        f"{location_ineligible} location ineligible"
-    )
-    return (
-        f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}"
-        f"{spend_note}{verify_note}"
-    )
+    # Delegates to the ScanReport renderer (moonlighter.discovery.results) so
+    # the counts/table/footer logic lives in exactly one place. scan_company
+    # still calls this directly; scan_and_evaluate builds a ScanReport itself.
+    return _render_counts(ScanReport(saved=saved, spend_hit=spend_hit, threshold=threshold))
 
 
 async def scan_and_evaluate(
     keywords: str, phase: str, config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
-) -> str:
+) -> ScanReport:
     companies = load_company_list(phase=None if phase == "all" else phase)
     raw_jobs, li_warning = await _collect_raw_jobs(keywords, config, companies)
     new_jobs = _drop_already_seen(raw_jobs)
-
+    saved: list[Job] = []
+    spend_hit = False
     if new_jobs:
         saved, spend_hit = await _evaluate_and_store(new_jobs, config, profile, caller)
-        report = _format_report(saved, spend_hit, config["score_threshold"])
-    else:
-        report = "No new jobs found."
-
-    archive_result = await archive_stale_jobs(None, None, config)
-    report = f"{report}\n\n{_format_archive_result(archive_result)}"
-
-    return _with_warning(report, li_warning)
+    return ScanReport(
+        saved=saved,
+        spend_hit=spend_hit,
+        threshold=config["score_threshold"],
+        archive=await archive_stale_jobs(None, None, config),
+        warning=li_warning,
+        no_new_jobs=not new_jobs,
+    )
 
 
 async def scan_company(
