@@ -3,6 +3,7 @@
     moonlighter-apply prepare JOB_ID              # questions from the job's ATS API
     moonlighter-apply prepare JOB_ID --paste FILE # questions read from a pasted page (- = stdin)
     moonlighter-apply prepare --url URL           # ingest the posting first (no LLM), then prepare
+    moonlighter-apply prepare --url URL --company X --title Y  # non-ATS page: name it yourself
 
 Prints one JSON document (sheet_result_to_dict) on stdout; logs on stderr.
 Exit 0 when a sheet was produced, 1 when the job was not found, had no API
@@ -41,11 +42,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prepare.add_argument("job_id", type=int, nargs="?", help="a job already in the database")
     prepare.add_argument("--url", help="ingest this posting first (no LLM), then prepare it")
     prepare.add_argument(
+        "--company", help="the posting's company, when --url is not on a known ATS"
+    )
+    prepare.add_argument("--title", help="the posting's title, when --url is not on a known ATS")
+    prepare.add_argument(
         "--paste", metavar="FILE", help="page text to read questions from; - for stdin"
     )
     args = parser.parse_args(argv)
     if args.command == "prepare" and (args.job_id is None) == (args.url is None):
         parser.error("prepare takes exactly one of JOB_ID or --url")
+    if args.command == "prepare" and args.url is None and (args.company or args.title):
+        parser.error("--company and --title are only meaningful with --url")
     return args
 
 
@@ -57,12 +64,12 @@ async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     config, profile = bootstrap()
     job_id = args.job_id
     if args.url is not None:
-        job = await job_from_url(args.url)
+        job = await job_from_url(args.url, company=args.company, title=args.title)
         if job is None:
             failed = failed_sheet(
                 SheetKind.POSTING_UNREADABLE,
-                f"The posting at {args.url} could not be read. Paste the page with --paste, "
-                "or add the job through the MCP server's add_job with company and title.",
+                f"The posting at {args.url} is not on a known ATS or could not be read. "
+                "Pass --company and --title to ingest it anyway, or give a job id.",
                 apply_url=args.url,
             )
             return sheet_result_to_dict(failed), EXIT_NOTHING

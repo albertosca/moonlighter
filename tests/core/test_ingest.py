@@ -41,6 +41,7 @@ async def test_job_from_url_ingests_via_the_ats_api_unscored(tmp_db):
         "needs_review",
         None,
     )
+    assert job.score_notes == "ingested by URL for a sheet — not evaluated"
     assert ScanLog.select().where(ScanLog.job_url == job.url).exists()  # a later scan dedups it
 
 
@@ -61,19 +62,41 @@ async def test_job_from_url_falls_back_to_the_generic_fetch_for_the_description(
 
 
 async def test_job_from_url_is_none_when_the_posting_cannot_be_named(tmp_db):
-    # No ATS match and the generic fetch cannot supply company/title: a Job
-    # row with empty company would poison list_jobs and the sheet header.
+    # No ATS match and no overrides: the page cannot name itself, so the
+    # generic fetch (an HTTP request) must never run -- a Job row with empty
+    # company would poison list_jobs and the sheet header anyway.
     from moonlighter.core.ingest import job_from_url
 
     init_db()
     with (
         patch("moonlighter.core.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=None)),
         patch(
-            "moonlighter.core.ingest.fetch_description", new=AsyncMock(return_value=("text", None))
+            "moonlighter.core.ingest.fetch_description",
+            side_effect=AssertionError("no fetch"),
         ),
     ):
         assert await job_from_url("https://example.com/careers/123") is None
     assert Job.select().count() == 0
+
+
+async def test_job_from_url_with_overrides_ingests_a_non_ats_page(tmp_db):
+    # No ATS match, but --company/--title supplied: the page can now be
+    # named, so the generic fetch runs to supply the description.
+    from moonlighter.core.ingest import job_from_url
+
+    init_db()
+    with (
+        patch("moonlighter.core.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=None)),
+        patch(
+            "moonlighter.core.ingest.fetch_description",
+            new=AsyncMock(return_value=("Page text", None)),
+        ),
+    ):
+        job = await job_from_url(
+            "https://example.com/careers/123", company="Acme", title="Staff Eng"
+        )
+    assert job is not None
+    assert (job.company, job.title, job.description) == ("Acme", "Staff Eng", "Page text")
 
 
 async def test_job_from_url_is_none_when_the_fetch_fails(tmp_db):
