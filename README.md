@@ -205,6 +205,7 @@ Every slice also installs a command you can drive from a shell or a cron job, wi
 | `moonlighter-apply prepare --url URL [--company X --title Y] [--paste FILE]` | Ingest the posting first: through its ATS API when the URL has a known shape, otherwise from the page itself with `--company` and `--title` supplied; stored unscored, then prepared. No LLM call for the ingest. |
 | `moonlighter-email sync` | Classify recent replies and advance applications. Standalone it does not feed the answer bank; the MCP server's `sync_email_responses` does. |
 | `moonlighter-email register JOB_ID` | Mark a job as applied by hand and mint its `+ref` tracking alias, so replies to it are matched by `sync`. |
+| `moonlighter-scan doctor` · `moonlighter-apply doctor` · `moonlighter-email doctor` · `moonlighter doctor` | Where the state lives and whether the config loads, as JSON; exit `1` when the config is missing or invalid. |
 
 ```sh
 moonlighter-scan --no-eval | jq '.saved[] | select(.status == "needs_review") | .url'

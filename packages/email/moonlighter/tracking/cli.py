@@ -2,6 +2,7 @@
 
     moonlighter-email sync
     moonlighter-email register JOB_ID
+    moonlighter-email doctor
 
 `sync` reads recent emails in the configured Gmail account, classifies them
 with the LLM and advances the matching applications. Prints

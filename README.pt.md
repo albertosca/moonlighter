@@ -205,6 +205,7 @@ Toda fatia também instala um comando que você pode disparar de um shell ou de 
 | `moonlighter-apply prepare --url URL [--company X --title Y] [--paste FILE]` | Ingere a vaga primeiro: pela API do ATS quando a URL tem um formato conhecido, senão a partir da própria página com `--company` e `--title` informados; grava sem pontuar, depois prepara. Nenhuma chamada ao LLM na ingestão. |
 | `moonlighter-email sync` | Classifica respostas recentes e avança candidaturas. Sozinho ele não alimenta o banco de respostas — quem faz isso é o `sync_email_responses` do servidor MCP. |
 | `moonlighter-email register JOB_ID` | Marca uma vaga como candidatada na mão e gera o alias de rastreio `+ref`, pra respostas a ela serem casadas pelo `sync`. |
+| `moonlighter-scan doctor` · `moonlighter-apply doctor` · `moonlighter-email doctor` · `moonlighter doctor` | Onde o estado mora e se a config carrega, em JSON; sai com `1` quando a config está faltando ou inválida. |
 
 ```sh
 moonlighter-scan --no-eval | jq '.saved[] | select(.status == "needs_review") | .url'

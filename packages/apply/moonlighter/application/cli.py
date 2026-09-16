@@ -4,6 +4,7 @@
     moonlighter-apply prepare JOB_ID --paste FILE # questions read from a pasted page (- = stdin)
     moonlighter-apply prepare --url URL           # ingest the posting first (no LLM), then prepare
     moonlighter-apply prepare --url URL --company X --title Y  # non-ATS page: name it yourself
+    moonlighter-apply doctor
 
 Prints one JSON document (sheet_result_to_dict) on stdout; logs on stderr.
 Exit 0 when a sheet was produced, 1 when the job was not found, had no API
