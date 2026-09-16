@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from moonlighter.application.assisted.composer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.results import SheetResult, render_sheet_result
+from moonlighter.application.assisted.results import SheetKind, SheetResult, render_sheet_result
 from moonlighter.application.assisted.service import (
     prepare_application,
     prepare_application_from_paste,
@@ -152,6 +152,7 @@ def composed_fixture():
 
 def test_render_sheet_result_reproduces_the_plain_sheet(composed_fixture, snapshot_text):
     result = SheetResult(
+        kind=SheetKind.SHEET,
         composed=composed_fixture,
         job_title="Staff Engineer",
         company="Acme",
@@ -169,6 +170,7 @@ def test_render_sheet_result_orders_alias_note_before_cv_note(composed_fixture):
     # contract -- swapping (alias_note, cv_note) to (cv_note, alias_note) in
     # render_sheet_result's loop leaves every other test green.
     result = SheetResult(
+        kind=SheetKind.SHEET,
         composed=composed_fixture,
         job_title="Staff Engineer",
         company="Acme",
@@ -219,3 +221,75 @@ async def test_prepare_from_paste_job_not_found_is_unchanged(tmp_db, snapshot_te
     init_db()
     out = render_sheet_result(await prepare_application_from_paste(4242, PAGE, CONFIG, PROFILE))
     snapshot_text(out, "paste_job_not_found")
+
+
+def test_sheet_result_kind_and_error_agree():
+    from moonlighter.application.assisted.results import SheetKind, SheetResult
+
+    with pytest.raises(ValueError, match="sheet"):
+        SheetResult(
+            kind=SheetKind.SHEET, composed=[], job_title="", company="", apply_url="", error="x"
+        )
+    with pytest.raises(ValueError, match="job_not_found"):
+        SheetResult(
+            kind=SheetKind.JOB_NOT_FOUND, composed=[], job_title="", company="", apply_url=""
+        )
+
+
+async def test_prepare_application_reports_the_cv_path_and_compiled_flag(tmp_db):
+    # cv_note carried the path inside an English sentence; a script needs the
+    # path and the flag as fields. The note is unchanged (snapshot).
+    job = _job(tmp_db, url="https://boards.greenhouse.io/acme/jobs/9")
+    compiled = TailoredCV(path=Path("/tmp/cv-generated/9/cv.pdf"), compiled=True)
+    with (
+        patch(
+            "moonlighter.application.assisted.service._questions_from_api",
+            new=AsyncMock(return_value=QUESTIONS),
+        ),
+        patch(
+            "moonlighter.application.assisted.service.ensure_tailored_cv",
+            new=AsyncMock(return_value=compiled),
+        ),
+        patch("moonlighter.application.assisted.service._tracking_alias", return_value=None),
+    ):
+        result = await prepare_application(job.id, CONFIG, PROFILE)
+    assert result.kind is SheetKind.SHEET
+    assert result.cv_path == "/tmp/cv-generated/9/cv.pdf"
+    assert result.cv_compiled is True
+
+
+async def test_prepare_application_not_found_has_the_kind_a_script_can_switch_on(tmp_db):
+    init_db()
+    result = await prepare_application(4242, CONFIG, PROFILE)
+    assert result.kind is SheetKind.JOB_NOT_FOUND
+    assert result.error == "Job 4242 not found."
+
+
+def test_sheet_result_to_dict_is_json_serialisable(composed_fixture):
+    import json
+
+    from moonlighter.application.assisted.results import (
+        SheetKind,
+        SheetResult,
+        sheet_result_to_dict,
+    )
+
+    result = SheetResult(
+        kind=SheetKind.SHEET,
+        composed=composed_fixture,
+        job_title="Staff Engineer",
+        company="Acme",
+        apply_url="https://x",
+        alias="jane+ab12@x.com",
+        alias_note="Where the form asks...",
+        cv_path="/p/cv.pdf",
+        cv_compiled=True,
+    )
+    d = sheet_result_to_dict(result)
+    json.dumps(d)
+    assert d["kind"] == "sheet"
+    assert d["alias"] == "jane+ab12@x.com"
+    assert d["cv"] == {"path": "/p/cv.pdf", "compiled": True}
+    first = d["answers"][0]
+    assert set(first) == {"label", "kind", "required", "options", "answer", "gap_reason"}
+    assert d["notes"] == ["Where the form asks..."]
