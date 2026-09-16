@@ -12,7 +12,7 @@ from typing import Any, ClassVar
 import httpx
 from moonlighter.core.http import HEADERS, FetchError, get_json, require_dict
 from moonlighter.core.log import get_logger
-from moonlighter.core.posting import _strip_tags
+from moonlighter.core.posting import strip_tags
 from moonlighter.discovery.sources.base import (
     BaseScanner,
     RawJob,
@@ -271,7 +271,7 @@ class InHireScanner(BaseScanner):
                 return None
             if not isinstance(detail, dict):
                 return None
-            return _strip_tags(str(detail.get("description") or ""))
+            return strip_tags(str(detail.get("description") or ""))
 
         descriptions = await asyncio.gather(
             *(_description(str(item["jobId"])) for _, item in published)

@@ -1,7 +1,12 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from moonlighter.core.posting import FetchedPosting, fetch_description, fetch_posting_via_ats
+from moonlighter.core.posting import (
+    FetchedPosting,
+    fetch_description,
+    fetch_posting_via_ats,
+    strip_tags,
+)
 
 GREENHOUSE_JOB = {
     "title": "Account Executive",
@@ -246,3 +251,10 @@ async def test_fetch_description_reports_a_non_200_instead_of_guessing():
         text, error = await fetch_description("https://x.com/job")
     assert text is None
     assert "HTTP 404" in (error or "")
+
+
+def test_strip_tags_is_public_so_other_packages_can_import_it_directly():
+    # discovery/sources/http.py imports this across a package boundary; a
+    # leading underscore would make that a private-symbol reach-in.
+    assert strip_tags("<p>Hello  world</p>") == "Hello world"
+    assert strip_tags("  ") is None

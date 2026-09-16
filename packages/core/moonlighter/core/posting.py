@@ -31,7 +31,7 @@ class FetchedPosting:
     description: str | None
 
 
-def _strip_tags(raw: str) -> str | None:
+def strip_tags(raw: str) -> str | None:
     text = re.sub(r"<[^>]+>", " ", raw)
     return re.sub(r"\s+", " ", text).strip() or None
 
@@ -60,7 +60,7 @@ async def _fetch_greenhouse(board: str, job_id: str) -> FetchedPosting | None:
     return FetchedPosting(
         company=data.get("company_name") or board,
         title=data.get("title"),
-        description=_strip_tags(raw),
+        description=strip_tags(raw),
     )
 
 
@@ -93,7 +93,7 @@ async def _fetch_recruitee_offer(host: str, offer: str) -> FetchedPosting | None
             return FetchedPosting(
                 company=item.get("company_name"),
                 title=item.get("title"),
-                description=_strip_tags(item.get("description") or ""),
+                description=strip_tags(item.get("description") or ""),
             )
     return None
 
