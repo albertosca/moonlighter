@@ -26,6 +26,8 @@ def make_test_context(
         config=config if config is not None else load_config(),
         profile=profile if profile is not None else {},
         companies=companies if companies is not None else {},
+        # Coerced to a MagicMock rather than left as None: None is the
+        # --no-eval sentinel in the scan service now, not "caller unset".
         llm_caller=llm_caller if llm_caller is not None else MagicMock(),
         startup_warnings=[],
         permission_warnings=[],

@@ -208,6 +208,8 @@ Every slice also installs a command you can drive from a shell or a cron job, wi
 moonlighter-scan --no-eval | jq '.saved[] | select(.status == "needs_review") | .url'
 ```
 
+The example above exits `1` on every quiet day (no new jobs), which trips `set -e`/`pipefail` in a script that chains it with `jq` — check the exit code before treating that as a script failure. `--no-eval` is zero-**LLM**, not offline: `archive_stale_jobs` still makes HTTP requests to check whether previously-saved jobs closed.
+
 ## Extensions (adding a new ATS scanner)
 
 Every ATS integration you see above (Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters, Gupy)

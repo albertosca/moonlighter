@@ -208,6 +208,8 @@ Toda fatia também instala um comando que você pode disparar de um shell ou de 
 moonlighter-scan --no-eval | jq '.saved[] | select(.status == "needs_review") | .url'
 ```
 
+O exemplo acima sai com `1` em todo dia sem vaga nova, o que dispara `set -e`/`pipefail` num script que encadeia com `jq` — confira o código de saída antes de tratar isso como falha do script. `--no-eval` é zero-**LLM**, não offline: `archive_stale_jobs` continua fazendo requisições HTTP pra checar se vagas já salvas fecharam.
+
 ## Extensões (adicionando um novo scanner de ATS)
 
 Toda integração de ATS que você vê acima (Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters,
