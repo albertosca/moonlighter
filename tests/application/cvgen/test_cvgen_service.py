@@ -730,3 +730,45 @@ async def test_shrunk_bookkeeping_is_per_experience_not_global(cfg):
     assert "B one" in tex
     assert "B two" not in tex
     assert "B three" not in tex
+
+
+def test_shrunk_keys_on_experience_index_so_a_rehire_keeps_its_own_counter():
+    # A rehire: the same company AND the same title twice in the pool, with a
+    # gap between the stints. Keyed on company+title the two experiences would
+    # share ONE counter (3 selected), so scanning from the tail `_shrunk` would
+    # see "3 > 1" and drop b-1 — the second stint's ONLY bullet — instead of
+    # dropping from the first stint, which still keeps a bullet after the drop.
+    # Keyed on the experience's index the counters are 2 and 1, and b-1 is
+    # untouchable.
+    from moonlighter.application.cvgen.pool import CVPool, PoolBullet, PoolExperience
+    from moonlighter.application.cvgen.render import CVSelection
+    from moonlighter.application.cvgen.service import _shrunk
+
+    def exp(period, *bullets):
+        return PoolExperience(
+            company="Acme",
+            title="Engineer",
+            period=period,
+            location="SP",
+            bullets=tuple(PoolBullet(id=i, angles=("backend",), latex=i) for i in bullets),
+            prose=None,
+            prose_id=None,
+            angles=(),
+        )
+
+    pool = CVPool(
+        experiences=(exp("2018 -- 2020", "a-1", "a-2"), exp("2022 -- 2026", "b-1")),
+        open_source=(),
+        summary_facts=(),
+    )
+    selection = CVSelection(
+        language="en",
+        summary="",
+        technical_expertise="",
+        bullets=("a-1", "a-2", "b-1"),
+        open_source=(),
+        translations={},
+    )
+    shrunk = _shrunk(selection, pool)
+    assert shrunk is not None
+    assert shrunk.bullets == ("a-1", "b-1")
