@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from unittest.mock import patch
 
 import pytest
 from moonlighter.core.config import ConfigError
@@ -289,6 +290,46 @@ def test_doctor_payload_reports_a_missing_config_and_exits_1(tmp_db, monkeypatch
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     payload, code = cli.doctor_payload()
     assert (payload["config"]["exists"], code) == (False, 1)
+
+
+def test_doctor_payload_live_and_missing_capabilities_share_the_same_keys(
+    tmp_db, monkeypatch, tmp_path
+):
+    # One payload, two object shapes was the bug: live[] carried name/commands
+    # /summary, missing[] carried name/needs/summary. A consumer keying off
+    # either list the same way would KeyError on the other. Both now carry
+    # name, needs (sorted), commands (list), summary -- and missing[] alone
+    # also carries needs_install, the subset of needs not yet installed.
+    from moonlighter.core import cli
+
+    (tmp_path / "config.yaml").write_text("score_threshold: 7.0\n")
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    with patch(
+        "moonlighter.core.cli.installed_slices",
+        return_value={"scan": True, "apply": False, "email": False, "full": False},
+    ):
+        payload, _code = cli.doctor_payload()
+
+    live_by_name = {c["name"]: c for c in payload["capabilities"]["live"]}
+    missing_by_name = {c["name"]: c for c in payload["capabilities"]["missing"]}
+
+    assert live_by_name["discovery"] == {
+        "name": "discovery",
+        "needs": ["scan"],
+        "commands": ["moonlighter-scan"],
+        "summary": "scan company boards and portals, score postings, archive closed ones",
+    }
+    assert missing_by_name["sheets"] == {
+        "name": "sheets",
+        "needs": ["apply"],
+        "commands": ["moonlighter-apply prepare"],
+        "summary": "compose a paste-ready application sheet, from a job id or straight from a URL",
+        "needs_install": ["apply"],
+    }
+    # scan-to-sheet needs {scan, apply}; scan is already installed, so only
+    # apply is what still needs installing.
+    assert missing_by_name["scan-to-sheet"]["needs"] == ["apply", "scan"]
+    assert missing_by_name["scan-to-sheet"]["needs_install"] == ["apply"]
 
 
 def test_doctor_payload_reports_a_malformed_yaml_config_instead_of_crashing(

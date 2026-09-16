@@ -32,7 +32,7 @@ from moonlighter.core.config import (
 )
 from moonlighter.core.db import Job, _db_path, init_db
 from moonlighter.core.log import setup as setup_logging
-from moonlighter.core.slices import capabilities, installed_slices
+from moonlighter.core.slices import SLICES, capabilities, installed_slices
 
 EXIT_OK = 0
 EXIT_NOTHING = 1
@@ -135,10 +135,25 @@ def doctor_payload() -> tuple[dict[str, Any], int]:
         ),
         "capabilities": {
             "live": [
-                {"name": c.name, "commands": list(c.commands), "summary": c.summary} for c in live
+                {
+                    "name": c.name,
+                    "needs": sorted(c.needs),
+                    "commands": list(c.commands),
+                    "summary": c.summary,
+                }
+                for c in live
             ],
             "missing": [
-                {"name": c.name, "needs": sorted(c.needs), "summary": c.summary} for c in missing
+                {
+                    "name": c.name,
+                    "needs": sorted(c.needs),
+                    "commands": list(c.commands),
+                    "summary": c.summary,
+                    "needs_install": sorted(
+                        c.needs - {s for s in SLICES if installed.get(s, False)}
+                    ),
+                }
+                for c in missing
             ],
         },
     }
