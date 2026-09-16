@@ -5,11 +5,14 @@ so its output is unchanged, and a CLI can serialise the same dataclass as JSON
 without either side owning the other's format.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
+from typing import Any
 
+from moonlighter.core.cli import job_to_dict
 from moonlighter.core.db import Job
 from moonlighter.discovery.archive import ArchiveResult, _format_archive_result
+from moonlighter.discovery.sources.base import ScanStats
 from moonlighter.views import render_jobs_table
 
 
@@ -39,6 +42,9 @@ class ScanReport:
     company: str | None = None
     # ALL_KNOWN only: how many postings were found and already known.
     found_but_known: int = 0
+    # Per-source fetch accounting the service already computes; not rendered
+    # -- a CLI's JSON is the only consumer (see scan_report_to_dict).
+    stats: ScanStats | None = None
 
     def __post_init__(self) -> None:
         # Every invariant here is "the fields agree with the kind". Before the
@@ -130,3 +136,23 @@ def _render_counts(report: ScanReport) -> str:
         f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}"
         f"{spend_note}{verify_note}"
     )
+
+
+def scan_report_to_dict(report: ScanReport) -> dict[str, Any]:
+    """The JSON a CLI prints. Every fact the renderer uses is here, plus the
+    ones it does not (stats): a script reads counts, never sentences."""
+    return {
+        "kind": report.kind.value,
+        "threshold": report.threshold,
+        "spend_hit": report.spend_hit,
+        "company": report.company,
+        "found_but_known": report.found_but_known,
+        "saved": [job_to_dict(j) for j in report.saved],
+        "archive": asdict(report.archive) if report.archive is not None else None,
+        "stats": {k: asdict(v) for k, v in report.stats.items()}
+        if report.stats is not None
+        else None,
+        "warning": report.warning,
+        "tip": report.tip,
+        "error": report.error,
+    }

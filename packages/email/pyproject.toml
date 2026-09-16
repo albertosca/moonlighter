@@ -31,6 +31,9 @@ Homepage = "https://github.com/albertosca/moonlighter"
 Repository = "https://github.com/albertosca/moonlighter"
 "Bug Tracker" = "https://github.com/albertosca/moonlighter/issues"
 
+[project.scripts]
+moonlighter-email = "moonlighter.tracking.cli:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["moonlighter"]
 

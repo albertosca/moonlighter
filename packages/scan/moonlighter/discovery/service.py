@@ -142,7 +142,10 @@ async def _run_browser_scanner(
 
 
 async def _collect_raw_jobs(
-    keywords: str, config: dict[str, Any], companies: dict[str, list[str]]
+    keywords: str,
+    config: dict[str, Any],
+    companies: dict[str, list[str]],
+    stats: ScanStats | None = None,
 ) -> tuple[list[RawJob], str | None]:
     """Collects jobs from the HTTP sources and every registered browser-scanner
     plugin (e.g. LinkedIn, if installed). Returns the raw jobs and any warnings
@@ -157,7 +160,8 @@ async def _collect_raw_jobs(
             "entries ignored"
         )
 
-    stats: ScanStats = {}
+    if stats is None:
+        stats = {}
     raw_jobs: list[RawJob] = []
     for source, scanner in scanners.items():
         slugs = companies.get(source, [])
@@ -263,7 +267,10 @@ def _drop_already_seen(raw_jobs: list[RawJob]) -> list[RawJob]:
 
 
 async def _evaluate_and_store(
-    new_jobs: list[RawJob], config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
+    new_jobs: list[RawJob],
+    config: dict[str, Any],
+    profile: dict[str, Any],
+    caller: LLMCaller | None,
 ) -> tuple[list[Job], bool]:
     """Evaluates and saves jobs in concurrent BATCHES (up to scan_concurrency batches
     in parallel, scan_batch_size jobs per batch), stopping at the first spend limit
@@ -324,6 +331,22 @@ async def _evaluate_and_store(
                     to_eval.append(raw)
 
             if not to_eval:
+                return results
+
+            if caller is None:
+                # --no-eval: nothing here may cost a token. Park the evaluable
+                # jobs the way a missing description already does, so verify_job
+                # can score them later from a pasted page.
+                for r in to_eval:
+                    job = _persist(
+                        r,
+                        score=None,
+                        score_notes="not evaluated (--no-eval)",
+                        caveats="[]",
+                        status="needs_review",
+                    )
+                    if job is not None:
+                        results.append(job)
                 return results
 
             try:
@@ -416,10 +439,15 @@ def _stats_warnings(stats: ScanStats) -> list[str]:
 
 
 async def scan_and_evaluate(
-    keywords: str, phase: str, config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
+    keywords: str,
+    phase: str,
+    config: dict[str, Any],
+    profile: dict[str, Any],
+    caller: LLMCaller | None,
 ) -> ScanReport:
     companies = load_company_list(phase=None if phase == "all" else phase)
-    raw_jobs, li_warning = await _collect_raw_jobs(keywords, config, companies)
+    stats: ScanStats = {}
+    raw_jobs, li_warning = await _collect_raw_jobs(keywords, config, companies, stats=stats)
     new_jobs = _drop_already_seen(raw_jobs)
     saved: list[Job] = []
     spend_hit = False
@@ -432,11 +460,16 @@ async def scan_and_evaluate(
         threshold=config["score_threshold"],
         archive=await archive_stale_jobs(None, None, config),
         warning=li_warning,
+        stats=stats,
     )
 
 
 async def scan_company(
-    source: str, company: str, config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
+    source: str,
+    company: str,
+    config: dict[str, Any],
+    profile: dict[str, Any],
+    caller: LLMCaller | None,
 ) -> ScanReport:
     """Scan every open posting at ONE company right now, without touching
     company_list.yaml. `company` is an ATS slug, or (Recruitee) a custom
@@ -473,6 +506,7 @@ async def scan_company(
             tip=tip,
             warning=warning,
             company=company,
+            stats=stats,
         )
 
     # An empty raw_jobs can mean the company genuinely has zero open postings
@@ -487,6 +521,7 @@ async def scan_company(
         warning=warning,
         company=company,
         found_but_known=len(raw_jobs),
+        stats=stats,
     )
 
 

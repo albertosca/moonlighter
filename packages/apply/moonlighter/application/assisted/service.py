@@ -13,7 +13,7 @@ from moonlighter.application.answers.email_alias import (
 )
 from moonlighter.application.assisted.composer import ComposedAnswer, compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.results import SheetResult
+from moonlighter.application.assisted.results import SheetKind, SheetResult
 from moonlighter.application.assisted.sources.greenhouse import (
     board_and_job_from_url,
     fetch_greenhouse_questions,
@@ -166,6 +166,7 @@ async def _sheet(
             f" (tailored for this job — review it before uploading)"
         )
     return SheetResult(
+        kind=SheetKind.SHEET,
         composed=composed,
         job_title=job.title,
         company=job.company,
@@ -173,16 +174,23 @@ async def _sheet(
         alias=alias,
         alias_note=alias_note,
         cv_note=cv_note,
+        cv_path=str(tailored.path) if tailored is not None else None,
+        cv_compiled=tailored.compiled if tailored is not None else None,
     )
 
 
-def _failed(message: str) -> SheetResult:
+def _failed(kind: SheetKind, message: str, *, apply_url: str = "") -> SheetResult:
     """A sheet that never got past an early check: no job, no questions.
 
-    Four call sites build this; the empty title/company/url are what the
-    renderer's error short-circuit ignores, so they carry no information.
+    The empty title/company are what the renderer's error short-circuit
+    ignores, so they carry no information. apply_url defaults empty too (no
+    job in hand for JOB_NOT_FOUND/NO_QUESTIONS) but the NEEDS_PASTE call site
+    passes job.url explicitly: a script reading apply_url off that result
+    needs the URL to open and paste from, and PASTE_HINT already has it.
     """
-    return SheetResult(composed=[], job_title="", company="", apply_url="", error=message)
+    return SheetResult(
+        kind=kind, composed=[], job_title="", company="", apply_url=apply_url, error=message
+    )
 
 
 async def prepare_application(
@@ -190,10 +198,14 @@ async def prepare_application(
 ) -> SheetResult:
     job = _job(job_id)
     if job is None:
-        return _failed(f"Job {job_id} not found.")
+        return _failed(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
     questions = await _questions_from_api(job)
     if not questions:
-        return _failed(PASTE_HINT.format(url=job.url, job_id=job_id))
+        return _failed(
+            SheetKind.NEEDS_PASTE,
+            PASTE_HINT.format(url=job.url, job_id=job_id),
+            apply_url=job.url,
+        )
     return await _sheet(job, questions, config, profile)
 
 
@@ -202,8 +214,11 @@ async def prepare_application_from_paste(
 ) -> SheetResult:
     job = _job(job_id)
     if job is None:
-        return _failed(f"Job {job_id} not found.")
+        return _failed(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
     questions = await extract_questions_from_page(page_text, make_caller(config))
     if not questions:
-        return _failed("No questions could be found in that text. Was the whole page copied?")
+        return _failed(
+            SheetKind.NO_QUESTIONS,
+            "No questions could be found in that text. Was the whole page copied?",
+        )
     return await _sheet(job, questions, config, profile)
