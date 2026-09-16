@@ -278,6 +278,19 @@ def test_scan_report_to_dict_is_json_serialisable_and_carries_the_facts(three_jo
     assert d["error"] is None
 
 
+def test_scan_report_to_dict_pins_the_found_but_known_key_on_all_known(three_jobs):
+    # A CLI consumer reads found_but_known by that exact key over the wire --
+    # renaming the dict literal (not the dataclass field) left every other
+    # test in the suite green before this test existed (mutation checked,
+    # reverted).
+    from moonlighter.discovery.results import scan_report_to_dict
+
+    report = ScanReport(kind=ScanKind.ALL_KNOWN, threshold=7.0, company="acme", found_but_known=3)
+    d = scan_report_to_dict(report)
+    assert "found_but_known" in d
+    assert d["found_but_known"] == 3
+
+
 def test_scan_report_stats_is_not_rendered(three_jobs, snapshot_text):
     # The MCP output must not move: stats is for the JSON consumer only.
     from moonlighter.discovery.sources.base import SourceStats

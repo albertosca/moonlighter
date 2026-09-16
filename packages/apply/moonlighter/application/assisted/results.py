@@ -74,6 +74,6 @@ def sheet_result_to_dict(result: SheetResult) -> dict[str, Any]:
             }
             for item in result.composed
         ],
-        "notes": [n for n in (result.alias_note, result.cv_note) if n is not None],
+        "notes": {"alias": result.alias_note, "cv": result.cv_note},
         "error": result.error,
     }

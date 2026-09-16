@@ -179,14 +179,17 @@ async def _sheet(
     )
 
 
-def _failed(kind: SheetKind, message: str) -> SheetResult:
+def _failed(kind: SheetKind, message: str, *, apply_url: str = "") -> SheetResult:
     """A sheet that never got past an early check: no job, no questions.
 
-    Four call sites build this; the empty title/company/url are what the
-    renderer's error short-circuit ignores, so they carry no information.
+    The empty title/company are what the renderer's error short-circuit
+    ignores, so they carry no information. apply_url defaults empty too (no
+    job in hand for JOB_NOT_FOUND/NO_QUESTIONS) but the NEEDS_PASTE call site
+    passes job.url explicitly: a script reading apply_url off that result
+    needs the URL to open and paste from, and PASTE_HINT already has it.
     """
     return SheetResult(
-        kind=kind, composed=[], job_title="", company="", apply_url="", error=message
+        kind=kind, composed=[], job_title="", company="", apply_url=apply_url, error=message
     )
 
 
@@ -198,7 +201,11 @@ async def prepare_application(
         return _failed(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
     questions = await _questions_from_api(job)
     if not questions:
-        return _failed(SheetKind.NEEDS_PASTE, PASTE_HINT.format(url=job.url, job_id=job_id))
+        return _failed(
+            SheetKind.NEEDS_PASTE,
+            PASTE_HINT.format(url=job.url, job_id=job_id),
+            apply_url=job.url,
+        )
     return await _sheet(job, questions, config, profile)
 
 

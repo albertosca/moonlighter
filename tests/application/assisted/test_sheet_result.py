@@ -258,6 +258,21 @@ async def test_prepare_application_reports_the_cv_path_and_compiled_flag(tmp_db)
     assert result.cv_compiled is True
 
 
+async def test_prepare_application_needs_paste_carries_the_job_url(tmp_db):
+    # _failed() built apply_url="" for every early-check failure, but the
+    # NEEDS_PASTE call site has job.url in hand (it's already in PASTE_HINT's
+    # message) -- a script reading apply_url off a needs_paste result got
+    # nothing instead of the URL it needs to open and paste from.
+    job = _job(tmp_db, url="https://boards.greenhouse.io/acme/jobs/6")
+    with patch(
+        "moonlighter.application.assisted.service._questions_from_api",
+        new=AsyncMock(return_value=[]),
+    ):
+        result = await prepare_application(job.id, CONFIG, PROFILE)
+    assert result.kind == SheetKind.NEEDS_PASTE
+    assert result.apply_url == job.url
+
+
 async def test_prepare_application_not_found_has_the_kind_a_script_can_switch_on(tmp_db):
     init_db()
     result = await prepare_application(4242, CONFIG, PROFILE)
@@ -292,4 +307,40 @@ def test_sheet_result_to_dict_is_json_serialisable(composed_fixture):
     assert d["cv"] == {"path": "/p/cv.pdf", "compiled": True}
     first = d["answers"][0]
     assert set(first) == {"label", "kind", "required", "options", "answer", "gap_reason"}
-    assert d["notes"] == ["Where the form asks..."]
+    assert d["notes"] == {"alias": "Where the form asks...", "cv": None}
+
+
+def test_sheet_result_to_dict_pins_the_needs_paste_and_no_questions_wire_values():
+    # A CLI consumer switches on the exact string over the wire -- pin both
+    # non-SHEET kinds a script can see, not just SHEET (see sheet_result_to_dict
+    # above). Renaming either StrEnum member's value left the suite green
+    # before this test existed (mutation checked, reverted).
+    from moonlighter.application.assisted.results import (
+        SheetKind,
+        SheetResult,
+        sheet_result_to_dict,
+    )
+
+    needs_paste = sheet_result_to_dict(
+        SheetResult(
+            kind=SheetKind.NEEDS_PASTE,
+            composed=[],
+            job_title="",
+            company="",
+            apply_url="",
+            error="paste it",
+        )
+    )
+    assert needs_paste["kind"] == "needs_paste"
+
+    no_questions = sheet_result_to_dict(
+        SheetResult(
+            kind=SheetKind.NO_QUESTIONS,
+            composed=[],
+            job_title="",
+            company="",
+            apply_url="",
+            error="no questions",
+        )
+    )
+    assert no_questions["kind"] == "no_questions"
