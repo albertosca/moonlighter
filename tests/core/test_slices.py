@@ -54,3 +54,14 @@ def test_slice_epilog_says_what_is_installed_and_what_each_missing_slice_unlocks
     assert "full" in text and "mcp-server" in text
     # Live capabilities are not advertised as missing.
     assert "would add: discovery" not in text
+
+
+def test_slice_epilog_tolerates_a_dict_missing_some_slice_keys():
+    # A caller can pass a partial dict (e.g. a scan-only install's own view of
+    # itself, which never heard of "apply"/"email"/"full") -- slice_epilog
+    # must treat an absent key the same as installed=False, matching
+    # capabilities()'s own installed.get(s, False), not raise KeyError.
+    from moonlighter.core.slices import slice_epilog
+
+    text = slice_epilog({"scan": True})
+    assert text.startswith("installed: scan")

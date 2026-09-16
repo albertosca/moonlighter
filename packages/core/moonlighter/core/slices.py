@@ -88,9 +88,9 @@ def slice_epilog(installed: dict[str, bool] | None = None) -> str:
     every combo."""
     installed = installed_slices() if installed is None else installed
     _live, missing = capabilities(installed)
-    lines = ["installed: " + ", ".join(s for s in SLICES if installed[s])]
+    lines = ["installed: " + ", ".join(s for s in SLICES if installed.get(s, False))]
     for c in missing:
-        need = ", ".join(sorted(c.needs - {s for s in SLICES if installed[s]}))
+        need = ", ".join(sorted(c.needs - {s for s in SLICES if installed.get(s, False)}))
         cmds = f" ({', '.join(c.commands)})" if c.commands else ""
         lines.append(f"  install {need} -> would add: {c.name}{cmds} -- {c.summary}")
     return "\n".join(lines)
