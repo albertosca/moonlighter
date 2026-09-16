@@ -5,7 +5,10 @@ import pytest
 from moonlighter.application.assisted.composer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.results import SheetResult, render_sheet_result
-from moonlighter.application.assisted.service import prepare_application
+from moonlighter.application.assisted.service import (
+    prepare_application,
+    prepare_application_from_paste,
+)
 from moonlighter.application.cvgen.service import TailoredCV
 from moonlighter.core.db import Job, init_db
 
@@ -15,6 +18,7 @@ QUESTIONS = [
     FormQuestion(label="Full name", kind=QuestionKind.TEXT, options=[], required=True),
     FormQuestion(label="Email", kind=QuestionKind.TEXT, options=[], required=True),
 ]
+PAGE = "Full name\nEmail\nWhy do you want to work here?"
 
 
 def _job(tmp_db, **kwargs):
@@ -154,3 +158,36 @@ def test_render_sheet_result_reproduces_the_plain_sheet(composed_fixture, snapsh
         error=None,
     )
     snapshot_text(render_sheet_result(result), "plain_sheet")
+
+
+async def test_prepare_from_paste_sheet_is_unchanged(tmp_db, snapshot_text):
+    job = _job(tmp_db, url="https://boards.greenhouse.io/acme/jobs/4")
+    with (
+        patch(
+            "moonlighter.application.assisted.service.extract_questions_from_page",
+            new=AsyncMock(return_value=QUESTIONS),
+        ),
+        patch(
+            "moonlighter.application.assisted.service.ensure_tailored_cv",
+            new=AsyncMock(return_value=None),
+        ),
+        patch("moonlighter.application.assisted.service._tracking_alias", return_value=None),
+    ):
+        out = await prepare_application_from_paste(job.id, PAGE, CONFIG, PROFILE)
+    snapshot_text(out, "paste_sheet")
+
+
+async def test_prepare_from_paste_no_questions_is_unchanged(tmp_db, snapshot_text):
+    job = _job(tmp_db, url="https://boards.greenhouse.io/acme/jobs/5")
+    with patch(
+        "moonlighter.application.assisted.service.extract_questions_from_page",
+        new=AsyncMock(return_value=[]),
+    ):
+        out = await prepare_application_from_paste(job.id, PAGE, CONFIG, PROFILE)
+    snapshot_text(out, "paste_no_questions")
+
+
+async def test_prepare_from_paste_job_not_found_is_unchanged(tmp_db, snapshot_text):
+    init_db()
+    out = await prepare_application_from_paste(4242, PAGE, CONFIG, PROFILE)
+    snapshot_text(out, "paste_job_not_found")

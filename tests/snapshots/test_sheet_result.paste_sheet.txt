@@ -1,0 +1,10 @@
+Staff Engineer — Acme
+https://boards.greenhouse.io/acme/jobs/4
+
+[1/2] Full name  (required)
+Jane Doe
+
+[2/2] Email  (required)
+jane@example.com
+
+All 2 answered — nothing left for you but to paste and submit.
