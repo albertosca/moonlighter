@@ -202,7 +202,9 @@ Every slice also installs a command you can drive from a shell or a cron job, wi
 |---|---|
 | `moonlighter-scan [--phase all] [--keywords ...]` | Run a scan; `--company SOURCE SLUG` scans one board. `--no-eval` discovers and stores postings as `needs_review` without calling the LLM — score them later with `verify_job`. |
 | `moonlighter-apply prepare JOB_ID [--paste FILE]` | Compose the paste-ready sheet; `--paste -` reads the page text from stdin. |
+| `moonlighter-apply prepare --url URL [--paste FILE]` | Ingest the posting first — through its ATS API when the URL has a known shape, else the page itself — stored unscored, then prepare it. No LLM call for the ingest. |
 | `moonlighter-email sync` | Classify recent replies and advance applications. Standalone it does not feed the answer bank; the MCP server's `sync_email_responses` does. |
+| `moonlighter-email register JOB_ID` | Mark a job as applied by hand and mint its `+ref` tracking alias, so replies to it are matched by `sync`. |
 
 ```sh
 moonlighter-scan --no-eval | jq '.saved[] | select(.status == "needs_review") | .url'
