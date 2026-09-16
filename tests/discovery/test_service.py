@@ -717,7 +717,7 @@ async def test_scan_unexpected_eval_error_stops_conservatively(tmp_db):
     # a non-spend error is logged and propagated; the scan stops conservatively and
     # the ScanLog claim is released (no orphan) for a future retry.
     assert ScanLog.select().count() == 0
-    assert "processed" in result or "No new jobs found" in result
+    assert "processed" in result and "No new jobs found" not in result
 
 
 async def test_scan_integrity_error_on_save_skips_silently(tmp_db):
@@ -726,7 +726,7 @@ async def test_scan_integrity_error_on_save_skips_silently(tmp_db):
     # evaluates, but Job.create collides → IntegrityError → job is skipped (return None).
     Job.create(source="x", company="x", title="x", url="https://x.com/scan/5", status="new")
     result = await _run_scan([_raw(5)])
-    assert "processed" in result or "No new jobs found" in result
+    assert "processed" in result and "No new jobs found" not in result
 
 
 async def test_scan_title_filtered_integrity_error_skips_silently(tmp_db):
@@ -735,7 +735,7 @@ async def test_scan_title_filtered_integrity_error_skips_silently(tmp_db):
     # tenta Job.create archived, colide → IntegrityError → pulada (return None).
     Job.create(source="x", company="x", title="x", url="https://x.com/scan/6", status="new")
     result = await _run_scan([_raw(6, title="Staff Accountant")])
-    assert "processed" in result or "No new jobs found" in result
+    assert "processed" in result and "No new jobs found" not in result
 
 
 async def test_scan_location_ineligible_integrity_error_skips_silently(tmp_db):
@@ -753,7 +753,7 @@ async def test_scan_location_ineligible_integrity_error_skips_silently(tmp_db):
         description="A detailed job description that goes on.",
     )
     result = await _run_scan([raw])
-    assert "processed" in result or "No new jobs found" in result
+    assert "processed" in result and "No new jobs found" not in result
 
 
 async def test_scan_needs_review_integrity_error_skips_silently(tmp_db):
@@ -769,7 +769,7 @@ async def test_scan_needs_review_integrity_error_skips_silently(tmp_db):
         description=None,
     )
     result = await _run_scan([raw])
-    assert "processed" in result or "No new jobs found" in result
+    assert "processed" in result and "No new jobs found" not in result
 
 
 # ── concurrency with semaphore ───────────────────────────────────────────────
