@@ -22,8 +22,16 @@ from moonlighter.application.assisted.service import (
     prepare_application,
     prepare_application_from_paste,
 )
-from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK, JsonArgumentParser, bootstrap, run
+from moonlighter.core.cli import (
+    EXIT_NOTHING,
+    EXIT_OK,
+    JsonArgumentParser,
+    bootstrap,
+    doctor_payload,
+    run,
+)
 from moonlighter.core.ingest import job_from_url
+from moonlighter.core.slices import slice_epilog
 
 # A missing --paste path is a bad argument, not a crash -- run() maps it to
 # exit 2 (usage_error) instead of exit 3 (a crash with a traceback the caller
@@ -35,6 +43,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = JsonArgumentParser(
         prog="moonlighter-apply",
         description=__doc__,
+        epilog=slice_epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -48,6 +57,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prepare.add_argument(
         "--paste", metavar="FILE", help="page text to read questions from; - for stdin"
     )
+    sub.add_parser("doctor", help="where the state lives and whether the config loads, as JSON")
     args = parser.parse_args(argv)
     if args.command == "prepare" and (args.job_id is None) == (args.url is None):
         parser.error("prepare takes exactly one of JOB_ID or --url")
@@ -61,6 +71,8 @@ def _read_paste(source: str) -> str:
 
 
 async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    if args.command == "doctor":
+        return doctor_payload()
     config, profile = bootstrap()
     job_id = args.job_id
     if args.url is not None:

@@ -23,8 +23,16 @@ standalone email install. Exit 0 (kind "registered") when the job exists,
 import argparse
 from typing import Any
 
-from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK, JsonArgumentParser, bootstrap, run
+from moonlighter.core.cli import (
+    EXIT_NOTHING,
+    EXIT_OK,
+    JsonArgumentParser,
+    bootstrap,
+    doctor_payload,
+    run,
+)
 from moonlighter.core.llm import make_caller
+from moonlighter.core.slices import slice_epilog
 from moonlighter.tracking.email_monitor import sync_responses
 from moonlighter.tracking.gmail_client import GmailAuthError
 from moonlighter.tracking.register import RegisterKind, register_application, register_to_dict
@@ -39,6 +47,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = JsonArgumentParser(
         prog="moonlighter-email",
         description=__doc__,
+        epilog=slice_epilog(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -47,10 +56,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "register", help="mark a job applied and mint its tracking alias"
     )
     register_parser.add_argument("job_id", type=int)
+    sub.add_parser("doctor", help="where the state lives and whether the config loads, as JSON")
     return parser.parse_args(argv)
 
 
 async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    if args.command == "doctor":
+        return doctor_payload()
     config, _profile = bootstrap()
     if args.command == "register":
         r = register_application(args.job_id, config)

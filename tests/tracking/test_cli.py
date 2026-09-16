@@ -117,3 +117,27 @@ async def test_run_register_unknown_job_exits_1(tmp_db):
     ):
         payload, code = await cli._run(cli.parse_args(["register", "7"]))
     assert (payload["kind"], code) == ("job_not_found", 1)
+
+
+def test_email_keeps_its_grammar_and_gains_doctor():
+    from moonlighter.tracking.cli import parse_args
+
+    assert parse_args(["doctor"]).command == "doctor"
+    assert parse_args(["sync"]).command == "sync"
+
+
+async def test_email_doctor_returns_the_doctor_payload(tmp_db):
+    from moonlighter.tracking import cli
+
+    with patch.object(cli, "doctor_payload", return_value=({"kind": "doctor"}, 0)):
+        payload, code = await cli._run(cli.parse_args(["doctor"]))
+    assert (payload, code) == ({"kind": "doctor"}, 0)
+
+
+def test_email_help_carries_the_slice_epilog(capsys):
+    from moonlighter.tracking.cli import parse_args
+
+    with pytest.raises(SystemExit) as exc:
+        parse_args(["--help"])
+    assert exc.value.code == 0
+    assert "installed:" in capsys.readouterr().out
