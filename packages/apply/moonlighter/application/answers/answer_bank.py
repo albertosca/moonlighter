@@ -15,7 +15,7 @@ over a wrong cache hit.
 """
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from moonlighter.application.assisted.questions import QuestionKind
@@ -70,10 +70,17 @@ def normalize_question(label: str) -> str:
     return _TRAILING_PUNCTUATION.sub("", text).strip()
 
 
-def load_answer_bank() -> dict[str, str]:
-    """Every banked answer, keyed by normalised question. The table is small
-    (Alberto's own repeat screening questions) — loading it whole is simpler
-    than a per-question query and cheap at this scale."""
+def load_answer_bank(max_age_days: int | None) -> dict[str, str]:
+    """Every banked answer no older than max_age_days, keyed by normalised
+    question; None disables expiry. The table is small (Alberto's own repeat
+    screening questions) — loading it whole is simpler than a per-question
+    query and cheap at this scale.
+
+    Age is measured from updated_at, which every promotion refreshes, so an
+    answer that keeps getting used never expires — only one nobody has
+    submitted in that long does. Nothing is deleted: a stale row is skipped
+    here and overwritten by the next promotion of the same question.
+    """
     # Local import, same layering reason as composer.py's cvgen import: this
     # module's pure helpers (normalize_question, is_bank_eligible,
     # is_sensitive_label) are imported by composer.py, which the plan requires
@@ -82,7 +89,12 @@ def load_answer_bank() -> dict[str, str]:
     # composer pull in peewee and the whole DB layer.
     from moonlighter.core.db import AnswerBankEntry
 
-    return {row.normalized_question: row.answer for row in AnswerBankEntry.select()}
+    rows = AnswerBankEntry.select()
+    if max_age_days is not None:
+        rows = rows.where(
+            AnswerBankEntry.updated_at >= datetime.now() - timedelta(days=max_age_days)
+        )
+    return {row.normalized_question: row.answer for row in rows}
 
 
 def promote_application(job_cache: dict[str, Any], source_job_id: int) -> None:

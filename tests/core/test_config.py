@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 from moonlighter.core.config import (
+    DEFAULTS,
     ConfigError,
     load_company_list,
     load_config,
@@ -564,3 +565,18 @@ def test_cv_schema_accepts_tailored_cv_keys(tmp_path, monkeypatch):
     assert config["cv"]["pool"] == "/somewhere/cv-pool.yaml"
     assert config["cv"]["template_dir"] == "/somewhere/templates"
     assert config["cv"]["generated_dir"] == "/somewhere/generated"
+
+
+class TestAnswerBankMaxAge:
+    def test_null_disables_expiry_and_is_valid(self):
+        validate_config({"answer_bank_max_age_days": None})
+
+    def test_int_is_valid(self):
+        validate_config({"answer_bank_max_age_days": 30})
+
+    def test_string_is_rejected_naming_the_key(self):
+        with pytest.raises(ConfigError, match="answer_bank_max_age_days"):
+            validate_config({"answer_bank_max_age_days": "90"})
+
+    def test_default_is_ninety_days(self):
+        assert DEFAULTS["answer_bank_max_age_days"] == 90

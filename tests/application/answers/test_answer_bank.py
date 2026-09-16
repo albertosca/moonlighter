@@ -125,12 +125,12 @@ def test_load_answer_bank_returns_normalized_question_to_answer_map(tmp_db):
         answer="Yes",
         source_job_id=1,
     )
-    assert load_answer_bank() == {"are you authorized to work in brazil": "Yes"}
+    assert load_answer_bank(max_age_days=None) == {"are you authorized to work in brazil": "Yes"}
 
 
 def test_load_answer_bank_empty_table_returns_empty_dict(tmp_db):
     init_db()
-    assert load_answer_bank() == {}
+    assert load_answer_bank(max_age_days=None) == {}
 
 
 # ── promote_application ───────────────────────────────────────────────────────
@@ -198,3 +198,34 @@ def test_promote_application_ignores_invalid_kind(tmp_db):
     job_cache = {"A question": {"answer": "some answer", "kind": "invalid_kind"}}
     promote_application(job_cache, source_job_id=1)
     assert AnswerBankEntry.select().count() == 0
+
+
+# ── expiry ────────────────────────────────────────────────────────────────────
+
+
+def _entry(question: str, answer: str, days_old: int) -> None:
+    from datetime import datetime, timedelta
+
+    AnswerBankEntry.create(
+        normalized_question=question,
+        kind="text",
+        answer=answer,
+        source_job_id=1,
+        updated_at=datetime.now() - timedelta(days=days_old),
+    )
+
+
+def test_load_answer_bank_skips_entries_older_than_max_age(tmp_db):
+    # "When can you start?" gets banked like any boolean/text answer and would
+    # replay verbatim months later. updated_at is refreshed on every promotion,
+    # so age here means "since the last time this answer was actually used".
+    init_db()
+    _entry("when can you start", "in two weeks", days_old=91)
+    _entry("notice period", "30 days", days_old=89)
+    assert load_answer_bank(max_age_days=90) == {"notice period": "30 days"}
+
+
+def test_load_answer_bank_with_no_max_age_keeps_everything(tmp_db):
+    init_db()
+    _entry("when can you start", "in two weeks", days_old=400)
+    assert load_answer_bank(max_age_days=None) == {"when can you start": "in two weeks"}

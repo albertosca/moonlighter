@@ -61,6 +61,10 @@ DEFAULTS: dict[str, Any] = {
     # `uvx moonlighter` has Claude Code far more often than an API key.
     "llm_backend": "cli",
     "score_threshold": 6.5,
+    # A banked answer older than this (days since it was last promoted, i.e.
+    # last submitted somewhere) is not replayed. "When can you start?" is the
+    # concrete case: true for a while, then quietly wrong. null disables expiry.
+    "answer_bank_max_age_days": 90,
     "llm_model": "claude-sonnet-4-6",
     "eval_model": "claude-haiku-4-5-20251001",
     "slow_mo_ms": 300,
@@ -140,6 +144,7 @@ _CONFIG_SCHEMA: dict[str, tuple[type, ...]] = {
     "scan_wwr": (bool,),
     "scan_hn_whoishiring": (bool,),
     "portal_max_age_days": _INT,
+    "answer_bank_max_age_days": (*_INT, type(None)),  # null disables expiry
 }
 
 _CV_SCHEMA: dict[str, tuple[type, ...]] = {
