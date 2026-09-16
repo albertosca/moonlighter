@@ -259,7 +259,7 @@ async def test_prepare_application_reports_the_cv_path_and_compiled_flag(tmp_db)
 
 
 async def test_prepare_application_needs_paste_carries_the_job_url(tmp_db):
-    # _failed() built apply_url="" for every early-check failure, but the
+    # failed_sheet() built apply_url="" for every early-check failure, but the
     # NEEDS_PASTE call site has job.url in hand (it's already in PASTE_HINT's
     # message) -- a script reading apply_url off a needs_paste result got
     # nothing instead of the URL it needs to open and paste from.
