@@ -13,7 +13,7 @@ from typing import Any
 from moonlighter.core.db import Job
 from moonlighter.core.log import get_logger
 from moonlighter.core.plugins import discover_entry_points_by_name
-from moonlighter.discovery.sources.base import BaseScanner
+from moonlighter.discovery.sources.base import BaseScanner, ScanStats
 from moonlighter.discovery.sources.registry import LISTING_SOURCES as _LISTING_SOURCES
 from moonlighter.discovery.sources.registry import PORTAL_SOURCES
 from moonlighter.discovery.urls import normalize_job_url
@@ -83,14 +83,29 @@ async def _check_via_listing(
     result: StalenessResult,
 ) -> None:
     scanner = scanners[source]
+    # The HTTP scanners never raise: _gather_jobs swallows a failed fetch, counts
+    # it in stats[source].errors and returns [] -- which, read as "zero open
+    # postings", archived a live job after a transient 404 (2026-09-16). The
+    # exception guard below stays for scanners that do raise; the stats dict is
+    # how the first-party ones report the same failure.
+    stats: ScanStats = {}
     try:
-        raw = await scanner.scan([company])
+        raw = await scanner.scan([company], stats=stats)
     except Exception as e:
         logger.warning("staleness: %s scan failed for %s — %s", source, company, e, exc_info=True)
         result.failed_companies.append(company)
         return
     if not isinstance(raw, list):
         logger.warning("staleness: %s scan returned unexpected type for %s", source, company)
+        result.failed_companies.append(company)
+        return
+    if (source_stats := stats.get(source)) is not None and source_stats.errors:
+        logger.warning(
+            "staleness: %s fetch failed for %s (%d error(s)) — not treated as closed",
+            source,
+            company,
+            source_stats.errors,
+        )
         result.failed_companies.append(company)
         return
     # Stored job.url is normalized (Task 5 strips the Recruitee /c/new apply

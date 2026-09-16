@@ -208,3 +208,52 @@ async def test_portal_age_archiving_disabled_with_zero():
     result = await find_stale_jobs({("remoteok", "acme"): [old]}, {}, {"portal_max_age_days": 0})
     assert result.stale_by_age == []
     assert result.failed_companies == ["1 remoteok job(s) (portal feed, no per-company listing)"]
+
+
+# ── a failed fetch is not "zero open jobs" ────────────────────────────────────
+# Found live on 2026-09-16: a Greenhouse fetch answered HTTP 404 and the run
+# archived a status='new', score-8.5 job with failed_companies == []. The real
+# HTTP scanners never raise — _gather_jobs swallows a failed slug, counts it in
+# stats[source].errors and returns [] — so the exception guard above protects a
+# path production does not take.
+
+
+class _FetchFailingScanner:
+    """Shaped like every _gather_jobs-backed scanner: no exception, [] back,
+    the failure visible only through the stats dict."""
+
+    async def scan(self, company_slugs, **kwargs):
+        from moonlighter.discovery.sources.base import SourceStats
+
+        stats = kwargs.get("stats")
+        if stats is not None:
+            stats["greenhouse"] = SourceStats(companies=len(company_slugs), jobs=0, errors=1)
+        return []
+
+
+async def test_fetch_error_reported_through_stats_marks_company_failed_not_stale():
+    job = _job(url="https://x.com/1")
+    result = await find_stale_jobs(
+        {("greenhouse", "acme"): [job]}, {"greenhouse": _FetchFailingScanner()}, CONFIG
+    )
+    assert result.stale == []
+    assert result.failed_companies == ["acme"]
+
+
+async def test_http_404_on_the_real_greenhouse_scanner_marks_company_failed_not_stale():
+    # The exact live scenario, through the real scanner and the real
+    # _gather_jobs: only the HTTP client is faked, and it answers 404.
+    from moonlighter.discovery.sources.http import GreenhouseScanner
+
+    from tests.discovery.sources.test_http import _make_simple_client
+
+    job = _job(url="https://boards.greenhouse.io/acme/jobs/1")
+    with patch(
+        "moonlighter.discovery.sources.http.httpx.AsyncClient",
+        return_value=_make_simple_client({}, status=404),
+    ):
+        result = await find_stale_jobs(
+            {("greenhouse", "acme"): [job]}, {"greenhouse": GreenhouseScanner()}, CONFIG
+        )
+    assert result.stale == []
+    assert result.failed_companies == ["acme"]
