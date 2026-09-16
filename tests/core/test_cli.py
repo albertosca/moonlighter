@@ -289,3 +289,48 @@ def test_doctor_payload_reports_a_missing_config_and_exits_1(tmp_db, monkeypatch
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     payload, code = cli.doctor_payload()
     assert (payload["config"]["exists"], code) == (False, 1)
+
+
+def test_doctor_payload_reports_a_malformed_yaml_config_instead_of_crashing(
+    tmp_db, monkeypatch, tmp_path
+):
+    # load_config() reaches yaml.safe_load() before validate_config() ever
+    # runs -- a syntax error there is a yaml.YAMLError, not a ConfigError, and
+    # doctor_payload() must still report it as JSON instead of letting it
+    # escape as a traceback (doctor's whole point is to be usable on a
+    # broken install).
+    from moonlighter.core import cli
+
+    (tmp_path / "config.yaml").write_text("score_threshold: [7.0\n")
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    payload, code = cli.doctor_payload()
+    assert code == 1
+    assert payload["config"]["valid"] is False
+    assert payload["config"]["error"] is not None
+    error_lower = payload["config"]["error"].lower()
+    assert "yaml" in error_lower or "pars" in error_lower or "scan" in error_lower
+
+
+def test_doctor_payload_reports_an_unreadable_config_instead_of_crashing(
+    tmp_db, monkeypatch, tmp_path
+):
+    # A chmod-000 config.yaml makes read_text() raise PermissionError, which
+    # is neither a ConfigError nor a yaml.YAMLError -- doctor_payload() must
+    # catch it too.
+    import os
+
+    from moonlighter.core import cli
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("score_threshold: 7.0\n")
+    config_path.chmod(0o000)
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    try:
+        if os.access(config_path, os.R_OK):
+            pytest.skip("running as a user that can read a chmod-000 file (e.g. root)")
+        payload, code = cli.doctor_payload()
+        assert code == 1
+        assert payload["config"]["valid"] is False
+        assert "permission" in payload["config"]["error"].lower()
+    finally:
+        config_path.chmod(0o644)

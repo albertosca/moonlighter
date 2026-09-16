@@ -21,6 +21,7 @@ from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, NoReturn
 
+import yaml
 from moonlighter.core.config import (
     ConfigError,
     harden_permissions,
@@ -108,7 +109,7 @@ def doctor_payload() -> tuple[dict[str, Any], int]:
     try:
         validate_config(load_config())
         valid = True
-    except ConfigError as e:
+    except (ConfigError, OSError, yaml.YAMLError) as e:
         error = str(e)
     installed = installed_slices()
     live, missing = capabilities(installed)
