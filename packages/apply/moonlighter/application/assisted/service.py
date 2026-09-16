@@ -6,11 +6,6 @@ from typing import Any
 
 import httpx
 from moonlighter.application.answers.answer_bank import load_answer_bank
-from moonlighter.application.answers.email_alias import (
-    build_email_alias,
-    is_email_label,
-    new_email_ref,
-)
 from moonlighter.application.assisted.composer import ComposedAnswer, compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.results import SheetKind, SheetResult
@@ -26,6 +21,11 @@ from moonlighter.application.assisted.sources.recruitee import (
 from moonlighter.application.cvgen.service import ensure_tailored_cv
 from moonlighter.core.config import DEFAULTS
 from moonlighter.core.db import Application, Job
+from moonlighter.core.email_alias import (
+    build_email_alias,
+    is_email_label,
+    new_email_ref,
+)
 from moonlighter.core.llm import make_caller
 
 PASTE_HINT = (
@@ -179,7 +179,7 @@ async def _sheet(
     )
 
 
-def _failed(kind: SheetKind, message: str, *, apply_url: str = "") -> SheetResult:
+def failed_sheet(kind: SheetKind, message: str, *, apply_url: str = "") -> SheetResult:
     """A sheet that never got past an early check: no job, no questions.
 
     The empty title/company are what the renderer's error short-circuit
@@ -198,10 +198,10 @@ async def prepare_application(
 ) -> SheetResult:
     job = _job(job_id)
     if job is None:
-        return _failed(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
+        return failed_sheet(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
     questions = await _questions_from_api(job)
     if not questions:
-        return _failed(
+        return failed_sheet(
             SheetKind.NEEDS_PASTE,
             PASTE_HINT.format(url=job.url, job_id=job_id),
             apply_url=job.url,
@@ -214,10 +214,10 @@ async def prepare_application_from_paste(
 ) -> SheetResult:
     job = _job(job_id)
     if job is None:
-        return _failed(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
+        return failed_sheet(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
     questions = await extract_questions_from_page(page_text, make_caller(config))
     if not questions:
-        return _failed(
+        return failed_sheet(
             SheetKind.NO_QUESTIONS,
             "No questions could be found in that text. Was the whole page copied?",
         )

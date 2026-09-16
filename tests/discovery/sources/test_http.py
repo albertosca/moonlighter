@@ -5,10 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from moonlighter.core.http import FetchError, get_json, require_dict
 from moonlighter.discovery.sources.base import ScanStats, SourceStats
 from moonlighter.discovery.sources.http import (
     AshbyScanner,
-    FetchError,
     GreenhouseScanner,
     GupyScanner,
     HNWhoIsHiringScanner,
@@ -20,8 +20,6 @@ from moonlighter.discovery.sources.http import (
     SmartRecruitersScanner,
     WeWorkRemotelyScanner,
     WorkableScanner,
-    _get_json,
-    _require_dict,
 )
 
 GREENHOUSE_RESPONSE = {
@@ -2182,7 +2180,7 @@ async def test_ashby_non_dict_response_returns_empty():
     assert jobs == []
 
 
-# --- _get_json + per-source stats counting ---
+# --- get_json + per-source stats counting ---
 
 
 def _mock_client_cls(mock_client):
@@ -2197,7 +2195,7 @@ async def test_get_json_raises_on_network_error():
     client = AsyncMock()
     client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
     with pytest.raises(FetchError):
-        await _get_json(client, "https://example.test/x")
+        await get_json(client, "https://example.test/x")
 
 
 @pytest.mark.asyncio
@@ -2206,7 +2204,7 @@ async def test_get_json_raises_on_non_200():
     response = MagicMock(status_code=500)
     client.get = AsyncMock(return_value=response)
     with pytest.raises(FetchError, match="HTTP 500"):
-        await _get_json(client, "https://example.test/x")
+        await get_json(client, "https://example.test/x")
 
 
 @pytest.mark.asyncio
@@ -2216,17 +2214,17 @@ async def test_get_json_raises_on_non_json_body():
     response.json.side_effect = ValueError("not json")
     client.get = AsyncMock(return_value=response)
     with pytest.raises(FetchError, match="non-JSON"):
-        await _get_json(client, "https://example.test/x")
+        await get_json(client, "https://example.test/x")
 
 
 def test_require_dict_returns_the_dict_unchanged():
     payload = {"jobs": []}
-    assert _require_dict(payload) is payload
+    assert require_dict(payload) is payload
 
 
 def test_require_dict_raises_on_a_list():
     with pytest.raises(FetchError, match="unexpected payload shape"):
-        _require_dict([1, 2, 3])
+        require_dict([1, 2, 3])
 
 
 def test_require_dict_raises_on_a_string():
@@ -2235,12 +2233,12 @@ def test_require_dict_raises_on_a_string():
     # collapses all relied on this exact raise to turn that into a visible
     # scan error instead of an AttributeError on .get().
     with pytest.raises(FetchError, match="unexpected payload shape"):
-        _require_dict("<html>error</html>")
+        require_dict("<html>error</html>")
 
 
 def test_require_dict_raises_on_none():
     with pytest.raises(FetchError, match="unexpected payload shape"):
-        _require_dict(None)
+        require_dict(None)
 
 
 @pytest.mark.asyncio

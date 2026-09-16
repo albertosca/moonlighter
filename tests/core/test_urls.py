@@ -1,6 +1,6 @@
 """Tests for job URL normalization."""
 
-from moonlighter.discovery.urls import normalize_job_url
+from moonlighter.core.urls import normalize_job_url
 
 
 def test_strips_recruitee_apply_suffix():

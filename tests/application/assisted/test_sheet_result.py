@@ -259,7 +259,7 @@ async def test_prepare_application_reports_the_cv_path_and_compiled_flag(tmp_db)
 
 
 async def test_prepare_application_needs_paste_carries_the_job_url(tmp_db):
-    # _failed() built apply_url="" for every early-check failure, but the
+    # failed_sheet() built apply_url="" for every early-check failure, but the
     # NEEDS_PASTE call site has job.url in hand (it's already in PASTE_HINT's
     # message) -- a script reading apply_url off a needs_paste result got
     # nothing instead of the URL it needs to open and paste from.
@@ -344,3 +344,21 @@ def test_sheet_result_to_dict_pins_the_needs_paste_and_no_questions_wire_values(
         )
     )
     assert no_questions["kind"] == "no_questions"
+
+
+def test_sheet_kind_posting_unreadable_is_pinned():
+    from moonlighter.application.assisted.results import (
+        SheetKind,
+        SheetResult,
+        sheet_result_to_dict,
+    )
+
+    r = SheetResult(
+        kind=SheetKind.POSTING_UNREADABLE,
+        composed=[],
+        job_title="",
+        company="",
+        apply_url="https://x",
+        error="The posting at https://x could not be read.",
+    )
+    assert sheet_result_to_dict(r)["kind"] == "posting_unreadable"

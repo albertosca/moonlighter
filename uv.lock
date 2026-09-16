@@ -1219,6 +1219,7 @@ version = "0.1.6"
 source = { editable = "packages/core" }
 dependencies = [
     { name = "anthropic" },
+    { name = "httpx" },
     { name = "peewee" },
     { name = "pyyaml" },
     { name = "rich" },
@@ -1232,6 +1233,7 @@ browser = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=0.40" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "peewee", specifier = ">=3.17" },
     { name = "playwright", marker = "extra == 'browser'", specifier = ">=1.47" },
     { name = "pyyaml", specifier = ">=6.0" },

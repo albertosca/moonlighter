@@ -13,10 +13,10 @@ from typing import Any
 from moonlighter.core.db import Job
 from moonlighter.core.log import get_logger
 from moonlighter.core.plugins import discover_entry_points_by_name
+from moonlighter.core.urls import normalize_job_url
 from moonlighter.discovery.sources.base import BaseScanner, ScanStats
 from moonlighter.discovery.sources.registry import LISTING_SOURCES as _LISTING_SOURCES
 from moonlighter.discovery.sources.registry import PORTAL_SOURCES
-from moonlighter.discovery.urls import normalize_job_url
 
 logger = get_logger(__name__)
 

@@ -78,3 +78,42 @@ def test_run_via_run_classifies_a_missing_gmail_token_as_an_expected_failure(tmp
     out = json.loads(capsys.readouterr().out)
     assert out["kind"] == "expected_failure"
     assert out["type"] == "GmailAuthError"
+
+
+async def test_run_register_exits_0_and_prints_the_alias(tmp_db):
+    from moonlighter.tracking import cli
+    from moonlighter.tracking.register import RegisterKind, RegisterResult
+
+    r = RegisterResult(
+        RegisterKind.REGISTERED,
+        7,
+        application_id=1,
+        status="submitted",
+        email_ref="ab12cd34",
+        alias="jane+ab12cd34@example.com",
+    )
+    with (
+        patch.object(
+            cli, "bootstrap", return_value=({"email": {"address": "jane@example.com"}}, {})
+        ),
+        patch.object(cli, "register_application", return_value=r),
+    ):
+        payload, code = await cli._run(cli.parse_args(["register", "7"]))
+    assert (payload["kind"], payload["alias"], code) == (
+        "registered",
+        "jane+ab12cd34@example.com",
+        0,
+    )
+
+
+async def test_run_register_unknown_job_exits_1(tmp_db):
+    from moonlighter.tracking import cli
+    from moonlighter.tracking.register import RegisterKind, RegisterResult
+
+    r = RegisterResult(RegisterKind.JOB_NOT_FOUND, 7, error="Job 7 not found.")
+    with (
+        patch.object(cli, "bootstrap", return_value=({}, {})),
+        patch.object(cli, "register_application", return_value=r),
+    ):
+        payload, code = await cli._run(cli.parse_args(["register", "7"]))
+    assert (payload["kind"], code) == ("job_not_found", 1)

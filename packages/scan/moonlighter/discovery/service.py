@@ -6,18 +6,18 @@ config/profile/caller. The logic lives here, testable in isolation.
 
 import asyncio
 import json
-import re
 from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
-import httpx
 from moonlighter.core.config import load_company_list
 from moonlighter.core.db import Job, ScanLog
 from moonlighter.core.llm import LLMCaller, is_spend_limit
 from moonlighter.core.log import get_logger
 from moonlighter.core.metrics import record_spend_limit_hit
 from moonlighter.core.plugins import discover_entry_points
+from moonlighter.core.posting import fetch_description, fetch_posting_via_ats
+from moonlighter.core.urls import normalize_job_url
 from moonlighter.discovery.archive import archive_stale_jobs as archive_stale_jobs
 from moonlighter.discovery.eligibility import Eligibility, classify_location
 from moonlighter.discovery.evaluator import (
@@ -26,11 +26,9 @@ from moonlighter.discovery.evaluator import (
     evaluate_jobs_batch,
     should_skip_by_title,
 )
-from moonlighter.discovery.posting import fetch_posting_via_ats
 from moonlighter.discovery.results import ScanKind, ScanReport
 from moonlighter.discovery.sources.base import RawJob, ScanStats
 from moonlighter.discovery.sources.registry import build_http_scanners
-from moonlighter.discovery.urls import normalize_job_url
 from peewee import IntegrityError
 
 logger = get_logger(__name__)
@@ -542,7 +540,7 @@ async def add_job(
             title = title or posting.title or ""
             description = description or posting.description or ""
     if not description:
-        fetched, error = await _fetch_description(url)
+        fetched, error = await fetch_description(url)
         if error:
             return error
         description = fetched or ""
@@ -639,38 +637,6 @@ async def verify_job(
     job.status = status
     job.save()
     return _format_add_result(job, job.company, job.title, result, threshold, status)
-
-
-async def _fetch_description(url: str) -> tuple[str | None, str | None]:
-    """Fetches and cleans (strips HTML from) the job description. Returns (description,
-    error) — only one of the two is non-null. Doesn't work on pages that require login."""
-    try:
-        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-            r = await client.get(url, headers={"User-Agent": "moonlighter/0.1"})
-        if r.status_code != 200:
-            return None, (
-                f"Could not fetch the URL (HTTP {r.status_code}). Provide 'description' manually."
-            )
-        # Remove script/style/noscript WITH their contents first: a bare
-        # tag-strip leaves e.g. a styled-components CSS bundle as the
-        # "description" of any SPA page (job #2646, the Ziflow case).
-        text = re.sub(r"(?is)<(script|style|noscript)\b[^>]*>.*?</\1\s*>", " ", r.text)
-        # The pair-matching regex above needs a real closing tag; malformed
-        # HTML with an unclosed <style>/<script>/<noscript> leaves it (and
-        # everything after it) untouched — measured directly: CSS/JS text
-        # then leaks into the description alongside real content. Every
-        # WELL-FORMED pair is already gone at this point, so any tag of these
-        # three names still present is unclosed by definition — truncate the
-        # rest of the document there rather than trust an unbounded tail.
-        text = re.split(r"(?is)<(?:script|style|noscript)\b", text, maxsplit=1)[0]
-        text = re.sub(r"<[^>]+>", " ", text).strip()
-        return re.sub(r"\s+", " ", text)[:8000], None
-    except Exception as e:
-        return None, (
-            f"Error fetching URL: {e}\n"
-            f"For pages that require login (LinkedIn, etc.), provide "
-            f"'company', 'title', and 'description' manually."
-        )
 
 
 def _existing_job_message(url: str) -> str | None:

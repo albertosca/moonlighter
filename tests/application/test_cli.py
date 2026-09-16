@@ -108,3 +108,102 @@ def test_run_via_run_classifies_a_missing_paste_file_as_a_usage_error(tmp_db, ca
     out = json.loads(capsys.readouterr().out)
     assert out["kind"] == "usage_error"
     assert out["type"] == "FileNotFoundError"
+
+
+async def test_run_prepare_with_url_ingests_then_prepares(tmp_db):
+    from moonlighter.application import cli
+    from moonlighter.core.db import Job, init_db
+
+    init_db()
+    job = Job.create(
+        source="manual", company="Acme", title="Eng", url="https://x/1", status="needs_review"
+    )
+    result = SheetResult(
+        kind=SheetKind.SHEET, composed=[], job_title="Eng", company="Acme", apply_url="https://x/1"
+    )
+    prepare = AsyncMock(return_value=result)
+    with (
+        patch.object(cli, "bootstrap", return_value=({}, {})),
+        patch.object(cli, "job_from_url", new=AsyncMock(return_value=job)),
+        patch.object(cli, "prepare_application", new=prepare),
+    ):
+        payload, code = await cli._run(cli.parse_args(["prepare", "--url", "https://x/1"]))
+    assert (payload["kind"], code) == ("sheet", 0)
+    assert prepare.await_args.args[0] == job.id
+
+
+async def test_run_prepare_with_an_unreadable_url_exits_1_with_its_own_kind(tmp_db):
+    from moonlighter.application import cli
+
+    with (
+        patch.object(cli, "bootstrap", return_value=({}, {})),
+        patch.object(cli, "job_from_url", new=AsyncMock(return_value=None)),
+    ):
+        payload, code = await cli._run(
+            cli.parse_args(["prepare", "--url", "https://example.com/x"])
+        )
+    assert (payload["kind"], code) == ("posting_unreadable", 1)
+    assert payload["apply_url"] == "https://example.com/x"
+    assert payload["error"] == (
+        "The posting at https://example.com/x is not on a known ATS or could not be read. "
+        "Pass --company and --title to ingest it anyway, or give a job id."
+    )
+
+
+def test_parse_args_prepare_requires_exactly_one_of_job_id_and_url(capsys):
+    import json
+
+    from moonlighter.application.cli import parse_args
+
+    for argv in (["prepare"], ["prepare", "42", "--url", "https://x"]):
+        with pytest.raises(SystemExit) as exc:
+            parse_args(argv)
+        assert exc.value.code == 2
+        assert json.loads(capsys.readouterr().out)["kind"] == "usage_error"
+
+
+def test_parse_args_prepare_with_url_and_company_title_overrides():
+    from moonlighter.application.cli import parse_args
+
+    args = parse_args(["prepare", "--url", "u", "--company", "Acme", "--title", "Eng"])
+    assert (args.url, args.company, args.title) == ("u", "Acme", "Eng")
+
+
+def test_parse_args_prepare_company_or_title_without_url_is_a_usage_error(capsys):
+    import json
+
+    from moonlighter.application.cli import parse_args
+
+    for argv in (
+        ["prepare", "42", "--company", "Acme"],
+        ["prepare", "42", "--title", "Eng"],
+    ):
+        with pytest.raises(SystemExit) as exc:
+            parse_args(argv)
+        assert exc.value.code == 2
+        assert json.loads(capsys.readouterr().out)["kind"] == "usage_error"
+
+
+async def test_run_prepare_with_url_passes_company_and_title_through(tmp_db):
+    from moonlighter.application import cli
+    from moonlighter.core.db import Job, init_db
+
+    init_db()
+    job = Job.create(
+        source="manual", company="Acme", title="Eng", url="https://x/1", status="needs_review"
+    )
+    result = SheetResult(
+        kind=SheetKind.SHEET, composed=[], job_title="Eng", company="Acme", apply_url="https://x/1"
+    )
+    ingest = AsyncMock(return_value=job)
+    with (
+        patch.object(cli, "bootstrap", return_value=({}, {})),
+        patch.object(cli, "job_from_url", new=ingest),
+        patch.object(cli, "prepare_application", new=AsyncMock(return_value=result)),
+    ):
+        await cli._run(
+            cli.parse_args(
+                ["prepare", "--url", "https://x/1", "--company", "Acme", "--title", "Eng"]
+            )
+        )
+    assert ingest.await_args.kwargs == {"company": "Acme", "title": "Eng"}

@@ -2,10 +2,13 @@
 
     moonlighter-apply prepare JOB_ID              # questions from the job's ATS API
     moonlighter-apply prepare JOB_ID --paste FILE # questions read from a pasted page (- = stdin)
+    moonlighter-apply prepare --url URL           # ingest the posting first (no LLM), then prepare
+    moonlighter-apply prepare --url URL --company X --title Y  # non-ATS page: name it yourself
 
 Prints one JSON document (sheet_result_to_dict) on stdout; logs on stderr.
 Exit 0 when a sheet was produced, 1 when the job was not found, had no API
-questions (paste the page), or the pasted text had none; 2 on an invalid config.
+questions (paste the page), the pasted text had none, or --url's posting
+could not be read; 2 on an invalid config.
 """
 
 import argparse
@@ -15,10 +18,12 @@ from typing import Any
 
 from moonlighter.application.assisted.results import SheetKind, sheet_result_to_dict
 from moonlighter.application.assisted.service import (
+    failed_sheet,
     prepare_application,
     prepare_application_from_paste,
 )
 from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK, JsonArgumentParser, bootstrap, run
+from moonlighter.core.ingest import job_from_url
 
 # A missing --paste path is a bad argument, not a crash -- run() maps it to
 # exit 2 (usage_error) instead of exit 3 (a crash with a traceback the caller
@@ -34,11 +39,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     sub = parser.add_subparsers(dest="command", required=True)
     prepare = sub.add_parser("prepare", help="compose the paste-ready sheet for one job")
-    prepare.add_argument("job_id", type=int)
+    prepare.add_argument("job_id", type=int, nargs="?", help="a job already in the database")
+    prepare.add_argument("--url", help="ingest this posting first (no LLM), then prepare it")
+    prepare.add_argument(
+        "--company", help="the posting's company, when --url is not on a known ATS"
+    )
+    prepare.add_argument("--title", help="the posting's title, when --url is not on a known ATS")
     prepare.add_argument(
         "--paste", metavar="FILE", help="page text to read questions from; - for stdin"
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.command == "prepare" and (args.job_id is None) == (args.url is None):
+        parser.error("prepare takes exactly one of JOB_ID or --url")
+    if args.command == "prepare" and args.url is None and (args.company or args.title):
+        parser.error("--company and --title are only meaningful with --url")
+    return args
 
 
 def _read_paste(source: str) -> str:
@@ -47,12 +62,24 @@ def _read_paste(source: str) -> str:
 
 async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     config, profile = bootstrap()
+    job_id = args.job_id
+    if args.url is not None:
+        job = await job_from_url(args.url, company=args.company, title=args.title)
+        if job is None:
+            failed = failed_sheet(
+                SheetKind.POSTING_UNREADABLE,
+                f"The posting at {args.url} is not on a known ATS or could not be read. "
+                "Pass --company and --title to ingest it anyway, or give a job id.",
+                apply_url=args.url,
+            )
+            return sheet_result_to_dict(failed), EXIT_NOTHING
+        job_id = job.id
     if args.paste is not None:
         result = await prepare_application_from_paste(
-            args.job_id, _read_paste(args.paste), config, profile
+            job_id, _read_paste(args.paste), config, profile
         )
     else:
-        result = await prepare_application(args.job_id, config, profile)
+        result = await prepare_application(job_id, config, profile)
     code = EXIT_OK if result.kind is SheetKind.SHEET else EXIT_NOTHING
     return sheet_result_to_dict(result), code
 

@@ -11,9 +11,9 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 from moonlighter.core.db import Job, ScanLog, init_db
+from moonlighter.core.posting import FetchedPosting
 from moonlighter.discovery import service as scan_service
 from moonlighter.discovery.evaluator import EvaluationResult
-from moonlighter.discovery.posting import FetchedPosting
 from moonlighter.discovery.results import ScanKind, ScanReport, _render_counts, render_scan_report
 
 CONFIG = {
@@ -143,7 +143,7 @@ async def test_add_job_fetches_description_when_empty(tmp_db):
     init_db()
     acm, _ = _http_client(text="<html><body>Real desc</body></html>")
     with (
-        patch("moonlighter.discovery.service.httpx.AsyncClient", return_value=acm),
+        patch("moonlighter.core.posting.httpx.AsyncClient", return_value=acm),
         patch(
             "moonlighter.discovery.service.evaluate_job",
             new=AsyncMock(return_value=_eval(8.0)),
@@ -155,55 +155,6 @@ async def test_add_job_fetches_description_when_empty(tmp_db):
     assert "NEW" in result
     job = Job.get(Job.url == "https://x.com/2")
     assert "Real desc" in (job.description or "")
-
-
-async def test_fetch_description_drops_style_and_script_contents():
-    html_page = "<style>.a{color:red}</style><script>var x=1;</script><p>Real text</p>"
-    response = MagicMock(status_code=200, text=html_page)
-    client = AsyncMock()
-    client.get = AsyncMock(return_value=response)
-    cls = MagicMock()
-    cls.return_value.__aenter__ = AsyncMock(return_value=client)
-    cls.return_value.__aexit__ = AsyncMock(return_value=False)
-    with patch("httpx.AsyncClient", cls):
-        description, error = await scan_service._fetch_description("https://example.com/job")
-    assert error is None
-    assert description == "Real text"
-    assert "color" not in description and "var x" not in description
-
-
-async def test_fetch_description_truncates_at_an_unclosed_style_tag():
-    # job #2646 (Ziflow): a bare tag-strip left a whole CSS bundle as the
-    # "description". The paired-tag regex fixed the well-formed case, but a
-    # malformed page with NO matching </style> anywhere lets the regex's
-    # non-greedy .*?</\1> simply fail to match — the tag and everything after
-    # it survive untouched. Measured by direct execution before this fix.
-    html_page = "<div>Real desc before</div><style>.a{color:red}<p>unreliable tail</p>"
-    response = MagicMock(status_code=200, text=html_page)
-    client = AsyncMock()
-    client.get = AsyncMock(return_value=response)
-    cls = MagicMock()
-    cls.return_value.__aenter__ = AsyncMock(return_value=client)
-    cls.return_value.__aexit__ = AsyncMock(return_value=False)
-    with patch("httpx.AsyncClient", cls):
-        description, error = await scan_service._fetch_description("https://example.com/job")
-    assert error is None
-    assert description == "Real desc before"
-    assert "color" not in description
-
-
-async def test_fetch_description_truncates_at_an_unclosed_script_tag():
-    html_page = "<div>Real desc</div><script>var x = 1;<p>tail</p>"
-    response = MagicMock(status_code=200, text=html_page)
-    client = AsyncMock()
-    client.get = AsyncMock(return_value=response)
-    cls = MagicMock()
-    cls.return_value.__aenter__ = AsyncMock(return_value=client)
-    cls.return_value.__aexit__ = AsyncMock(return_value=False)
-    with patch("httpx.AsyncClient", cls):
-        description, error = await scan_service._fetch_description("https://example.com/job")
-    assert error is None
-    assert description == "Real desc"
 
 
 async def test_add_job_routes_through_ats_when_fields_missing(tmp_db):
@@ -233,7 +184,7 @@ async def test_add_job_routes_through_ats_when_fields_missing(tmp_db):
 async def test_add_job_http_non_200_returns_error(tmp_db):
     init_db()
     acm, _ = _http_client(status_code=404)
-    with patch("moonlighter.discovery.service.httpx.AsyncClient", return_value=acm):
+    with patch("moonlighter.core.posting.httpx.AsyncClient", return_value=acm):
         result = await scan_service.add_job(
             "https://x.com/3", "Stripe", "Engineer", "", CONFIG, PROFILE, MagicMock()
         )
@@ -245,7 +196,7 @@ async def test_add_job_http_exception_returns_error(tmp_db):
     acm = MagicMock()
     acm.__aenter__ = AsyncMock(side_effect=Exception("connection refused"))
     acm.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.service.httpx.AsyncClient", return_value=acm):
+    with patch("moonlighter.core.posting.httpx.AsyncClient", return_value=acm):
         result = await scan_service.add_job(
             "https://x.com/4", "Stripe", "Engineer", "", CONFIG, PROFILE, MagicMock()
         )
