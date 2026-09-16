@@ -65,3 +65,20 @@ def test_slice_epilog_tolerates_a_dict_missing_some_slice_keys():
 
     text = slice_epilog({"scan": True})
     assert text.startswith("installed: scan")
+
+
+def test_slice_epilog_pins_one_missing_line_verbatim():
+    # The README's jq example and a human reading --help both depend on this
+    # exact wording ("install X -> would add: NAME (cmds) -- summary").
+    # Membership checks (as in the test above) pass under a renamed field or
+    # a reordered/reworded line -- this test fails the moment the format
+    # actually changes, which is the point of a pin.
+    from moonlighter.core.slices import slice_epilog
+
+    text = slice_epilog({"scan": True, "apply": False, "email": False, "full": False})
+    lines = text.splitlines()
+    sheets_lines = [line for line in lines if "would add: sheets" in line]
+    assert sheets_lines == [
+        "  install apply -> would add: sheets (moonlighter-apply prepare)"
+        " -- compose a paste-ready application sheet, from a job id or straight from a URL"
+    ]
