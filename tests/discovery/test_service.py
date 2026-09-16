@@ -1349,3 +1349,68 @@ async def test_aged_portal_jobs_archive_as_aged_not_closed(tmp_db):
     assert result.aged == [{"company": "acme", "title": "Eng", "url": "https://remoteok.com/j/1"}]
     text = _format_archive_result(result)
     assert "archived by age" in text and "30" in text
+
+
+# ── --no-eval: caller=None, zero-LLM mode ────────────────────────────────────
+
+
+async def test_no_eval_persists_evaluable_jobs_as_needs_review_without_an_llm(tmp_db):
+    # caller=None is the zero-LLM mode. A job that WOULD have gone to the
+    # model is stored unscored for verify_job later; nothing else changes.
+    init_db()
+    raw = _raw(1)  # a plain "Engineer" title with a description: evaluable
+    saved, spend_hit = await scan_service._evaluate_and_store(
+        [raw],
+        {
+            "score_threshold": 6.5,
+            "title_blocklist": [],
+            "scan_concurrency": 2,
+            "scan_batch_size": 5,
+        },
+        {},
+        None,
+    )
+    assert spend_hit is False
+    assert [j.status for j in saved] == ["needs_review"]
+    assert saved[0].score is None
+    assert saved[0].score_notes == "not evaluated (--no-eval)"
+
+
+async def test_no_eval_still_archives_title_filtered_jobs_deterministically(tmp_db):
+    init_db()
+    raw = _raw(2, title="Recruiter")
+    saved, _ = await scan_service._evaluate_and_store(
+        [raw],
+        {
+            "score_threshold": 6.5,
+            "title_blocklist": ["recruiter"],
+            "scan_concurrency": 2,
+            "scan_batch_size": 5,
+        },
+        {},
+        None,
+    )
+    assert [j.status for j in saved] == ["archived"]
+    assert saved[0].score_notes.startswith("title filtered:")
+
+
+async def test_no_eval_needs_review_integrity_error_skips_silently(tmp_db):
+    init_db()
+    # Pre-existing Job at the same URL (no ScanLog claim) -> the --no-eval
+    # branch's Job.create collides -> IntegrityError -> _persist returns None
+    # -> skipped, same as every other persist site in this function.
+    Job.create(source="x", company="x", title="x", url="https://x.com/scan/1", status="new")
+    raw = _raw(1)
+    saved, spend_hit = await scan_service._evaluate_and_store(
+        [raw],
+        {
+            "score_threshold": 6.5,
+            "title_blocklist": [],
+            "scan_concurrency": 2,
+            "scan_batch_size": 5,
+        },
+        {},
+        None,
+    )
+    assert saved == []
+    assert spend_hit is False

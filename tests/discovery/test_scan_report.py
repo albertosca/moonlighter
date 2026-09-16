@@ -237,3 +237,55 @@ async def test_scan_and_evaluate_end_to_end_pins_the_full_output_with_archive(
     init_db()
     out = await _run_scan([_raw(1)])
     snapshot_text(out, "scan_and_evaluate_end_to_end")
+
+
+# ── stats and scan_report_to_dict: the JSON projection a CLI consumes ───────
+
+
+def test_scan_report_to_dict_is_json_serialisable_and_carries_the_facts(three_jobs):
+    import json
+
+    from moonlighter.discovery.archive import ArchiveResult
+    from moonlighter.discovery.results import scan_report_to_dict
+    from moonlighter.discovery.sources.base import SourceStats
+
+    report = ScanReport(
+        kind=ScanKind.EVALUATED,
+        saved=three_jobs,
+        spend_hit=True,
+        threshold=7.0,
+        archive=ArchiveResult(archived=[{"id": "1", "company": "Acme"}], max_age_days=30),
+        warning="⚠️  greenhouse: 0 jobs",
+        stats={"greenhouse": SourceStats(companies=3, jobs=2, errors=1)},
+        company="acme",
+    )
+    d = scan_report_to_dict(report)
+    json.dumps(d)  # raises on anything non-serialisable
+    assert d["kind"] == "evaluated"
+    assert d["spend_hit"] is True
+    assert d["threshold"] == 7.0
+    assert d["company"] == "acme"
+    assert [j["title"] for j in d["saved"]] == [j.title for j in three_jobs]
+    assert d["saved"][0]["score"] == 9.0
+    assert d["archive"] == {
+        "archived": [{"id": "1", "company": "Acme"}],
+        "aged": [],
+        "max_age_days": 30,
+        "failed_companies": [],
+    }
+    assert d["stats"] == {"greenhouse": {"companies": 3, "jobs": 2, "errors": 1}}
+    assert d["warning"] == "⚠️  greenhouse: 0 jobs"
+    assert d["error"] is None
+
+
+def test_scan_report_stats_is_not_rendered(three_jobs, snapshot_text):
+    # The MCP output must not move: stats is for the JSON consumer only.
+    from moonlighter.discovery.sources.base import SourceStats
+
+    report = ScanReport(
+        kind=ScanKind.EVALUATED,
+        saved=three_jobs,
+        threshold=7.0,
+        stats={"greenhouse": SourceStats(companies=1, jobs=3, errors=0)},
+    )
+    snapshot_text(render_scan_report(report), "above_threshold")
