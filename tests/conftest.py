@@ -1,8 +1,11 @@
 import os
 import shutil
 import tempfile
+from pathlib import Path
 
 import pytest
+
+_SNAPSHOTS = Path(__file__).parent / "snapshots"
 
 _session_home: str | None = None
 
@@ -46,3 +49,16 @@ def tmp_db(monkeypatch, tmp_path):
     db_path = str(tmp_path / "test.db")
     monkeypatch.setenv("MOONLIGHTER_DB_PATH", db_path)
     return db_path
+
+
+@pytest.fixture
+def snapshot_text(request):
+    def _check(actual: str, name: str) -> None:
+        path = _SNAPSHOTS / f"{request.node.module.__name__.split('.')[-1]}.{name}.txt"
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(actual)
+            pytest.fail(f"snapshot written: {path} — inspect it, then re-run")
+        assert actual == path.read_text()
+
+    return _check

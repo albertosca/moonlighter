@@ -16,6 +16,7 @@ from moonlighter.core.llm import make_caller
 from moonlighter.core.log import setup as setup_logging
 from moonlighter.core.metrics import operation_metrics
 from moonlighter.discovery import service as scan_service
+from moonlighter.discovery.results import render_scan_report
 
 
 async def _run(keywords: str, phase: str) -> str:
@@ -28,7 +29,8 @@ async def _run(keywords: str, phase: str) -> str:
     init_db()
     caller = make_caller(config)
     with operation_metrics("scan_and_evaluate"):
-        return await scan_service.scan_and_evaluate(keywords, phase, config, profile, caller)
+        report = await scan_service.scan_and_evaluate(keywords, phase, config, profile, caller)
+    return render_scan_report(report)
 
 
 def main() -> None:  # pragma: no cover - entry point (boundary)

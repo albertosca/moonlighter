@@ -3,6 +3,8 @@ import logging
 import sys
 from pathlib import Path
 
+from moonlighter.discovery.results import ScanReport
+
 _SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
 
 
@@ -15,10 +17,20 @@ def _scan():
 
 
 def test_scan_runner_scopes_and_delegates(monkeypatch, caplog):
+    # scan_and_evaluate returns a ScanReport (this branch's refactor); _run must
+    # render it -- printing the dataclass repr instead is exactly the bug this
+    # test now guards against (scripts/ is outside coverage's source_pkgs and
+    # CI's mypy runs --package moonlighter.* only, so neither gate would catch it).
     scan = _scan()
 
     async def fake_scan(keywords, phase, config, profile, caller):
-        return f"scanned {phase}:{keywords}"
+        return ScanReport(
+            saved=[],
+            spend_hit=False,
+            threshold=6.5,
+            no_new_jobs=True,
+            warning=f"scanned {phase}:{keywords}",
+        )
 
     monkeypatch.setattr(scan.scan_service, "scan_and_evaluate", fake_scan)
     monkeypatch.setattr(scan, "load_config", lambda: {"score_threshold": 6.5})
@@ -30,5 +42,5 @@ def test_scan_runner_scopes_and_delegates(monkeypatch, caplog):
     with caplog.at_level(logging.INFO):
         out = asyncio.run(scan._run("kw", "phase2"))
 
-    assert out == "scanned phase2:kw"
+    assert out == "No new jobs found.\n\nscanned phase2:kw"
     assert any("op=scan_and_evaluate" in r.getMessage() for r in caplog.records)

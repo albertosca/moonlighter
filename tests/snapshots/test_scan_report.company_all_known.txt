@@ -1,0 +1,3 @@
+No new jobs at 'acme' (1 found, all already known).
+
+Tip: add 'acme' under 'greenhouse:' in company_list.yaml to include it in recurring scans.

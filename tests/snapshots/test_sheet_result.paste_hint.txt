@@ -1,0 +1,3 @@
+No form questions could be read for this job.
+Open https://boards.greenhouse.io/acme/jobs/5, select the whole page (Cmd+A), copy it (Cmd+C), and call
+prepare_application_from_paste(1, "<the copied text>").

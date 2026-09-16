@@ -10,6 +10,7 @@ from mcp.server.mcpserver import Context, MCPServer
 from moonlighter._tool_logging import tool_logged
 from moonlighter.application.answers.answer_bank import promote_application
 from moonlighter.application.assisted import service as assisted_service
+from moonlighter.application.assisted.results import render_sheet_result
 from moonlighter.core.config import (
     DEFAULTS,
     harden_permissions,
@@ -26,6 +27,7 @@ from moonlighter.core.metrics import operation_metrics
 from moonlighter.core.parsing import wrap_untrusted
 from moonlighter.discovery import service as scan_service
 from moonlighter.discovery.archive import ArchiveStaleJobsError, _format_archive_result
+from moonlighter.discovery.results import render_scan_report
 from moonlighter.priority import company_rejection_ages, rejection_badge, rejection_penalty
 from moonlighter.startup import StartupWarning, validate_startup
 from moonlighter.tracking.email_monitor import sync_responses
@@ -95,8 +97,10 @@ async def scan_and_evaluate(
     """
     app = ctx.request_context.lifespan_context
     with operation_metrics("scan_and_evaluate"):
-        return await scan_service.scan_and_evaluate(
-            keywords, phase, app.config, app.profile, app.llm_caller
+        return render_scan_report(
+            await scan_service.scan_and_evaluate(
+                keywords, phase, app.config, app.profile, app.llm_caller
+            )
         )
 
 
@@ -115,8 +119,10 @@ async def scan_company(source: str, company: str, *, ctx: Context[AppContext, An
     """
     app = ctx.request_context.lifespan_context
     with operation_metrics("scan_company"):
-        return await scan_service.scan_company(
-            source, company, app.config, app.profile, app.llm_caller
+        return render_scan_report(
+            await scan_service.scan_company(
+                source, company, app.config, app.profile, app.llm_caller
+            )
         )
 
 
@@ -275,7 +281,9 @@ async def prepare_application(job_id: int, *, ctx: Context[AppContext, Any]) -> 
     """
     app = ctx.request_context.lifespan_context
     with operation_metrics("prepare_application"):
-        return await assisted_service.prepare_application(job_id, app.config, app.profile)
+        return render_sheet_result(
+            await assisted_service.prepare_application(job_id, app.config, app.profile)
+        )
 
 
 @mcp.tool()
@@ -291,8 +299,10 @@ async def prepare_application_from_paste(
     """
     app = ctx.request_context.lifespan_context
     with operation_metrics("prepare_application_from_paste"):
-        return await assisted_service.prepare_application_from_paste(
-            job_id, page_text, app.config, app.profile
+        return render_sheet_result(
+            await assisted_service.prepare_application_from_paste(
+                job_id, page_text, app.config, app.profile
+            )
         )
 
 

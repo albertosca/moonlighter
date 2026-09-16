@@ -18,7 +18,6 @@ from moonlighter.core.llm import LLMCaller, is_spend_limit
 from moonlighter.core.log import get_logger
 from moonlighter.core.metrics import record_spend_limit_hit
 from moonlighter.core.plugins import discover_entry_points
-from moonlighter.discovery.archive import _format_archive_result
 from moonlighter.discovery.archive import archive_stale_jobs as archive_stale_jobs
 from moonlighter.discovery.eligibility import Eligibility, classify_location
 from moonlighter.discovery.evaluator import (
@@ -28,10 +27,10 @@ from moonlighter.discovery.evaluator import (
     should_skip_by_title,
 )
 from moonlighter.discovery.posting import fetch_posting_via_ats
+from moonlighter.discovery.results import ScanReport
 from moonlighter.discovery.sources.base import RawJob, ScanStats
 from moonlighter.discovery.sources.registry import build_http_scanners
 from moonlighter.discovery.urls import normalize_job_url
-from moonlighter.views import render_jobs_table
 from peewee import IntegrityError
 
 logger = get_logger(__name__)
@@ -416,106 +415,75 @@ def _stats_warnings(stats: ScanStats) -> list[str]:
     return lines
 
 
-def _with_warning(message: str, warning: str | None) -> str:
-    return f"{message}\n\n{warning}" if warning else message
-
-
-def _format_report(saved: list[Job], spend_hit: bool, threshold: float) -> str:
-    above = [j for j in saved if j.status == "new"]
-    title_filtered = sum(
-        1 for j in saved if j.score_notes and j.score_notes.startswith("title filtered:")
-    )
-    location_ineligible = sum(
-        1 for j in saved if j.score_notes and j.score_notes.startswith("location ineligible:")
-    )
-    needs_verification = sum(1 for j in saved if j.status == "needs_review")
-    below = len(saved) - len(above) - title_filtered - location_ineligible - needs_verification
-    spend_note = (
-        "\n\n⚠️  Spend limit reached — scan stopped (remaining jobs are left for the next scan)."
-        if spend_hit
-        else ""
-    )
-    verify_note = (
-        f"\n\n⚠️  {needs_verification} job(s) need manual verification — "
-        f"list_jobs(status='needs_review') to see them, verify_job(job_id, page_text) to score one."
-        if needs_verification
-        else ""
-    )
-
-    if not above:
-        return (
-            f"{len(saved)} jobs processed. None passed the threshold of {threshold}. "
-            f"({title_filtered} filtered by title, {location_ineligible} location ineligible, "
-            f"{below} below score)"
-            f"{spend_note}{verify_note}"
-        )
-
-    table = render_jobs_table(above)
-    footer = (
-        f"\n∗ = salary estimated by the LLM  |  "
-        f"{below} below threshold  |  {title_filtered} filtered by title  |  "
-        f"{location_ineligible} location ineligible"
-    )
-    return (
-        f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}"
-        f"{spend_note}{verify_note}"
-    )
-
-
 async def scan_and_evaluate(
     keywords: str, phase: str, config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
-) -> str:
+) -> ScanReport:
     companies = load_company_list(phase=None if phase == "all" else phase)
     raw_jobs, li_warning = await _collect_raw_jobs(keywords, config, companies)
     new_jobs = _drop_already_seen(raw_jobs)
-
+    saved: list[Job] = []
+    spend_hit = False
     if new_jobs:
         saved, spend_hit = await _evaluate_and_store(new_jobs, config, profile, caller)
-        report = _format_report(saved, spend_hit, config["score_threshold"])
-    else:
-        report = "No new jobs found."
-
-    archive_result = await archive_stale_jobs(None, None, config)
-    report = f"{report}\n\n{_format_archive_result(archive_result)}"
-
-    return _with_warning(report, li_warning)
+    return ScanReport(
+        saved=saved,
+        spend_hit=spend_hit,
+        threshold=config["score_threshold"],
+        archive=await archive_stale_jobs(None, None, config),
+        warning=li_warning,
+        no_new_jobs=not new_jobs,
+    )
 
 
 async def scan_company(
     source: str, company: str, config: dict[str, Any], profile: dict[str, Any], caller: LLMCaller
-) -> str:
+) -> ScanReport:
     """Scan every open posting at ONE company right now, without touching
     company_list.yaml. `company` is an ATS slug, or (Recruitee) a custom
     career domain."""
+    threshold = config["score_threshold"]
     scanners = build_http_scanners()
     if source not in scanners:
-        return (
-            f"Unknown source {source!r}. Valid sources: {', '.join(sorted(scanners))}. "
-            "Portal boards (gupy, remoteok, remotive, weworkremotely, hn_whoishiring) "
-            "are enabled via config flags and scanned by scan_and_evaluate."
+        return ScanReport(
+            saved=[],
+            spend_hit=False,
+            threshold=threshold,
+            error=(
+                f"Unknown source {source!r}. Valid sources: {', '.join(sorted(scanners))}. "
+                "Portal boards (gupy, remoteok, remotive, weworkremotely, hn_whoishiring) "
+                "are enabled via config flags and scanned by scan_and_evaluate."
+            ),
         )
     stats: ScanStats = {}
     raw_jobs = await scanners[source].scan([company], stats=stats)
     raw_jobs = [replace(j, url=normalize_job_url(j.url)) for j in raw_jobs]
     new_jobs = _drop_already_seen(raw_jobs)
+    tip = (
+        f"Tip: add {company!r} under '{source}:' in company_list.yaml "
+        "to include it in recurring scans."
+    )
+    warning = "\n".join(_stats_warnings(stats)) or None
 
     if new_jobs:
         saved, spend_hit = await _evaluate_and_store(new_jobs, config, profile, caller)
-        report = _format_report(saved, spend_hit, config["score_threshold"])
-    elif raw_jobs:
-        report = f"No new jobs at {company!r} ({len(raw_jobs)} found, all already known)."
-    else:
-        # An empty raw_jobs can mean the company genuinely has zero open
-        # postings OR the fetch itself failed -- "0 found, all already known"
-        # would lie in the second case. _stats_warnings (appended below via
-        # _with_warning) carries the fetch-error detail when there is one.
-        report = f"No open jobs found at {company!r} (see warnings below if the fetch failed)."
+        return ScanReport(
+            saved=saved, spend_hit=spend_hit, threshold=threshold, tip=tip, warning=warning
+        )
 
-    report += (
-        f"\n\nTip: add {company!r} under '{source}:' in company_list.yaml "
-        "to include it in recurring scans."
+    # An empty raw_jobs can mean the company genuinely has zero open postings
+    # OR the fetch itself failed -- found_but_known (0 here, len(raw_jobs)
+    # otherwise) lets the renderer pick the right sentence without lying about
+    # which happened; `warning` (via _stats_warnings) carries the fetch-error
+    # detail when there is one.
+    return ScanReport(
+        saved=[],
+        spend_hit=False,
+        threshold=threshold,
+        tip=tip,
+        warning=warning,
+        company=company,
+        found_but_known=len(raw_jobs),
     )
-    return _with_warning(report, "\n".join(_stats_warnings(stats)) or None)
 
 
 async def add_job(
