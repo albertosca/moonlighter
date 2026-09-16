@@ -71,8 +71,12 @@ async def test_prepare_application_appends_the_alias_note(tmp_db, snapshot_text)
             return_value="jane+ab12cd@example.com",
         ),
     ):
-        out = render_sheet_result(await prepare_application(job.id, CONFIG, PROFILE))
-    snapshot_text(out, "alias_note")
+        result = await prepare_application(job.id, CONFIG, PROFILE)
+    # .alias is the one machine-usable field on SheetResult -- render_sheet_result
+    # never reads it (only .alias_note, the human-facing footer), so it can drift
+    # to None with the suite still green unless something asserts it directly.
+    assert result.alias == "jane+ab12cd@example.com"
+    snapshot_text(render_sheet_result(result), "alias_note")
 
 
 async def test_prepare_application_appends_the_uncompiled_cv_note(tmp_db, snapshot_text):
