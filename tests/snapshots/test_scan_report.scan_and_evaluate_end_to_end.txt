@@ -1,0 +1,11 @@
+1 jobs processed. 1 above threshold:
+
+                                                                                                                  
+  #      Company / Title                Score     Salary           Posted        Remote     Caveats               
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 
+  1      Co1 / Engineer                 8.0       $150–200k *      —             —          —                     
+                                                                                                                  
+
+∗ = salary estimated by the LLM  |  0 below threshold  |  0 filtered by title  |  0 location ineligible
+
+No closed jobs found.

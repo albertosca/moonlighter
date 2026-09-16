@@ -5,7 +5,7 @@ from moonlighter.core.db import Job, ScanLog, init_db
 from moonlighter.discovery.results import ScanReport, _render_counts, render_scan_report
 from moonlighter.discovery.service import scan_company
 
-from tests.discovery.test_service import _raw
+from tests.discovery.test_service import _raw, _run_scan
 
 
 @pytest.fixture
@@ -168,3 +168,18 @@ async def test_scan_company_with_new_jobs_is_unchanged(tmp_db, snapshot_text, th
     ):
         out = render_scan_report(await scan_company("greenhouse", "acme", CONFIG, {}, MagicMock()))
     snapshot_text(out, "company_new_jobs")
+
+
+# ── scan_and_evaluate end-to-end (unlike scan_company above, every prior test
+# in this file builds a hand-made ScanReport with archive=None -- the real
+# scan_and_evaluate always calls archive_stale_jobs(None, None, config) and
+# attaches its real result, so nothing here pinned the `\n\n` joint before the
+# archive block, or the fact that archive is never None on this path) ────────
+
+
+async def test_scan_and_evaluate_end_to_end_pins_the_full_output_with_archive(
+    tmp_db, snapshot_text
+):
+    init_db()
+    out = await _run_scan([_raw(1)])
+    snapshot_text(out, "scan_and_evaluate_end_to_end")
