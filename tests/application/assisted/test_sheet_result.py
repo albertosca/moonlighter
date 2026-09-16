@@ -160,6 +160,26 @@ def test_render_sheet_result_reproduces_the_plain_sheet(composed_fixture, snapsh
     snapshot_text(render_sheet_result(result), "plain_sheet")
 
 
+def test_render_sheet_result_orders_alias_note_before_cv_note(composed_fixture):
+    # The relative order of the two footers is part of the byte-identical MCP
+    # contract -- swapping (alias_note, cv_note) to (cv_note, alias_note) in
+    # render_sheet_result's loop leaves every other test green.
+    result = SheetResult(
+        composed=composed_fixture,
+        job_title="Staff Engineer",
+        company="Acme",
+        apply_url="https://boards.greenhouse.io/acme/jobs/1",
+        alias="jane+ab12cd@example.com",
+        alias_note="Where the form asks for an email address, use: jane+ab12cd@example.com",
+        cv_note="Upload this CV for this job: /tmp/cv.pdf (tailored for this job — review it before uploading)",
+        error=None,
+    )
+    rendered = render_sheet_result(result)
+    alias_at = rendered.index("Where the form asks for an email address")
+    cv_at = rendered.index("Upload this CV for this job")
+    assert alias_at < cv_at
+
+
 async def test_prepare_from_paste_sheet_is_unchanged(tmp_db, snapshot_text):
     job = _job(tmp_db, url="https://boards.greenhouse.io/acme/jobs/4")
     with (
