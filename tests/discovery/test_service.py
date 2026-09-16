@@ -100,6 +100,23 @@ async def test_render_counts_verify_line_shown_even_with_nothing_above_threshold
     assert "1 job(s) need manual verification" in report
 
 
+async def test_render_counts_verify_note_is_pinned_exactly(tmp_db):
+    init_db()
+    pending = _saved_job(
+        "https://x.com/fr/5",
+        status="needs_review",
+        score=None,
+        score_notes="description unavailable — needs manual verification",
+    )
+    report = _render_counts(ScanReport(saved=[pending], spend_hit=False, threshold=6.5))
+    assert report == (
+        "1 jobs processed. None passed the threshold of 6.5. "
+        "(0 filtered by title, 0 location ineligible, 0 below score)\n\n"
+        "⚠️  1 job(s) need manual verification — "
+        "list_jobs(status='needs_review') to see them, verify_job(job_id, page_text) to score one."
+    )
+
+
 # ── input validation ────────────────────────────────────────────────────────
 
 
