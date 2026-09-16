@@ -18,7 +18,7 @@ Monorepo of 5 PEP 420 namespace packages under `packages/*/moonlighter/` — nev
 - e2e tests are deselected by default (`addopts` carries `-m 'not e2e'`); run them with `uv run pytest -m e2e` — they need a real browser.
 - Try a tool version before merging its Dependabot PR: `uvx ruff@0.16.3 format --check packages tests`.
 - Lint: `uv run ruff check .` · Format: `uv run ruff format --check .`
-- Types (mirror of ci.yml): `uv run mypy --package moonlighter.core --package moonlighter.discovery --package moonlighter.application --package moonlighter.tracking --package moonlighter.server --package moonlighter.startup --package moonlighter.views --package moonlighter._tool_logging --package moonlighter.init` — always `--package`, never file paths (paths duplicate module resolution in namespace packages).
+- Types (mirror of ci.yml): `uv run mypy --package moonlighter.core --package moonlighter.discovery --package moonlighter.application --package moonlighter.tracking --package moonlighter.server --package moonlighter.startup --package moonlighter.views --package moonlighter._tool_logging --package moonlighter.init` — always `--package`, never file paths (paths duplicate module resolution in namespace packages). `scripts/` is not a package and gets its own line, `uv run mypy scripts/` — `ci.yml` runs both.
 
 ## Quick DB access
 

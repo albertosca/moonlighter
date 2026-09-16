@@ -46,7 +46,7 @@ jobs:
             --package moonlighter.views \
             --package moonlighter._tool_logging \
             --package moonlighter.init
-          uv run mypy scripts/scan.py
+          uv run mypy scripts/
 
       - name: Tests (unit, coverage gate 100%)
         run: uv run pytest -m "not e2e"

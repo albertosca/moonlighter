@@ -25,6 +25,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from typing import Any
+
 from moonlighter.core.config import load_config, load_profile
 from moonlighter.core.db import Job, init_db
 from moonlighter.core.llm import is_spend_limit, make_caller
@@ -51,8 +53,8 @@ def _fetch_victims(company: str | None, limit: int | None) -> list[Job]:
 
 async def _reevaluate(
     jobs: list[Job],
-    config: dict,
-    profile: dict,
+    config: dict[str, Any],
+    profile: dict[str, Any],
     dry_run: bool,
     model: str,
     title_only: bool = False,
