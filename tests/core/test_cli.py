@@ -64,6 +64,10 @@ async def _config_broken():
     raise ConfigError("unknown config key 'nope'")
 
 
+async def _crash():
+    raise ValueError("boom")
+
+
 def test_run_drives_the_entry_and_returns_its_exit_code(capsys):
     from moonlighter.core.cli import run
 
@@ -79,6 +83,27 @@ def test_run_maps_a_config_error_to_json_on_stdout_and_exit_2(capsys):
     assert run(_config_broken) == EXIT_USAGE
     out = json.loads(capsys.readouterr().out)
     assert out == {"kind": "config_error", "error": "unknown config key 'nope'"}
+
+
+def test_run_maps_an_unexpected_exception_to_json_on_stdout_and_exit_3(capsys, caplog):
+    # Anything that isn't a ConfigError (a DB error, a plain bug) still has to
+    # leave stdout as one parseable JSON document — never an empty stdout with
+    # a traceback on stderr and Python's default exit code 1, which would
+    # collide with EXIT_NOTHING without being a deliberate mapping.
+    from moonlighter.core.cli import EXIT_CRASH, run
+
+    assert run(_crash) == EXIT_CRASH
+    out = capsys.readouterr().out
+    # stdout carries exactly the one JSON document and nothing else — no
+    # traceback, no extra lines.
+    assert out.endswith("\n") and out.count("\n") == 1
+    assert json.loads(out) == {"kind": "error", "type": "ValueError", "error": "boom"}
+    # The human-facing half: the traceback/message still reaches the log.
+    # (Not asserting stderr is otherwise empty: moonlighter.core.log.setup()
+    # is a process-wide, once-only side effect that other tests in the suite
+    # may already have triggered, which would make a real Rich handler write
+    # to actual stderr here too — that's independent of this test's contract.)
+    assert "boom" in caplog.text
 
 
 def test_bootstrap_loads_config_and_profile_and_inits_the_db(tmp_db, monkeypatch, tmp_path):

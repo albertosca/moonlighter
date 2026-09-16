@@ -4,13 +4,15 @@ semantic exit codes.
 The contract (specs/2026-09-14-model-agnostic-cli-design.md): stdout carries
 exactly one JSON document, always — including on failure — so a shell script
 never has to parse prose; logs and warnings go to stderr; exit codes are
-0 success, 1 expected failure, 2 usage error. `main()` in each slice's cli.py
-is an untested boundary; everything it calls lives here or in that slice's
-`_run`-style functions, which return (payload, code) and never print.
+0 success, 1 expected failure, 2 usage error, 3 unexpected crash. `main()` in
+each slice's cli.py is an untested boundary; everything it calls lives here
+or in that slice's `_run`-style functions, which return (payload, code) and
+never print.
 """
 
 import asyncio
 import json
+import logging
 import sys
 from collections.abc import Awaitable, Callable
 from datetime import datetime
@@ -29,6 +31,9 @@ from moonlighter.core.log import setup as setup_logging
 EXIT_OK = 0
 EXIT_NOTHING = 1
 EXIT_USAGE = 2
+# A crash is neither an expected failure (1) nor a usage error (2) — a script
+# consuming this CLI's JSON must be able to tell the three apart.
+EXIT_CRASH = 3
 
 _JOB_COLUMNS = (
     "id",
@@ -89,10 +94,21 @@ def emit(payload: dict[str, Any], code: int) -> int:
 
 
 def run(entry: Callable[[], Awaitable[tuple[dict[str, Any], int]]]) -> int:
-    """Drive one CLI entry to its exit code. The only place a ConfigError is
-    caught: it becomes the JSON document the contract promises, not a trace."""
+    """Drive one CLI entry to its exit code. ConfigError becomes the JSON
+    document the contract promises, not a trace. Any other exception is the
+    same: the JSON is for the machine, the logged traceback is for the human."""
     try:
         payload, code = asyncio.run(entry())
     except ConfigError as e:
         payload, code = {"kind": "config_error", "error": str(e)}, EXIT_USAGE
+    except Exception as e:
+        logging.getLogger(__name__).exception("unhandled error in CLI entry")
+        payload, code = (
+            {
+                "kind": "error",
+                "type": type(e).__name__,
+                "error": str(e),
+            },
+            EXIT_CRASH,
+        )
     return emit(payload, code)
