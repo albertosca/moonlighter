@@ -638,3 +638,33 @@ async def test_a_legacy_flat_form_data_row_self_heals_into_the_new_shape(job_fac
     healed = Application.get(Application.id == application.id).get_form_data()
     assert legacy_label not in healed
     assert healed == {"Why us?": {"answer": "a generated answer", "kind": "long_text"}}
+
+
+async def test_a_banked_answer_older_than_max_age_is_not_replayed(tmp_db, job_factory, monkeypatch):
+    # Sibling of the replay test above with one difference: after promotion the
+    # bank row is backdated past answer_bank_max_age_days (default 90). The
+    # second job must then go to the LLM again — proven by a caller that
+    # answers "No" where the banked answer said "Yes".
+    from datetime import datetime, timedelta
+
+    from moonlighter.application.answers.answer_bank import promote_application
+    from moonlighter.core.db import AnswerBankEntry
+
+    job1 = job_factory(source="lever", url="https://jobs.lever.co/acme/1")
+    job2 = job_factory(source="lever", url="https://jobs.lever.co/other/2")
+    label = "Do you have experience with Kubernetes in production?"
+
+    async def one_boolean(page_text: str, llm_caller: Any) -> list[FormQuestion]:
+        return [FormQuestion(label=label, kind=QuestionKind.BOOLEAN, required=True)]
+
+    monkeypatch.setattr(service, "extract_questions_from_page", one_boolean)
+    monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller("Yes"))
+    await service.prepare_application_from_paste(job1.id, "p", {}, {})
+    promote_application(Application.get(Application.job == job1).get_form_data(), job1.id)
+    AnswerBankEntry.update(updated_at=datetime.now() - timedelta(days=100)).execute()
+
+    monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller("No"))
+    out2 = render_sheet_result(await service.prepare_application_from_paste(job2.id, "p", {}, {}))
+    assert label in out2
+    assert "No" in out2
+    assert "Yes" not in out2  # the stale banked answer must not leak through

@@ -24,6 +24,7 @@ from moonlighter.application.assisted.sources.recruitee import (
     host_and_offer_from_url,
 )
 from moonlighter.application.cvgen.service import ensure_tailored_cv
+from moonlighter.core.config import DEFAULTS
 from moonlighter.core.db import Application, Job
 from moonlighter.core.llm import make_caller
 
@@ -107,7 +108,9 @@ async def _sheet(
 ) -> SheetResult:
     application, _ = Application.get_or_create(job=job, defaults={"status": "draft"})
     job_cache: dict[str, Any] = application.get_form_data()
-    answer_bank = load_answer_bank()
+    answer_bank = load_answer_bank(
+        config.get("answer_bank_max_age_days", DEFAULTS["answer_bank_max_age_days"])
+    )
     caller = make_caller(config)
     tailored = await ensure_tailored_cv(
         {"id": job.id, "title": job.title, "company": job.company, "description": job.description},

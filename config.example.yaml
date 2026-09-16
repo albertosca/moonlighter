@@ -21,6 +21,10 @@ eval_model: claude-haiku-4-5-20251001
 # Jobs scoring below this threshold are archived.
 score_threshold: 6.5
 
+# A banked screening answer is not replayed once it is older than this many
+# days (counted from the last application it was submitted with). null disables.
+answer_bank_max_age_days: 90
+
 # Delay (ms) between browser actions — helps stabilize dynamic forms.
 slow_mo_ms: 300
 
