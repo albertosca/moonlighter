@@ -13,6 +13,8 @@ Prints one JSON document (scan_report_to_dict, or doctor_payload for
 there was nothing new, 2 on an unknown source or an invalid config. --no-eval
 parks new postings as needs_review without spending a token; score them
 later with verify_job.
+
+Help for the run flags: `moonlighter-scan run --help`; the top-level `moonlighter-scan --help` also lists the installed slices.
 """
 
 import argparse
