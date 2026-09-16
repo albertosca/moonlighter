@@ -2,6 +2,7 @@ import json
 from contextlib import contextmanager
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from moonlighter.discovery.results import ScanKind, ScanReport
 
 
@@ -29,6 +30,21 @@ def test_parse_args_defaults_and_no_eval():
     assert (args.keywords, args.phase, args.no_eval, args.company) == ("", "phase1", False, None)
     assert parse_args(["--no-eval", "--phase", "all"]).no_eval is True
     assert parse_args(["--company", "greenhouse", "acme"]).company == ["greenhouse", "acme"]
+
+
+def test_parse_args_rejects_a_phase_outside_the_configured_set(capsys):
+    # A free-text --phase silently scans zero companies (load_company_list's
+    # value.get(phase, [])) and produces the same no_new_jobs JSON as a
+    # genuinely quiet day -- a cron never learns it is scanning nothing.
+    from moonlighter.discovery.cli import parse_args
+
+    with pytest.raises(SystemExit) as exc:
+        parse_args(["--phase", "phase9"])
+    assert exc.value.code == 2
+    # JsonArgumentParser: stdout still carries the contract's one JSON
+    # document, not zero bytes, even on a bad flag.
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["kind"] == "usage_error"
 
 
 async def test_run_evaluated_scan_exits_0_with_the_report_as_json(tmp_db):

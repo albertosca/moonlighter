@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 
+import pytest
 from moonlighter.core.config import ConfigError
 from moonlighter.core.db import Job, init_db
 
@@ -106,6 +107,63 @@ def test_run_maps_an_unexpected_exception_to_json_on_stdout_and_exit_3(capsys, c
     assert "boom" in caplog.text
 
 
+class _NoToken(Exception):
+    pass
+
+
+class _BadArg(Exception):
+    pass
+
+
+async def _no_token():
+    raise _NoToken("no token")
+
+
+async def _bad_arg():
+    raise _BadArg("bad path")
+
+
+def test_run_classifies_an_expected_failure_as_exit_1_not_a_crash(capsys):
+    # A routine, anticipated failure (missing credential, no data yet) is not
+    # a bug: it must not land on EXIT_CRASH with a traceback the caller reads
+    # as "something broke". expected= is how a slice's cli.py declares which
+    # exceptions are routine for IT, without core/cli.py naming them.
+    from moonlighter.core.cli import EXIT_NOTHING, run
+
+    assert run(_no_token, expected=(_NoToken,)) == EXIT_NOTHING
+    out = json.loads(capsys.readouterr().out)
+    assert out == {"kind": "expected_failure", "type": "_NoToken", "error": "no token"}
+
+
+def test_run_classifies_a_usage_error_as_exit_2(capsys):
+    from moonlighter.core.cli import EXIT_USAGE, run
+
+    assert run(_bad_arg, usage=(_BadArg,)) == EXIT_USAGE
+    out = json.loads(capsys.readouterr().out)
+    assert out == {"kind": "usage_error", "type": "_BadArg", "error": "bad path"}
+
+
+def test_run_usage_takes_priority_over_expected_when_both_match(capsys):
+    # Order of clauses: ConfigError -> usage -> expected -> crash. A slice
+    # could plausibly list the same exception type in both tuples; usage wins,
+    # since it is checked first.
+    from moonlighter.core.cli import EXIT_USAGE, run
+
+    assert run(_bad_arg, expected=(_BadArg,), usage=(_BadArg,)) == EXIT_USAGE
+    out = json.loads(capsys.readouterr().out)
+    assert out["kind"] == "usage_error"
+
+
+def test_run_default_expected_and_usage_are_empty_and_match_nothing(capsys):
+    # An empty tuple in an except clause matches nothing -- run() with no
+    # expected=/usage= behaves exactly as before this feature existed.
+    from moonlighter.core.cli import EXIT_CRASH, run
+
+    assert run(_crash) == EXIT_CRASH
+    out = json.loads(capsys.readouterr().out)
+    assert out["kind"] == "error"
+
+
 def test_bootstrap_loads_config_and_profile_and_inits_the_db(tmp_db, monkeypatch, tmp_path):
     from moonlighter.core import cli
 
@@ -130,6 +188,43 @@ def test_bootstrap_tolerates_a_missing_profile(tmp_db, monkeypatch):
     monkeypatch.setattr(cli, "load_profile", _missing)
     monkeypatch.setattr(cli, "harden_permissions", lambda: [])
     assert cli.bootstrap() == ({}, {})
+
+
+def test_json_argument_parser_error_emits_usage_error_json_on_stdout_and_exits_2(capsys):
+    # argparse's default .error() writes usage prose to stderr and NOTHING to
+    # stdout -- a shell script that always parses stdout as JSON gets zero
+    # bytes on a bad flag. JsonArgumentParser must still leave stdout carrying
+    # exactly the contract's one JSON document.
+    from moonlighter.core.cli import JsonArgumentParser
+
+    parser = JsonArgumentParser(prog="x")
+    parser.add_argument("--flag")
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(["--bogus"])
+    assert exc.value.code == 2
+    out, err = capsys.readouterr()
+    assert out.endswith("\n") and out.count("\n") == 1
+    payload = json.loads(out)
+    assert payload["kind"] == "usage_error"
+    # argparse's own message names the unrecognized argument -- assert the
+    # contract (kind + presence), not argparse's exact wording.
+    assert "bogus" in payload["error"]
+    assert err != ""  # usage prose still goes to stderr, unchanged
+
+
+def test_json_argument_parser_help_still_exits_0_on_stdout(capsys):
+    # --help must keep going through argparse's own default path (stdout,
+    # exit 0) -- JsonArgumentParser only changes .error(), never .exit()/-h.
+    from moonlighter.core.cli import JsonArgumentParser
+
+    parser = JsonArgumentParser(prog="x")
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(["--help"])
+    assert exc.value.code == 0
+    out, _err = capsys.readouterr()
+    assert "usage" in out
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(out)
 
 
 def test_bootstrap_prints_permission_warnings_to_stderr_not_stdout(tmp_db, monkeypatch, capsys):

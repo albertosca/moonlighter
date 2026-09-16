@@ -17,13 +17,19 @@ the same sync through the MCP tool and gets the promotion.
 import argparse
 from typing import Any
 
-from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK, bootstrap, run
+from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK, JsonArgumentParser, bootstrap, run
 from moonlighter.core.llm import make_caller
 from moonlighter.tracking.email_monitor import sync_responses
+from moonlighter.tracking.gmail_client import GmailAuthError
+
+# No Gmail token/credentials yet is a routine, anticipated failure -- not a
+# bug -- so run() maps it to exit 1 (expected_failure) instead of exit 3
+# (a crash with a traceback the caller reads as "something broke").
+EXPECTED_FAILURES = (GmailAuthError,)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
+    parser = JsonArgumentParser(
         prog="moonlighter-email",
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -43,4 +49,4 @@ def main() -> None:  # pragma: no cover - entry point (boundary)
     import sys
 
     args = parse_args()
-    sys.exit(run(lambda: _run(args)))
+    sys.exit(run(lambda: _run(args), expected=EXPECTED_FAILURES))

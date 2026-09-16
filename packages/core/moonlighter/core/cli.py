@@ -10,13 +10,14 @@ or in that slice's `_run`-style functions, which return (payload, code) and
 never print.
 """
 
+import argparse
 import asyncio
 import json
 import logging
 import sys
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any
+from typing import Any, NoReturn
 
 from moonlighter.core.config import (
     ConfigError,
@@ -59,6 +60,20 @@ _JOB_COLUMNS = (
 )
 
 
+class JsonArgumentParser(argparse.ArgumentParser):
+    """An ArgumentParser whose .error() keeps the contract: stdout carries one
+    JSON document even on a bad flag. Plain argparse writes usage prose to
+    stderr and exits 2 with stdout untouched -- a shell script that always
+    parses stdout as JSON gets zero bytes instead of a `usage_error` payload.
+    --help is unaffected: it never calls .error(), so it keeps going through
+    argparse's own default path (stdout, exit 0)."""
+
+    def error(self, message: str) -> NoReturn:
+        self.print_usage(sys.stderr)
+        emit({"kind": "usage_error", "error": message}, EXIT_USAGE)
+        sys.exit(EXIT_USAGE)
+
+
 def bootstrap() -> tuple[dict[str, Any], dict[str, Any]]:
     """Same boot the MCP server does, minus the server: logging to stderr,
     config loaded and validated (ConfigError propagates — `run` turns it into
@@ -93,14 +108,34 @@ def emit(payload: dict[str, Any], code: int) -> int:
     return code
 
 
-def run(entry: Callable[[], Awaitable[tuple[dict[str, Any], int]]]) -> int:
+def run(
+    entry: Callable[[], Awaitable[tuple[dict[str, Any], int]]],
+    *,
+    expected: tuple[type[Exception], ...] = (),
+    usage: tuple[type[Exception], ...] = (),
+) -> int:
     """Drive one CLI entry to its exit code. ConfigError becomes the JSON
-    document the contract promises, not a trace. Any other exception is the
-    same: the JSON is for the machine, the logged traceback is for the human."""
+    document the contract promises, not a trace. `expected` and `usage` let a
+    slice's cli.py classify its own routine exceptions -- a missing credential
+    is not a bug (exit 1, `expected_failure`), a bad argument is not a crash
+    (exit 2, `usage_error`) -- without core/cli.py importing or naming them.
+    An empty tuple (the default) matches nothing, so `run(entry)` behaves
+    exactly as before this existed. Anything left over is the same as always:
+    the JSON is for the machine, the logged traceback is for the human."""
     try:
         payload, code = asyncio.run(entry())
     except ConfigError as e:
         payload, code = {"kind": "config_error", "error": str(e)}, EXIT_USAGE
+    except usage as e:
+        payload, code = (
+            {"kind": "usage_error", "type": type(e).__name__, "error": str(e)},
+            EXIT_USAGE,
+        )
+    except expected as e:
+        payload, code = (
+            {"kind": "expected_failure", "type": type(e).__name__, "error": str(e)},
+            EXIT_NOTHING,
+        )
     except Exception as e:
         logging.getLogger(__name__).exception("unhandled error in CLI entry")
         payload, code = (

@@ -18,11 +18,16 @@ from moonlighter.application.assisted.service import (
     prepare_application,
     prepare_application_from_paste,
 )
-from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK, bootstrap, run
+from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK, JsonArgumentParser, bootstrap, run
+
+# A missing --paste path is a bad argument, not a crash -- run() maps it to
+# exit 2 (usage_error) instead of exit 3 (a crash with a traceback the caller
+# reads as "something broke").
+USAGE_ERRORS = (FileNotFoundError,)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
+    parser = JsonArgumentParser(
         prog="moonlighter-apply",
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -54,4 +59,4 @@ async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
 
 def main() -> None:  # pragma: no cover - entry point (boundary)
     args = parse_args()
-    sys.exit(run(lambda: _run(args)))
+    sys.exit(run(lambda: _run(args), usage=USAGE_ERRORS))

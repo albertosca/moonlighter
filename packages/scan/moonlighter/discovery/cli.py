@@ -12,7 +12,14 @@ without spending a token; score them later with verify_job.
 import argparse
 from typing import Any
 
-from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK, EXIT_USAGE, bootstrap, run
+from moonlighter.core.cli import (
+    EXIT_NOTHING,
+    EXIT_OK,
+    EXIT_USAGE,
+    JsonArgumentParser,
+    bootstrap,
+    run,
+)
 from moonlighter.core.llm import make_caller
 from moonlighter.discovery.results import ScanKind, ScanReport, scan_report_to_dict
 from moonlighter.discovery.service import scan_and_evaluate, scan_company
@@ -27,13 +34,18 @@ _EXIT_BY_KIND = {
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
+    parser = JsonArgumentParser(
         prog="moonlighter-scan",
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--keywords", default="", help="browser-scanner keywords (optional)")
-    parser.add_argument("--phase", default="phase1", help="phase1 | phase2 | phase3 | all")
+    parser.add_argument(
+        "--phase",
+        default="phase1",
+        choices=("phase1", "phase2", "phase3", "all"),
+        help="phase1 | phase2 | phase3 | all",
+    )
     parser.add_argument(
         "--company",
         nargs=2,
