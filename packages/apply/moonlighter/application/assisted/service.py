@@ -173,27 +173,24 @@ async def _sheet(
     )
 
 
+def _failed(message: str) -> SheetResult:
+    """A sheet that never got past an early check: no job, no questions.
+
+    Four call sites build this; the empty title/company/url are what the
+    renderer's error short-circuit ignores, so they carry no information.
+    """
+    return SheetResult(composed=[], job_title="", company="", apply_url="", error=message)
+
+
 async def prepare_application(
     job_id: int, config: dict[str, Any], profile: dict[str, Any]
 ) -> SheetResult:
     job = _job(job_id)
     if job is None:
-        return SheetResult(
-            composed=[],
-            job_title="",
-            company="",
-            apply_url="",
-            error=f"Job {job_id} not found.",
-        )
+        return _failed(f"Job {job_id} not found.")
     questions = await _questions_from_api(job)
     if not questions:
-        return SheetResult(
-            composed=[],
-            job_title="",
-            company="",
-            apply_url="",
-            error=PASTE_HINT.format(url=job.url, job_id=job_id),
-        )
+        return _failed(PASTE_HINT.format(url=job.url, job_id=job_id))
     return await _sheet(job, questions, config, profile)
 
 
@@ -202,20 +199,8 @@ async def prepare_application_from_paste(
 ) -> SheetResult:
     job = _job(job_id)
     if job is None:
-        return SheetResult(
-            composed=[],
-            job_title="",
-            company="",
-            apply_url="",
-            error=f"Job {job_id} not found.",
-        )
+        return _failed(f"Job {job_id} not found.")
     questions = await extract_questions_from_page(page_text, make_caller(config))
     if not questions:
-        return SheetResult(
-            composed=[],
-            job_title="",
-            company="",
-            apply_url="",
-            error="No questions could be found in that text. Was the whole page copied?",
-        )
+        return _failed("No questions could be found in that text. Was the whole page copied?")
     return await _sheet(job, questions, config, profile)
