@@ -301,38 +301,3 @@ def _match_by_company_title(company: str | None, job_title: str | None) -> Any:
 
     results = list(query)
     return results[0] if len(results) == 1 else None
-
-
-# ── Standalone entry point ───────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    import asyncio
-    import logging
-    import sys
-
-    # Logs to stdout only. In cron, the output is redirected to the log file
-    # (>> email-sync.log), so a FileHandler here would duplicate every line.
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
-
-    from moonlighter.core.config import load_config
-    from moonlighter.core.db import init_db
-    from moonlighter.core.llm import make_caller
-
-    init_db()  # ensures connection + tables (including ProcessedEmail) on the standalone/cron path
-    cfg = load_config()
-    llm_caller = make_caller(cfg)
-
-    updates = asyncio.run(sync_responses(cfg, llm_caller))
-    logger.info("sync_responses: %d updates", len(updates))
-    for u in updates:
-        logger.info(
-            "  %s @ %s → %s (match: %s)",
-            u.get("title"),
-            u.get("company"),
-            u.get("type"),
-            u.get("match_type"),
-        )
