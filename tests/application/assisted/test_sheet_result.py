@@ -173,7 +173,9 @@ async def test_prepare_from_paste_sheet_is_unchanged(tmp_db, snapshot_text):
         ),
         patch("moonlighter.application.assisted.service._tracking_alias", return_value=None),
     ):
-        out = await prepare_application_from_paste(job.id, PAGE, CONFIG, PROFILE)
+        out = render_sheet_result(
+            await prepare_application_from_paste(job.id, PAGE, CONFIG, PROFILE)
+        )
     snapshot_text(out, "paste_sheet")
 
 
@@ -183,11 +185,13 @@ async def test_prepare_from_paste_no_questions_is_unchanged(tmp_db, snapshot_tex
         "moonlighter.application.assisted.service.extract_questions_from_page",
         new=AsyncMock(return_value=[]),
     ):
-        out = await prepare_application_from_paste(job.id, PAGE, CONFIG, PROFILE)
+        out = render_sheet_result(
+            await prepare_application_from_paste(job.id, PAGE, CONFIG, PROFILE)
+        )
     snapshot_text(out, "paste_no_questions")
 
 
 async def test_prepare_from_paste_job_not_found_is_unchanged(tmp_db, snapshot_text):
     init_db()
-    out = await prepare_application_from_paste(4242, PAGE, CONFIG, PROFILE)
+    out = render_sheet_result(await prepare_application_from_paste(4242, PAGE, CONFIG, PROFILE))
     snapshot_text(out, "paste_job_not_found")

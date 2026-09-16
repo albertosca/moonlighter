@@ -13,7 +13,7 @@ from moonlighter.application.answers.email_alias import (
 )
 from moonlighter.application.assisted.composer import ComposedAnswer, compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.results import SheetResult, render_sheet_result
+from moonlighter.application.assisted.results import SheetResult
 from moonlighter.application.assisted.sources.greenhouse import (
     board_and_job_from_url,
     fetch_greenhouse_questions,
@@ -199,11 +199,23 @@ async def prepare_application(
 
 async def prepare_application_from_paste(
     job_id: int, page_text: str, config: dict[str, Any], profile: dict[str, Any]
-) -> str:
+) -> SheetResult:
     job = _job(job_id)
     if job is None:
-        return f"Job {job_id} not found."
+        return SheetResult(
+            composed=[],
+            job_title="",
+            company="",
+            apply_url="",
+            error=f"Job {job_id} not found.",
+        )
     questions = await extract_questions_from_page(page_text, make_caller(config))
     if not questions:
-        return "No questions could be found in that text. Was the whole page copied?"
-    return render_sheet_result(await _sheet(job, questions, config, profile))
+        return SheetResult(
+            composed=[],
+            job_title="",
+            company="",
+            apply_url="",
+            error="No questions could be found in that text. Was the whole page copied?",
+        )
+    return await _sheet(job, questions, config, profile)

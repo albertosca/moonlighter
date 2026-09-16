@@ -299,8 +299,10 @@ async def prepare_application_from_paste(
     """
     app = ctx.request_context.lifespan_context
     with operation_metrics("prepare_application_from_paste"):
-        return await assisted_service.prepare_application_from_paste(
-            job_id, page_text, app.config, app.profile
+        return render_sheet_result(
+            await assisted_service.prepare_application_from_paste(
+                job_id, page_text, app.config, app.profile
+            )
         )
 
 

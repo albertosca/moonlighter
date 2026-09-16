@@ -603,7 +603,9 @@ async def test_prepare_application_from_paste_tool_delegates_to_assisted_service
 
     async def fake_prepare_from_paste(job_id, page_text, config, profile):
         called["args"] = (job_id, page_text)
-        return "sheet from paste"
+        return SheetResult(
+            composed=[], job_title="", company="", apply_url="", error="sheet from paste"
+        )
 
     monkeypatch.setattr(
         server.assisted_service, "prepare_application_from_paste", fake_prepare_from_paste
