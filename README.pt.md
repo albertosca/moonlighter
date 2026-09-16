@@ -205,12 +205,30 @@ Toda fatia também instala um comando que você pode disparar de um shell ou de 
 | `moonlighter-apply prepare --url URL [--company X --title Y] [--paste FILE]` | Ingere a vaga primeiro: pela API do ATS quando a URL tem um formato conhecido, senão a partir da própria página com `--company` e `--title` informados; grava sem pontuar, depois prepara. Nenhuma chamada ao LLM na ingestão. |
 | `moonlighter-email sync` | Classifica respostas recentes e avança candidaturas. Sozinho ele não alimenta o banco de respostas — quem faz isso é o `sync_email_responses` do servidor MCP. |
 | `moonlighter-email register JOB_ID` | Marca uma vaga como candidatada na mão e gera o alias de rastreio `+ref`, pra respostas a ela serem casadas pelo `sync`. |
+| `moonlighter-scan doctor` · `moonlighter-apply doctor` · `moonlighter-email doctor` · `moonlighter doctor` | Onde o estado mora e se a config carrega, em JSON; sai com `1` quando a config está faltando ou inválida. |
 
 ```sh
 moonlighter-scan --no-eval | jq '.saved[] | select(.status == "needs_review") | .url'
 ```
 
 O exemplo acima sai com `1` em todo dia sem vaga nova, o que dispara `set -e`/`pipefail` num script que encadeia com `jq` — confira o código de saída antes de tratar isso como falha do script. `--no-eval` é zero-**LLM**, não offline: `archive_stale_jobs` continua fazendo requisições HTTP pra checar se vagas já salvas fecharam.
+
+### O que cada instalação te dá
+
+Os cinco pacotes são fatias de uma ferramenta só. Instale só as que você precisa; cada comando conta no `--help` o que ele faz nessa combinação e o que uma fatia faltando acrescentaria, e o `doctor` imprime a mesma informação em JSON.
+
+| Você instala | Você ganha |
+|---|---|
+| `moonlighter-scan` | `moonlighter-scan`: boards e portais escaneados, vagas pontuadas (ou salvas sem pontuar com `--no-eval`), as fechadas arquivadas |
+| `moonlighter-apply` | `moonlighter-apply prepare`: a folha pronta pra colar, a partir de um id de vaga ou direto de uma URL |
+| `moonlighter-email` | `moonlighter-email register` e `sync`: candidaturas registradas na mão, respostas do Gmail casadas de volta com elas |
+| `moonlighter-scan` + `moonlighter-apply` | um script só: escaneia, escolhe pela pontuação, prepara uma folha pra cada uma |
+| `moonlighter-apply` + `moonlighter-email` | o alias de rastreio que uma folha gera é o mesmo que o `sync` usa pra casar as respostas |
+| `moonlighter` (tudo) | tudo isso acima mais o servidor MCP pro Claude Code, e a promoção pro banco de respostas quando uma resposta avança uma candidatura |
+
+```sh
+moonlighter-apply doctor | jq '.slices, .capabilities.missing[].name'
+```
 
 ## Extensões (adicionando um novo scanner de ATS)
 

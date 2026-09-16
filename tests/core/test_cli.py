@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from unittest.mock import patch
 
 import pytest
 from moonlighter.core.config import ConfigError
@@ -238,3 +239,139 @@ def test_bootstrap_prints_permission_warnings_to_stderr_not_stdout(tmp_db, monke
     out, err = capsys.readouterr()
     assert out == ""
     assert "world-readable" in err
+
+
+def test_doctor_payload_reports_paths_slices_and_a_valid_config(monkeypatch, tmp_path):
+    # No tmp_db here: doctor_payload() only checks db path existence, never
+    # opens the DB, and tmp_db's MOONLIGHTER_DB_PATH override would shadow the
+    # MOONLIGHTER_HOME set below, breaking the "path ends in moonlighter.db"
+    # assertion.
+    import json
+
+    from moonlighter.core import cli
+
+    (tmp_path / "config.yaml").write_text("score_threshold: 7.0\n")
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    payload, code = cli.doctor_payload()
+    json.dumps(payload)
+    assert code == 0
+    assert payload["kind"] == "doctor"
+    assert payload["home"] == str(tmp_path)
+    assert payload["config"] == {
+        "path": str(tmp_path / "config.yaml"),
+        "exists": True,
+        "valid": True,
+        "error": None,
+    }
+    assert (
+        payload["profile"]["path"] == str(tmp_path / "profile.yaml")
+        and payload["profile"]["exists"] is False
+    )
+    assert payload["db"]["path"].endswith("moonlighter.db")
+    assert set(payload["slices"]) == {"scan", "apply", "email", "full"}
+    assert payload["commands"] == sorted(payload["commands"])
+    assert {c["name"] for c in payload["capabilities"]["live"]} >= {"discovery"}
+
+
+def test_doctor_payload_reports_an_invalid_config_and_exits_1(tmp_db, monkeypatch, tmp_path):
+    from moonlighter.core import cli
+
+    (tmp_path / "config.yaml").write_text("nope: 1\n")
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    payload, code = cli.doctor_payload()
+    assert code == 1
+    assert payload["config"]["valid"] is False
+    assert "unknown config key 'nope'" in payload["config"]["error"]
+
+
+def test_doctor_payload_reports_a_missing_config_and_exits_1(tmp_db, monkeypatch, tmp_path):
+    from moonlighter.core import cli
+
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    payload, code = cli.doctor_payload()
+    assert (payload["config"]["exists"], code) == (False, 1)
+
+
+def test_doctor_payload_live_and_missing_capabilities_share_the_same_keys(
+    tmp_db, monkeypatch, tmp_path
+):
+    # One payload, two object shapes was the bug: live[] carried name/commands
+    # /summary, missing[] carried name/needs/summary. A consumer keying off
+    # either list the same way would KeyError on the other. Both now carry
+    # name, needs (sorted), commands (list), summary -- and missing[] alone
+    # also carries needs_install, the subset of needs not yet installed.
+    from moonlighter.core import cli
+
+    (tmp_path / "config.yaml").write_text("score_threshold: 7.0\n")
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    with patch(
+        "moonlighter.core.cli.installed_slices",
+        return_value={"scan": True, "apply": False, "email": False, "full": False},
+    ):
+        payload, _code = cli.doctor_payload()
+
+    live_by_name = {c["name"]: c for c in payload["capabilities"]["live"]}
+    missing_by_name = {c["name"]: c for c in payload["capabilities"]["missing"]}
+
+    assert live_by_name["discovery"] == {
+        "name": "discovery",
+        "needs": ["scan"],
+        "commands": ["moonlighter-scan"],
+        "summary": "scan company boards and portals, score postings, archive closed ones",
+    }
+    assert missing_by_name["sheets"] == {
+        "name": "sheets",
+        "needs": ["apply"],
+        "commands": ["moonlighter-apply prepare"],
+        "summary": "compose a paste-ready application sheet, from a job id or straight from a URL",
+        "needs_install": ["apply"],
+    }
+    # scan-to-sheet needs {scan, apply}; scan is already installed, so only
+    # apply is what still needs installing.
+    assert missing_by_name["scan-to-sheet"]["needs"] == ["apply", "scan"]
+    assert missing_by_name["scan-to-sheet"]["needs_install"] == ["apply"]
+
+
+def test_doctor_payload_reports_a_malformed_yaml_config_instead_of_crashing(
+    tmp_db, monkeypatch, tmp_path
+):
+    # load_config() reaches yaml.safe_load() before validate_config() ever
+    # runs -- a syntax error there is a yaml.YAMLError, not a ConfigError, and
+    # doctor_payload() must still report it as JSON instead of letting it
+    # escape as a traceback (doctor's whole point is to be usable on a
+    # broken install).
+    from moonlighter.core import cli
+
+    (tmp_path / "config.yaml").write_text("score_threshold: [7.0\n")
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    payload, code = cli.doctor_payload()
+    assert code == 1
+    assert payload["config"]["valid"] is False
+    assert payload["config"]["error"] is not None
+    error_lower = payload["config"]["error"].lower()
+    assert "yaml" in error_lower or "pars" in error_lower or "scan" in error_lower
+
+
+def test_doctor_payload_reports_an_unreadable_config_instead_of_crashing(
+    tmp_db, monkeypatch, tmp_path
+):
+    # A chmod-000 config.yaml makes read_text() raise PermissionError, which
+    # is neither a ConfigError nor a yaml.YAMLError -- doctor_payload() must
+    # catch it too.
+    import os
+
+    from moonlighter.core import cli
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("score_threshold: 7.0\n")
+    config_path.chmod(0o000)
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    try:
+        if os.access(config_path, os.R_OK):
+            pytest.skip("running as a user that can read a chmod-000 file (e.g. root)")
+        payload, code = cli.doctor_payload()
+        assert code == 1
+        assert payload["config"]["valid"] is False
+        assert "permission" in payload["config"]["error"].lower()
+    finally:
+        config_path.chmod(0o644)

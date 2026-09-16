@@ -207,3 +207,27 @@ async def test_run_prepare_with_url_passes_company_and_title_through(tmp_db):
             )
         )
     assert ingest.await_args.kwargs == {"company": "Acme", "title": "Eng"}
+
+
+def test_apply_keeps_its_grammar_and_gains_doctor():
+    from moonlighter.application.cli import parse_args
+
+    assert parse_args(["doctor"]).command == "doctor"
+    assert parse_args(["prepare", "42"]).command == "prepare"
+
+
+async def test_apply_doctor_returns_the_doctor_payload(tmp_db):
+    from moonlighter.application import cli
+
+    with patch.object(cli, "doctor_payload", return_value=({"kind": "doctor"}, 0)):
+        payload, code = await cli._run(cli.parse_args(["doctor"]))
+    assert (payload, code) == ({"kind": "doctor"}, 0)
+
+
+def test_apply_help_carries_the_slice_epilog(capsys):
+    from moonlighter.application.cli import parse_args
+
+    with pytest.raises(SystemExit) as exc:
+        parse_args(["--help"])
+    assert exc.value.code == 0
+    assert "installed:" in capsys.readouterr().out

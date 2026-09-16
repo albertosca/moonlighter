@@ -530,14 +530,41 @@ async def sync_email_responses(*, ctx: Context[AppContext, Any]) -> str:
         return "\n".join(lines)
 
 
-def main() -> None:  # pragma: no cover - MCP server entry point (boundary)
-    import sys
+_USAGE = """usage: moonlighter [init | doctor | -h]
 
+  (no arguments)  start the MCP server on stdio (what Claude Code runs)
+  init            interactive first-run setup: writes config.yaml
+  doctor          where the state lives and whether the config loads, as JSON
+"""
+
+
+def _dispatch(argv: list[str]) -> int | None:
+    """Everything `moonlighter <word>` can do besides serving MCP. None means
+    "no subcommand: run the server". `init` stays where it was (it is
+    interactive); `doctor` and help are the two things a script or a human
+    may ask a stdio server binary before deciding to run it."""
+    if not argv:
+        return None
+    if argv[0] in ("-h", "--help"):
+        sys.stdout.write(_USAGE)
+        return 0
+    if argv[0] == "doctor":
+        from moonlighter.core.cli import doctor_payload, emit
+
+        payload, code = doctor_payload()
+        return emit(payload, code)
+    return None
+
+
+def main() -> None:  # pragma: no cover - MCP server entry point (boundary)
     if len(sys.argv) > 1 and sys.argv[1] == "init":
         from moonlighter.init import main as init_main
 
         init_main()
         return
+    code = _dispatch(sys.argv[1:])
+    if code is not None:
+        sys.exit(code)
     mcp.run()
 
 
