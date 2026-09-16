@@ -1,10 +1,13 @@
 import pytest
 from moonlighter.application.answers.answer_bank import (
+    forget,
     is_bank_eligible,
     is_sensitive_label,
+    list_entries,
     load_answer_bank,
     normalize_question,
     promote_application,
+    render_answer_bank,
 )
 from moonlighter.application.assisted.questions import QuestionKind
 from moonlighter.core.db import AnswerBankEntry, init_db
@@ -229,3 +232,50 @@ def test_load_answer_bank_with_no_max_age_keeps_everything(tmp_db):
     init_db()
     _entry("when can you start", "in two weeks", days_old=400)
     assert load_answer_bank(max_age_days=None) == {"when can you start": "in two weeks"}
+
+
+# ── inspection and editing ────────────────────────────────────────────────────
+
+
+def test_list_entries_returns_rows_most_recently_used_first(tmp_db):
+    init_db()
+    _entry("notice period", "30 days", days_old=5)
+    _entry("when can you start", "in two weeks", days_old=1)
+    assert [row.normalized_question for row in list_entries()] == [
+        "when can you start",
+        "notice period",
+    ]
+
+
+def test_forget_normalises_the_question_and_deletes_the_row(tmp_db):
+    init_db()
+    _entry("are you authorized to work in brazil", "Yes", days_old=1)
+    assert forget("  Are You Authorized to Work in Brazil?  ") is True
+    assert AnswerBankEntry.select().count() == 0
+
+
+def test_forget_reports_when_nothing_matched(tmp_db):
+    init_db()
+    _entry("notice period", "30 days", days_old=1)
+    assert forget("something else") is False
+    assert AnswerBankEntry.select().count() == 1
+
+
+def test_render_answer_bank_marks_entries_past_max_age(tmp_db):
+    # The operator's real question is "why wasn't this replayed?" — the
+    # listing answers it inline instead of making them do date arithmetic.
+    init_db()
+    _entry("notice period", "30 days", days_old=5)
+    _entry("when can you start", "in two weeks", days_old=120)
+    out = render_answer_bank(list_entries(), max_age_days=90)
+    assert "notice period" in out and "30 days" in out
+    assert "when can you start" in out and "in two weeks" in out
+    stale_line = next(line for line in out.splitlines() if "when can you start" in line)
+    fresh_line = next(line for line in out.splitlines() if "notice period" in line)
+    assert "expired" in stale_line
+    assert "expired" not in fresh_line
+
+
+def test_render_answer_bank_empty(tmp_db):
+    init_db()
+    assert render_answer_bank([], max_age_days=90) == "The answer bank is empty."

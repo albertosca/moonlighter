@@ -2182,3 +2182,48 @@ async def test_sync_email_responses_does_not_promote_when_the_status_did_not_adv
         await sync_email_responses(ctx=make_test_context(config={"email": {}}))
 
     assert AnswerBankEntry.select().count() == 0
+
+
+# ── answer bank: inspection tools ─────────────────────────────────────────────
+
+
+async def test_list_answer_bank_shows_what_would_be_replayed(tmp_db):
+    init_db()
+    from moonlighter.core.db import AnswerBankEntry
+    from moonlighter.server import list_answer_bank
+
+    AnswerBankEntry.create(
+        normalized_question="notice period", kind="text", answer="30 days", source_job_id=7
+    )
+    result = await list_answer_bank(ctx=make_test_context(config={"answer_bank_max_age_days": 90}))
+    assert "notice period" in result
+    assert "30 days" in result
+
+
+async def test_list_answer_bank_empty(tmp_db):
+    init_db()
+    from moonlighter.server import list_answer_bank
+
+    result = await list_answer_bank(ctx=make_test_context(config={}))
+    assert result == "The answer bank is empty."
+
+
+async def test_forget_answer_removes_the_entry_and_says_so(tmp_db):
+    init_db()
+    from moonlighter.core.db import AnswerBankEntry
+    from moonlighter.server import forget_answer
+
+    AnswerBankEntry.create(
+        normalized_question="notice period", kind="text", answer="30 days", source_job_id=7
+    )
+    result = await forget_answer("Notice period?", ctx=make_test_context(config={}))
+    assert "notice period" in result
+    assert AnswerBankEntry.select().count() == 0
+
+
+async def test_forget_answer_reports_no_match(tmp_db):
+    init_db()
+    from moonlighter.server import forget_answer
+
+    result = await forget_answer("nothing here", ctx=make_test_context(config={}))
+    assert "No banked answer" in result

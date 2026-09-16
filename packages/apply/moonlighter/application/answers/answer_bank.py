@@ -16,9 +16,12 @@ over a wrong cache hit.
 
 import re
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from moonlighter.application.assisted.questions import QuestionKind
+
+if TYPE_CHECKING:
+    from moonlighter.core.db import AnswerBankEntry
 
 _BANK_ELIGIBLE_KINDS = frozenset(
     {QuestionKind.TEXT, QuestionKind.BOOLEAN, QuestionKind.SINGLE_SELECT, QuestionKind.MULTI_SELECT}
@@ -136,3 +139,43 @@ def promote_application(job_cache: dict[str, Any], source_job_id: int) -> None:
             row.source_job_id = source_job_id
             row.updated_at = datetime.now()
             row.save()
+
+
+def list_entries() -> list[AnswerBankEntry]:
+    """Every banked answer, most recently used first — the order the operator
+    wants when asking "what would replay right now?"."""
+    from moonlighter.core.db import AnswerBankEntry  # local: see load_answer_bank
+
+    return list(AnswerBankEntry.select().order_by(AnswerBankEntry.updated_at.desc()))
+
+
+def forget(question: str) -> bool:
+    """Delete the banked answer for `question`, normalised the way the bank
+    keys it. False when nothing matched. The next application that asks it
+    goes to the LLM again and, once submitted, re-banks whatever it answered."""
+    from moonlighter.core.db import AnswerBankEntry  # local: see load_answer_bank
+
+    deleted: int = (
+        AnswerBankEntry.delete()
+        .where(AnswerBankEntry.normalized_question == normalize_question(question))
+        .execute()
+    )
+    return deleted > 0
+
+
+def render_answer_bank(rows: list[AnswerBankEntry], max_age_days: int | None) -> str:
+    """One line per entry. An entry past max_age_days is kept but marked, since
+    "why wasn't this replayed?" is the question that brings an operator here."""
+    if not rows:
+        return "The answer bank is empty."
+    cutoff = None if max_age_days is None else datetime.now() - timedelta(days=max_age_days)
+    noun = "entry" if len(rows) == 1 else "entries"
+    lines = [f"# Answer bank — {len(rows)} {noun}\n"]
+    for row in rows:
+        expired = cutoff is not None and row.updated_at < cutoff
+        flag = "  (expired — not replayed)" if expired else ""
+        lines.append(
+            f"- **{row.normalized_question}** → {row.answer}  "
+            f"[{row.kind}, job #{row.source_job_id}, last used {row.updated_at:%Y-%m-%d}]{flag}"
+        )
+    return "\n".join(lines)
