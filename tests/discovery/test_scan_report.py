@@ -40,6 +40,34 @@ def three_jobs(tmp_db):
     ]
 
 
+# ── __post_init__ guard against impossible combinations ─────────────────────
+# ScanReport.company and .no_new_jobs are renderer mode switches: once set,
+# _render_counts / render_scan_report ignore the state they'd otherwise
+# render. Neither real producer (scan_and_evaluate, scan_company) ever
+# combines them -- these three raise on the combinations that would silently
+# drop a jobs table, a spend warning, or a verification count.
+
+
+def test_scan_report_rejects_company_with_saved_jobs(three_jobs):
+    with pytest.raises(ValueError, match="company silences saved/spend_hit"):
+        ScanReport(saved=three_jobs, spend_hit=False, threshold=7.0, company="acme")
+
+
+def test_scan_report_rejects_company_with_spend_hit():
+    with pytest.raises(ValueError, match="company silences saved/spend_hit"):
+        ScanReport(saved=[], spend_hit=True, threshold=7.0, company="acme")
+
+
+def test_scan_report_rejects_no_new_jobs_with_saved_jobs(three_jobs):
+    with pytest.raises(ValueError, match="no_new_jobs silences"):
+        ScanReport(saved=three_jobs, spend_hit=False, threshold=7.0, no_new_jobs=True)
+
+
+def test_scan_report_rejects_found_but_known_without_company():
+    with pytest.raises(ValueError, match="found_but_known is only read when company is set"):
+        ScanReport(saved=[], spend_hit=False, threshold=7.0, found_but_known=3)
+
+
 def test_render_counts_above_threshold_is_unchanged(three_jobs, snapshot_text):
     report = ScanReport(saved=three_jobs, spend_hit=False, threshold=7.0)
     snapshot_text(_render_counts(report), "above_threshold")

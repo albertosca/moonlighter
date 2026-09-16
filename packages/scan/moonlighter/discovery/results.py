@@ -41,6 +41,33 @@ class ScanReport:
     # scan_and_evaluate is the only caller that sets it.
     no_new_jobs: bool = False
 
+    def __post_init__(self) -> None:
+        # company and no_new_jobs are both renderer mode switches, not facts:
+        # _render_counts short-circuits on either one and never looks at
+        # saved/spend_hit/found_but_known once it does. Combining them with
+        # the state they'd silence is always a producer bug -- e.g.
+        # ScanReport(saved=[job_above_threshold], spend_hit=True, company="acme")
+        # would silently drop both the jobs table AND the spend-limit warning.
+        # Neither real producer (scan_and_evaluate, scan_company) hits this;
+        # it exists to fail loudly if a future caller ever does.
+        if self.company is not None and (self.saved or self.spend_hit):
+            raise ValueError(
+                "ScanReport.company silences saved/spend_hit in _render_counts -- "
+                "never construct a report with both."
+            )
+        if self.no_new_jobs and (
+            self.saved or self.spend_hit or self.company is not None or self.found_but_known
+        ):
+            raise ValueError(
+                "ScanReport.no_new_jobs silences saved/spend_hit/company/found_but_known "
+                "in render_scan_report -- never construct a report with both."
+            )
+        if self.found_but_known and self.company is None:
+            raise ValueError(
+                "ScanReport.found_but_known is only read when company is set -- "
+                "never construct a report with found_but_known but no company."
+            )
+
 
 def render_scan_report(report: ScanReport) -> str:
     if report.error is not None:
