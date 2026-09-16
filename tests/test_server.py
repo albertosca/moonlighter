@@ -8,7 +8,7 @@ from moonlighter.application.assisted.results import SheetResult
 from moonlighter.core.db import Application, Job, ScanLog, init_db
 from moonlighter.core.metrics import record_call
 from moonlighter.discovery.evaluator import EvaluationResult
-from moonlighter.discovery.results import ScanReport
+from moonlighter.discovery.results import ScanKind, ScanReport
 
 from tests._context import make_test_context
 
@@ -400,7 +400,7 @@ async def test_scan_company_tool_delegates_to_service(tmp_db):
     init_db()
     from moonlighter.server import scan_company
 
-    fake_report = ScanReport(saved=[], spend_hit=False, threshold=6.5, error="report")
+    fake_report = ScanReport(kind=ScanKind.UNKNOWN_SOURCE, threshold=6.5, error="report")
     with patch(
         "moonlighter.discovery.service.scan_company", new=AsyncMock(return_value=fake_report)
     ) as mock_scan_company:

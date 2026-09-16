@@ -5,74 +5,63 @@ so its output is unchanged, and a CLI can serialise the same dataclass as JSON
 without either side owning the other's format.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import StrEnum
 
 from moonlighter.core.db import Job
 from moonlighter.discovery.archive import ArchiveResult, _format_archive_result
 from moonlighter.views import render_jobs_table
 
 
+class ScanKind(StrEnum):
+    """Which of the five shapes a scan produced. One field, exhaustive, so the
+    renderer dispatches on it and a CLI can map it to an exit code without
+    parsing the message."""
+
+    EVALUATED = "evaluated"  # candidates were evaluated: saved/spend_hit carry the counts
+    NO_NEW_JOBS = "no_new_jobs"  # scan_and_evaluate: nothing to evaluate at all
+    ALL_KNOWN = "all_known"  # scan_company: found some, every one already in ScanLog
+    NO_OPEN_JOBS = "no_open_jobs"  # scan_company: zero postings (or the fetch failed)
+    UNKNOWN_SOURCE = "unknown_source"  # scan_company: usage error, `error` carries it
+
+
 @dataclass(frozen=True)
 class ScanReport:
-    saved: list[Job]
-    spend_hit: bool
-    threshold: float
+    kind: ScanKind
+    saved: list[Job] = field(default_factory=list)
+    spend_hit: bool = False
+    threshold: float = 0.0
     archive: ArchiveResult | None = None
     warning: str | None = None
     tip: str | None = None
     error: str | None = None
-    # Only scan_company can distinguish "nothing new, but N were found and are
-    # already known" from "nothing found at all" -- an empty raw_jobs there may
-    # mean zero open postings OR a failed fetch.
-    found_but_known: int = 0
-    # Set only by scan_company, only on its two "nothing new" shapes (never on
-    # its own "new jobs found" shape, and never by scan_and_evaluate, which has
-    # no single company to name). This is the signal _render_counts uses to
-    # pick one of scan_company's literal sentences instead of the generic
-    # "N jobs processed..." counts -- found_but_known alone can't do it, since
-    # 0 is also scan_and_evaluate's default and would collide with "no open
-    # jobs found at <company>" for zero raw_jobs.
+    # A fact, not a switch: the company scan_company scanned, on every shape.
     company: str | None = None
-    # True only when there were zero candidate jobs to evaluate in the first
-    # place (no_new_jobs is the ONLY thing distinguishing that from "evaluated
-    # some candidates but zero survived" -- a crash, a spend-limit stop, or a
-    # silently-skipped IntegrityError all also leave saved=[], and those must
-    # still render the computed "N jobs processed..." counts, not this literal.
-    # scan_and_evaluate is the only caller that sets it.
-    no_new_jobs: bool = False
+    # ALL_KNOWN only: how many postings were found and already known.
+    found_but_known: int = 0
 
     def __post_init__(self) -> None:
-        # company and no_new_jobs are both renderer mode switches, not facts:
-        # _render_counts short-circuits on either one and never looks at
-        # saved/spend_hit/found_but_known once it does. Combining them with
-        # the state they'd silence is always a producer bug -- e.g.
-        # ScanReport(saved=[job_above_threshold], spend_hit=True, company="acme")
-        # would silently drop both the jobs table AND the spend-limit warning.
-        # Neither real producer (scan_and_evaluate, scan_company) hits this;
-        # it exists to fail loudly if a future caller ever does.
-        if self.company is not None and (self.saved or self.spend_hit):
+        # Every invariant here is "the fields agree with the kind". Before the
+        # kind existed, `company` and `no_new_jobs` were renderer mode switches
+        # that silently discarded saved/spend_hit when combined with them; now
+        # the contradiction is impossible to express without raising.
+        k = self.kind
+        if (self.error is not None) != (k is ScanKind.UNKNOWN_SOURCE):
+            raise ValueError("ScanReport.error is set exactly when kind is unknown_source")
+        if k in (ScanKind.ALL_KNOWN, ScanKind.NO_OPEN_JOBS) and self.company is None:
+            raise ValueError(f"ScanReport kind {k} names a company; company is required")
+        if (self.found_but_known > 0) != (k is ScanKind.ALL_KNOWN):
             raise ValueError(
-                "ScanReport.company silences saved/spend_hit in _render_counts -- "
-                "never construct a report with both."
+                "ScanReport.found_but_known is positive exactly when kind is all_known"
             )
-        if self.no_new_jobs and (
-            self.saved or self.spend_hit or self.company is not None or self.found_but_known
-        ):
-            raise ValueError(
-                "ScanReport.no_new_jobs silences saved/spend_hit/company/found_but_known "
-                "in render_scan_report -- never construct a report with both."
-            )
-        if self.found_but_known and self.company is None:
-            raise ValueError(
-                "ScanReport.found_but_known is only read when company is set -- "
-                "never construct a report with found_but_known but no company."
-            )
+        if k is not ScanKind.EVALUATED and (self.saved or self.spend_hit):
+            raise ValueError("only an evaluated ScanReport carries saved/spend_hit")
 
 
 def render_scan_report(report: ScanReport) -> str:
     if report.error is not None:
         return report.error
-    body = "No new jobs found." if report.no_new_jobs else _render_counts(report)
+    body = _body(report)
     if report.tip is not None:
         body += f"\n\n{report.tip}"
     if report.archive is not None:
@@ -82,17 +71,22 @@ def render_scan_report(report: ScanReport) -> str:
     return body
 
 
-def _render_counts(report: ScanReport) -> str:
-    if report.company is not None:
-        # scan_company's two "nothing new" shapes: no evaluation was attempted
-        # (new_jobs was empty), so there are no counts to compute at all.
-        if report.found_but_known:
+def _body(report: ScanReport) -> str:
+    match report.kind:
+        case ScanKind.NO_NEW_JOBS:
+            return "No new jobs found."
+        case ScanKind.ALL_KNOWN:
             return (
                 f"No new jobs at {report.company!r} "
                 f"({report.found_but_known} found, all already known)."
             )
-        return f"No open jobs found at {report.company!r} (see warnings below if the fetch failed)."
+        case ScanKind.NO_OPEN_JOBS:
+            return f"No open jobs found at {report.company!r} (see warnings below if the fetch failed)."
+        case _:
+            return _render_counts(report)
 
+
+def _render_counts(report: ScanReport) -> str:
     saved = report.saved
     spend_hit = report.spend_hit
     threshold = report.threshold

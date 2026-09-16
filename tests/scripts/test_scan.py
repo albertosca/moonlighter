@@ -3,7 +3,7 @@ import logging
 import sys
 from pathlib import Path
 
-from moonlighter.discovery.results import ScanReport
+from moonlighter.discovery.results import ScanKind, ScanReport
 
 _SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
 
@@ -25,10 +25,8 @@ def test_scan_runner_scopes_and_delegates(monkeypatch, caplog):
 
     async def fake_scan(keywords, phase, config, profile, caller):
         return ScanReport(
-            saved=[],
-            spend_hit=False,
+            kind=ScanKind.NO_NEW_JOBS,
             threshold=6.5,
-            no_new_jobs=True,
             warning=f"scanned {phase}:{keywords}",
         )
 

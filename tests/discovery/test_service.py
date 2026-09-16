@@ -14,7 +14,7 @@ from moonlighter.core.db import Job, ScanLog, init_db
 from moonlighter.discovery import service as scan_service
 from moonlighter.discovery.evaluator import EvaluationResult
 from moonlighter.discovery.posting import FetchedPosting
-from moonlighter.discovery.results import ScanReport, _render_counts, render_scan_report
+from moonlighter.discovery.results import ScanKind, ScanReport, _render_counts, render_scan_report
 
 CONFIG = {
     "score_threshold": 7.0,
@@ -72,7 +72,9 @@ async def test_render_counts_needs_review_separately_from_below(tmp_db):
         score_notes="description unavailable — needs manual verification",
     )
     report = _render_counts(
-        ScanReport(saved=[above, below, pending], spend_hit=False, threshold=6.5)
+        ScanReport(
+            kind=ScanKind.EVALUATED, saved=[above, below, pending], spend_hit=False, threshold=6.5
+        )
     )
     assert "1 below threshold" in report
     assert "1 job(s) need manual verification" in report
@@ -83,7 +85,9 @@ async def test_render_counts_needs_review_separately_from_below(tmp_db):
 async def test_render_counts_no_verify_line_when_nothing_pending(tmp_db):
     init_db()
     above = _saved_job("https://x.com/fr/4", status="new", score=8.0)
-    report = _render_counts(ScanReport(saved=[above], spend_hit=False, threshold=6.5))
+    report = _render_counts(
+        ScanReport(kind=ScanKind.EVALUATED, saved=[above], spend_hit=False, threshold=6.5)
+    )
     assert "need manual verification" not in report
 
 
@@ -95,7 +99,9 @@ async def test_render_counts_verify_line_shown_even_with_nothing_above_threshold
         score=None,
         score_notes="description unavailable — needs manual verification",
     )
-    report = _render_counts(ScanReport(saved=[pending], spend_hit=False, threshold=6.5))
+    report = _render_counts(
+        ScanReport(kind=ScanKind.EVALUATED, saved=[pending], spend_hit=False, threshold=6.5)
+    )
     assert "None passed the threshold" in report
     assert "1 job(s) need manual verification" in report
 
@@ -108,7 +114,9 @@ async def test_render_counts_verify_note_is_pinned_exactly(tmp_db):
         score=None,
         score_notes="description unavailable — needs manual verification",
     )
-    report = _render_counts(ScanReport(saved=[pending], spend_hit=False, threshold=6.5))
+    report = _render_counts(
+        ScanReport(kind=ScanKind.EVALUATED, saved=[pending], spend_hit=False, threshold=6.5)
+    )
     assert report == (
         "1 jobs processed. None passed the threshold of 6.5. "
         "(0 filtered by title, 0 location ineligible, 0 below score)\n\n"
