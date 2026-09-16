@@ -2239,3 +2239,47 @@ async def test_forget_answer_reports_no_match(tmp_db):
 
     result = await forget_answer("nothing here", ctx=make_test_context(config={}))
     assert "No banked answer" in result
+
+
+# ── _dispatch: everything `moonlighter <word>` can do besides serving MCP ──────
+
+
+def test_dispatch_with_no_argv_returns_none_so_the_server_starts():
+    from moonlighter.server import _dispatch
+
+    assert _dispatch([]) is None
+
+
+def test_dispatch_help_prints_usage_and_returns_0(capsys):
+    from moonlighter.server import _dispatch
+
+    assert _dispatch(["--help"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("usage: moonlighter")
+
+
+def test_dispatch_short_help_flag_also_works(capsys):
+    from moonlighter.server import _dispatch
+
+    assert _dispatch(["-h"]) == 0
+    assert capsys.readouterr().out.startswith("usage: moonlighter")
+
+
+def test_dispatch_doctor_emits_the_doctor_payload_and_its_exit_code(capsys):
+    from moonlighter import server
+
+    with patch("moonlighter.core.cli.doctor_payload", return_value=({"kind": "doctor"}, 1)):
+        code = server._dispatch(["doctor"])
+    assert code == 1
+    out = capsys.readouterr().out
+    assert out.endswith("\n") and out.count("\n") == 1
+    assert json.loads(out) == {"kind": "doctor"}
+
+
+def test_dispatch_unknown_word_returns_none_and_falls_through_to_the_server():
+    # Unrecognized words are not this dispatcher's business -- they must not
+    # be swallowed, so the caller's existing "start the server" fallback still
+    # runs unchanged for any argv this function does not understand.
+    from moonlighter.server import _dispatch
+
+    assert _dispatch(["serve-me"]) is None
