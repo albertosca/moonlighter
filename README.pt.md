@@ -194,6 +194,20 @@ Pra trabalhar no código em vez de só usar a ferramenta, veja [CONTRIBUTING.md]
 | `sync_email_responses` | Busca respostas recentes e classifica estágios de entrevista |
 | `get_pipeline` | Resumo completo do pipeline |
 
+## Linha de comando
+
+Toda fatia também instala um comando que você pode disparar de um shell ou de um cron job, sem nenhuma conversa com LLM envolvida. Cada um imprime exatamente um documento JSON no stdout (os logs vão pro stderr) e sai com `0` em caso de sucesso, `1` quando não havia nada a fazer (nenhuma vaga nova, vaga não encontrada, nenhuma pergunta), `2` num erro de uso ou de config, `3` num erro inesperado (o JSON então traz `kind: "error"` e o traceback vai pro stderr).
+
+| Comando | O que faz |
+|---|---|
+| `moonlighter-scan [--phase all] [--keywords ...]` | Roda um scan; `--company SOURCE SLUG` escaneia só um board. `--no-eval` descobre e grava as vagas como `needs_review` sem chamar o LLM — pontue depois com `verify_job`. |
+| `moonlighter-apply prepare JOB_ID [--paste FILE]` | Compõe a folha pronta pra colar; `--paste -` lê o texto da página do stdin. |
+| `moonlighter-email sync` | Classifica respostas recentes e avança candidaturas. Sozinho ele não alimenta o banco de respostas — quem faz isso é o `sync_email_responses` do servidor MCP. |
+
+```sh
+moonlighter-scan --no-eval | jq '.saved[] | select(.status == "needs_review") | .url'
+```
+
 ## Extensões (adicionando um novo scanner de ATS)
 
 Toda integração de ATS que você vê acima (Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters,

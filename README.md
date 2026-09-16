@@ -194,6 +194,20 @@ To work on the code rather than just use it, see [CONTRIBUTING.md](CONTRIBUTING.
 | `sync_email_responses` | Pull latest replies and classify interview stages |
 | `get_pipeline` | Full pipeline summary |
 
+## Command line
+
+Every slice also installs a command you can drive from a shell or a cron job, with no LLM conversation involved. Each prints exactly one JSON document on stdout (logs go to stderr) and exits `0` on success, `1` when there was nothing to do (no new jobs, job not found, no questions), `2` on a usage or config error, `3` on an unexpected error (the JSON then carries `kind: "error"` and the traceback goes to stderr).
+
+| Command | What it does |
+|---|---|
+| `moonlighter-scan [--phase all] [--keywords ...]` | Run a scan; `--company SOURCE SLUG` scans one board. `--no-eval` discovers and stores postings as `needs_review` without calling the LLM — score them later with `verify_job`. |
+| `moonlighter-apply prepare JOB_ID [--paste FILE]` | Compose the paste-ready sheet; `--paste -` reads the page text from stdin. |
+| `moonlighter-email sync` | Classify recent replies and advance applications. Standalone it does not feed the answer bank; the MCP server's `sync_email_responses` does. |
+
+```sh
+moonlighter-scan --no-eval | jq '.saved[] | select(.status == "needs_review") | .url'
+```
+
 ## Extensions (adding a new ATS scanner)
 
 Every ATS integration you see above (Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters, Gupy)
