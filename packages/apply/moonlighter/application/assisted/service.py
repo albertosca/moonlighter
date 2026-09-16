@@ -179,7 +179,7 @@ async def _sheet(
     )
 
 
-def _failed(kind: SheetKind, message: str, *, apply_url: str = "") -> SheetResult:
+def failed_sheet(kind: SheetKind, message: str, *, apply_url: str = "") -> SheetResult:
     """A sheet that never got past an early check: no job, no questions.
 
     The empty title/company are what the renderer's error short-circuit
@@ -198,10 +198,10 @@ async def prepare_application(
 ) -> SheetResult:
     job = _job(job_id)
     if job is None:
-        return _failed(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
+        return failed_sheet(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
     questions = await _questions_from_api(job)
     if not questions:
-        return _failed(
+        return failed_sheet(
             SheetKind.NEEDS_PASTE,
             PASTE_HINT.format(url=job.url, job_id=job_id),
             apply_url=job.url,
@@ -214,10 +214,10 @@ async def prepare_application_from_paste(
 ) -> SheetResult:
     job = _job(job_id)
     if job is None:
-        return _failed(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
+        return failed_sheet(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
     questions = await extract_questions_from_page(page_text, make_caller(config))
     if not questions:
-        return _failed(
+        return failed_sheet(
             SheetKind.NO_QUESTIONS,
             "No questions could be found in that text. Was the whole page copied?",
         )

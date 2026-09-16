@@ -344,3 +344,21 @@ def test_sheet_result_to_dict_pins_the_needs_paste_and_no_questions_wire_values(
         )
     )
     assert no_questions["kind"] == "no_questions"
+
+
+def test_sheet_kind_posting_unreadable_is_pinned():
+    from moonlighter.application.assisted.results import (
+        SheetKind,
+        SheetResult,
+        sheet_result_to_dict,
+    )
+
+    r = SheetResult(
+        kind=SheetKind.POSTING_UNREADABLE,
+        composed=[],
+        job_title="",
+        company="",
+        apply_url="https://x",
+        error="The posting at https://x could not be read.",
+    )
+    assert sheet_result_to_dict(r)["kind"] == "posting_unreadable"

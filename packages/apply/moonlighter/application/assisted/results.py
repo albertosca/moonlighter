@@ -13,6 +13,7 @@ class SheetKind(StrEnum):
     JOB_NOT_FOUND = "job_not_found"
     NEEDS_PASTE = "needs_paste"  # the API had no questions: paste the page
     NO_QUESTIONS = "no_questions"  # the pasted text had none
+    POSTING_UNREADABLE = "posting_unreadable"  # --url given, the page could not be read or named
 
 
 @dataclass(frozen=True)
