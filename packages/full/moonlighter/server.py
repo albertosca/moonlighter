@@ -8,7 +8,13 @@ from typing import Any
 
 from mcp.server.mcpserver import Context, MCPServer
 from moonlighter._tool_logging import tool_logged
-from moonlighter.application.answers.answer_bank import promote_application
+from moonlighter.application.answers.answer_bank import (
+    forget,
+    list_entries,
+    normalize_question,
+    promote_application,
+    render_answer_bank,
+)
 from moonlighter.application.assisted import service as assisted_service
 from moonlighter.application.assisted.results import render_sheet_result
 from moonlighter.core.config import (
@@ -394,6 +400,34 @@ async def update_status(
     if next_action:
         result += f"\n  Next action: {next_action}"
     return result
+
+
+@mcp.tool()
+@tool_logged
+async def list_answer_bank(*, ctx: Context[AppContext, Any]) -> str:
+    """
+    Every banked screening answer, most recently used first. Entries older than
+    answer_bank_max_age_days are marked expired: kept, but no longer replayed
+    on a sheet until a new submission refreshes them.
+    """
+    app = ctx.request_context.lifespan_context
+    max_age = app.config.get("answer_bank_max_age_days", DEFAULTS["answer_bank_max_age_days"])
+    return render_answer_bank(list_entries(), max_age)
+
+
+@mcp.tool()
+@tool_logged
+async def forget_answer(question: str, *, ctx: Context[AppContext, Any]) -> str:
+    """
+    Delete one banked answer by its question text (matched the way the bank
+    keys it: lowercase, collapsed whitespace, no trailing punctuation). Use it
+    when list_answer_bank shows an answer that is wrong or stale; the next
+    application that asks the question goes to the LLM again.
+    """
+    normalized = normalize_question(question)
+    if forget(question):
+        return f"Forgot the banked answer for '{normalized}'."
+    return f"No banked answer matches '{normalized}'."
 
 
 @mcp.tool()

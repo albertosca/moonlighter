@@ -188,6 +188,8 @@ Pra trabalhar no código em vez de só usar a ferramenta, veja [CONTRIBUTING.md]
 | `prepare_application` | Compõe todas as respostas do formulário de candidatura de uma vaga numa única folha revisável, pra você colar e enviar |
 | `prepare_application_from_paste` | O mesmo que `prepare_application`, pra um formulário cujas perguntas nenhuma API publica — passe o texto que você copiou da página |
 | `update_status` | Move uma vaga manualmente pelo pipeline |
+| `list_answer_bank` | Toda resposta de triagem banqueada, da mais recente pra mais antiga; as expiradas marcadas |
+| `forget_answer` | Apaga uma resposta banqueada pra próxima candidatura perguntar ao LLM de novo |
 | `setup_email` | Autoriza OAuth do Gmail |
 | `sync_email_responses` | Busca respostas recentes e classifica estágios de entrevista |
 | `get_pipeline` | Resumo completo do pipeline |
