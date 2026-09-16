@@ -16,6 +16,7 @@ Usage:
 """
 
 import sys
+from typing import Any
 
 from moonlighter.application.cvgen.compile import compile_pdf, latex_available, page_count
 from moonlighter.application.cvgen.pool import CVPool, PoolError, load_pool
@@ -47,7 +48,7 @@ def check(pool: CVPool, template: str) -> int | None:
     return page_count(tex)
 
 
-def main(config: dict) -> int:
+def main(config: dict[str, Any]) -> int:
     pool_path = (config.get("cv") or {}).get("pool")
     if not pool_path:
         print("No cv.pool configured — nothing to check.")

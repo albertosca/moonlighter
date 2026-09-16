@@ -28,15 +28,19 @@ import yaml
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
+from typing import Any
+
 from moonlighter.core.config import load_config, load_profile, moonlighter_home
 from moonlighter.core.db import Job, init_db
-from moonlighter.core.llm import make_caller
+from moonlighter.core.llm import LLMCaller, make_caller
 from moonlighter.core.log import setup as setup_logging
 from moonlighter.core.metrics import operation_metrics
 from moonlighter.core.parsing import extract_json
 
 
-def _make_proposal_prompt(company: str, threshold: float, titles_block: str, profile: dict) -> str:
+def _make_proposal_prompt(
+    company: str, threshold: float, titles_block: str, profile: dict[str, Any]
+) -> str:
     name = profile.get("name", "the candidate")
     level = profile.get("level", "senior software engineer")
     skills = ", ".join((profile.get("top_skills") or [])[:4]) or "software engineering"
@@ -98,7 +102,7 @@ def _load_learned() -> list[str]:
     if not path.exists():
         return []
     data = yaml.safe_load(path.read_text()) or {}
-    return data.get("title_blocklist", [])
+    return list(data.get("title_blocklist", []))
 
 
 def _save_learned(patterns: list[str]) -> None:
@@ -147,8 +151,13 @@ def _fetch_low_scorers(threshold: float, company: str | None) -> dict[str, list[
 
 
 async def _propose_for_company(
-    company: str, titles: list[str], threshold: float, caller, model: str, profile: dict
-) -> list[dict]:
+    company: str,
+    titles: list[str],
+    threshold: float,
+    caller: LLMCaller,
+    model: str,
+    profile: dict[str, Any],
+) -> list[dict[str, Any]]:
     titles_block = "\n".join(f"- {t}" for t in titles[:80])  # cap at 80 to avoid huge context
     prompt = _make_proposal_prompt(company, threshold, titles_block, profile)
     try:
@@ -175,8 +184,8 @@ async def _run(
     company_filter: str | None,
     dry_run: bool,
     model: str,
-    config: dict,
-    profile: dict,
+    config: dict[str, Any],
+    profile: dict[str, Any],
     assume_yes: bool,
 ) -> None:
     with operation_metrics("build_blocklist"):
