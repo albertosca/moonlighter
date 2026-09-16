@@ -11,8 +11,8 @@ import re
 from dataclasses import dataclass
 
 import httpx
-from moonlighter.discovery.sources.http import FetchError, _get_json
-from moonlighter.discovery.urls import normalize_job_url
+from moonlighter.core.http import HEADERS, FetchError, get_json
+from moonlighter.core.urls import normalize_job_url
 
 _GREENHOUSE_URL = re.compile(r"greenhouse\.io/(?P<board>[^/]+)/jobs/(?P<job_id>\d+)")
 # Any host with a Recruitee-shaped /o/{offer} path: subdomain customers AND
@@ -50,7 +50,7 @@ async def fetch_posting_via_ats(url: str) -> FetchedPosting | None:
 async def _fetch_greenhouse(board: str, job_id: str) -> FetchedPosting | None:
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            data = await _get_json(client, _GREENHOUSE_API.format(board=board, job_id=job_id))
+            data = await get_json(client, _GREENHOUSE_API.format(board=board, job_id=job_id))
     except FetchError:
         return None
     if not isinstance(data, dict):
@@ -81,7 +81,7 @@ async def _fetch_recruitee_offer(host: str, offer: str) -> FetchedPosting | None
     """
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            data = await _get_json(client, f"https://{host}/api/offers/")
+            data = await get_json(client, f"https://{host}/api/offers/")
     except FetchError:
         return None
     if not isinstance(data, dict):
@@ -96,3 +96,35 @@ async def _fetch_recruitee_offer(host: str, offer: str) -> FetchedPosting | None
                 description=_strip_tags(item.get("description") or ""),
             )
     return None
+
+
+async def fetch_description(url: str) -> tuple[str | None, str | None]:
+    """Fetches and cleans (strips HTML from) the job description. Returns (description,
+    error) — only one of the two is non-null. Doesn't work on pages that require login."""
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            r = await client.get(url, headers=HEADERS)
+        if r.status_code != 200:
+            return None, (
+                f"Could not fetch the URL (HTTP {r.status_code}). Provide 'description' manually."
+            )
+        # Remove script/style/noscript WITH their contents first: a bare
+        # tag-strip leaves e.g. a styled-components CSS bundle as the
+        # "description" of any SPA page (job #2646, the Ziflow case).
+        text = re.sub(r"(?is)<(script|style|noscript)\b[^>]*>.*?</\1\s*>", " ", r.text)
+        # The pair-matching regex above needs a real closing tag; malformed
+        # HTML with an unclosed <style>/<script>/<noscript> leaves it (and
+        # everything after it) untouched — measured directly: CSS/JS text
+        # then leaks into the description alongside real content. Every
+        # WELL-FORMED pair is already gone at this point, so any tag of these
+        # three names still present is unclosed by definition — truncate the
+        # rest of the document there rather than trust an unbounded tail.
+        text = re.split(r"(?is)<(?:script|style|noscript)\b", text, maxsplit=1)[0]
+        text = re.sub(r"<[^>]+>", " ", text).strip()
+        return re.sub(r"\s+", " ", text)[:8000], None
+    except Exception as e:
+        return None, (
+            f"Error fetching URL: {e}\n"
+            f"For pages that require login (LinkedIn, etc.), provide "
+            f"'company', 'title', and 'description' manually."
+        )

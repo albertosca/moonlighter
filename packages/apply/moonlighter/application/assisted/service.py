@@ -6,11 +6,6 @@ from typing import Any
 
 import httpx
 from moonlighter.application.answers.answer_bank import load_answer_bank
-from moonlighter.application.answers.email_alias import (
-    build_email_alias,
-    is_email_label,
-    new_email_ref,
-)
 from moonlighter.application.assisted.composer import ComposedAnswer, compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.results import SheetKind, SheetResult
@@ -26,6 +21,11 @@ from moonlighter.application.assisted.sources.recruitee import (
 from moonlighter.application.cvgen.service import ensure_tailored_cv
 from moonlighter.core.config import DEFAULTS
 from moonlighter.core.db import Application, Job
+from moonlighter.core.email_alias import (
+    build_email_alias,
+    is_email_label,
+    new_email_ref,
+)
 from moonlighter.core.llm import make_caller
 
 PASTE_HINT = (

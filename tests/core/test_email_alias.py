@@ -1,6 +1,6 @@
 import re
 
-from moonlighter.application.answers.email_alias import (
+from moonlighter.core.email_alias import (
     build_email_alias,
     is_email_label,
     new_email_ref,
