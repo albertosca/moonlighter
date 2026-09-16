@@ -238,3 +238,54 @@ def test_bootstrap_prints_permission_warnings_to_stderr_not_stdout(tmp_db, monke
     out, err = capsys.readouterr()
     assert out == ""
     assert "world-readable" in err
+
+
+def test_doctor_payload_reports_paths_slices_and_a_valid_config(monkeypatch, tmp_path):
+    # No tmp_db here: doctor_payload() only checks db path existence, never
+    # opens the DB, and tmp_db's MOONLIGHTER_DB_PATH override would shadow the
+    # MOONLIGHTER_HOME set below, breaking the "path ends in moonlighter.db"
+    # assertion.
+    import json
+
+    from moonlighter.core import cli
+
+    (tmp_path / "config.yaml").write_text("score_threshold: 7.0\n")
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    payload, code = cli.doctor_payload()
+    json.dumps(payload)
+    assert code == 0
+    assert payload["kind"] == "doctor"
+    assert payload["home"] == str(tmp_path)
+    assert payload["config"] == {
+        "path": str(tmp_path / "config.yaml"),
+        "exists": True,
+        "valid": True,
+        "error": None,
+    }
+    assert (
+        payload["profile"]["path"] == str(tmp_path / "profile.yaml")
+        and payload["profile"]["exists"] is False
+    )
+    assert payload["db"]["path"].endswith("moonlighter.db")
+    assert set(payload["slices"]) == {"scan", "apply", "email", "full"}
+    assert payload["commands"] == sorted(payload["commands"])
+    assert {c["name"] for c in payload["capabilities"]["live"]} >= {"discovery"}
+
+
+def test_doctor_payload_reports_an_invalid_config_and_exits_1(tmp_db, monkeypatch, tmp_path):
+    from moonlighter.core import cli
+
+    (tmp_path / "config.yaml").write_text("nope: 1\n")
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    payload, code = cli.doctor_payload()
+    assert code == 1
+    assert payload["config"]["valid"] is False
+    assert "unknown config key 'nope'" in payload["config"]["error"]
+
+
+def test_doctor_payload_reports_a_missing_config_and_exits_1(tmp_db, monkeypatch, tmp_path):
+    from moonlighter.core import cli
+
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    payload, code = cli.doctor_payload()
+    assert (payload["config"]["exists"], code) == (False, 1)

@@ -1,0 +1,56 @@
+from importlib.metadata import PackageNotFoundError
+from unittest.mock import patch
+
+
+def test_installed_slices_always_answers_for_all_four():
+    from moonlighter.core.slices import SLICES, installed_slices
+
+    installed = installed_slices()
+    assert set(installed) == set(SLICES)
+    # This dev environment has every wheel installed.
+    assert all(installed.values())
+
+
+def test_installed_slices_reports_a_missing_wheel_as_false_not_absent():
+    from moonlighter.core import slices
+
+    def fake_distribution(name):
+        if name == "moonlighter-email":
+            raise PackageNotFoundError(name)
+        return object()
+
+    with patch.object(slices, "distribution", fake_distribution):
+        installed = slices.installed_slices()
+    assert installed == {"scan": True, "apply": True, "email": False, "full": True}
+
+
+def test_capabilities_split_by_what_is_installed():
+    from moonlighter.core.slices import capabilities
+
+    live, missing = capabilities({"scan": True, "apply": False, "email": False, "full": False})
+    assert [c.name for c in live] == ["discovery"]
+    assert [c.name for c in missing] == [
+        "sheets",
+        "tracking",
+        "scan-to-sheet",
+        "alias-round-trip",
+        "mcp-server",
+    ]
+
+
+def test_every_capability_names_only_known_slices():
+    from moonlighter.core.slices import CAPABILITIES, SLICES
+
+    for c in CAPABILITIES:
+        assert c.needs <= set(SLICES), c.name
+
+
+def test_slice_epilog_says_what_is_installed_and_what_each_missing_slice_unlocks():
+    from moonlighter.core.slices import slice_epilog
+
+    text = slice_epilog({"scan": True, "apply": True, "email": False, "full": False})
+    assert "installed: scan, apply" in text
+    assert "email" in text and "moonlighter-email sync" in text and "tracking" in text
+    assert "full" in text and "mcp-server" in text
+    # Live capabilities are not advertised as missing.
+    assert "would add: discovery" not in text

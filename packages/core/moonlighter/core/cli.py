@@ -17,6 +17,8 @@ import logging
 import sys
 from collections.abc import Awaitable, Callable
 from datetime import datetime
+from importlib.metadata import entry_points
+from pathlib import Path
 from typing import Any, NoReturn
 
 from moonlighter.core.config import (
@@ -24,10 +26,12 @@ from moonlighter.core.config import (
     harden_permissions,
     load_config,
     load_profile,
+    moonlighter_home,
     validate_config,
 )
-from moonlighter.core.db import Job, init_db
+from moonlighter.core.db import Job, _db_path, init_db
 from moonlighter.core.log import setup as setup_logging
+from moonlighter.core.slices import capabilities, installed_slices
 
 EXIT_OK = 0
 EXIT_NOTHING = 1
@@ -91,6 +95,54 @@ def bootstrap() -> tuple[dict[str, Any], dict[str, Any]]:
     for warning in harden_permissions():
         print(f"⚠️  {warning}", file=sys.stderr, flush=True)
     return config, profile
+
+
+def doctor_payload() -> tuple[dict[str, Any], int]:
+    """Where the state lives and whether it loads. The diagnosis IS the
+    payload -- a broken config is reported, not raised -- so a script can gate
+    on the exit code and a human can read the JSON. Never calls bootstrap():
+    a broken install must still be diagnosable."""
+    home = moonlighter_home()
+    config_path = home / "config.yaml"
+    valid, error = False, None
+    try:
+        validate_config(load_config())
+        valid = True
+    except ConfigError as e:
+        error = str(e)
+    installed = installed_slices()
+    live, missing = capabilities(installed)
+    payload = {
+        "kind": "doctor",
+        "home": str(home),
+        "config": {
+            "path": str(config_path),
+            "exists": config_path.exists(),
+            "valid": valid,
+            "error": error,
+        },
+        "profile": {
+            "path": str(home / "profile.yaml"),
+            "exists": (home / "profile.yaml").exists(),
+        },
+        "db": {"path": _db_path(), "exists": Path(_db_path()).exists()},
+        "slices": installed,
+        "commands": sorted(
+            ep.name
+            for ep in entry_points(group="console_scripts")
+            if ep.name.startswith("moonlighter")
+        ),
+        "capabilities": {
+            "live": [
+                {"name": c.name, "commands": list(c.commands), "summary": c.summary} for c in live
+            ],
+            "missing": [
+                {"name": c.name, "needs": sorted(c.needs), "summary": c.summary} for c in missing
+            ],
+        },
+    }
+    ok = valid and config_path.exists()
+    return payload, (EXIT_OK if ok else EXIT_NOTHING)
 
 
 def _iso(value: Any) -> Any:
