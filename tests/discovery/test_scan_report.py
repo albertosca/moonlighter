@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from moonlighter.core.db import Job, ScanLog, init_db
-from moonlighter.discovery.results import ScanReport, _render_counts, render_scan_report
+from moonlighter.discovery.results import ScanKind, ScanReport, _render_counts, render_scan_report
 from moonlighter.discovery.service import scan_company
 
 from tests.discovery.test_service import _raw, _run_scan
@@ -48,56 +48,80 @@ def three_jobs(tmp_db):
 # drop a jobs table, a spend warning, or a verification count.
 
 
-def test_scan_report_rejects_company_with_saved_jobs(three_jobs):
-    with pytest.raises(ValueError, match="company silences saved/spend_hit"):
-        ScanReport(saved=three_jobs, spend_hit=False, threshold=7.0, company="acme")
+def test_scan_report_all_known_requires_a_company_and_a_count(three_jobs):
+    with pytest.raises(ValueError, match="all_known"):
+        ScanReport(kind=ScanKind.ALL_KNOWN, found_but_known=3)
+    with pytest.raises(ValueError, match="all_known"):
+        ScanReport(kind=ScanKind.ALL_KNOWN, company="acme")
 
 
-def test_scan_report_rejects_company_with_spend_hit():
-    with pytest.raises(ValueError, match="company silences saved/spend_hit"):
-        ScanReport(saved=[], spend_hit=True, threshold=7.0, company="acme")
+def test_scan_report_no_open_jobs_requires_a_company():
+    with pytest.raises(ValueError, match="no_open_jobs"):
+        ScanReport(kind=ScanKind.NO_OPEN_JOBS)
 
 
-def test_scan_report_rejects_no_new_jobs_with_saved_jobs(three_jobs):
-    with pytest.raises(ValueError, match="no_new_jobs silences"):
-        ScanReport(saved=three_jobs, spend_hit=False, threshold=7.0, no_new_jobs=True)
+def test_scan_report_error_is_the_unknown_source_message_and_nothing_else(three_jobs):
+    with pytest.raises(ValueError, match="unknown_source"):
+        ScanReport(kind=ScanKind.UNKNOWN_SOURCE)
+    with pytest.raises(ValueError, match="unknown_source"):
+        ScanReport(kind=ScanKind.EVALUATED, saved=three_jobs, error="boom")
 
 
-def test_scan_report_rejects_found_but_known_without_company():
-    with pytest.raises(ValueError, match="found_but_known is only read when company is set"):
-        ScanReport(saved=[], spend_hit=False, threshold=7.0, found_but_known=3)
+def test_scan_report_only_an_evaluated_scan_carries_results(three_jobs):
+    # The old dataclass used `company` and `no_new_jobs` as renderer mode
+    # switches that silently discarded saved/spend_hit. The kind is explicit
+    # now, and carrying results under any other kind is a producer bug.
+    with pytest.raises(ValueError, match="evaluated"):
+        ScanReport(kind=ScanKind.NO_NEW_JOBS, saved=three_jobs)
+    with pytest.raises(ValueError, match="evaluated"):
+        ScanReport(kind=ScanKind.NO_OPEN_JOBS, company="acme", spend_hit=True)
+
+
+def test_scan_report_company_is_a_fact_not_a_mode_switch(three_jobs, snapshot_text):
+    # Before: ScanReport(kind=ScanKind.EVALUATED, saved=[...], company="acme") rendered "No open jobs
+    # found at 'acme'" and dropped the whole table. Now scan_company can name
+    # the company it scanned on its evaluated shape too, and the output is
+    # the same bytes as with no company at all.
+    report = ScanReport(kind=ScanKind.EVALUATED, saved=three_jobs, threshold=7.0, company="acme")
+    snapshot_text(render_scan_report(report), "above_threshold")
 
 
 def test_render_counts_above_threshold_is_unchanged(three_jobs, snapshot_text):
-    report = ScanReport(saved=three_jobs, spend_hit=False, threshold=7.0)
+    report = ScanReport(kind=ScanKind.EVALUATED, saved=three_jobs, spend_hit=False, threshold=7.0)
     snapshot_text(_render_counts(report), "above_threshold")
 
 
 def test_render_counts_none_above_threshold_is_unchanged(three_jobs, snapshot_text):
-    report = ScanReport(saved=three_jobs[1:], spend_hit=False, threshold=7.0)
+    report = ScanReport(
+        kind=ScanKind.EVALUATED, saved=three_jobs[1:], spend_hit=False, threshold=7.0
+    )
     snapshot_text(_render_counts(report), "none_above")
 
 
 def test_render_counts_spend_hit_is_unchanged(three_jobs, snapshot_text):
-    report = ScanReport(saved=three_jobs, spend_hit=True, threshold=7.0)
+    report = ScanReport(kind=ScanKind.EVALUATED, saved=three_jobs, spend_hit=True, threshold=7.0)
     snapshot_text(_render_counts(report), "spend_hit")
 
 
 def test_render_scan_report_reproduces_the_old_format_report(three_jobs, snapshot_text):
-    report = ScanReport(saved=three_jobs, spend_hit=False, threshold=7.0)
+    report = ScanReport(kind=ScanKind.EVALUATED, saved=three_jobs, spend_hit=False, threshold=7.0)
     snapshot_text(render_scan_report(report), "above_threshold")
 
 
 def test_render_scan_report_appends_the_warning_last(three_jobs):
     report = ScanReport(
-        saved=three_jobs, spend_hit=False, threshold=7.0, warning="⚠️  linkedin: 0 jobs"
+        kind=ScanKind.EVALUATED,
+        saved=three_jobs,
+        spend_hit=False,
+        threshold=7.0,
+        warning="⚠️  linkedin: 0 jobs",
     )
     assert render_scan_report(report).endswith("\n\n⚠️  linkedin: 0 jobs")
 
 
 def test_render_scan_report_no_new_jobs_is_the_old_literal_string(snapshot_text):
     # Set only when scan_and_evaluate found zero candidates to evaluate at all.
-    report = ScanReport(saved=[], spend_hit=False, threshold=7.0, no_new_jobs=True)
+    report = ScanReport(kind=ScanKind.NO_NEW_JOBS, threshold=7.0)
     snapshot_text(render_scan_report(report), "empty")
 
 
@@ -106,17 +130,18 @@ def test_render_scan_report_empty_saved_without_no_new_jobs_still_computes_count
     # spend-limit stop, or a silently-skipped IntegrityError) and zero jobs
     # survived it -- must render the computed "0 jobs processed..." counts,
     # matching _render_counts([], ...), not the "No new jobs found." literal.
-    report = ScanReport(saved=[], spend_hit=True, threshold=7.0)
+    report = ScanReport(kind=ScanKind.EVALUATED, saved=[], spend_hit=True, threshold=7.0)
     rendered = render_scan_report(report)
-    assert rendered == _render_counts(ScanReport(saved=[], spend_hit=True, threshold=7.0))
+    assert rendered == _render_counts(
+        ScanReport(kind=ScanKind.EVALUATED, saved=[], spend_hit=True, threshold=7.0)
+    )
     assert "jobs processed" in rendered
     assert "No new jobs found." not in rendered
 
 
 def test_render_scan_report_error_short_circuits_everything_else(three_jobs):
     report = ScanReport(
-        saved=three_jobs,
-        spend_hit=False,
+        kind=ScanKind.UNKNOWN_SOURCE,
         threshold=7.0,
         tip="Tip: ignored",
         warning="ignored too",
@@ -129,6 +154,7 @@ def test_render_scan_report_appends_the_tip_before_archive_and_warning(three_job
     from moonlighter.discovery.archive import ArchiveResult
 
     report = ScanReport(
+        kind=ScanKind.EVALUATED,
         saved=three_jobs,
         spend_hit=False,
         threshold=7.0,

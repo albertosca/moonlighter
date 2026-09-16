@@ -27,7 +27,7 @@ from moonlighter.discovery.evaluator import (
     should_skip_by_title,
 )
 from moonlighter.discovery.posting import fetch_posting_via_ats
-from moonlighter.discovery.results import ScanReport
+from moonlighter.discovery.results import ScanKind, ScanReport
 from moonlighter.discovery.sources.base import RawJob, ScanStats
 from moonlighter.discovery.sources.registry import build_http_scanners
 from moonlighter.discovery.urls import normalize_job_url
@@ -426,12 +426,12 @@ async def scan_and_evaluate(
     if new_jobs:
         saved, spend_hit = await _evaluate_and_store(new_jobs, config, profile, caller)
     return ScanReport(
+        kind=ScanKind.EVALUATED if new_jobs else ScanKind.NO_NEW_JOBS,
         saved=saved,
         spend_hit=spend_hit,
         threshold=config["score_threshold"],
         archive=await archive_stale_jobs(None, None, config),
         warning=li_warning,
-        no_new_jobs=not new_jobs,
     )
 
 
@@ -445,8 +445,7 @@ async def scan_company(
     scanners = build_http_scanners()
     if source not in scanners:
         return ScanReport(
-            saved=[],
-            spend_hit=False,
+            kind=ScanKind.UNKNOWN_SOURCE,
             threshold=threshold,
             error=(
                 f"Unknown source {source!r}. Valid sources: {', '.join(sorted(scanners))}. "
@@ -467,7 +466,13 @@ async def scan_company(
     if new_jobs:
         saved, spend_hit = await _evaluate_and_store(new_jobs, config, profile, caller)
         return ScanReport(
-            saved=saved, spend_hit=spend_hit, threshold=threshold, tip=tip, warning=warning
+            kind=ScanKind.EVALUATED,
+            saved=saved,
+            spend_hit=spend_hit,
+            threshold=threshold,
+            tip=tip,
+            warning=warning,
+            company=company,
         )
 
     # An empty raw_jobs can mean the company genuinely has zero open postings
@@ -476,8 +481,7 @@ async def scan_company(
     # which happened; `warning` (via _stats_warnings) carries the fetch-error
     # detail when there is one.
     return ScanReport(
-        saved=[],
-        spend_hit=False,
+        kind=ScanKind.ALL_KNOWN if raw_jobs else ScanKind.NO_OPEN_JOBS,
         threshold=threshold,
         tip=tip,
         warning=warning,
