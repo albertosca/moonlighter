@@ -366,6 +366,37 @@ def test_fill_template_handles_a_missing_optional_field():
     assert r"\phone[mobile]{}" in filled
 
 
+def test_fill_template_escapes_tex_specials_in_contact_and_education_fields():
+    # pool.py's own module docstring records this exact bug class already
+    # happening once: an unescaped '&' in a hand-curated "R&D Engineer" title
+    # broke every pdflatex compile silently. NAME_FIRST/NAME_LAST/HEADLINE/
+    # PHONE/EMAIL and the education fields all substitute into ordinary
+    # text-mode LaTeX macros (\firstname{}, \title{}, \phone[mobile]{},
+    # \email{}, \cventry{...}) -- not verbatim -- so a profile.yaml field
+    # containing a TeX special must come out escaped, not raw. A bare '%' is
+    # the sharpest case: unescaped, it is LaTeX's comment character and
+    # silently truncates the rest of the line with no compile error at all.
+    profile = {
+        "name": "Anne & Marie Doe",
+        "headline": "Full-Stack Engineer (Node.js & React, 100% remote)",
+        "phone": "+1 555 0100 #2",
+        "email": "jane_doe@example.com",
+        "education": [
+            {"degree": "R&D Engineering", "school": "50% Scholarship University", "year": 2014}
+        ],
+    }
+    filled = fill_template(profile)
+    assert r"\firstname{Anne \& Marie}" in filled
+    assert r"\familyname{Doe}" in filled
+    assert r"\title{Full-Stack Engineer (Node.js \& React, 100\% remote)}" in filled
+    assert r"\phone[mobile]{+1 555 0100 \#2}" in filled
+    assert r"\email{jane\_doe@example.com}" in filled
+    assert r"R\&D Engineering" in filled
+    assert r"50\% Scholarship University" in filled
+    # LINKEDIN_USERNAME is the one deliberate exception: it is a slug already
+    # parsed out of a URL, never free text, so it is never escaped.
+
+
 def test_fill_template_skips_a_malformed_education_entry_that_is_not_a_mapping():
     # profile.yaml is hand-edited: a stray '-' under "education" (the same
     # mistake pool.py's own _bullet/_experience guard against) makes an entry

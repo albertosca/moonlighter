@@ -184,13 +184,19 @@ def _linkedin_username(url: str) -> str:
 
 
 def _education_block(entries: list[Any]) -> str:
+    # year/degree/school are pasted into \cventry{...} the same way pool.py's
+    # curated company/title/location are (see that module's own docstring for
+    # the "R&D Engineer" incident this class of bug already caused once) --
+    # profile.yaml is operator-authored free text, not pre-escaped LaTeX, so
+    # every field goes through escape_latex exactly like the contact fields
+    # below.
     lines = []
     for e in entries:
         if not isinstance(e, dict):
             continue
-        year = e.get("year", "")
-        degree = e.get("degree", "")
-        school = e.get("school", "")
+        year = escape_latex(str(e.get("year") or ""))
+        degree = escape_latex(str(e.get("degree") or ""))
+        school = escape_latex(str(e.get("school") or ""))
         lines.append(f"\\cventry{{{year}}}{{{degree}}}{{{school}}}{{}}{{}}{{}}")
     return "\n".join(lines)
 
@@ -203,23 +209,25 @@ def fill_template(profile: dict[str, Any]) -> str:
     templates = importlib.resources.files("moonlighter.application.cvgen.templates")
     text = (templates / "cv-template.en.example.tex").read_text()
     first, last = _split_name(str(profile.get("name") or ""))
-    filled = (
-        text.replace("{{NAME_FIRST}}", first)
-        .replace("{{NAME_LAST}}", last)
-        .replace("{{HEADLINE}}", str(profile.get("headline") or ""))
-        .replace("{{PHONE}}", str(profile.get("phone") or ""))
-        .replace("{{EMAIL}}", str(profile.get("email") or ""))
+    # These five substitute into ordinary text-mode LaTeX macros (\firstname{},
+    # \title{}, \phone[mobile]{}, \email{}), never verbatim -- an unescaped
+    # '&'/'%'/'_' from a profile field either breaks the compile or, worse, a
+    # bare '%' silently truncates the rest of the line (LaTeX's comment
+    # character) with no compile error at all. escape_latex is what pool.py's
+    # own curated fields and every model-authored string in render.py already
+    # go through before reaching a .tex file; profile.yaml is exactly as
+    # untrusted as either. LINKEDIN_USERNAME is the one exception: it is a
+    # slug already parsed out of a URL by _linkedin_username, never free text,
+    # and moderncv's \social[linkedin]{...} expects exactly that bare slug.
+    return (
+        text.replace("{{NAME_FIRST}}", escape_latex(first))
+        .replace("{{NAME_LAST}}", escape_latex(last))
+        .replace("{{HEADLINE}}", escape_latex(str(profile.get("headline") or "")))
+        .replace("{{PHONE}}", escape_latex(str(profile.get("phone") or "")))
+        .replace("{{EMAIL}}", escape_latex(str(profile.get("email") or "")))
         .replace("{{LINKEDIN_USERNAME}}", _linkedin_username(str(profile.get("linkedin") or "")))
         .replace("{{EDUCATION}}", _education_block(profile.get("education") or []))
     )
-    # The shipped template's own header comment (for a human copying and
-    # hand-editing the example) writes the marker syntax literally as
-    # "{{...}}" -- not a real placeholder, so none of the replacements above
-    # touch it, and it would otherwise be the only "{{" left once every real
-    # one-time placeholder is filled. Once this file is a filled, per-user
-    # copy that ellipsis is misleading anyway (there's nothing left to fill),
-    # so it is worded out here rather than left dangling.
-    return filled.replace("{{...}}", "the one-time placeholders described above")
 
 
 @dataclass(frozen=True)

@@ -3,11 +3,12 @@
 % Generic example template for moonlighter's tailored-CV feature. Copy this
 % to MOONLIGHTER_HOME/cv-templates/cv-template.en.tex and customize it by
 % hand, or let `bootstrap_cv_pool` / `moonlighter-apply bootstrap-cv` fill
-% the {{...}} placeholders below from your profile.yaml automatically.
+% the double-brace placeholders below from your profile.yaml automatically.
 %
 % Two DIFFERENT marker styles, on purpose:
-%   {{...}}  — filled ONCE by the bootstrap, from profile.yaml (name, email,
-%              education...). After that first fill, edit this file by hand
+%   double-brace NAME_FIRST/NAME_LAST/HEADLINE/PHONE/EMAIL/LINKEDIN_USERNAME/
+%              EDUCATION markers — filled ONCE by the bootstrap, from
+%              profile.yaml. After that first fill, edit this file by hand
 %              like any other LaTeX document; nothing re-fills these.
 %   %%...%%  — filled on EVERY prepare_application call, by the per-job CV
 %              selection engine (cvgen/render.py). Never remove these four:
