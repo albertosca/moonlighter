@@ -11,7 +11,7 @@ from typing import Any
 
 from moonlighter.core.cli import job_to_dict
 from moonlighter.core.db import Job
-from moonlighter.discovery.archive import ArchiveResult, _format_archive_result
+from moonlighter.discovery.archive import ArchiveResult, format_archive_result
 from moonlighter.discovery.sources.base import ScanStats
 from moonlighter.views import render_jobs_table
 
@@ -71,7 +71,7 @@ def render_scan_report(report: ScanReport) -> str:
     if report.tip is not None:
         body += f"\n\n{report.tip}"
     if report.archive is not None:
-        body += f"\n\n{_format_archive_result(report.archive)}"
+        body += f"\n\n{format_archive_result(report.archive)}"
     if report.warning is not None:
         body += f"\n\n{report.warning}"
     return body

@@ -194,6 +194,17 @@ Pra trabalhar no código em vez de só usar a ferramenta, veja [CONTRIBUTING.md]
 | `sync_email_responses` | Busca respostas recentes e classifica estágios de entrevista |
 | `get_pipeline` | Resumo completo do pipeline |
 
+### Answer bank
+
+Toda resposta de triagem não-múltipla-escolha que você aprova — "anos de Elixir", "prazo de aviso",
+qualquer coisa que um formulário pergunta e não é um campo estático do perfil — é guardada em cache por
+vaga e também promovida pra um banco entre vagas, então uma pergunta com a mesma redação numa candidatura
+futura reaproveita a resposta em vez de perguntar de novo ao LLM. Uma resposta banqueada expira depois de
+`answer_bank_max_age_days` (padrão 90, `config.example.yaml`; `null` desliga a expiração), contado a
+partir da última vez que foi enviada — assim uma resposta de prazo de aviso ou disponibilidade que ficou
+velha volta a ser perguntada em vez de repetida pra sempre. `list_answer_bank` mostra o que está em cache
+(as expiradas marcadas); `forget_answer` apaga uma pra próxima candidatura perguntar de novo.
+
 ## Linha de comando
 
 Toda fatia também instala um comando que você pode disparar de um shell ou de um cron job, sem nenhuma conversa com LLM envolvida. Cada um imprime exatamente um documento JSON no stdout (os logs vão pro stderr) e sai com `0` em caso de sucesso, `1` quando não havia nada a fazer (nenhuma vaga nova, vaga não encontrada, nenhuma pergunta), `2` num erro de uso ou de config, `3` num erro inesperado (o JSON então traz `kind: "error"` e o traceback vai pro stderr).

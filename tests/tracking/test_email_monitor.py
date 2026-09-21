@@ -1196,7 +1196,7 @@ class TestSetupGmailService:
             setup_gmail_service(config)
 
     def test_gmail_oauth_sets_chmod_600_on_token(self, tmp_path):
-        from moonlighter.tracking.gmail_client import _run_gmail_oauth
+        from moonlighter.tracking.gmail_client import run_gmail_oauth
 
         token_path = str(tmp_path / "subdir" / "gmail-token.json")
         creds_path = str(tmp_path / "creds.json")
@@ -1209,7 +1209,7 @@ class TestSetupGmailService:
 
         with patch("moonlighter.tracking.gmail_client.InstalledAppFlow") as MockFlow:
             MockFlow.from_client_secrets_file.return_value = mock_flow
-            _run_gmail_oauth(creds_path, token_path)
+            run_gmail_oauth(creds_path, token_path)
 
         written = Path(token_path)
         assert written.read_text() == '{"token": "abc"}'
@@ -2920,15 +2920,15 @@ def test_resolve_application_no_company_no_title_is_uncertain(tmp_db):
     assert match == "uncertain"
 
 
-def test_run_gmail_oauth_raises_without_oauthlib():
+def testrun_gmail_oauth_raises_without_oauthlib():
     """InstalledAppFlow None → GmailAuthError (454)."""
-    from moonlighter.tracking.gmail_client import GmailAuthError, _run_gmail_oauth
+    from moonlighter.tracking.gmail_client import GmailAuthError, run_gmail_oauth
 
     with (
         patch("moonlighter.tracking.gmail_client.InstalledAppFlow", None),
         pytest.raises(GmailAuthError, match="google-auth-oauthlib"),
     ):
-        _run_gmail_oauth("creds.json", "token.json")
+        run_gmail_oauth("creds.json", "token.json")
 
 
 def test_extract_body_multipart_unresolvable_returns_empty():

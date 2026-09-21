@@ -82,7 +82,7 @@ async def archive_stale_jobs(
     )
 
 
-def _format_archive_result(result: ArchiveResult) -> str:
+def format_archive_result(result: ArchiveResult) -> str:
     if not result.archived and not result.aged and not result.failed_companies:
         return "No closed jobs found."
     lines: list[str] = []

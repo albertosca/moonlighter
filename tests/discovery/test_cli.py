@@ -92,7 +92,7 @@ async def test_run_no_eval_passes_no_caller_to_the_service(tmp_db):
         patch.object(cli, "scan_and_evaluate", new=scan),
     ):
         await _run(parse_args(["--no-eval"]))
-    assert scan.await_args.args[-1] is None
+    assert scan.await_args.args[-1] is cli.NO_EVAL
 
 
 def test_scan_keeps_its_flag_grammar_and_gains_doctor():

@@ -8,7 +8,7 @@ import asyncio
 import json
 from dataclasses import replace
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from moonlighter.core.config import load_company_list
 from moonlighter.core.db import Job, ScanLog
@@ -36,6 +36,14 @@ logger = get_logger(__name__)
 
 class _StopScan:
     """Sentinel returned by a coroutine that detected a spend limit and stopped."""
+
+
+class _NoEval:
+    """--no-eval mode marker, distinct from any accidental `None` default
+    elsewhere (a stray unset caller can never compare equal to this)."""
+
+
+NO_EVAL = _NoEval()
 
 
 def _model_for(config: dict[str, Any]) -> str:
@@ -268,7 +276,7 @@ async def _evaluate_and_store(
     new_jobs: list[RawJob],
     config: dict[str, Any],
     profile: dict[str, Any],
-    caller: LLMCaller | None,
+    caller: LLMCaller | _NoEval,
 ) -> tuple[list[Job], bool]:
     """Evaluates and saves jobs in concurrent BATCHES (up to scan_concurrency batches
     in parallel, scan_batch_size jobs per batch), stopping at the first spend limit
@@ -331,7 +339,7 @@ async def _evaluate_and_store(
             if not to_eval:
                 return results
 
-            if caller is None:
+            if caller is NO_EVAL:
                 # --no-eval: nothing here may cost a token. Park the evaluable
                 # jobs the way a missing description already does, so verify_job
                 # can score them later from a pasted page.
@@ -361,7 +369,9 @@ async def _evaluate_and_store(
                     ],
                     profile,
                     model,
-                    caller,
+                    # mypy doesn't narrow a variable captured by this nested
+                    # closure across the `caller is NO_EVAL` check above.
+                    cast(LLMCaller, caller),
                 )
             except Exception as e:
                 for raw in to_eval:
@@ -441,7 +451,7 @@ async def scan_and_evaluate(
     phase: str,
     config: dict[str, Any],
     profile: dict[str, Any],
-    caller: LLMCaller | None,
+    caller: LLMCaller | _NoEval,
 ) -> ScanReport:
     companies = load_company_list(phase=None if phase == "all" else phase)
     stats: ScanStats = {}
@@ -467,7 +477,7 @@ async def scan_company(
     company: str,
     config: dict[str, Any],
     profile: dict[str, Any],
-    caller: LLMCaller | None,
+    caller: LLMCaller | _NoEval,
 ) -> ScanReport:
     """Scan every open posting at ONE company right now, without touching
     company_list.yaml. `company` is an ATS slug, or (Recruitee) a custom

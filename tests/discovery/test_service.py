@@ -959,43 +959,43 @@ async def test_archive_stale_jobs_excludes_resolved_statuses(tmp_db, monkeypatch
     assert seen_groups[0] == {}
 
 
-# ── _format_archive_result ──────────────────────────────────────────────────
+# ── format_archive_result ──────────────────────────────────────────────────
 
 
-def test_format_archive_result_empty():
-    from moonlighter.discovery.archive import ArchiveResult, _format_archive_result
+def testformat_archive_result_empty():
+    from moonlighter.discovery.archive import ArchiveResult, format_archive_result
 
-    assert _format_archive_result(ArchiveResult()) == "No closed jobs found."
+    assert format_archive_result(ArchiveResult()) == "No closed jobs found."
 
 
-def test_format_archive_result_archived_only():
-    from moonlighter.discovery.archive import ArchiveResult, _format_archive_result
+def testformat_archive_result_archived_only():
+    from moonlighter.discovery.archive import ArchiveResult, format_archive_result
 
     result = ArchiveResult(
         archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}]
     )
-    formatted = _format_archive_result(result)
+    formatted = format_archive_result(result)
     assert "1 job(s) archived" in formatted
     assert "acme / Engineer — https://x.com/1" in formatted
 
 
-def test_format_archive_result_failed_only():
-    from moonlighter.discovery.archive import ArchiveResult, _format_archive_result
+def testformat_archive_result_failed_only():
+    from moonlighter.discovery.archive import ArchiveResult, format_archive_result
 
     result = ArchiveResult(failed_companies=["acme"])
-    formatted = _format_archive_result(result)
+    formatted = format_archive_result(result)
     assert "No closed jobs found." in formatted
     assert "Could not check: acme" in formatted
 
 
-def test_format_archive_result_archived_and_failed():
-    from moonlighter.discovery.archive import ArchiveResult, _format_archive_result
+def testformat_archive_result_archived_and_failed():
+    from moonlighter.discovery.archive import ArchiveResult, format_archive_result
 
     result = ArchiveResult(
         archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}],
         failed_companies=["beta"],
     )
-    formatted = _format_archive_result(result)
+    formatted = format_archive_result(result)
     assert "1 job(s) archived" in formatted
     assert "Could not check: beta" in formatted
 
@@ -1281,7 +1281,7 @@ async def test_scan_company_zero_raw_jobs_does_not_claim_all_already_known(tmp_d
 async def test_aged_portal_jobs_archive_as_aged_not_closed(tmp_db):
     import datetime
 
-    from moonlighter.discovery.archive import _format_archive_result
+    from moonlighter.discovery.archive import format_archive_result
 
     init_db()
     old = Job.create(
@@ -1298,15 +1298,15 @@ async def test_aged_portal_jobs_archive_as_aged_not_closed(tmp_db):
     assert refreshed.status == "archived"  # aged out, NOT closed-at-source
     assert refreshed.closed_at is None
     assert result.aged == [{"company": "acme", "title": "Eng", "url": "https://remoteok.com/j/1"}]
-    text = _format_archive_result(result)
+    text = format_archive_result(result)
     assert "archived by age" in text and "30" in text
 
 
-# ── --no-eval: caller=None, zero-LLM mode ────────────────────────────────────
+# ── --no-eval: caller=NO_EVAL, zero-LLM mode ─────────────────────────────────
 
 
 async def test_no_eval_persists_evaluable_jobs_as_needs_review_without_an_llm(tmp_db):
-    # caller=None is the zero-LLM mode. A job that WOULD have gone to the
+    # caller=NO_EVAL is the zero-LLM mode. A job that WOULD have gone to the
     # model is stored unscored for verify_job later; nothing else changes.
     init_db()
     raw = _raw(1)  # a plain "Engineer" title with a description: evaluable
@@ -1319,7 +1319,7 @@ async def test_no_eval_persists_evaluable_jobs_as_needs_review_without_an_llm(tm
             "scan_batch_size": 5,
         },
         {},
-        None,
+        scan_service.NO_EVAL,
     )
     assert spend_hit is False
     assert [j.status for j in saved] == ["needs_review"]
@@ -1339,7 +1339,7 @@ async def test_no_eval_still_archives_title_filtered_jobs_deterministically(tmp_
             "scan_batch_size": 5,
         },
         {},
-        None,
+        scan_service.NO_EVAL,
     )
     assert [j.status for j in saved] == ["archived"]
     assert saved[0].score_notes.startswith("title filtered:")
@@ -1361,7 +1361,29 @@ async def test_no_eval_needs_review_integrity_error_skips_silently(tmp_db):
             "scan_batch_size": 5,
         },
         {},
-        None,
+        scan_service.NO_EVAL,
     )
     assert saved == []
     assert spend_hit is False
+
+
+async def test_a_stray_none_caller_does_not_take_the_no_eval_shortcut(tmp_db):
+    # The hardening this guards: NO_EVAL is a dedicated sentinel, not None, so
+    # an accidental caller=None elsewhere can never silently match it and skip
+    # the LLM. Proven by mocking evaluate_jobs_batch and asserting it's called.
+    init_db()
+    raw = _raw(1)
+    batch = AsyncMock(return_value=[_eval(8.0)])
+    with patch("moonlighter.discovery.service.evaluate_jobs_batch", batch):
+        await scan_service._evaluate_and_store(
+            [raw],
+            {
+                "score_threshold": 6.5,
+                "title_blocklist": [],
+                "scan_concurrency": 2,
+                "scan_batch_size": 5,
+            },
+            {},
+            None,
+        )
+    batch.assert_awaited_once()
