@@ -10,7 +10,7 @@ from moonlighter.application.assisted.service import (
     prepare_application_from_paste,
 )
 from moonlighter.application.cvgen.service import TailoredCV
-from moonlighter.core.db import Job, init_db
+from moonlighter.core.db import Job, init_db, record_cv_bootstrap_decline
 
 CONFIG = {"llm_model": "claude-sonnet-4-6"}
 PROFILE = {"name": "Jane Doe", "email": "jane@example.com"}
@@ -23,6 +23,13 @@ PAGE = "Full name\nEmail\nWhy do you want to work here?"
 
 def _job(tmp_db, **kwargs):
     init_db()
+    # This module doesn't exercise the CV-pool bootstrap offer (Task 7's own
+    # tests for that live in test_assisted_service.py) -- every prepare_*
+    # call below predates it and asserts on sheet/paste-hint/error content.
+    # Recording a decline here keeps _cv_bootstrap_offer a no-op without
+    # touching resolved_pool_path, so ensure_tailored_cv's mocked/None
+    # behavior below is unaffected.
+    record_cv_bootstrap_decline()
     defaults = {
         "source": "greenhouse",
         "company": "Acme",
@@ -362,3 +369,7 @@ def test_sheet_kind_posting_unreadable_is_pinned():
         error="The posting at https://x could not be read.",
     )
     assert sheet_result_to_dict(r)["kind"] == "posting_unreadable"
+
+
+def test_cv_bootstrap_offer_is_a_valid_sheet_kind():
+    assert SheetKind.CV_BOOTSTRAP_OFFER.value == "cv_bootstrap_offer"
