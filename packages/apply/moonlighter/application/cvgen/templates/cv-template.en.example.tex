@@ -1,0 +1,53 @@
+% packages/apply/moonlighter/application/cvgen/templates/cv-template.en.example.tex
+%
+% Generic example template for moonlighter's tailored-CV feature. Copy this
+% to MOONLIGHTER_HOME/cv-templates/cv-template.en.tex and customize it by
+% hand, or let `bootstrap_cv_pool` / `moonlighter-apply bootstrap-cv` fill
+% the {{...}} placeholders below from your profile.yaml automatically.
+%
+% Two DIFFERENT marker styles, on purpose:
+%   {{...}}  — filled ONCE by the bootstrap, from profile.yaml (name, email,
+%              education...). After that first fill, edit this file by hand
+%              like any other LaTeX document; nothing re-fills these.
+%   %%...%%  — filled on EVERY prepare_application call, by the per-job CV
+%              selection engine (cvgen/render.py). Never remove these four:
+%              %%SUMMARY%%, %%TECHNICAL_EXPERTISE%%, %%EXPERIENCE%%,
+%              %%OPEN_SOURCE%%.
+%
+% %%BASE_SUMMARY/%%BASE_EXPERTISE describe what this template's own summary
+% says right now (what a USE_BASE decision falls back to) — keep them in
+% sync with the %%SUMMARY%%/%%TECHNICAL_EXPERTISE%% lines below, in the same
+% plain-text **bold** dialect the generator answers in.
+%%BASE_SUMMARY: Senior engineer with **10+ years** building backend and full-stack systems. Strong in **distributed systems, APIs and data-intensive services**.
+%%BASE_EXPERTISE: Backend, APIs, distributed systems, cloud infrastructure
+\documentclass[11pt,a4paper,sans]{moderncv}
+\moderncvstyle{banking}
+\moderncvcolor{blue}
+\usepackage[scale=0.95]{geometry}
+\usepackage[utf8]{inputenc}
+
+\firstname{{{NAME_FIRST}}}
+\familyname{{{NAME_LAST}}}
+\title{{{HEADLINE}}}
+\phone[mobile]{{{PHONE}}}
+\email{{{EMAIL}}}
+\social[linkedin]{{{LINKEDIN_USERNAME}}}
+
+\begin{document}
+\makecvtitle
+
+\section{Professional Summary}
+\cvlistitem{%%SUMMARY%%}
+
+\cvlistitem{\textbf{Technical Expertise:} %%TECHNICAL_EXPERTISE%%}
+
+\section{Experience}
+
+%%EXPERIENCE%%
+
+%%OPEN_SOURCE%%
+
+\section{Education}
+{{EDUCATION}}
+
+\end{document}
