@@ -1,6 +1,11 @@
 """Tests for the CV-pool bootstrap (draft_pool, fill_template, bootstrap_cv_pool)."""
 
 import importlib.resources
+import json
+
+import pytest
+from moonlighter.application.cvgen.bootstrap import BootstrapError, draft_pool
+from moonlighter.application.cvgen.pool import CVPool
 
 
 def test_the_example_template_and_pool_ship_as_package_data():
@@ -14,3 +19,286 @@ def test_the_example_template_and_pool_ship_as_package_data():
     assert "experiences:" in pool_text
     assert "{{NAME_FIRST}}" in template_text
     assert "%%SUMMARY%%" in template_text
+
+
+PROFILE = {
+    "name": "Jane Doe",
+    "location": "Remote (Brazil)",
+    "summary": "Senior engineer.",
+    "skills": ["Python", "Go"],
+    "experience": [
+        {
+            "company": "Acme Corp",
+            "role": "Senior Software Engineer",
+            "period": "2020 - present",
+            "highlights": ["Led the migration of a monolith to services, cutting p99 by 40%."],
+        }
+    ],
+}
+
+DRAFT_RESPONSE = json.dumps(
+    {
+        "experiences": [
+            {
+                "company": "Acme Corp",
+                "title": "Senior Software Engineer",
+                "period": "2020 - present",
+                "bullets": [
+                    {
+                        "id": "acme-migration",
+                        "angles": ["backend"],
+                        "text": "Led the migration of a monolith to services, cutting **p99 latency by 40%**.",
+                    }
+                ],
+            }
+        ],
+        "open_source": [],
+        "summary_facts": ["10+ years of experience"],
+    }
+)
+
+
+def _caller(response: str = DRAFT_RESPONSE):
+    async def _call(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        return response
+
+    return _call
+
+
+async def test_draft_pool_turns_a_profile_into_a_cv_pool():
+    pool = await draft_pool(PROFILE, _caller())
+    assert isinstance(pool, CVPool)
+    assert pool.experiences[0].company == "Acme Corp"
+    assert pool.experiences[0].location == "Remote (Brazil)"  # profile's top-level fallback
+    bullet = pool.experiences[0].bullets[0]
+    assert bullet.id == "acme-migration"
+    assert bullet.angles == ("backend",)
+    # escape_latex applied: **bold** markdown becomes \textbf{}, not raw asterisks
+    assert r"\textbf{p99 latency by 40\%}" in bullet.latex
+
+
+async def test_draft_pool_dedupes_a_repeated_bullet_id():
+    dupe_response = json.dumps(
+        {
+            "experiences": [
+                {
+                    "company": "Acme",
+                    "title": "Eng",
+                    "period": "2020",
+                    "bullets": [
+                        {"id": "acme-a", "angles": [], "text": "First"},
+                        {"id": "acme-a", "angles": [], "text": "Second"},
+                    ],
+                }
+            ],
+            "open_source": [],
+            "summary_facts": [],
+        }
+    )
+    pool = await draft_pool(PROFILE, _caller(dupe_response))
+    ids = [b.id for e in pool.experiences for b in e.bullets]
+    assert ids == ["acme-a", "acme-a-2"]
+
+
+async def test_draft_pool_drops_a_non_typesettable_bullet_with_a_warning(caplog):
+    bad_response = json.dumps(
+        {
+            "experiences": [
+                {
+                    "company": "Acme",
+                    "title": "Eng",
+                    "period": "2020",
+                    "bullets": [
+                        {"id": "acme-emoji", "angles": [], "text": "Shipped it 🚀"},
+                        {"id": "acme-ok", "angles": [], "text": "Shipped it well"},
+                    ],
+                }
+            ],
+            "open_source": [],
+            "summary_facts": [],
+        }
+    )
+    pool = await draft_pool(PROFILE, _caller(bad_response))
+    ids = [b.id for e in pool.experiences for b in e.bullets]
+    assert ids == ["acme-ok"]
+
+
+async def test_draft_pool_raises_when_the_profile_has_no_experience():
+    with pytest.raises(BootstrapError, match="no experience"):
+        await draft_pool({"name": "Jane"}, _caller())
+
+
+async def test_draft_pool_raises_when_the_model_response_is_unusable():
+    with pytest.raises(BootstrapError, match="could not be parsed"):
+        await draft_pool(PROFILE, _caller("not json"))
+
+
+async def test_draft_pool_reraises_a_spend_limit():
+    async def _quota_exceeded(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        raise RuntimeError("spend limit reached")
+
+    with pytest.raises(RuntimeError, match="spend limit"):
+        await draft_pool(PROFILE, _quota_exceeded)
+
+
+# The 7 cases above are the plan's brief verbatim. The repo's coverage gate
+# (--cov-fail-under=100, whole-tree) is a hard requirement (see CLAUDE.md),
+# and the branches below -- a 3rd repeat id, a malformed bullet, a bullet
+# that escapes to nothing, a company-less experience, an experience whose
+# only bullet gets dropped, a non-spend-limit call failure, and a
+# shape-valid-but-empty response -- are real deterministic-validation paths
+# a security-sensitive drafting function must not leave silently untested.
+
+
+async def test_draft_pool_disambiguates_a_third_repeated_bullet_id():
+    triple_response = json.dumps(
+        {
+            "experiences": [
+                {
+                    "company": "Acme",
+                    "title": "Eng",
+                    "period": "2020",
+                    "bullets": [
+                        {"id": "acme-a", "angles": [], "text": "First"},
+                        {"id": "acme-a", "angles": [], "text": "Second"},
+                        {"id": "acme-a", "angles": [], "text": "Third"},
+                    ],
+                }
+            ],
+            "open_source": [],
+            "summary_facts": [],
+        }
+    )
+    pool = await draft_pool(PROFILE, _caller(triple_response))
+    ids = [b.id for e in pool.experiences for b in e.bullets]
+    assert ids == ["acme-a", "acme-a-2", "acme-a-3"]
+
+
+async def test_draft_pool_skips_a_bullet_that_is_not_a_mapping():
+    mixed_response = json.dumps(
+        {
+            "experiences": [
+                {
+                    "company": "Acme",
+                    "title": "Eng",
+                    "period": "2020",
+                    "bullets": [
+                        "not a mapping",
+                        {"id": "acme-ok", "angles": [], "text": "Shipped it well"},
+                    ],
+                }
+            ],
+            "open_source": [],
+            "summary_facts": [],
+        }
+    )
+    pool = await draft_pool(PROFILE, _caller(mixed_response))
+    ids = [b.id for e in pool.experiences for b in e.bullets]
+    assert ids == ["acme-ok"]
+
+
+async def test_draft_pool_drops_a_bullet_that_escapes_to_nothing():
+    # A zero-width space is not whitespace (str.strip() leaves it) and is
+    # invisible to is_typesettable (Cf is dropped before the allow-list
+    # check), so it survives both guards -- but escape_latex's own Cf-drop
+    # + strip then collapses it to "", and an empty bullet must not render.
+    zwsp_response = json.dumps(
+        {
+            "experiences": [
+                {
+                    "company": "Acme",
+                    "title": "Eng",
+                    "period": "2020",
+                    "bullets": [
+                        {"id": "acme-empty", "angles": [], "text": "​"},
+                        {"id": "acme-ok", "angles": [], "text": "Shipped it well"},
+                    ],
+                }
+            ],
+            "open_source": [],
+            "summary_facts": [],
+        }
+    )
+    pool = await draft_pool(PROFILE, _caller(zwsp_response))
+    ids = [b.id for e in pool.experiences for b in e.bullets]
+    assert ids == ["acme-ok"]
+
+
+async def test_draft_pool_skips_an_experience_entry_missing_a_company():
+    no_company_response = json.dumps(
+        {
+            "experiences": [
+                {
+                    "title": "Eng",
+                    "period": "2020",
+                    "bullets": [{"id": "x", "angles": [], "text": "No company here"}],
+                },
+                {
+                    "company": "Acme",
+                    "title": "Eng",
+                    "period": "2020",
+                    "bullets": [{"id": "acme-ok", "angles": [], "text": "Shipped it well"}],
+                },
+            ],
+            "open_source": [],
+            "summary_facts": [],
+        }
+    )
+    pool = await draft_pool(PROFILE, _caller(no_company_response))
+    assert [e.company for e in pool.experiences] == ["Acme"]
+
+
+async def test_draft_pool_drops_an_experience_when_every_bullet_is_dropped():
+    dropped_response = json.dumps(
+        {
+            "experiences": [
+                {
+                    "company": "Bad Co",
+                    "title": "Eng",
+                    "period": "2020",
+                    "bullets": [{"id": "bad", "angles": [], "text": "Shipped it 🚀"}],
+                },
+                {
+                    "company": "Acme",
+                    "title": "Eng",
+                    "period": "2020",
+                    "bullets": [{"id": "acme-ok", "angles": [], "text": "Shipped it well"}],
+                },
+            ],
+            "open_source": [],
+            "summary_facts": [],
+        }
+    )
+    pool = await draft_pool(PROFILE, _caller(dropped_response))
+    assert [e.company for e in pool.experiences] == ["Acme"]
+
+
+async def test_draft_pool_raises_when_the_call_fails_for_a_non_spend_limit_reason():
+    async def _broken(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        raise RuntimeError("connection reset")
+
+    with pytest.raises(BootstrapError, match="drafting call failed"):
+        await draft_pool(PROFILE, _broken)
+
+
+async def test_draft_pool_raises_when_the_response_has_no_experiences_key():
+    with pytest.raises(BootstrapError, match="could not be parsed into a CV pool"):
+        await draft_pool(PROFILE, _caller(json.dumps({"foo": "bar"})))
+
+
+async def test_draft_pool_raises_when_every_experience_is_unusable():
+    unusable_response = json.dumps(
+        {
+            "experiences": [
+                {
+                    "title": "Eng",
+                    "period": "2020",
+                    "bullets": [{"id": "x", "angles": [], "text": "No company"}],
+                }
+            ],
+            "open_source": [],
+            "summary_facts": [],
+        }
+    )
+    with pytest.raises(BootstrapError, match="no usable experience"):
+        await draft_pool(PROFILE, _caller(unusable_response))
