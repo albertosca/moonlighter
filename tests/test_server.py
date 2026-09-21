@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from moonlighter.application.assisted.results import SheetKind, SheetResult
+from moonlighter.application.cvgen.bootstrap import BootstrapError, BootstrapOutcome
 from moonlighter.core.db import Application, Job, ScanLog, init_db
 from moonlighter.core.metrics import record_call
 from moonlighter.discovery.evaluator import EvaluationResult
@@ -2283,3 +2284,44 @@ def test_dispatch_unknown_word_returns_none_and_falls_through_to_the_server():
     from moonlighter.server import _dispatch
 
     assert _dispatch(["serve-me"]) is None
+
+
+async def test_bootstrap_cv_pool_tool_reports_what_it_generated(monkeypatch, tmp_path):
+    from moonlighter import server
+
+    outcome = BootstrapOutcome(
+        pool_path=tmp_path / "cv-pool.yaml",
+        template_path=tmp_path / "cv-templates" / "cv-template.en.tex",
+        pdf_path=tmp_path / "cv-templates" / "cv-template.en.pdf",
+        bullet_count=3,
+    )
+
+    async def _fake_bootstrap(profile, config, caller, *, force=False):
+        return outcome
+
+    monkeypatch.setattr(server, "bootstrap_cv_pool_service", _fake_bootstrap)
+    result = await server.bootstrap_cv_pool(ctx=make_test_context())
+    assert "3" in result
+    assert str(outcome.pool_path) in result
+    assert "review" in result.lower()
+
+
+async def test_bootstrap_cv_pool_tool_reports_a_bootstrap_error(monkeypatch):
+    from moonlighter import server
+
+    async def _fake_bootstrap(profile, config, caller, *, force=False):
+        raise BootstrapError("no experience entries")
+
+    monkeypatch.setattr(server, "bootstrap_cv_pool_service", _fake_bootstrap)
+    result = await server.bootstrap_cv_pool(ctx=make_test_context())
+    assert "no experience entries" in result
+
+
+async def test_skip_cv_bootstrap_tool_records_the_decline(tmp_db):
+    from moonlighter import server
+    from moonlighter.core.db import cv_bootstrap_declined, init_db
+
+    init_db()
+    result = await server.skip_cv_bootstrap(ctx=make_test_context())
+    assert cv_bootstrap_declined() is True
+    assert "won't" in result.lower() or "never" in result.lower() or "skip" in result.lower()
