@@ -308,7 +308,7 @@ def _get_or_create_label(service: Any, label_name: str) -> str:
     return str(created["id"])
 
 
-def _run_gmail_oauth(
+def run_gmail_oauth(
     credentials_path: str, token_path: str, config: dict[str, Any] | None = None
 ) -> None:
     """Runs the interactive OAuth2 flow and saves the token."""

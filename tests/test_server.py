@@ -1557,7 +1557,7 @@ async def test_setup_email_calls_gmail_flow():
     }
     with (
         patch("moonlighter.server.setup_gmail_service") as mock_setup,
-        patch("moonlighter.server._run_gmail_oauth") as mock_oauth,
+        patch("moonlighter.server.run_gmail_oauth") as mock_oauth,
         patch("os.path.exists", return_value=True),
     ):
         mock_oauth.return_value = None
@@ -1598,7 +1598,7 @@ async def test_setup_email_resolves_a_relative_credentials_path_under_moonlighte
     }
     with (
         patch("moonlighter.server.setup_gmail_service") as mock_setup,
-        patch("moonlighter.server._run_gmail_oauth") as mock_oauth,
+        patch("moonlighter.server.run_gmail_oauth") as mock_oauth,
     ):
         mock_oauth.return_value = None
         mock_setup.return_value = MagicMock()
@@ -1624,7 +1624,7 @@ async def test_setup_email_leaves_an_absolute_credentials_path_untouched(tmp_pat
     }
     with (
         patch("moonlighter.server.setup_gmail_service") as mock_setup,
-        patch("moonlighter.server._run_gmail_oauth") as mock_oauth,
+        patch("moonlighter.server.run_gmail_oauth") as mock_oauth,
     ):
         mock_oauth.return_value = None
         mock_setup.return_value = MagicMock()
@@ -1990,7 +1990,7 @@ async def test_setup_email_handles_auth_error(tmp_path):
     test_config = {
         "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
     }
-    with patch("moonlighter.server._run_gmail_oauth", side_effect=GmailAuthError("invalid token")):
+    with patch("moonlighter.server.run_gmail_oauth", side_effect=GmailAuthError("invalid token")):
         result = await setup_email(ctx=make_test_context(config=test_config))
     assert "Gmail" in result and "invalid token" in result
 
@@ -2004,7 +2004,7 @@ async def test_setup_email_handles_unexpected_error(tmp_path):
     test_config = {
         "email": {"credentials_path": str(creds), "token_path": str(tmp_path / "t.json")}
     }
-    with patch("moonlighter.server._run_gmail_oauth", side_effect=RuntimeError("boom")):
+    with patch("moonlighter.server.run_gmail_oauth", side_effect=RuntimeError("boom")):
         result = await setup_email(ctx=make_test_context(config=test_config))
     assert "unexpected" in result.lower()
 

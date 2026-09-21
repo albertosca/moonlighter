@@ -32,12 +32,12 @@ from moonlighter.core.log import setup as _setup_logging
 from moonlighter.core.metrics import operation_metrics
 from moonlighter.core.parsing import wrap_untrusted
 from moonlighter.discovery import service as scan_service
-from moonlighter.discovery.archive import ArchiveStaleJobsError, _format_archive_result
+from moonlighter.discovery.archive import ArchiveStaleJobsError, format_archive_result
 from moonlighter.discovery.results import render_scan_report
 from moonlighter.priority import company_rejection_ages, rejection_badge, rejection_penalty
 from moonlighter.startup import StartupWarning, validate_startup
 from moonlighter.tracking.email_monitor import sync_responses
-from moonlighter.tracking.gmail_client import GmailAuthError, _run_gmail_oauth, setup_gmail_service
+from moonlighter.tracking.gmail_client import GmailAuthError, run_gmail_oauth, setup_gmail_service
 from moonlighter.views import render_jobs_table
 
 
@@ -214,7 +214,7 @@ async def archive_stale_jobs(
         result = await scan_service.archive_stale_jobs(job_id, company, app.config)
     except ArchiveStaleJobsError as e:
         return str(e)
-    return _format_archive_result(result)
+    return format_archive_result(result)
 
 
 @mcp.tool()
@@ -467,7 +467,7 @@ async def setup_email(*, ctx: Context[AppContext, Any]) -> str:
         )
 
     try:
-        _run_gmail_oauth(creds_path, token_path, config)
+        run_gmail_oauth(creds_path, token_path, config)
         setup_gmail_service(config)
         return "✓ Gmail authentication configured successfully."
     except GmailAuthError as e:
