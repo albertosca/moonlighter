@@ -210,7 +210,7 @@ async def test_draft_pool_drops_a_bullet_that_escapes_to_nothing():
                     "title": "Eng",
                     "period": "2020",
                     "bullets": [
-                        {"id": "acme-empty", "angles": [], "text": "​"},
+                        {"id": "acme-empty", "angles": [], "text": "\u200b"},
                         {"id": "acme-ok", "angles": [], "text": "Shipped it well"},
                     ],
                 }
@@ -284,6 +284,34 @@ async def test_draft_pool_raises_when_the_call_fails_for_a_non_spend_limit_reaso
 async def test_draft_pool_raises_when_the_response_has_no_experiences_key():
     with pytest.raises(BootstrapError, match="could not be parsed into a CV pool"):
         await draft_pool(PROFILE, _caller(json.dumps({"foo": "bar"})))
+
+
+async def test_draft_pool_escapes_a_tex_special_in_the_experience_header_fields():
+    # pool.py's own module docstring records this exact bug already happening once:
+    # an unescaped '&' in a hand-curated "R&D Engineer" title broke every pdflatex
+    # compile silently until someone compiled it. render.py's _entry pastes company/
+    # title/period/location into \cventry{...} unescaped, trusting they are already
+    # curated LaTeX -- a model-echoed "AT&T" from the profile is not, so
+    # _experience_from_raw must run these four fields through escape_latex exactly
+    # like bullet text, not just pass them through raw.
+    special_response = json.dumps(
+        {
+            "experiences": [
+                {
+                    "company": "AT&T",
+                    "title": "R&D Engineer",
+                    "period": "2020",
+                    "bullets": [{"id": "att-ok", "angles": [], "text": "Shipped it well"}],
+                }
+            ],
+            "open_source": [],
+            "summary_facts": [],
+        }
+    )
+    pool = await draft_pool(PROFILE, _caller(special_response))
+    exp = pool.experiences[0]
+    assert exp.company == r"AT\&T"
+    assert exp.title == r"R\&D Engineer"
 
 
 async def test_draft_pool_raises_when_every_experience_is_unusable():

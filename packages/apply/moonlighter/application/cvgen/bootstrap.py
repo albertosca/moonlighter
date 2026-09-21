@@ -100,10 +100,10 @@ def _experience_from_raw(
     if not bullets:
         return None
     return PoolExperience(
-        company=str(raw["company"]),
-        title=str(raw.get("title") or ""),
-        period=str(raw.get("period") or ""),
-        location=str(raw.get("location") or default_location),
+        company=escape_latex(str(raw["company"])),
+        title=escape_latex(str(raw.get("title") or "")),
+        period=escape_latex(str(raw.get("period") or "")),
+        location=escape_latex(str(raw.get("location") or default_location)),
         bullets=bullets,
         prose=None,
         prose_id=None,
