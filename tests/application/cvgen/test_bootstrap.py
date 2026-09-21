@@ -4,7 +4,13 @@ import importlib.resources
 import json
 
 import pytest
-from moonlighter.application.cvgen.bootstrap import BootstrapError, draft_pool
+from moonlighter.application.cvgen.bootstrap import (
+    BootstrapError,
+    BootstrapOutcome,
+    bootstrap_cv_pool,
+    draft_pool,
+    fill_template,
+)
 from moonlighter.application.cvgen.pool import CVPool
 
 
@@ -330,3 +336,128 @@ async def test_draft_pool_raises_when_every_experience_is_unusable():
     )
     with pytest.raises(BootstrapError, match="no usable experience"):
         await draft_pool(PROFILE, _caller(unusable_response))
+
+
+def test_fill_template_substitutes_contact_and_education_placeholders():
+    profile = {
+        "name": "Jane Marie Doe",
+        "headline": "Senior Engineer",
+        "email": "jane@example.com",
+        "phone": "+1 555 0100",
+        "linkedin": "https://www.linkedin.com/in/janedoe/",
+        "education": [
+            {"degree": "BSc Computer Science", "school": "Example University", "year": 2014}
+        ],
+    }
+    filled = fill_template(profile)
+    assert "{{" not in filled  # every {{...}} placeholder was substituted
+    assert "%%SUMMARY%%" in filled  # the per-job markers survive untouched
+    assert r"\firstname{Jane Marie}" in filled
+    assert r"\familyname{Doe}" in filled
+    assert r"\email{jane@example.com}" in filled
+    assert r"\social[linkedin]{janedoe}" in filled
+    assert "BSc Computer Science" in filled
+    assert "Example University" in filled
+
+
+def test_fill_template_handles_a_missing_optional_field():
+    filled = fill_template({"name": "Jane Doe"})
+    assert "{{" not in filled
+    assert r"\phone[mobile]{}" in filled
+
+
+def test_fill_template_skips_a_malformed_education_entry_that_is_not_a_mapping():
+    # profile.yaml is hand-edited: a stray '-' under "education" (the same
+    # mistake pool.py's own _bullet/_experience guard against) makes an entry
+    # a bare string instead of a mapping -- fill_template must skip it rather
+    # than crash the whole bootstrap on one malformed line.
+    profile = {
+        "name": "Jane Doe",
+        "education": [
+            "not a mapping",
+            {"degree": "BSc Computer Science", "school": "Example University", "year": 2014},
+        ],
+    }
+    filled = fill_template(profile)
+    assert "{{" not in filled
+    assert "BSc Computer Science" in filled
+    assert "not a mapping" not in filled
+
+
+async def test_bootstrap_cv_pool_writes_pool_template_and_compiled_pdf(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    profile = {
+        "name": "Jane Doe",
+        "email": "jane@example.com",
+        "experience": [
+            {
+                "company": "Acme",
+                "role": "Engineer",
+                "period": "2020",
+                "highlights": ["Did the thing."],
+            }
+        ],
+    }
+    outcome = await bootstrap_cv_pool(profile, {}, _caller())
+    assert isinstance(outcome, BootstrapOutcome)
+    assert outcome.pool_path == tmp_path / "cv-pool.yaml"
+    assert outcome.pool_path.exists()
+    assert outcome.pool_path.read_text().startswith("# DRAFT")
+    assert outcome.template_path == tmp_path / "cv-templates" / "cv-template.en.tex"
+    assert outcome.template_path.exists()
+    assert outcome.bullet_count == 1
+    # pdf_path is None or a real path depending on whether pdflatex is on this
+    # machine -- both are correct, per compile_pdf's own degrade-never-crash
+    # contract (cvgen/compile.py). Only assert the type, not which branch.
+    assert outcome.pdf_path is None or outcome.pdf_path.exists()
+
+
+async def test_bootstrap_cv_pool_refuses_to_overwrite_an_existing_pool(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "cv-pool.yaml").write_text("experiences: []\n")
+    profile = {
+        "name": "Jane Doe",
+        "experience": [{"company": "Acme", "role": "Eng", "period": "2020", "highlights": ["X"]}],
+    }
+    with pytest.raises(BootstrapError, match="already exists"):
+        await bootstrap_cv_pool(profile, {}, _caller())
+
+
+async def test_bootstrap_cv_pool_force_overwrites_an_existing_pool(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "cv-pool.yaml").write_text("experiences: []\n")
+    profile = {
+        "name": "Jane Doe",
+        "experience": [{"company": "Acme", "role": "Eng", "period": "2020", "highlights": ["X"]}],
+    }
+    outcome = await bootstrap_cv_pool(profile, {}, _caller(), force=True)
+    assert outcome.bullet_count == 1
+
+
+async def test_bootstrap_cv_pool_output_is_immediately_usable_by_ensure_tailored_cv(
+    monkeypatch, tmp_path
+):
+    # The guardrail decision (spec: comment header only, no code-level lock):
+    # proves nothing added in this plan blocks the very next ensure_tailored_cv
+    # call from reading the pool this same bootstrap just wrote -- the DRAFT
+    # comment is a YAML comment, invisible to load_pool, not a lock file.
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    profile = {
+        "name": "Jane Doe",
+        "experience": [
+            {"company": "Acme", "role": "Eng", "period": "2020", "highlights": ["Did X."]}
+        ],
+    }
+    await bootstrap_cv_pool(profile, {}, _caller())
+
+    from moonlighter.application.cvgen.pool import load_pool
+    from moonlighter.application.cvgen.service import resolved_pool_path
+
+    pool = load_pool(resolved_pool_path({}))
+    # _caller()'s default response is the module-level DRAFT_RESPONSE fixture
+    # (a canned LLM reply, like every other draft_pool test above) -- it does
+    # not parse `profile`, so the drafted company is DRAFT_RESPONSE's own
+    # "Acme Corp", not this test's local profile["experience"][0]["company"].
+    # What this test actually proves -- the only thing its own comment above
+    # claims -- is that load_pool can read back what bootstrap_cv_pool wrote.
+    assert pool.experiences[0].company == "Acme Corp"
