@@ -194,6 +194,17 @@ To work on the code rather than just use it, see [CONTRIBUTING.md](CONTRIBUTING.
 | `sync_email_responses` | Pull latest replies and classify interview stages |
 | `get_pipeline` | Full pipeline summary |
 
+### Answer bank
+
+Every non-choice screening answer you approve — "years of Elixir", "notice period", anything an
+application form asks that isn't a static profile field — is cached per job and also promoted to a
+cross-job bank, so a question worded the same way on a later application reuses the answer instead of
+asking the LLM again. A banked answer expires after `answer_bank_max_age_days` (default 90,
+`config.example.yaml`; `null` disables expiry) counted from the last time it was submitted, so a
+notice-period or availability answer that goes stale gets asked again instead of replayed forever.
+`list_answer_bank` shows what's cached (expired entries marked); `forget_answer` deletes one so the next
+application asks fresh.
+
 ## Command line
 
 Every slice also installs a command you can drive from a shell or a cron job, with no LLM conversation involved. Each prints exactly one JSON document on stdout (logs go to stderr) and exits `0` on success, `1` when there was nothing to do (no new jobs, job not found, no questions), `2` on a usage or config error, `3` on an unexpected error (the JSON then carries `kind: "error"` and the traceback goes to stderr).
