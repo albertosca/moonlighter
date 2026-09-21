@@ -77,6 +77,8 @@ Config keys: `cv.pool`, `cv.template_dir` (holding `cv-template.en.tex`, optiona
 
 Each job's result is cached under `<generated_dir>/<job_id>/`, so no job is ever generated twice — after editing your pool or template, delete that directory to have the next `prepare_application` regenerate that job's CV.
 
+No `cv.pool` yet? `prepare_application` offers to draft one from your `profile.yaml` the first time it's missing (or run `moonlighter-apply bootstrap-cv` from a shell) — a first draft you review and edit, built from the generic example at `packages/apply/moonlighter/application/cvgen/templates/cv-pool.example.yaml` (and its matching `cv-template.en.example.tex`), the schema reference if you'd rather hand-write one instead.
+
 ## Architecture
 
 A [uv workspace](https://docs.astral.sh/uv/concepts/workspaces/) of 5 namespace packages (`moonlighter.*`), feature-sliced:
@@ -193,6 +195,8 @@ To work on the code rather than just use it, see [CONTRIBUTING.md](CONTRIBUTING.
 | `setup_email` | Authorize Gmail OAuth |
 | `sync_email_responses` | Pull latest replies and classify interview stages |
 | `get_pipeline` | Full pipeline summary |
+| `bootstrap_cv_pool` | Draft a CV pool + template from your profile.yaml — a first draft to review |
+| `skip_cv_bootstrap` | Decline the CV-pool bootstrap offer once, permanently |
 
 ### Answer bank
 
