@@ -85,14 +85,13 @@ def _check_cv(cv_path: str) -> StartupWarning | None:
 
 
 def _check_browser(config: dict[str, Any]) -> StartupWarning | None:
-    """Missing browser → a browser-based scan extension (e.g. LinkedIn), if installed,
-    won't work. moonlighter itself never opens a browser (see DISCLAIMER.md)."""
+    """Missing browser → LinkedIn scan and browser-based applications don't work."""
     browser_path = browser_executable(config)
     if not browser_path or Path(browser_path).exists():
         return None
     return StartupWarning(
         "warn",
         f"Browser not found at {browser_path}. "
-        "A browser-based scan extension, if installed, will not work. "
+        "LinkedIn scan and browser-based applications will not work. "
         "Install the browser (Chrome/Chromium/Brave) or set browser_path in config.yaml.",
     )

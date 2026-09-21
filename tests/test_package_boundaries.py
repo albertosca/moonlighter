@@ -50,7 +50,7 @@ def _declared_moonlighter_deps(pkg: str) -> set[str]:
     deps = data["project"].get("dependencies", [])
     found = set()
     for raw in deps:
-        name = raw.split(">")[0].split("=")[0].split("<")[0].strip()
+        name = raw.split("[")[0].split(">")[0].split("=")[0].split("<")[0].strip()
         if name in _DIST_TO_DIR:
             found.add(_DIST_TO_DIR[name])
     return found

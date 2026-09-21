@@ -1,0 +1,58 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Workable-shaped application form</title>
+<!--
+  Mirrors a live Workable posting captured 2026-08-04. Two details matter and
+  neither is guessable from the Recruitee shape:
+   1. The required marker is a line of its OWN, BEFORE the label ("*\nFirst name"),
+      and the phone field appends the dial code on another line.
+   2. Every screening question is a YES/NO radio pair whose question lives in a
+      <span> four levels above the input — not in a <legend>. Four distinct
+      questions therefore share the same two option labels.
+-->
+<form>
+  <!-- Workable's labels WRAP their input and carry no `for` at all. A lookup
+       that only reads `for` finds nothing, and get_by_label does not match a
+       label whose text contains newlines — every text field came back
+       not_found on a live posting while the radios filled fine. -->
+  <label><span>*</span><br>First name<input id="fn" type="text" required></label>
+  <label><span>*</span><br>Phone<br>+55<input id="ph" type="tel" required></label>
+
+  <fieldset role="radiogroup">
+    <div><div><div>
+      <span>*<br>Do you have at least 8 years of professional experience in software development?</span>
+      <!-- `pointer-events: none` is what makes this fixture as hard as the real
+           page: Workable's input is React-controlled, so a direct click reports
+           "Clicking the checkbox did not change its state". Clicking the wrapping
+           label still works, because label activation is not a pointer event on
+           the input. Without this the fixture passes with or without the fix. -->
+      <style>#rXk3, #rQ7z { pointer-events: none; }</style>
+      <!-- Workable hides the real input (aria-hidden, tabindex -1, random id, no
+           label[for]) and wraps it in a <label> inside a div[role=radio]. Forcing
+           a click on the input answers "Clicking the checkbox did not change its
+           state" — the label is what a human clicks. -->
+      <div>
+        <div role="radio">
+          <label><input type="radio" name="QA_12088154" value="true" required
+                        aria-hidden="true" tabindex="-1" id="rXk3">YES</label>
+        </div>
+        <div role="radio">
+          <label><input type="radio" name="QA_12088154" value="false" required
+                        aria-hidden="true" tabindex="-1" id="rQ7z">NO</label>
+        </div>
+      </div>
+    </div></div></div>
+  </fieldset>
+
+  <fieldset role="radiogroup">
+    <div><div><div>
+      <span>*<br>Expertise in building large React applications with TypeScript</span>
+      <div>
+        <input id="q2y" type="radio" name="QA_12088155" value="true" required>
+        <label for="q2y">YES</label>
+        <input id="q2n" type="radio" name="QA_12088155" value="false" required>
+        <label for="q2n">NO</label>
+      </div>
+    </div></div></div>
+  </fieldset>
+</form>

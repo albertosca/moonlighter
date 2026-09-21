@@ -1203,13 +1203,13 @@ name = "moonlighter-apply"
 version = "0.1.7"
 source = { editable = "packages/apply" }
 dependencies = [
-    { name = "moonlighter-core" },
+    { name = "moonlighter-core", extra = ["browser"] },
     { name = "pyyaml" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "moonlighter-core", editable = "packages/core" },
+    { name = "moonlighter-core", extras = ["browser"], editable = "packages/core" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
 
