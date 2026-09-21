@@ -133,12 +133,29 @@ def generated_dir_for(config: dict[str, Any], job_id: int) -> Path:
     return root / str(job_id)
 
 
+# Conventional defaults used whenever cv.pool/cv.template_dir is absent from
+# config -- the feature still turns on purely by the file existing (opt-in
+# by existence, unchanged), it just has somewhere to exist without the user
+# hand-writing the config key first. Only the bootstrap (cvgen/bootstrap.py)
+# ever writes here; nothing conjures a file at this path on its own.
+_DEFAULT_POOL_NAME = "cv-pool.yaml"
+_DEFAULT_TEMPLATE_DIR_NAME = "cv-templates"
+
+
+def resolved_pool_path(config: dict[str, Any]) -> Path:
+    pool_path = (config.get("cv") or {}).get("pool") or _DEFAULT_POOL_NAME
+    return resolve_under_home(pool_path)
+
+
+def resolved_template_dir(config: dict[str, Any]) -> Path:
+    tdir = (config.get("cv") or {}).get("template_dir") or _DEFAULT_TEMPLATE_DIR_NAME
+    return resolve_under_home(tdir)
+
+
 def _template(config: dict[str, Any], language: str) -> str | None:
-    tdir = (config.get("cv") or {}).get("template_dir")
-    if not tdir:
-        return None
-    en = resolve_under_home(tdir) / "cv-template.en.tex"
-    pt = resolve_under_home(tdir) / "cv-template.pt.tex"
+    tdir = resolved_template_dir(config)
+    en = tdir / "cv-template.en.tex"
+    pt = tdir / "cv-template.pt.tex"
     if language == "pt":
         if pt.exists():
             return pt.read_text()
@@ -188,8 +205,8 @@ async def ensure_tailored_cv(
     profile: dict[str, Any],
     caller: LLMCaller,
 ) -> TailoredCV | None:
-    pool_path = (config.get("cv") or {}).get("pool")
-    if not pool_path or not resolve_under_home(pool_path).exists():
+    pool_path = resolved_pool_path(config)
+    if not pool_path.exists():
         return None
     raw_id = job.get("id")
     if raw_id is None:
@@ -213,7 +230,7 @@ async def ensure_tailored_cv(
         return _after_compile(out / "cv.tex")  # a machine that gained latex since
 
     try:
-        pool = load_pool(resolve_under_home(pool_path))
+        pool = load_pool(pool_path)
     except PoolError as e:
         logger.warning("cv pool unusable, using default CV — %s", e)
         return None
