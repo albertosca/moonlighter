@@ -142,6 +142,17 @@ _DEFAULT_POOL_NAME = "cv-pool.yaml"
 _DEFAULT_TEMPLATE_DIR_NAME = "cv-templates"
 
 
+# KNOWN LIMITATION (found by review, 2026-09-21; ruled: park, not fix): an
+# `or` fallback cannot distinguish cv.pool being ABSENT from cv.pool being
+# explicitly set to null/"" -- both fall through to the default path below.
+# A coincidental file at that default path would then override an explicit
+# `cv: {pool: null}`. Not fixed because no config in this project (not
+# config.example.yaml, not DEFAULTS) ever sets cv.pool at all, let alone
+# explicitly nulls it -- simply omitting the key already means "off," so
+# there is no realistic config that hits this path -- and a correct fix
+# needs Path | None through every caller, which is real design surface the
+# original brainstorm never covered. Revisit if a real config ever needs to
+# explicitly null cv.pool.
 def resolved_pool_path(config: dict[str, Any]) -> Path:
     pool_path = (config.get("cv") or {}).get("pool") or _DEFAULT_POOL_NAME
     return resolve_under_home(pool_path)

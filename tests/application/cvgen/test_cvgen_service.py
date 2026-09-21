@@ -793,6 +793,13 @@ def test_resolved_template_dir_falls_back_to_a_default_under_moonlighter_home(
     assert resolved_template_dir({}) == tmp_path / "cv-templates"
 
 
+def test_resolved_template_dir_honors_an_explicit_config_value(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    assert (
+        resolved_template_dir({"cv": {"template_dir": "my-templates"}}) == tmp_path / "my-templates"
+    )
+
+
 async def test_ensure_tailored_cv_is_still_off_with_no_config_and_no_bootstrapped_file(
     monkeypatch, tmp_path
 ):
