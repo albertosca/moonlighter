@@ -33,7 +33,7 @@ from moonlighter.core.cli import (
 from moonlighter.core.llm import make_caller
 from moonlighter.core.slices import slice_epilog
 from moonlighter.discovery.results import ScanKind, ScanReport, scan_report_to_dict
-from moonlighter.discovery.service import scan_and_evaluate, scan_company
+from moonlighter.discovery.service import NO_EVAL, scan_and_evaluate, scan_company
 
 _EXIT_BY_KIND = {
     ScanKind.EVALUATED: EXIT_OK,
@@ -85,7 +85,7 @@ async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     if args.command == "doctor":
         return doctor_payload()
     config, profile = bootstrap()
-    caller = None if args.no_eval else make_caller(config)
+    caller = NO_EVAL if args.no_eval else make_caller(config)
     report: ScanReport
     if args.company:
         source, slug = args.company
