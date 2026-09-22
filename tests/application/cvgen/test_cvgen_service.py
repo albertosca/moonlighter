@@ -7,6 +7,8 @@ from moonlighter.application.cvgen.service import (
     TailoredCV,
     ensure_tailored_cv,
     generated_dir_for,
+    resolved_pool_path,
+    resolved_template_dir,
 )
 
 POOL_YAML = """
@@ -772,3 +774,38 @@ def test_shrunk_keys_on_experience_index_so_a_rehire_keeps_its_own_counter():
     shrunk = _shrunk(selection, pool)
     assert shrunk is not None
     assert shrunk.bullets == ("a-1", "b-1")
+
+
+def test_resolved_pool_path_falls_back_to_a_default_under_moonlighter_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    assert resolved_pool_path({}) == tmp_path / "cv-pool.yaml"
+
+
+def test_resolved_pool_path_honors_an_explicit_config_value(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    assert resolved_pool_path({"cv": {"pool": "my-pool.yaml"}}) == tmp_path / "my-pool.yaml"
+
+
+def test_resolved_template_dir_falls_back_to_a_default_under_moonlighter_home(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    assert resolved_template_dir({}) == tmp_path / "cv-templates"
+
+
+def test_resolved_template_dir_honors_an_explicit_config_value(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    assert (
+        resolved_template_dir({"cv": {"template_dir": "my-templates"}}) == tmp_path / "my-templates"
+    )
+
+
+async def test_ensure_tailored_cv_is_still_off_with_no_config_and_no_bootstrapped_file(
+    monkeypatch, tmp_path
+):
+    # The default path existing as a CONCEPT must not turn the feature on by
+    # itself -- only an actual file at that path does (nothing ever calls the
+    # bootstrap in this test).
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    result = await ensure_tailored_cv(JOB, {}, {}, _caller())
+    assert result is None

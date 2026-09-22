@@ -139,3 +139,39 @@ def load_pool(path: Path) -> CVPool:
         dupes = sorted({i for i in ids if ids.count(i) > 1})
         raise PoolError(f"duplicate bullet ids: {dupes}")
     return pool
+
+
+def _bullet_dict(bullet: PoolBullet) -> dict[str, Any]:
+    return {"id": bullet.id, "angles": list(bullet.angles), "latex": bullet.latex}
+
+
+def _experience_dict(exp: PoolExperience) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "company": exp.company,
+        "title": exp.title,
+        "period": exp.period,
+        "location": exp.location,
+    }
+    if exp.angles:
+        out["angles"] = list(exp.angles)
+    if exp.prose is not None:
+        out["id"] = exp.prose_id
+        out["prose"] = exp.prose
+    else:
+        out["bullets"] = [_bullet_dict(b) for b in exp.bullets]
+    return out
+
+
+def dump_pool(pool: CVPool) -> str:
+    """The inverse of load_pool: a CVPool serialized back to the exact YAML
+    shape load_pool parses (round-trips). Used by the bootstrap (Task 6) to
+    write a freshly drafted pool -- never by anything that reads a
+    hand-curated one, so there is no risk of silently reformatting an
+    operator's own file."""
+    raw: dict[str, Any] = {"experiences": [_experience_dict(e) for e in pool.experiences]}
+    if pool.open_source:
+        raw["open_source"] = [_bullet_dict(b) for b in pool.open_source]
+    if pool.summary_facts:
+        raw["summary_facts"] = list(pool.summary_facts)
+    result = yaml.safe_dump(raw, sort_keys=False, allow_unicode=True, width=100)
+    return result if isinstance(result, str) else ""

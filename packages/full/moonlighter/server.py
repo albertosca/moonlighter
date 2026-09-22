@@ -17,6 +17,9 @@ from moonlighter.application.answers.answer_bank import (
 )
 from moonlighter.application.assisted import service as assisted_service
 from moonlighter.application.assisted.results import render_sheet_result
+from moonlighter.application.cvgen.bootstrap import BootstrapError
+from moonlighter.application.cvgen.bootstrap import bootstrap_cv_pool as bootstrap_cv_pool_service
+from moonlighter.application.cvgen.compile import latex_available
 from moonlighter.core.config import (
     DEFAULTS,
     harden_permissions,
@@ -474,6 +477,56 @@ async def setup_email(*, ctx: Context[AppContext, Any]) -> str:
         return f"⚠️  Gmail authentication error: {e}"
     except Exception as e:
         return f"⚠️  Unexpected error configuring Gmail: {e}"
+
+
+@mcp.tool()
+@tool_logged
+async def bootstrap_cv_pool(*, ctx: Context[AppContext, Any]) -> str:
+    """
+    Draft a CV bullet pool + adapted template from your profile.yaml — a
+    first draft you review and edit, not a finished document. Offered by
+    prepare_application whenever it finds no pool yet (see its
+    cv_bootstrap_offer response), until you bootstrap one or skip it.
+    """
+    app = ctx.request_context.lifespan_context
+    caller = make_caller(app.config)
+    try:
+        outcome = await bootstrap_cv_pool_service(app.profile, app.config, caller)
+    except BootstrapError as e:
+        return f"Could not draft a CV pool: {e}"
+    # Two different reasons for a missing PDF, and naming the wrong one sends
+    # the operator to install a pdflatex they already have. latex_available()
+    # is the only thing that tells them apart.
+    if outcome.pdf_path is not None:
+        pdf_note = f" A draft PDF was compiled at {outcome.pdf_path}."
+    elif latex_available():
+        pdf_note = (
+            " pdflatex is installed but the draft did not compile — "
+            f"see the .log next to {outcome.template_path}."
+        )
+    else:
+        pdf_note = (
+            " pdflatex is not installed, so no PDF was compiled — "
+            "the .tex is ready to compile yourself."
+        )
+    return (
+        f"Drafted {outcome.bullet_count} bullets into {outcome.pool_path} "
+        f"and adapted the template at {outcome.template_path}.{pdf_note} "
+        "Please review it before your first real application uses it."
+    )
+
+
+@mcp.tool()
+@tool_logged
+async def skip_cv_bootstrap(*, ctx: Context[AppContext, Any]) -> str:
+    """
+    Decline the CV-pool bootstrap offer. You won't be asked again — you can
+    still call bootstrap_cv_pool yourself at any time later.
+    """
+    from moonlighter.core.db import record_cv_bootstrap_decline
+
+    record_cv_bootstrap_decline()
+    return "Understood — I won't offer to draft a CV pool again for this installation."
 
 
 def _promote_advanced_applications(updates: list[dict[str, Any]]) -> None:

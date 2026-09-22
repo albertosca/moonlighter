@@ -1,0 +1,61 @@
+% packages/apply/moonlighter/application/cvgen/templates/cv-template.en.example.tex
+%
+% Generic example template for moonlighter's tailored-CV feature. Copy this
+% to MOONLIGHTER_HOME/cv-templates/cv-template.en.tex and customize it by
+% hand, or let `bootstrap_cv_pool` / `moonlighter-apply bootstrap-cv` fill
+% the double-brace placeholders below from your profile.yaml automatically.
+%
+% Two DIFFERENT marker styles, on purpose. NEITHER family is ever written
+% out literally in this header: fill_template and render_cv both substitute
+% by blind str.replace, so a literal marker HERE would be substituted too --
+% and the experience block is MULTI-LINE, so its second line onwards would
+% land as live LaTeX before \documentclass, failing every compile. Name the
+% markers, never spell them.
+%   double-brace NAME_FIRST/NAME_LAST/HEADLINE/PHONE/EMAIL/LINKEDIN_USERNAME/
+%              EDUCATION markers -- filled ONCE by the bootstrap, from
+%              profile.yaml. After that first fill, edit this file by hand
+%              like any other LaTeX document; nothing re-fills these.
+%   the four per-job markers (SUMMARY, TECHNICAL_EXPERTISE, EXPERIENCE,
+%              OPEN_SOURCE, each wrapped in a pair of percent signs) --
+%              filled on EVERY prepare_application call, by the per-job CV
+%              selection engine (cvgen/render.py). Never remove those four
+%              lines from the body below.
+%
+% The two BASE_SUMMARY/BASE_EXPERTISE lines that follow (each opened by a
+% pair of percent signs and closed by a colon) describe what this template's
+% own summary says right now -- what a USE_BASE decision falls back to. Keep
+% them in sync with the summary and technical-expertise lines in the body
+% below, in the same plain-text **bold** dialect the generator answers in.
+%%BASE_SUMMARY: Senior engineer with **10+ years** building backend and full-stack systems. Strong in **distributed systems, APIs and data-intensive services**.
+%%BASE_EXPERTISE: Backend, APIs, distributed systems, cloud infrastructure
+\documentclass[11pt,a4paper,sans]{moderncv}
+\moderncvstyle{banking}
+\moderncvcolor{blue}
+\usepackage[scale=0.95]{geometry}
+\usepackage[utf8]{inputenc}
+
+\firstname{{{NAME_FIRST}}}
+\familyname{{{NAME_LAST}}}
+\title{{{HEADLINE}}}
+\phone[mobile]{{{PHONE}}}
+\email{{{EMAIL}}}
+\social[linkedin]{{{LINKEDIN_USERNAME}}}
+
+\begin{document}
+\makecvtitle
+
+\section{Professional Summary}
+\cvlistitem{%%SUMMARY%%}
+
+\cvlistitem{\textbf{Technical Expertise:} %%TECHNICAL_EXPERTISE%%}
+
+\section{Experience}
+
+%%EXPERIENCE%%
+
+%%OPEN_SOURCE%%
+
+\section{Education}
+{{EDUCATION}}
+
+\end{document}

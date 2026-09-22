@@ -1,0 +1,54 @@
+# packages/apply/moonlighter/application/cvgen/templates/cv-pool.example.yaml
+#
+# Example CV bullet pool — schema reference for moonlighter's tailored-CV
+# feature. Copy this to MOONLIGHTER_HOME/cv-pool.yaml and edit it by hand,
+# or run the `bootstrap_cv_pool` MCP tool / `moonlighter-apply bootstrap-cv`
+# CLI command to have moonlighter draft one from your own profile.yaml
+# instead (see the README's "Tailored CV per job" section).
+#
+# Schema:
+#   experiences: one entry per job. Each needs company/title/period/location
+#     and EITHER bullets (a list of {id, angles, latex}) OR prose+id (a
+#     single paragraph instead of a bullet list — used for grouping several
+#     short stints). `id` must be unique across the whole file. `angles` are
+#     free-form tags (e.g. backend/frontend/ai/leadership) the generator uses
+#     to pick relevant bullets per posting; a bullet can carry several.
+#   open_source: bullets in the same {id, angles, latex} shape, shown as a
+#     dedicated section only when a posting's angles call for it.
+#   summary_facts: short plain-text facts the generator may draw on when
+#     writing the posting-specific professional summary.
+#
+# `latex` fields are inserted into the compiled CV as-is — this is YOUR
+# curated markup, never touched or validated beyond checking a `&`/`%`/`$`/
+# `#`/`_` isn't left unescaped (a bare one breaks the whole PDF compile).
+
+experiences:
+  - company: "Acme Corp"
+    title: "Senior Software Engineer"
+    period: "Jan 2020 -- present"
+    location: "Remote"
+    bullets:
+      - id: acme-migration
+        angles: [backend]
+        latex: 'Led the migration of a monolith to services, cutting p99 latency by \textbf{40\%}'
+      - id: acme-billing
+        angles: [backend, leadership]
+        latex: 'Built the billing pipeline handling \textbf{2M events/day}, mentoring two junior engineers on the team'
+
+  - company: "Startup Inc"
+    title: "Software Engineer"
+    period: "Jun 2017 -- Dec 2019"
+    location: "San Francisco, USA"
+    bullets:
+      - id: startup-api
+        angles: [backend, frontend]
+        latex: 'Built the public API and the customer-facing dashboard from scratch, taking the product from \textbf{0 to 10k users}'
+
+open_source:
+  - id: oss-example-project
+    angles: [backend]
+    latex: 'Maintainer of \textbf{example-project} (2k+ GitHub stars), a tool for X'
+
+summary_facts:
+  - "10+ years building backend and full-stack systems"
+  - "Strong in distributed systems, APIs and data-intensive services"

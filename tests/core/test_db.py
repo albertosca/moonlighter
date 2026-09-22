@@ -538,3 +538,24 @@ def test_answer_bank_entry_created_and_normalized_question_is_unique(tmp_db):
             answer="No",
             source_job_id=2,
         )
+
+
+# --- CVBootstrapDecline ──────────────────────────────────────────────────────
+
+
+def test_cv_bootstrap_declined_is_false_until_recorded(tmp_db):
+    from moonlighter.core.db import cv_bootstrap_declined, record_cv_bootstrap_decline
+
+    init_db()
+    assert cv_bootstrap_declined() is False
+    record_cv_bootstrap_decline()
+    assert cv_bootstrap_declined() is True
+
+
+def test_record_cv_bootstrap_decline_is_idempotent(tmp_db):
+    from moonlighter.core.db import cv_bootstrap_declined, record_cv_bootstrap_decline
+
+    init_db()
+    record_cv_bootstrap_decline()
+    record_cv_bootstrap_decline()  # must not raise (e.g. a second decline check)
+    assert cv_bootstrap_declined() is True

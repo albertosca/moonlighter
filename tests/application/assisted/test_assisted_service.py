@@ -11,8 +11,8 @@ from typing import Any
 
 from moonlighter.application.assisted import service
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.results import render_sheet_result
-from moonlighter.core.db import Application
+from moonlighter.application.assisted.results import SheetKind, render_sheet_result
+from moonlighter.core.db import Application, record_cv_bootstrap_decline
 
 
 def _never_fetch_greenhouse(board: str, job_id: str, client: Any) -> Any:
@@ -34,11 +34,23 @@ def _stub_caller(answer: str = "a generated answer") -> Any:
     return _call
 
 
+def _bypass_cv_bootstrap_offer() -> None:
+    """Every test below predates the CV-pool bootstrap offer (Task 7) and
+    exercises routing/caching, not the offer itself. Recording a decline
+    keeps _cv_bootstrap_offer a no-op without touching resolved_pool_path,
+    so ensure_tailored_cv's own no-pool branch (and every monkeypatch of it
+    below) sees exactly the same "no pool" world it did before this task.
+    Requires the DB schema to already exist — true by the time this is
+    called, since job_factory's own fixture setup already ran init_db()."""
+    record_cv_bootstrap_decline()
+
+
 # ── prepare_application: routing ────────────────────────────────────────────
 
 
 async def test_an_unsupported_source_asks_the_user_to_paste(job_factory, monkeypatch):
     job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+    _bypass_cv_bootstrap_offer()
     monkeypatch.setattr(service, "fetch_greenhouse_questions", _never_fetch_greenhouse)
     monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
 
@@ -51,6 +63,7 @@ async def test_an_unsupported_source_asks_the_user_to_paste(job_factory, monkeyp
 
 async def test_a_greenhouse_job_with_no_questions_asks_the_user_to_paste(job_factory, monkeypatch):
     job = job_factory(source="greenhouse", url="https://job-boards.greenhouse.io/gitlab/jobs/1")
+    _bypass_cv_bootstrap_offer()
 
     async def no_questions(board: str, job_id: str, client: Any) -> list[FormQuestion]:
         return []
@@ -65,6 +78,7 @@ async def test_a_greenhouse_job_with_no_questions_asks_the_user_to_paste(job_fac
 
 async def test_a_recruitee_job_with_no_questions_asks_the_user_to_paste(job_factory, monkeypatch):
     job = job_factory(source="recruitee", url="https://acme.recruitee.com/o/engineer")
+    _bypass_cv_bootstrap_offer()
 
     async def no_questions(slug: str, offer: str, client: Any) -> list[FormQuestion]:
         return []
@@ -84,6 +98,7 @@ async def test_a_greenhouse_url_the_regex_cannot_parse_asks_the_user_to_paste(
     # (e.g. a redirect or a custom landing page) -- must degrade to the paste hint,
     # not explode trying to call the API with nothing.
     job = job_factory(source="greenhouse", url="https://acme.example.com/careers")
+    _bypass_cv_bootstrap_offer()
     monkeypatch.setattr(service, "fetch_greenhouse_questions", _never_fetch_greenhouse)
     monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
 
@@ -96,6 +111,7 @@ async def test_a_recruitee_url_the_regex_cannot_parse_asks_the_user_to_paste(
     job_factory, monkeypatch
 ):
     job = job_factory(source="recruitee", url="https://careers.acme.com/jobs/engineer")
+    _bypass_cv_bootstrap_offer()
     monkeypatch.setattr(service, "fetch_greenhouse_questions", _never_fetch_greenhouse)
     monkeypatch.setattr(service, "fetch_recruitee_questions", _never_fetch_recruitee)
 
@@ -108,6 +124,7 @@ async def test_a_greenhouse_job_with_questions_returns_a_sheet_not_the_paste_hin
     job_factory, monkeypatch
 ):
     job = job_factory(source="greenhouse", url="https://job-boards.greenhouse.io/gitlab/jobs/1")
+    _bypass_cv_bootstrap_offer()
     question = FormQuestion(label="Favorite language", kind=QuestionKind.TEXT, required=False)
 
     async def one_question(board: str, job_id: str, client: Any) -> list[FormQuestion]:
@@ -126,6 +143,7 @@ async def test_a_greenhouse_job_with_questions_returns_a_sheet_not_the_paste_hin
 
 async def test_sheet_generates_the_tailored_cv_before_composing(job_factory, monkeypatch):
     job = job_factory(source="greenhouse", url="https://job-boards.greenhouse.io/gitlab/jobs/9")
+    _bypass_cv_bootstrap_offer()
     question = FormQuestion(label="Favorite language", kind=QuestionKind.TEXT, required=False)
     seen = {}
 
@@ -152,6 +170,7 @@ async def test_sheet_builds_one_caller_and_reuses_it_for_both_llm_users(job_fact
     # twice, instantiating a second Anthropic SDK client per sheet. One call, one
     # caller, shared by the tailored-CV step and the composer.
     job = job_factory(source="greenhouse", url="https://job-boards.greenhouse.io/gitlab/jobs/11")
+    _bypass_cv_bootstrap_offer()
     question = FormQuestion(label="Favorite language", kind=QuestionKind.TEXT, required=False)
     calls = 0
     caller = _stub_caller()
@@ -201,6 +220,7 @@ async def test_sheet_notes_the_uncompiled_tex(job_factory, monkeypatch, tmp_path
     from moonlighter.application.cvgen.service import TailoredCV
 
     job = job_factory(source="greenhouse", url="https://job-boards.greenhouse.io/gitlab/jobs/9")
+    _bypass_cv_bootstrap_offer()
     question = FormQuestion(label="Favorite language", kind=QuestionKind.TEXT, required=False)
     tex = tmp_path / "cv.tex"
     tex.write_text("x")
@@ -236,6 +256,7 @@ async def test_a_compiled_cv_reaches_the_sheet_when_no_cv_question_exists(
     from moonlighter.application.cvgen.service import TailoredCV
 
     job = job_factory(source="greenhouse", url="https://job-boards.greenhouse.io/gitlab/jobs/9")
+    _bypass_cv_bootstrap_offer()
     pdf = tmp_path / "cv.pdf"
     pdf.write_bytes(b"%PDF")
 
@@ -262,6 +283,7 @@ async def test_a_compiled_cv_already_named_by_a_cv_gap_is_not_repeated(
     from moonlighter.application.cvgen.service import TailoredCV
 
     job = job_factory(source="greenhouse", url="https://job-boards.greenhouse.io/gitlab/jobs/9")
+    _bypass_cv_bootstrap_offer()
     generated = tmp_path / "generated"
     out_dir = generated / str(job.id)
     out_dir.mkdir(parents=True)
@@ -290,6 +312,7 @@ async def test_a_recruitee_job_with_questions_returns_a_sheet_not_the_paste_hint
     job_factory, monkeypatch
 ):
     job = job_factory(source="recruitee", url="https://acme.recruitee.com/o/engineer")
+    _bypass_cv_bootstrap_offer()
     question = FormQuestion(label="Favorite language", kind=QuestionKind.TEXT, required=False)
 
     async def one_question(slug: str, offer: str, client: Any) -> list[FormQuestion]:
@@ -316,6 +339,7 @@ async def test_a_missing_job_is_reported_rather_than_raising():
 
 async def test_paste_with_no_recognisable_questions_says_so(job_factory, monkeypatch):
     job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+    _bypass_cv_bootstrap_offer()
     monkeypatch.setattr(service, "extract_questions_from_page", _empty_extraction)
 
     out = render_sheet_result(
@@ -331,6 +355,7 @@ async def _empty_extraction(page_text: str, llm_caller: Any) -> list[FormQuestio
 
 async def test_paste_with_questions_returns_a_sheet(job_factory, monkeypatch):
     job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+    _bypass_cv_bootstrap_offer()
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
 
     async def one_question(page_text: str, llm_caller: Any) -> list[FormQuestion]:
@@ -379,6 +404,7 @@ async def test_the_email_answer_carries_the_tracking_alias_not_the_profile_email
     job_factory, monkeypatch
 ):
     job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+    _bypass_cv_bootstrap_offer()
     monkeypatch.setattr(service, "extract_questions_from_page", _extract_email_and_essay)
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
 
@@ -396,6 +422,7 @@ async def test_the_email_answer_carries_the_tracking_alias_not_the_profile_email
 
 async def test_preparing_twice_reuses_the_same_application_and_ref(job_factory, monkeypatch):
     job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+    _bypass_cv_bootstrap_offer()
     monkeypatch.setattr(service, "extract_questions_from_page", _extract_email_and_essay)
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
 
@@ -418,6 +445,7 @@ async def test_an_unanswered_email_question_is_answered_by_the_alias(job_factory
     # alias is still the right answer — tracking must not depend on the profile
     # carrying an email address.
     job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+    _bypass_cv_bootstrap_offer()
     monkeypatch.setattr(service, "extract_questions_from_page", _extract_email_and_essay)
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
 
@@ -431,6 +459,7 @@ async def test_an_unanswered_email_question_is_answered_by_the_alias(job_factory
 
 async def test_without_email_config_the_sheet_keeps_the_profile_email(job_factory, monkeypatch):
     job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+    _bypass_cv_bootstrap_offer()
     monkeypatch.setattr(service, "extract_questions_from_page", _extract_email_and_essay)
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
 
@@ -459,6 +488,7 @@ async def test_a_choice_question_mentioning_email_is_not_overwritten(job_factory
         ]
 
     job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+    _bypass_cv_bootstrap_offer()
     monkeypatch.setattr(service, "extract_questions_from_page", extract)
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller("Yes"))
 
@@ -482,6 +512,7 @@ async def test_an_alias_with_no_email_question_is_surfaced_on_the_sheet(job_fact
         return [FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)]
 
     job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+    _bypass_cv_bootstrap_offer()
     monkeypatch.setattr(service, "extract_questions_from_page", extract)
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
 
@@ -498,6 +529,7 @@ async def test_the_api_path_carries_the_alias_too(job_factory, monkeypatch):
     # is proven separately — a fix that reconciles only one path is how the
     # last silent regression happened.
     job = job_factory(source="greenhouse", url="https://job-boards.greenhouse.io/gitlab/jobs/1")
+    _bypass_cv_bootstrap_offer()
 
     async def one_question(board: str, job_id: str, client: Any) -> list[FormQuestion]:
         return [FormQuestion(label="E-mail", kind=QuestionKind.TEXT, required=True)]
@@ -520,6 +552,7 @@ async def test_a_manual_job_with_a_greenhouse_url_still_gets_the_api(job_factory
         source="manual",
         url="https://job-boards.eu.greenhouse.io/teachablecareers/jobs/4913809101?gh_src=x",
     )
+    _bypass_cv_bootstrap_offer()
     seen: dict[str, str] = {}
 
     async def fake_fetch(board: str, job_id: str, client: Any) -> list[FormQuestion]:
@@ -542,6 +575,7 @@ async def test_preparing_the_same_job_twice_reuses_the_job_cache_and_skips_the_l
     job_factory, monkeypatch
 ):
     job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+    _bypass_cv_bootstrap_offer()
     calls = 0
 
     async def one_essay(page_text: str, llm_caller: Any) -> list[FormQuestion]:
@@ -570,6 +604,7 @@ async def test_a_submitted_bank_eligible_answer_is_available_to_a_different_job(
 
     job1 = job_factory(source="lever", url="https://jobs.lever.co/acme/1")
     job2 = job_factory(source="lever", url="https://jobs.lever.co/other/2")
+    _bypass_cv_bootstrap_offer()
     # NOT "Are you authorized to work in..." (the brief's literal example): that
     # label matches work_auth's _AUTHORIZED_RE unconditionally, so with no
     # work_authorization config it is intercepted by pre_populate_answers
@@ -620,6 +655,7 @@ async def test_a_legacy_flat_form_data_row_self_heals_into_the_new_shape(job_fac
     # first successful run.
     legacy_label = "Full name\xa0*"
     job = job_factory(source="lever", url="https://jobs.lever.co/legacy/1")
+    _bypass_cv_bootstrap_offer()
     application = Application.create(
         job=job,
         status="draft",
@@ -652,6 +688,7 @@ async def test_a_banked_answer_older_than_max_age_is_not_replayed(tmp_db, job_fa
 
     job1 = job_factory(source="lever", url="https://jobs.lever.co/acme/1")
     job2 = job_factory(source="lever", url="https://jobs.lever.co/other/2")
+    _bypass_cv_bootstrap_offer()
     label = "Do you have experience with Kubernetes in production?"
 
     async def one_boolean(page_text: str, llm_caller: Any) -> list[FormQuestion]:
@@ -668,3 +705,67 @@ async def test_a_banked_answer_older_than_max_age_is_not_replayed(tmp_db, job_fa
     assert label in out2
     assert "No" in out2
     assert "Yes" not in out2  # the stale banked answer must not leak through
+
+
+# ── CV-pool bootstrap offer ──────────────────────────────────────────────────
+
+
+async def test_prepare_application_offers_the_bootstrap_when_no_pool_exists(
+    job_factory, monkeypatch, tmp_path
+):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    monkeypatch.setattr(service, "fetch_greenhouse_questions", _never_fetch_greenhouse)
+    job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+
+    result = await service.prepare_application(job.id, {}, {})
+
+    assert result.kind is SheetKind.CV_BOOTSTRAP_OFFER
+    assert "bootstrap_cv_pool" in result.error
+    assert "moonlighter-apply bootstrap-cv" in result.error
+
+
+async def test_prepare_application_never_offers_twice_after_a_decline(
+    job_factory, monkeypatch, tmp_path, tmp_db
+):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    from moonlighter.core.db import init_db
+
+    init_db()
+    record_cv_bootstrap_decline()
+    monkeypatch.setattr(service, "fetch_greenhouse_questions", _never_fetch_greenhouse)
+    job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+
+    result = await service.prepare_application(job.id, {}, {})
+
+    assert result.kind is not SheetKind.CV_BOOTSTRAP_OFFER
+
+
+async def test_prepare_application_never_offers_once_a_pool_exists(
+    job_factory, monkeypatch, tmp_path
+):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "cv-pool.yaml").write_text("experiences: []\n")
+    monkeypatch.setattr(service, "fetch_greenhouse_questions", _never_fetch_greenhouse)
+    job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+
+    result = await service.prepare_application(job.id, {}, {})
+
+    assert result.kind is not SheetKind.CV_BOOTSTRAP_OFFER
+
+
+async def test_prepare_application_from_paste_also_offers_the_bootstrap_when_no_pool_exists(
+    job_factory, monkeypatch, tmp_path
+):
+    # The offer is wired into BOTH public entry points (Step 4 of the brief) --
+    # each is proven separately, the same discipline test_the_api_path_carries_
+    # the_alias_too uses above, since a fix that reconciles only one path is
+    # how the last silent regression happened.
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    monkeypatch.setattr(service, "extract_questions_from_page", _never_extract)
+    job = job_factory(source="lever", url="https://jobs.lever.co/x/y")
+
+    result = await service.prepare_application_from_paste(job.id, "the whole page", {}, {})
+
+    assert result.kind is SheetKind.CV_BOOTSTRAP_OFFER
+    assert "bootstrap_cv_pool" in result.error
+    assert "moonlighter-apply bootstrap-cv" in result.error

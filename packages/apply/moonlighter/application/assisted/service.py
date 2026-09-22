@@ -18,9 +18,9 @@ from moonlighter.application.assisted.sources.recruitee import (
     fetch_recruitee_questions,
     host_and_offer_from_url,
 )
-from moonlighter.application.cvgen.service import ensure_tailored_cv
+from moonlighter.application.cvgen.service import ensure_tailored_cv, resolved_pool_path
 from moonlighter.core.config import DEFAULTS
-from moonlighter.core.db import Application, Job
+from moonlighter.core.db import Application, Job, cv_bootstrap_declined
 from moonlighter.core.email_alias import (
     build_email_alias,
     is_email_label,
@@ -193,12 +193,29 @@ def failed_sheet(kind: SheetKind, message: str, *, apply_url: str = "") -> Sheet
     )
 
 
+_CV_BOOTSTRAP_OFFER_MESSAGE = (
+    "You don't have a tailored-CV pool yet. I can draft one from your profile.yaml — "
+    "call the bootstrap_cv_pool tool to generate it, or skip_cv_bootstrap if you'd "
+    "rather not use this feature. I'll keep offering this on every "
+    "prepare_application until you either bootstrap a pool or skip it. "
+    "From a shell: `moonlighter-apply bootstrap-cv` (add --skip to decline)."
+)
+
+
+def _cv_bootstrap_offer(config: dict[str, Any]) -> SheetResult | None:
+    if resolved_pool_path(config).exists() or cv_bootstrap_declined():
+        return None
+    return failed_sheet(SheetKind.CV_BOOTSTRAP_OFFER, _CV_BOOTSTRAP_OFFER_MESSAGE)
+
+
 async def prepare_application(
     job_id: int, config: dict[str, Any], profile: dict[str, Any]
 ) -> SheetResult:
     job = _job(job_id)
     if job is None:
         return failed_sheet(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
+    if (offer := _cv_bootstrap_offer(config)) is not None:
+        return offer
     questions = await _questions_from_api(job)
     if not questions:
         return failed_sheet(
@@ -215,6 +232,8 @@ async def prepare_application_from_paste(
     job = _job(job_id)
     if job is None:
         return failed_sheet(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
+    if (offer := _cv_bootstrap_offer(config)) is not None:
+        return offer
     questions = await extract_questions_from_page(page_text, make_caller(config))
     if not questions:
         return failed_sheet(

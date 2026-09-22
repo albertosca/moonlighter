@@ -5,6 +5,7 @@
     moonlighter-apply prepare --url URL           # ingest the posting first (no LLM), then prepare
     moonlighter-apply prepare --url URL --company X --title Y  # non-ATS page: name it yourself
     moonlighter-apply doctor
+    moonlighter-apply bootstrap-cv [--force] [--skip]
 
 Prints one JSON document (sheet_result_to_dict) on stdout; logs on stderr.
 Exit 0 when a sheet was produced, 1 when the job was not found, had no API
@@ -23,6 +24,7 @@ from moonlighter.application.assisted.service import (
     prepare_application,
     prepare_application_from_paste,
 )
+from moonlighter.application.cvgen.bootstrap import BootstrapError, bootstrap_cv_pool
 from moonlighter.core.cli import (
     EXIT_NOTHING,
     EXIT_OK,
@@ -32,12 +34,19 @@ from moonlighter.core.cli import (
     run,
 )
 from moonlighter.core.ingest import job_from_url
+from moonlighter.core.llm import make_caller
 from moonlighter.core.slices import slice_epilog
 
 # A missing --paste path is a bad argument, not a crash -- run() maps it to
 # exit 2 (usage_error) instead of exit 3 (a crash with a traceback the caller
 # reads as "something broke").
 USAGE_ERRORS = (FileNotFoundError,)
+
+# An existing CV pool without --force is not a bug -- the CLI's own equivalent
+# of the MCP tool's conversational "overwrite?" offer (Task 7), just without
+# anyone to ask: bootstrap_cv_pool refuses, and that refusal is an expected
+# failure (exit 1), never a crash (exit 3).
+EXPECTED_ERRORS = (BootstrapError,)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -59,6 +68,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--paste", metavar="FILE", help="page text to read questions from; - for stdin"
     )
     sub.add_parser("doctor", help="where the state lives and whether the config loads, as JSON")
+    bootstrap_cv = sub.add_parser(
+        "bootstrap-cv", help="draft a CV pool + template from profile.yaml"
+    )
+    bootstrap_cv.add_argument("--force", action="store_true", help="overwrite an existing pool")
+    bootstrap_cv.add_argument(
+        "--skip", action="store_true", help="decline the feature — never offered again, no LLM call"
+    )
     args = parser.parse_args(argv)
     if args.command == "prepare" and (args.job_id is None) == (args.url is None):
         parser.error("prepare takes exactly one of JOB_ID or --url")
@@ -75,6 +91,23 @@ async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     if args.command == "doctor":
         return doctor_payload()
     config, profile = bootstrap()
+    if args.command == "bootstrap-cv":
+        if args.skip:
+            from moonlighter.core.db import record_cv_bootstrap_decline
+
+            record_cv_bootstrap_decline()
+            return {"kind": "cv_bootstrap_skipped"}, EXIT_OK
+        outcome = await bootstrap_cv_pool(profile, config, make_caller(config), force=args.force)
+        return (
+            {
+                "kind": "cv_bootstrap",
+                "pool_path": str(outcome.pool_path),
+                "template_path": str(outcome.template_path),
+                "pdf_path": str(outcome.pdf_path) if outcome.pdf_path else None,
+                "bullet_count": outcome.bullet_count,
+            },
+            EXIT_OK,
+        )
     job_id = args.job_id
     if args.url is not None:
         job = await job_from_url(args.url, company=args.company, title=args.title)
@@ -99,4 +132,4 @@ async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
 
 def main() -> None:  # pragma: no cover - entry point (boundary)
     args = parse_args()
-    sys.exit(run(lambda: _run(args), usage=USAGE_ERRORS))
+    sys.exit(run(lambda: _run(args), usage=USAGE_ERRORS, expected=EXPECTED_ERRORS))

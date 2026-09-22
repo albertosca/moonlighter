@@ -130,6 +130,25 @@ class AnswerBankEntry(BaseModel):
     updated_at = DateTimeField(default=datetime.datetime.now)
 
 
+class CVBootstrapDecline(BaseModel):
+    """A single row means the CV-pool bootstrap offer was declined once and
+    must never be offered again -- existence-as-flag, the same idiom
+    ensure_tailored_cv already uses for "is the feature on" (a file exists
+    or it doesn't). One installation needs at most one row; a second
+    record_cv_bootstrap_decline() call is a harmless no-op, not an error."""
+
+    declined_at = DateTimeField(default=datetime.datetime.now)
+
+
+def cv_bootstrap_declined() -> bool:
+    return CVBootstrapDecline.select().exists()
+
+
+def record_cv_bootstrap_decline() -> None:
+    if not cv_bootstrap_declined():
+        CVBootstrapDecline.create()
+
+
 _APP_TO_JOB_STATUS = {
     "submitted": "applied",
     "screening": "applied",
@@ -161,7 +180,10 @@ def init_db() -> None:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     db.init(path)
     db.connect(reuse_if_open=True)
-    db.create_tables([Job, Application, ScanLog, ProcessedEmail, AnswerBankEntry], safe=True)
+    db.create_tables(
+        [Job, Application, ScanLog, ProcessedEmail, AnswerBankEntry, CVBootstrapDecline],
+        safe=True,
+    )
     from moonlighter.core.migrations import run_migrations
 
     run_migrations(db)

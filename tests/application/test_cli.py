@@ -231,3 +231,84 @@ def test_apply_help_carries_the_slice_epilog(capsys):
         parse_args(["--help"])
     assert exc.value.code == 0
     assert "installed:" in capsys.readouterr().out
+
+
+async def test_bootstrap_cv_subcommand_reports_what_it_generated(monkeypatch, tmp_path):
+    from moonlighter.application import cli
+    from moonlighter.application.cvgen.bootstrap import BootstrapOutcome
+
+    monkeypatch.setattr(cli, "bootstrap", lambda: ({}, {"name": "Jane"}))
+    outcome = BootstrapOutcome(
+        pool_path=tmp_path / "cv-pool.yaml",
+        template_path=tmp_path / "cv-templates" / "cv-template.en.tex",
+        pdf_path=None,
+        bullet_count=2,
+    )
+
+    async def _fake_bootstrap(profile, config, caller, *, force=False):
+        return outcome
+
+    monkeypatch.setattr(cli, "bootstrap_cv_pool", _fake_bootstrap)
+    payload, code = await cli._run(cli.parse_args(["bootstrap-cv"]))
+    assert code == 0
+    assert payload["bullet_count"] == 2
+    assert payload["pool_path"] == str(outcome.pool_path)
+
+
+async def test_bootstrap_cv_subcommand_threads_the_force_flag(monkeypatch, tmp_path):
+    from moonlighter.application import cli
+    from moonlighter.application.cvgen.bootstrap import BootstrapOutcome
+
+    monkeypatch.setattr(cli, "bootstrap", lambda: ({}, {"name": "Jane"}))
+    received: dict[str, object] = {}
+
+    async def _fake_bootstrap(profile, config, caller, *, force=False):
+        received["force"] = force
+        return BootstrapOutcome(tmp_path / "p.yaml", tmp_path / "t.tex", None, 1)
+
+    monkeypatch.setattr(cli, "bootstrap_cv_pool", _fake_bootstrap)
+    await cli._run(cli.parse_args(["bootstrap-cv", "--force"]))
+    assert received["force"] is True
+
+
+def test_bootstrap_cv_subcommand_reports_a_bootstrap_error_as_expected_failure(monkeypatch, capsys):
+    # _run() itself never classifies its own exceptions -- that's run()'s job
+    # (see core/cli.py's docstring and this slice's other expected/usage-error
+    # test, test_run_via_run_classifies_a_missing_paste_file_as_a_usage_error,
+    # a few tests up), so this goes THROUGH run() with EXPECTED_ERRORS, same
+    # as that sibling test does for USAGE_ERRORS -- not through a bare
+    # `await cli._run(...)`, which would let the BootstrapError propagate
+    # uncaught instead of returning a (payload, code) tuple.
+    from moonlighter.application import cli
+    from moonlighter.application.cvgen.bootstrap import BootstrapError
+    from moonlighter.core.cli import run
+
+    monkeypatch.setattr(cli, "bootstrap", lambda: ({}, {"name": "Jane"}))
+
+    async def _fake_bootstrap(profile, config, caller, *, force=False):
+        raise BootstrapError("a pool already exists")
+
+    monkeypatch.setattr(cli, "bootstrap_cv_pool", _fake_bootstrap)
+    args = cli.parse_args(["bootstrap-cv"])
+    code = run(lambda: cli._run(args), expected=cli.EXPECTED_ERRORS)
+    assert code == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["kind"] == "expected_failure"
+
+
+async def test_bootstrap_cv_skip_records_the_decline_without_calling_the_llm(monkeypatch, tmp_db):
+    from moonlighter.application import cli
+    from moonlighter.core.db import cv_bootstrap_declined, init_db
+
+    init_db()
+    monkeypatch.setattr(cli, "bootstrap", lambda: ({}, {"name": "Jane"}))
+    monkeypatch.setattr(
+        cli,
+        "bootstrap_cv_pool",
+        lambda *a, **k: (_ for _ in ()).throw(
+            AssertionError("must not draft when --skip is given")
+        ),
+    )
+    _payload, code = await cli._run(cli.parse_args(["bootstrap-cv", "--skip"]))
+    assert code == 0
+    assert cv_bootstrap_declined() is True

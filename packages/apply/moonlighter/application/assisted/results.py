@@ -14,6 +14,7 @@ class SheetKind(StrEnum):
     NEEDS_PASTE = "needs_paste"  # the API had no questions: paste the page
     NO_QUESTIONS = "no_questions"  # the pasted text had none
     POSTING_UNREADABLE = "posting_unreadable"  # --url given, the page could not be read or named
+    CV_BOOTSTRAP_OFFER = "cv_bootstrap_offer"  # no CV pool yet; offered before composing a sheet
 
 
 @dataclass(frozen=True)

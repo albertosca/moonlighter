@@ -33,6 +33,30 @@ _BASE_EXPERTISE = re.compile(r"^%%BASE_EXPERTISE: (.+)$", re.MULTILINE)
 _MARKER_LINES = re.compile(r"^%%BASE_(SUMMARY|EXPERTISE): .+\n", re.MULTILINE)
 
 
+def base_fields(template: str) -> tuple[str, str]:
+    """The (summary, expertise) base text a template declares for itself.
+
+    Public because the bootstrap (cvgen/bootstrap.py) renders a SAMPLE of the
+    pool it just drafted through the template it just filled, and that sample
+    needs the same two fields this module feeds the per-job generator. One
+    definition, not two regexes drifting apart across modules — an empty
+    string for either is a template that simply declares no base, exactly as
+    the per-job path already treats it.
+    """
+    summary = m.group(1) if (m := _BASE_SUMMARY.search(template)) else ""
+    expertise = m.group(1) if (m := _BASE_EXPERTISE.search(template)) else ""
+    return summary, expertise
+
+
+def strip_marker_lines(rendered: str) -> str:
+    """Drops the BASE_SUMMARY/BASE_EXPERTISE declaration lines from a rendered
+    document. They are metadata for the generator, never content: pdflatex
+    reads them as ordinary comments, but leaving them in a finished .tex means
+    the next reader cannot tell a declaration from the summary it describes.
+    Shared with the bootstrap's sample render for the same reason."""
+    return _MARKER_LINES.sub("", rendered)
+
+
 @dataclass(frozen=True)
 class TailoredCV:
     path: Path
@@ -111,7 +135,7 @@ def _fit_to_one_page(
     tex = out / "cv.tex"
     current: CVSelection | None = selection
     while current is not None:
-        tex.write_text(_MARKER_LINES.sub("", render_cv(template, current, pool)))
+        tex.write_text(strip_marker_lines(render_cv(template, current, pool)))
         pdf = compile_pdf(tex)
         if pdf is None:
             return _after_compile_failure(tex)
@@ -133,12 +157,40 @@ def generated_dir_for(config: dict[str, Any], job_id: int) -> Path:
     return root / str(job_id)
 
 
+# Conventional defaults used whenever cv.pool/cv.template_dir is absent from
+# config -- the feature still turns on purely by the file existing (opt-in
+# by existence, unchanged), it just has somewhere to exist without the user
+# hand-writing the config key first. Only the bootstrap (cvgen/bootstrap.py)
+# ever writes here; nothing conjures a file at this path on its own.
+_DEFAULT_POOL_NAME = "cv-pool.yaml"
+_DEFAULT_TEMPLATE_DIR_NAME = "cv-templates"
+
+
+# KNOWN LIMITATION (found by review, 2026-09-21; ruled: park, not fix): an
+# `or` fallback cannot distinguish cv.pool being ABSENT from cv.pool being
+# explicitly set to null/"" -- both fall through to the default path below.
+# A coincidental file at that default path would then override an explicit
+# `cv: {pool: null}`. Not fixed because no config in this project (not
+# config.example.yaml, not DEFAULTS) ever sets cv.pool at all, let alone
+# explicitly nulls it -- simply omitting the key already means "off," so
+# there is no realistic config that hits this path -- and a correct fix
+# needs Path | None through every caller, which is real design surface the
+# original brainstorm never covered. Revisit if a real config ever needs to
+# explicitly null cv.pool.
+def resolved_pool_path(config: dict[str, Any]) -> Path:
+    pool_path = (config.get("cv") or {}).get("pool") or _DEFAULT_POOL_NAME
+    return resolve_under_home(pool_path)
+
+
+def resolved_template_dir(config: dict[str, Any]) -> Path:
+    tdir = (config.get("cv") or {}).get("template_dir") or _DEFAULT_TEMPLATE_DIR_NAME
+    return resolve_under_home(tdir)
+
+
 def _template(config: dict[str, Any], language: str) -> str | None:
-    tdir = (config.get("cv") or {}).get("template_dir")
-    if not tdir:
-        return None
-    en = resolve_under_home(tdir) / "cv-template.en.tex"
-    pt = resolve_under_home(tdir) / "cv-template.pt.tex"
+    tdir = resolved_template_dir(config)
+    en = tdir / "cv-template.en.tex"
+    pt = tdir / "cv-template.pt.tex"
     if language == "pt":
         if pt.exists():
             return pt.read_text()
@@ -162,8 +214,7 @@ def _relanguage_fallback_fields(
     used_en_expertise = selection.technical_expertise == en_base_expertise
     if not used_en_summary and not used_en_expertise:
         return selection
-    lang_base_summary = m.group(1) if (m := _BASE_SUMMARY.search(template)) else ""
-    lang_base_expertise = m.group(1) if (m := _BASE_EXPERTISE.search(template)) else ""
+    lang_base_summary, lang_base_expertise = base_fields(template)
     if (used_en_summary and not lang_base_summary) or (
         used_en_expertise and not lang_base_expertise
     ):
@@ -188,8 +239,8 @@ async def ensure_tailored_cv(
     profile: dict[str, Any],
     caller: LLMCaller,
 ) -> TailoredCV | None:
-    pool_path = (config.get("cv") or {}).get("pool")
-    if not pool_path or not resolve_under_home(pool_path).exists():
+    pool_path = resolved_pool_path(config)
+    if not pool_path.exists():
         return None
     raw_id = job.get("id")
     if raw_id is None:
@@ -213,7 +264,7 @@ async def ensure_tailored_cv(
         return _after_compile(out / "cv.tex")  # a machine that gained latex since
 
     try:
-        pool = load_pool(resolve_under_home(pool_path))
+        pool = load_pool(pool_path)
     except PoolError as e:
         logger.warning("cv pool unusable, using default CV — %s", e)
         return None
@@ -221,8 +272,7 @@ async def ensure_tailored_cv(
     if en_template is None:
         logger.warning("cv.template_dir has no cv-template.en.tex — using default CV")
         return None
-    base_summary = m.group(1) if (m := _BASE_SUMMARY.search(en_template)) else ""
-    base_expertise = m.group(1) if (m := _BASE_EXPERTISE.search(en_template)) else ""
+    base_summary, base_expertise = base_fields(en_template)
 
     try:
         selection = await decide_cv(job, pool, profile, base_summary, base_expertise, caller)
