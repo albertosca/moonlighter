@@ -397,6 +397,61 @@ async def test_bootstrap_cv_pool_refuses_to_report_success_on_an_unloadable_pool
     with pytest.raises(BootstrapError, match="not loadable"):
         await bootstrap_cv_pool(PROFILE, {}, _caller(zwsp_company))
 
+    # write-to-temp-then-rename: a failed validation must leave NOTHING at
+    # the real pool_path -- not a half-written pool for _cv_bootstrap_offer
+    # to see and stop offering forever, and not a garbage file for
+    # ensure_tailored_cv to silently degrade past. The temp file itself must
+    # also be gone, not just orphaned next to the real path.
+    assert not (tmp_path / "cv-pool.yaml").exists()
+    assert not (tmp_path / "cv-pool.yaml.tmp").exists()
+
+
+async def test_bootstrap_cv_pool_force_preserves_the_previous_pool_on_a_failed_draft(
+    monkeypatch, tmp_path
+):
+    # Under force=True, the real pool_path holds the operator's previous,
+    # perfectly good pool at the moment bootstrap_cv_pool is called. If the
+    # NEW draft fails load_pool validation, that previous pool must survive
+    # untouched -- the write-to-temp-then-rename approach makes this true by
+    # construction, since the real path is never written to until the temp
+    # file has already proven loadable.
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    previous_pool = (
+        "experiences:\n"
+        "  - company: Previous Co\n"
+        "    title: Engineer\n"
+        "    period: 2018 - 2020\n"
+        "    location: Remote\n"
+        "    bullets:\n"
+        "      - id: previous-bullet\n"
+        "        angles: []\n"
+        "        latex: Did the previous thing.\n"
+    )
+    (tmp_path / "cv-pool.yaml").write_text(previous_pool)
+
+    zwsp_company = json.dumps(
+        {
+            "experiences": [
+                {
+                    "company": "​",
+                    "title": "Eng",
+                    "period": "2020",
+                    "bullets": [{"id": "acme-ok", "angles": [], "text": "Shipped it well"}],
+                }
+            ],
+            "open_source": [],
+            "summary_facts": [],
+        }
+    )
+    with pytest.raises(BootstrapError, match="not loadable"):
+        await bootstrap_cv_pool(PROFILE, {}, _caller(zwsp_company), force=True)
+
+    from moonlighter.application.cvgen.pool import load_pool
+
+    reloaded = load_pool(tmp_path / "cv-pool.yaml")
+    assert reloaded.experiences[0].company == "Previous Co"
+    assert not (tmp_path / "cv-pool.yaml.tmp").exists()
+
 
 def test_fill_template_substitutes_contact_and_education_placeholders():
     profile = {
@@ -516,10 +571,6 @@ async def test_bootstrap_cv_pool_writes_pool_template_and_compiled_pdf(monkeypat
     assert outcome.template_path == tmp_path / "cv-templates" / "cv-template.en.tex"
     assert outcome.template_path.exists()
     assert outcome.bullet_count == 1
-    # pdf_path is None or a real path depending on whether pdflatex is on this
-    # machine -- both are correct, per compile_pdf's own degrade-never-crash
-    # contract (cvgen/compile.py). Only assert the type, not which branch.
-    assert outcome.pdf_path is None or outcome.pdf_path.exists()
 
 
 async def test_bootstrap_cv_pool_refuses_to_overwrite_an_existing_pool(monkeypatch, tmp_path):

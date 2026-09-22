@@ -320,22 +320,23 @@ async def bootstrap_cv_pool(
         )
     pool = await draft_pool(profile, caller)
     pool_path.parent.mkdir(parents=True, exist_ok=True)
-    pool_path.write_text(DRAFT_HEADER + dump_pool(pool))
 
-    # Validate what we just wrote, through the exact boundary every reader
-    # goes through. dump_pool can serialize shapes load_pool then refuses
-    # (an empty title/period/location is the documented example), and the
-    # only thing worse than a bootstrap that fails is one that reports
-    # success and leaves a pool the very next prepare_application silently
-    # drops. The spec names this boundary for exactly this job: "the
-    # existing PoolError boundary (pool.py) is the right place to surface
-    # that." A guard per field would close one case; this closes the class.
+    # Write to a sibling temp file, validate THAT, and only rename into place
+    # once validation passes -- never write-then-validate-in-place. Under
+    # force=True the real pool_path may hold the operator's previous,
+    # perfectly good pool; validating in place would mean the only recovery
+    # from a bad draft is a pool file already overwritten with garbage. The
+    # temp file never touches pool_path until it has already proven loadable,
+    # so a failed draft leaves the previous pool (or no pool) exactly as it
+    # was -- nothing for _cv_bootstrap_offer or ensure_tailored_cv to trip on.
+    tmp_path = pool_path.with_suffix(".yaml.tmp")
+    tmp_path.write_text(DRAFT_HEADER + dump_pool(pool))
     try:
-        load_pool(pool_path)
+        load_pool(tmp_path)
     except PoolError as e:
-        raise BootstrapError(
-            f"the drafted pool at {pool_path} is not loadable, so it would be ignored: {e}"
-        ) from e
+        tmp_path.unlink(missing_ok=True)
+        raise BootstrapError(f"the drafted pool is not loadable, so it was discarded: {e}") from e
+    tmp_path.replace(pool_path)
 
     template_dir = resolved_template_dir(config)
     template_dir.mkdir(parents=True, exist_ok=True)
