@@ -17,9 +17,27 @@ from typing import Any
 
 from moonlighter.application.answers.profile import profile_for_answers
 from moonlighter.application.cvgen.compile import compile_pdf
-from moonlighter.application.cvgen.pool import CVPool, PoolBullet, PoolExperience, dump_pool
-from moonlighter.application.cvgen.render import escape_latex, is_typesettable
-from moonlighter.application.cvgen.service import resolved_pool_path, resolved_template_dir
+from moonlighter.application.cvgen.generate import MAX_BULLETS, MAX_OPEN_SOURCE
+from moonlighter.application.cvgen.pool import (
+    CVPool,
+    PoolBullet,
+    PoolError,
+    PoolExperience,
+    dump_pool,
+    load_pool,
+)
+from moonlighter.application.cvgen.render import (
+    CVSelection,
+    escape_latex,
+    is_typesettable,
+    render_cv,
+)
+from moonlighter.application.cvgen.service import (
+    base_fields,
+    resolved_pool_path,
+    resolved_template_dir,
+    strip_marker_lines,
+)
 from moonlighter.core.llm import LLMCaller, is_spend_limit
 from moonlighter.core.log import get_logger
 from moonlighter.core.parsing import parse_llm_json
@@ -33,14 +51,19 @@ class BootstrapError(Exception):
 
 
 # pool.py's load_pool requires every experience to carry a non-empty
-# location (its own _fixed_field/`not raw.get(field)` check) -- but a
-# profile.yaml with neither a top-level "location" nor a per-entry one is a
-# realistic bootstrap input, not a malformed one. Falling all the way to ""
-# would write a pool that dump_pool can produce but load_pool then refuses
-# to read back, breaking the very next ensure_tailored_cv call. A placeholder
-# the operator will visibly want to replace is safer than an empty field
-# that silently breaks the pool on first reload.
+# company, title, period AND location (one `not raw.get(field)` check over
+# all four) -- but a profile.yaml missing any of them is a realistic
+# bootstrap input, not a malformed one, and so is a model that omits one
+# from its answer. Falling all the way to "" would write a pool that
+# dump_pool can produce but load_pool then refuses to read back, breaking
+# the very next ensure_tailored_cv call. A placeholder the operator will
+# visibly want to replace is safer than an empty field that silently breaks
+# the pool on first reload. (Company is not in this list on purpose:
+# _experience_from_raw drops an entry with no company outright -- there is
+# nothing to place-hold, the entry names no job.)
 _UNKNOWN_LOCATION = "Not specified"
+_UNKNOWN_TITLE = "Title not specified"
+_UNKNOWN_PERIOD = "Period not specified"
 
 
 _PROMPT = """You are drafting a first CV bullet pool from this candidate's profile, for them
@@ -118,8 +141,8 @@ def _experience_from_raw(
         return None
     return PoolExperience(
         company=escape_latex(str(raw["company"])),
-        title=escape_latex(str(raw.get("title") or "")),
-        period=escape_latex(str(raw.get("period") or "")),
+        title=escape_latex(str(raw.get("title") or _UNKNOWN_TITLE)),
+        period=escape_latex(str(raw.get("period") or _UNKNOWN_PERIOD)),
         location=escape_latex(str(raw.get("location") or default_location or _UNKNOWN_LOCATION)),
         bullets=bullets,
         prose=None,
@@ -230,6 +253,34 @@ def fill_template(profile: dict[str, Any]) -> str:
     )
 
 
+DRAFT_TEX_NAME = "cv-draft.tex"
+
+
+def _sample_selection(pool: CVPool, template: str) -> CVSelection:
+    """A CVSelection covering the whole freshly drafted pool.
+
+    The per-job engine builds this from one LLM call per posting; the
+    bootstrap has no posting, so it stands in for the model with the widest
+    honest selection -- every id in the pool, under the SAME one-page budget
+    (generate.py's MAX_BULLETS/MAX_OPEN_SOURCE) a real selection is held to,
+    so the draft PDF looks like the documents this pool will actually
+    produce rather than an everything-at-once version of it. Summary and
+    expertise come from the template's own base declarations, which is
+    precisely what a USE_BASE decision renders. No translations: the draft
+    is English, per the spec's scope cut.
+    """
+    summary, expertise = base_fields(template)
+    bullets = tuple(b.id for e in pool.experiences for b in e.bullets)[:MAX_BULLETS]
+    return CVSelection(
+        language="en",
+        summary=summary,
+        technical_expertise=expertise,
+        bullets=bullets,
+        open_source=tuple(b.id for b in pool.open_source)[:MAX_OPEN_SOURCE],
+        translations={},
+    )
+
+
 @dataclass(frozen=True)
 class BootstrapOutcome:
     pool_path: Path
@@ -253,12 +304,39 @@ async def bootstrap_cv_pool(
     pool_path.parent.mkdir(parents=True, exist_ok=True)
     pool_path.write_text(DRAFT_HEADER + dump_pool(pool))
 
+    # Validate what we just wrote, through the exact boundary every reader
+    # goes through. dump_pool can serialize shapes load_pool then refuses
+    # (an empty title/period/location is the documented example), and the
+    # only thing worse than a bootstrap that fails is one that reports
+    # success and leaves a pool the very next prepare_application silently
+    # drops. The spec names this boundary for exactly this job: "the
+    # existing PoolError boundary (pool.py) is the right place to surface
+    # that." A guard per field would close one case; this closes the class.
+    try:
+        load_pool(pool_path)
+    except PoolError as e:
+        raise BootstrapError(
+            f"the drafted pool at {pool_path} is not loadable, so it would be ignored: {e}"
+        ) from e
+
     template_dir = resolved_template_dir(config)
     template_dir.mkdir(parents=True, exist_ok=True)
     template_path = template_dir / "cv-template.en.tex"
-    template_path.write_text(fill_template(profile))
+    filled = fill_template(profile)
+    template_path.write_text(filled)
 
-    pdf_path = compile_pdf(template_path)
+    # Compile a SAMPLE RENDER, never the template itself: the template still
+    # carries the four per-job markers, and '%' is LaTeX's comment character,
+    # so \cvlistitem{ + a marker opens a group whose closing brace is
+    # swallowed as a comment -- pdflatex fails on EVERY machine, and a None
+    # pdf_path then gets misread as "pdflatex is not installed." The sample
+    # goes through render_cv, the same function the per-job path uses, so a
+    # PDF here proves the pool AND the template are a working pair.
+    draft_tex = template_dir / DRAFT_TEX_NAME
+    draft_tex.write_text(
+        strip_marker_lines(render_cv(filled, _sample_selection(pool, filled), pool))
+    )
+    pdf_path = compile_pdf(draft_tex)
     bullet_count = sum(len(e.bullets) for e in pool.experiences) + len(pool.open_source)
     return BootstrapOutcome(
         pool_path=pool_path,

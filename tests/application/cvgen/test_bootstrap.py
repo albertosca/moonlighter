@@ -11,7 +11,9 @@ from moonlighter.application.cvgen.bootstrap import (
     draft_pool,
     fill_template,
 )
+from moonlighter.application.cvgen.compile import latex_available, looks_like_a_compiled_pdf
 from moonlighter.application.cvgen.pool import CVPool
+from moonlighter.application.cvgen.service import ensure_tailored_cv
 
 
 def test_the_example_template_and_pool_ship_as_package_data():
@@ -338,6 +340,64 @@ async def test_draft_pool_raises_when_every_experience_is_unusable():
         await draft_pool(PROFILE, _caller(unusable_response))
 
 
+async def test_bootstrap_cv_pool_place_holds_a_missing_title_and_period(monkeypatch, tmp_path):
+    # pool.py's _experience rejects an EMPTY title/period with PoolError just
+    # as hard as an empty location, and a model that omits either is ordinary
+    # -- location already had a placeholder guard, these two fell through to
+    # "". The proof is the round trip, not the field: a pool that load_pool
+    # refuses to read is a pool ensure_tailored_cv silently ignores forever.
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    thin_response = json.dumps(
+        {
+            "experiences": [
+                {
+                    "company": "Acme",
+                    "bullets": [{"id": "acme-ok", "angles": [], "text": "Shipped it well"}],
+                }
+            ],
+            "open_source": [],
+            "summary_facts": [],
+        }
+    )
+    outcome = await bootstrap_cv_pool(PROFILE, {}, _caller(thin_response))
+
+    from moonlighter.application.cvgen.pool import load_pool
+
+    reloaded = load_pool(outcome.pool_path)
+    exp = reloaded.experiences[0]
+    assert exp.title == "Title not specified"
+    assert exp.period == "Period not specified"
+    assert exp.location == "Remote (Brazil)"  # PROFILE's own top-level location
+
+
+async def test_bootstrap_cv_pool_refuses_to_report_success_on_an_unloadable_pool(
+    monkeypatch, tmp_path
+):
+    # Validate-what-you-wrote closes the CLASS the two guards above only
+    # patch two instances of. A zero-width space is a truthy company (so the
+    # entry is kept) that escape_latex then reduces to "" (Cf is dropped) --
+    # dump_pool happily serializes it and load_pool refuses it. Without this
+    # check the bootstrap reports N bullets drafted and every later
+    # prepare_application quietly skips the file.
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    zwsp_company = json.dumps(
+        {
+            "experiences": [
+                {
+                    "company": "​",
+                    "title": "Eng",
+                    "period": "2020",
+                    "bullets": [{"id": "acme-ok", "angles": [], "text": "Shipped it well"}],
+                }
+            ],
+            "open_source": [],
+            "summary_facts": [],
+        }
+    )
+    with pytest.raises(BootstrapError, match="not loadable"):
+        await bootstrap_cv_pool(PROFILE, {}, _caller(zwsp_company))
+
+
 def test_fill_template_substitutes_contact_and_education_placeholders():
     profile = {
         "name": "Jane Marie Doe",
@@ -492,3 +552,76 @@ async def test_bootstrap_cv_pool_output_is_immediately_usable_by_ensure_tailored
     # What this test actually proves -- the only thing its own comment above
     # claims -- is that load_pool can read back what bootstrap_cv_pool wrote.
     assert pool.experiences[0].company == "Acme Corp"
+
+
+# --- The end-to-end compile proof -------------------------------------------
+#
+# Every assertion above stops at "a file was written." None of them ever asked
+# pdflatex whether that file is a DOCUMENT, and the two bugs this test exists
+# to catch both lived in exactly that gap for ten rounds of review:
+#   1. bootstrap_cv_pool compiled the raw template, markers and all, so
+#      \cvlistitem{ + a per-job marker opened a group whose closing brace the
+#      LaTeX comment character then swallowed -- pdf_path was None on EVERY
+#      machine, and the MCP tool blamed a missing pdflatex for it.
+#   2. the shipped example template's own header comment SPELLED the per-job
+#      markers, and render_cv's blind str.replace substituted them there too;
+#      the experience block is multi-line, so its tail landed as live LaTeX
+#      before \documentclass and failed every per-job render as well.
+# The old assertion here was `pdf_path is None or pdf_path.exists()` -- true
+# whether compilation succeeded or failed, which is why neither bug showed.
+# This one demands a real PDF from a real pdflatex, and then walks the
+# bootstrap's output through the per-job pipeline it exists to feed.
+
+REAL_PROFILE = {
+    "name": "Jane Marie Doe",
+    "headline": "Senior Software Engineer",
+    "email": "jane@example.com",
+    "phone": "+1 555 0100",
+    "linkedin": "https://www.linkedin.com/in/janedoe/",
+    "location": "Remote (Brazil)",
+    "education": [{"degree": "BSc Computer Science", "school": "Example University", "year": 2014}],
+    "experience": [
+        {
+            "company": "Acme Corp",
+            "role": "Senior Software Engineer",
+            "period": "2020 - present",
+            "highlights": ["Led the migration of a monolith to services."],
+        }
+    ],
+}
+
+DECIDE_RESPONSE = json.dumps(
+    {
+        "decision": "GENERATE",
+        "language": "en",
+        "summary": "Senior engineer with **10+ years** building backend systems.",
+        "technical_expertise": "Backend, APIs, distributed systems",
+        "bullets": ["acme-migration"],
+        "open_source": [],
+    }
+)
+
+
+@pytest.mark.skipif(not latex_available(), reason="pdflatex not installed")
+async def test_bootstrap_output_compiles_and_feeds_the_per_job_pipeline(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+
+    outcome = await bootstrap_cv_pool(REAL_PROFILE, {}, _caller())
+
+    # Not `is None or exists()`: a real PDF, or this fails.
+    assert outcome.pdf_path is not None
+    assert outcome.pdf_path.exists()
+    assert looks_like_a_compiled_pdf(outcome.pdf_path)
+
+    # And the pool + template it just wrote are a working INPUT to the per-job
+    # engine -- the whole point of bootstrapping them.
+    job = {
+        "id": 1,
+        "company": "Globex",
+        "title": "Backend Engineer",
+        "description": "We need a backend engineer for our distributed services.",
+    }
+    tailored = await ensure_tailored_cv(job, {}, REAL_PROFILE, _caller(DECIDE_RESPONSE))
+    assert tailored is not None
+    assert tailored.compiled is True
+    assert looks_like_a_compiled_pdf(tailored.path)

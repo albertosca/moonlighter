@@ -33,6 +33,30 @@ _BASE_EXPERTISE = re.compile(r"^%%BASE_EXPERTISE: (.+)$", re.MULTILINE)
 _MARKER_LINES = re.compile(r"^%%BASE_(SUMMARY|EXPERTISE): .+\n", re.MULTILINE)
 
 
+def base_fields(template: str) -> tuple[str, str]:
+    """The (summary, expertise) base text a template declares for itself.
+
+    Public because the bootstrap (cvgen/bootstrap.py) renders a SAMPLE of the
+    pool it just drafted through the template it just filled, and that sample
+    needs the same two fields this module feeds the per-job generator. One
+    definition, not two regexes drifting apart across modules — an empty
+    string for either is a template that simply declares no base, exactly as
+    the per-job path already treats it.
+    """
+    summary = m.group(1) if (m := _BASE_SUMMARY.search(template)) else ""
+    expertise = m.group(1) if (m := _BASE_EXPERTISE.search(template)) else ""
+    return summary, expertise
+
+
+def strip_marker_lines(rendered: str) -> str:
+    """Drops the BASE_SUMMARY/BASE_EXPERTISE declaration lines from a rendered
+    document. They are metadata for the generator, never content: pdflatex
+    reads them as ordinary comments, but leaving them in a finished .tex means
+    the next reader cannot tell a declaration from the summary it describes.
+    Shared with the bootstrap's sample render for the same reason."""
+    return _MARKER_LINES.sub("", rendered)
+
+
 @dataclass(frozen=True)
 class TailoredCV:
     path: Path
@@ -111,7 +135,7 @@ def _fit_to_one_page(
     tex = out / "cv.tex"
     current: CVSelection | None = selection
     while current is not None:
-        tex.write_text(_MARKER_LINES.sub("", render_cv(template, current, pool)))
+        tex.write_text(strip_marker_lines(render_cv(template, current, pool)))
         pdf = compile_pdf(tex)
         if pdf is None:
             return _after_compile_failure(tex)
@@ -190,8 +214,7 @@ def _relanguage_fallback_fields(
     used_en_expertise = selection.technical_expertise == en_base_expertise
     if not used_en_summary and not used_en_expertise:
         return selection
-    lang_base_summary = m.group(1) if (m := _BASE_SUMMARY.search(template)) else ""
-    lang_base_expertise = m.group(1) if (m := _BASE_EXPERTISE.search(template)) else ""
+    lang_base_summary, lang_base_expertise = base_fields(template)
     if (used_en_summary and not lang_base_summary) or (
         used_en_expertise and not lang_base_expertise
     ):
@@ -249,8 +272,7 @@ async def ensure_tailored_cv(
     if en_template is None:
         logger.warning("cv.template_dir has no cv-template.en.tex — using default CV")
         return None
-    base_summary = m.group(1) if (m := _BASE_SUMMARY.search(en_template)) else ""
-    base_expertise = m.group(1) if (m := _BASE_EXPERTISE.search(en_template)) else ""
+    base_summary, base_expertise = base_fields(en_template)
 
     try:
         selection = await decide_cv(job, pool, profile, base_summary, base_expertise, caller)
