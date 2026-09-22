@@ -11,6 +11,24 @@ _session_home: str | None = None
 
 
 def pytest_configure(config: pytest.Config) -> None:
+    _register_e2e_guard(config)
+    _isolate_moonlighter_home()
+
+
+def _register_e2e_guard(config: pytest.Config) -> None:
+    """Turn a skipped e2e test into a failure (see tests/_e2e_guard.py).
+
+    Registered here rather than through ``-p`` in addopts: ``-p`` imports the
+    plugin before the rootdir is on sys.path, so ``tests._e2e_guard`` would not
+    resolve.
+    """
+    from tests import _e2e_guard
+
+    if not config.pluginmanager.is_registered(_e2e_guard):
+        config.pluginmanager.register(_e2e_guard, "tests._e2e_guard")
+
+
+def _isolate_moonlighter_home() -> None:
     """Point MOONLIGHTER_HOME at a session-scoped temp dir BEFORE pytest imports
     any test module.
 
