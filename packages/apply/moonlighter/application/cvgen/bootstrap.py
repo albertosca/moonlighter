@@ -193,7 +193,18 @@ DRAFT_HEADER = (
     "# Read every bullet before your first real application uses it.\n\n"
 )
 
-_LINKEDIN_USERNAME = re.compile(r"linkedin\.com/in/([^/?#]+)")
+# The ONE substitution fill_template leaves unescaped, on the reasoning that
+# a LinkedIn slug is never free text -- so the pattern has to actually be a
+# slug, which "anything but /?#" was not: it happily captured a '%' (LaTeX's
+# comment character, which silently eats the rest of the line) or a '\' out
+# of a malformed profile.yaml and pasted it straight into \social[linkedin]{}.
+# A real vanity slug is letters, digits and hyphens. The lookahead is what
+# makes the tightening safe rather than lossy: without it the pattern would
+# match the ASCII PREFIX of a percent-encoded international slug and silently
+# put a truncated, wrong handle on the CV. Anchored to the end of the path
+# segment, a slug that is not a slug matches nothing and degrades to an empty
+# \social{} -- announced, not silent.
+_LINKEDIN_USERNAME = re.compile(r"linkedin\.com/in/([A-Za-z0-9-]+)(?=[/?#]|$)")
 
 
 def _split_name(name: str) -> tuple[str, str]:
@@ -203,7 +214,14 @@ def _split_name(name: str) -> tuple[str, str]:
 
 def _linkedin_username(url: str) -> str:
     m = _LINKEDIN_USERNAME.search(url)
-    return m.group(1).rstrip("/") if m else ""
+    if m is not None:
+        return m.group(1)
+    if url.strip():
+        logger.warning(
+            "bootstrap: profile.yaml's linkedin value is not a recognizable profile URL "
+            "— leaving the CV's LinkedIn field empty"
+        )
+    return ""
 
 
 def _education_block(entries: list[Any]) -> str:

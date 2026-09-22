@@ -457,6 +457,25 @@ def test_fill_template_escapes_tex_specials_in_contact_and_education_fields():
     # parsed out of a URL, never free text, so it is never escaped.
 
 
+def test_fill_template_drops_a_linkedin_value_that_is_not_a_real_slug():
+    # LINKEDIN_USERNAME is the one substitution fill_template leaves
+    # UNESCAPED, justified by "it's a slug, never free text" -- so the
+    # pattern has to enforce that, and "anything but /?#" did not. A '%' is
+    # LaTeX's comment character: unescaped inside \social[linkedin]{...} it
+    # eats the closing brace and the rest of the line, with no compile error
+    # at the point of the mistake. A value that is not a slug now yields
+    # nothing at all rather than something unsafe.
+    filled = fill_template(
+        {"name": "Jane Doe", "linkedin": "https://www.linkedin.com/in/jane%doe}\\evil"}
+    )
+    assert r"\social[linkedin]{}" in filled
+    assert "%doe" not in filled
+    assert "evil" not in filled
+    # And a legitimate slug is still lossless, hyphen and digits included.
+    ok = fill_template({"name": "Jane Doe", "linkedin": "https://linkedin.com/in/jane-doe-42"})
+    assert r"\social[linkedin]{jane-doe-42}" in ok
+
+
 def test_fill_template_skips_a_malformed_education_entry_that_is_not_a_mapping():
     # profile.yaml is hand-edited: a stray '-' under "education" (the same
     # mistake pool.py's own _bullet/_experience guard against) makes an entry

@@ -196,7 +196,8 @@ def failed_sheet(kind: SheetKind, message: str, *, apply_url: str = "") -> Sheet
 _CV_BOOTSTRAP_OFFER_MESSAGE = (
     "You don't have a tailored-CV pool yet. I can draft one from your profile.yaml — "
     "call the bootstrap_cv_pool tool to generate it, or skip_cv_bootstrap if you'd "
-    "rather not use this feature (asked only once). "
+    "rather not use this feature. I'll keep offering this on every "
+    "prepare_application until you either bootstrap a pool or skip it. "
     "From a shell: `moonlighter-apply bootstrap-cv` (add --skip to decline)."
 )
 
