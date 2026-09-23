@@ -1,0 +1,3 @@
+# moonlighter
+
+> The job-application assistant that leaves the last word to you. Open-source, self-hosted MCP server and CLIs (Python, AGPL-3.0) that scan ATS job boards, score postings against your profile with an LLM, and draft complete application answer sheets for you to review and send. It never sends an application.

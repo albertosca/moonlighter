@@ -18,6 +18,13 @@ dev = [
     "ruff>=0.16.4,<0.17",
     "mypy>=1.11",
 ]
+# Docs site (guide/ → GitHub Pages). Deliberately no upper bound: uv.lock pins the
+# exact version and a Dependabot bump lands only if the strict docs build passes.
+# Zensical is pre-1.0 (0.0.64 on 2026-09-23) — try a bump locally before merging it:
+#   uv run --group docs --with zensical==X zensical build --strict -f zensical.en.yml
+docs = [
+    "zensical",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
