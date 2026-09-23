@@ -1,7 +1,5 @@
 🇺🇸 [English](README.md) · 🇧🇷 [Português](README.pt.md)
 
-![moonlighter](assets/site/social-preview.png)
-
 # moonlighter
 
 **The job-application assistant that leaves the last word to you.**
