@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 280" role="img" aria-label="Before the model, recognised salary, compliance and demographic questions go to your config or to you; after it, answers addressed to the operator become gaps">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#EEF1F6"/></marker>
+  </defs>
+  <g font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="13" fill="#EEF1F6" text-anchor="middle">
+    <rect x="20" y="110" width="150" height="50" rx="6" fill="none" stroke="#EEF1F6"/><text x="95" y="140">form question</text>
+    <line x1="170" y1="135" x2="218" y2="135" stroke="#EEF1F6" marker-end="url(#a)"/>
+    <path d="M220 135 L250 110 L280 135 L250 160 Z" fill="none" stroke="#EEF1F6"/>
+    <text x="250" y="182">recognised as salary /</text><text x="250" y="199">compliance / demographic?</text>
+    <line x1="250" y1="110" x2="250" y2="66" stroke="#EEF1F6" marker-end="url(#a)"/><text x="262" y="92" font-size="11" text-anchor="start">yes</text>
+    <rect x="200" y="20" width="220" height="44" rx="6" fill="none" stroke="#EEF1F6"/><text x="310" y="38">your configured value —</text><text x="310" y="55">or a gap for you</text>
+    <line x1="280" y1="135" x2="398" y2="135" stroke="#EEF1F6" marker-end="url(#a)"/><text x="339" y="127" font-size="11">no</text>
+    <rect x="400" y="110" width="180" height="50" rx="6" fill="none" stroke="#EEF1F6"/><text x="490" y="131">LLM drafts from</text><text x="490" y="148">your profile</text>
+    <line x1="580" y1="135" x2="628" y2="135" stroke="#EEF1F6" marker-end="url(#a)"/>
+    <path d="M630 135 L660 110 L690 135 L660 160 Z" fill="none" stroke="#EEF1F6"/>
+    <text x="660" y="84">answer addressed</text><text x="660" y="100">to the operator?</text>
+    <line x1="660" y1="160" x2="660" y2="208" stroke="#EEF1F6" marker-end="url(#a)"/><text x="672" y="188" font-size="11" text-anchor="start">yes</text>
+    <rect x="590" y="210" width="200" height="44" rx="6" fill="none" stroke="#EEF1F6"/><text x="690" y="237">gap for you</text>
+    <line x1="690" y1="135" x2="778" y2="135" stroke="#EEF1F6" marker-end="url(#a)"/><text x="734" y="127" font-size="11">no</text>
+    <rect x="780" y="110" width="80" height="50" rx="6" fill="none" stroke="#EEF1F6"/><text x="820" y="140">sheet</text>
+  </g>
+</svg>
