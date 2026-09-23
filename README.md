@@ -34,7 +34,7 @@ moonlighter: Senior Backend Engineer — Acme Robotics
   Ana Lima
 
   [2/9] Email  (required)
-  ana.jobs+k3xv9q@gmail.com     ← tracking alias: Acme's reply will match this application by itself
+  ana.jobs+k3xv9qhm@gmail.com     ← tracking alias: Acme's reply will match this application by itself
 
   [3/9] Why do you want to work at Acme?  (required)
   Three sentences drafted from Ana's profile.
@@ -70,7 +70,7 @@ You drive it from a Claude conversation through MCP tools; the scan, apply and e
 
 - **It never sends an application.** It drafts the sheet; you paste the answers into the employer's form and send it yourself.
 - **Your pipeline lives in a local SQLite file.** Jobs, drafts and application history are stored under `MOONLIGHTER_HOME`. What leaves your machine is only what goes to the LLM and the APIs you configure — Claude, Gmail, the job boards. [PRIVACY.md](PRIVACY.md) has the details.
-- **The model never answers a question the guards recognise as salary, compliance or demographic.** Those come from your config or are left to you. The guards match known phrasings, and when you paste in a page's text, the model still reads all of it to find the questions.
+- **The model never answers a question the guards recognise as salary, compliance or demographic.** Those come from your profile or config, or are left to you. The guards match known phrasings, and when you paste in a page's text, the model still reads all of it to find the questions.
 
 The model can still get an answer wrong — which is why every sheet is yours to review.
 
@@ -95,6 +95,11 @@ You need [uv](https://docs.astral.sh/uv/) (it fetches Python 3.14 for you) and a
 - **Then:** `uvx moonlighter init` writes your config; fill in `profile.yaml` and `company_list.yaml`, and ask Claude to "scan my companies".
 
 [Full install guide →](https://albertosca.github.io/moonlighter/getting-started/install/)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/fitting-dark.svg">
+  <img alt="Each moonlighter package works alone; installing two adds commands between them" src="assets/diagrams/fitting-light.svg">
+</picture>
 
 ## Documentation
 

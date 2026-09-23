@@ -34,7 +34,7 @@ moonlighter: Senior Backend Engineer — Acme Robotics
   Ana Lima
 
   [2/9] Email  (required)
-  ana.jobs+k3xv9q@gmail.com     ← alias de rastreio: a resposta da Acme casa sozinha com esta candidatura
+  ana.jobs+k3xv9qhm@gmail.com     ← alias de rastreio: a resposta da Acme casa sozinha com esta candidatura
 
   [3/9] Why do you want to work at Acme?  (required)
   Três frases rascunhadas a partir do perfil da Ana.
@@ -70,7 +70,7 @@ Você comanda tudo de uma conversa com o Claude, por ferramentas MCP; os pacotes
 
 - **Ele nunca envia uma candidatura.** Ele rascunha a folha; você cola as respostas no formulário do empregador e envia por conta própria.
 - **Seu pipeline mora num arquivo SQLite local.** Vagas, rascunhos e histórico de candidaturas são guardados em `MOONLIGHTER_HOME`. O que sai da sua máquina é só o que vai para o LLM e para as APIs que você configura — Claude, Gmail, os portais de vagas. O [PRIVACY.md](PRIVACY.md) (em inglês) tem os detalhes.
-- **O modelo nunca responde uma pergunta que as guardas reconhecem como de salário, compliance ou dados demográficos.** Essas respostas vêm da sua config ou ficam com você. As guardas reconhecem formulações conhecidas, e quando você cola o texto de uma página, o modelo ainda lê o texto inteiro para encontrar as perguntas.
+- **O modelo nunca responde uma pergunta que as guardas reconhecem como de salário, compliance ou dados demográficos.** Essas respostas vêm do seu perfil ou config, ou ficam com você. As guardas reconhecem formulações conhecidas, e quando você cola o texto de uma página, o modelo ainda lê o texto inteiro para encontrar as perguntas.
 
 O modelo ainda pode errar uma resposta — e é por isso que toda folha passa pela sua revisão.
 
@@ -95,6 +95,11 @@ Você precisa do [uv](https://docs.astral.sh/uv/) (ele baixa o Python 3.14 para 
 - **Depois:** `uvx moonlighter init` escreve a sua config; preencha `profile.yaml` e `company_list.yaml` e peça ao Claude "varre minhas empresas".
 
 [Guia completo de instalação →](https://albertosca.github.io/moonlighter/pt/getting-started/install/)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/fitting-dark.svg">
+  <img alt="Cada pacote do moonlighter funciona sozinho; instalar dois acrescenta comandos entre eles" src="assets/diagrams/fitting-light.svg">
+</picture>
 
 ## Documentação
 
