@@ -11,9 +11,9 @@
     <text x="215" y="168" font-size="11">scan → pick by score → prepare</text>
     <path d="M355 96 V200 H555 V98" fill="none" stroke="#1F2B47" marker-end="url(#a)"/>
     <text x="455" y="218" font-size="11">the +alias a sheet mints is what sync matches</text>
-    <path d="M30 240 V250 H640 V240" fill="none" stroke="#1F2B47"/>
-    <path d="M775 96 V250 H642" fill="none" stroke="#1F2B47" marker-end="url(#a)"/>
-    <text x="708" y="243" font-size="11">installs all four</text>
+    <path d="M30 96 V235 H640 V96" fill="none" stroke="#1F2B47"/>
+    <path d="M640 235 H775 V98" fill="none" stroke="#1F2B47" marker-end="url(#a)"/>
+    <text x="745" y="253" font-size="11">installs the three + moonlighter-core</text>
     <text x="440" y="285" font-size="11" fill="#9AA8C4">same JSON output whatever you install — combinations add commands, never dialects</text>
   </g>
 </svg>

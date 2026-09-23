@@ -5,7 +5,7 @@
   </defs>
   <g font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="13" fill="{{fg}}" text-anchor="middle">
     <rect x="20" y="30" width="520" height="130" rx="10" fill="none" stroke="{{muted}}" stroke-dasharray="5 4"/>
-    <text x="280" y="22" fill="{{muted}}">moonlighter (your machine)</text>
+    <text x="280" y="22" fill="{{muted}}">moonlighter · runs locally, calls your LLM</text>
     <rect x="40" y="70" width="130" height="50" rx="6" fill="none" stroke="{{fg}}"/><text x="105" y="100">scan boards</text>
     <rect x="210" y="70" width="130" height="50" rx="6" fill="none" stroke="{{fg}}"/><text x="275" y="100">score fit</text>
     <rect x="380" y="70" width="140" height="50" rx="6" fill="none" stroke="{{fg}}"/><text x="450" y="100">draft sheet</text>
