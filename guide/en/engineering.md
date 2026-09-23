@@ -38,7 +38,7 @@ The five PyPI packages each install on their own, and a `pip install moonlighter
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://albertosca.github.io/moonlighter/assets/diagrams/llm-guards-dark.svg">
-  <img alt="Before drafting, recognised salary, compliance and demographic questions go to your config or to you; after drafting, answers addressed to the operator become gaps" src="https://albertosca.github.io/moonlighter/assets/diagrams/llm-guards-light.svg">
+  <img alt="Before drafting, recognised salary, compliance and demographic questions go to your config or to you; after drafting, a free-text answer addressed to the operator becomes a gap" src="https://albertosca.github.io/moonlighter/assets/diagrams/llm-guards-light.svg">
 </picture>
 
 *Two checkpoints. Before drafting, a question the guards recognise as salary, compliance or demographic gets your configured value or is left as a gap for you. After drafting, a free-text answer addressed to the operator becomes a gap. Only the rest reaches the sheet. The guards match known phrasings, and on the paste path the model still reads the whole page to find the questions.*
