@@ -22,6 +22,8 @@ theme:
         icon: material/weather-sunny
         name: Mudar para o modo claro
   custom_dir: overrides
+  features:
+    - navigation.tabs
 extra_css:
   - stylesheets/night-shift.css
 extra:
@@ -48,3 +50,4 @@ nav:
       - Configuração: reference/config.md
   - Engenharia: engineering.md
   - Perguntas frequentes: faq.md
+  - LinkedIn: https://www.linkedin.com/in/albertosca/
