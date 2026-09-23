@@ -2,16 +2,28 @@
 
 # Command line
 
-## Command line
+Every slice also installs a command you can drive from a shell or a cron job, with no LLM conversation involved. The CLIs don't depend on Claude as an MCP client; the steps that score or draft still call the LLM backend in `config.yaml`, and `--no-eval` makes a scan with no LLM call at all.
 
-Every slice also installs a command you can drive from a shell or a cron job, with no LLM conversation involved. Each prints exactly one JSON document on stdout (logs go to stderr) and exits `0` on success, `1` when there was nothing to do (no new jobs, job not found, no questions), `2` on a usage or config error, `3` on an unexpected error (the JSON then carries `kind: "error"` and the traceback goes to stderr).
+## Output and exit codes
+
+Each command prints exactly one JSON document on stdout (logs go to stderr) and exits:
+
+| Exit | Meaning |
+|---|---|
+| `0` | success |
+| `1` | nothing to do (no new jobs, job not found, no questions) |
+| `2` | usage or config error |
+| `3` | unexpected error — the JSON then carries `kind: "error"` and the traceback goes to stderr |
+
+## Commands
 
 | Command | What it does |
 |---|---|
 | `moonlighter-scan [--phase all] [--keywords ...]` | Run a scan; `--company SOURCE SLUG` scans one board. `--no-eval` discovers and stores postings as `needs_review` without calling the LLM — score them later with `verify_job`. |
 | `moonlighter-apply prepare JOB_ID [--paste FILE]` | Compose the paste-ready sheet; `--paste -` reads the page text from stdin. |
 | `moonlighter-apply prepare --url URL [--company X --title Y] [--paste FILE]` | Ingest the posting first: through its ATS API when the URL has a known shape, otherwise from the page itself with `--company` and `--title` supplied; stored unscored, then prepared. No LLM call for the ingest. |
-| `moonlighter-email sync` | Classify recent replies and advance applications. Standalone it does not feed the answer bank; the MCP server's `sync_email_responses` does. |
+| `moonlighter-apply bootstrap-cv [--force] [--skip]` | Draft a CV pool and template from `profile.yaml` — see [Tailored CV](../guides/tailored-cv.md). |
+| `moonlighter-email sync` | Classify recent replies and advance applications. Standalone it does not feed the [answer bank](../guides/answer-bank.md); the MCP server's `sync_email_responses` does. |
 | `moonlighter-email register JOB_ID` | Mark a job as applied by hand and mint its `+ref` tracking alias, so replies to it are matched by `sync`. |
 | `moonlighter-scan doctor` · `moonlighter-apply doctor` · `moonlighter-email doctor` · `moonlighter doctor` | Where the state lives and whether the config loads, as JSON; exit `1` when the config is missing or invalid. |
 
@@ -21,9 +33,16 @@ moonlighter-scan --no-eval | jq '.saved[] | select(.status == "needs_review") | 
 
 The example above exits `1` on every quiet day (no new jobs), which trips `set -e`/`pipefail` in a script that chains it with `jq` — check the exit code before treating that as a script failure. `--no-eval` is zero-**LLM**, not offline: `archive_stale_jobs` still makes HTTP requests to check whether previously-saved jobs closed.
 
-### What each install gives you
+## What each install gives you
 
 The five packages are slices of one tool. Install the ones you need; each command tells you in `--help` what it can do here and what a missing slice would add, and `doctor` prints the same as JSON.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://albertosca.github.io/moonlighter/assets/diagrams/fitting-dark.svg">
+  <img alt="Each moonlighter package works alone; installing two adds commands between them" src="https://albertosca.github.io/moonlighter/assets/diagrams/fitting-light.svg">
+</picture>
+
+*Each package works alone, and installing two adds commands between them; `moonlighter` installs the three plus `moonlighter-core`. The JSON output is the same whatever you install.*
 
 | You install | You get |
 |---|---|

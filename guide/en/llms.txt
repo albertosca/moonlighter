@@ -1,3 +1,25 @@
 # moonlighter
 
 > The job-application assistant that leaves the last word to you. Open-source, self-hosted MCP server and CLIs (Python, AGPL-3.0) that scan ATS job boards, score postings against your profile with an LLM, and draft complete application answer sheets for you to review and send. It never sends an application.
+
+<!-- facts -->1,700+ tests · 100% branch coverage (CI-gated) · 5 packages on PyPI · mypy strict<!-- /facts -->
+
+moonlighter scans Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters and InHire boards for the companies you list, plus optional portal feeds. It is for developers job hunting from Claude Code (or any MCP client) who want to review every answer before it goes out. Built by Alberto Cavalcanti (https://www.linkedin.com/in/albertosca/).
+
+## Docs
+
+- [Install](https://albertosca.github.io/moonlighter/getting-started/install/): requirements, the setup wizard, registering the MCP server
+- [First scan](https://albertosca.github.io/moonlighter/getting-started/first-scan/): scan companies, read the scores, prepare a first application
+- [Gmail tracking](https://albertosca.github.io/moonlighter/getting-started/gmail/): match recruiter replies to applications by a per-application alias
+- [Tailored CV](https://albertosca.github.io/moonlighter/guides/tailored-cv/): a one-page LaTeX CV per posting, built from a curated bullet pool
+- [Answer bank](https://albertosca.github.io/moonlighter/guides/answer-bank/): approved screening answers reused across applications, with expiry
+- [Extensions](https://albertosca.github.io/moonlighter/guides/extensions/): add a job source as a separate package through entry points
+- [Command line](https://albertosca.github.io/moonlighter/reference/cli/): one JSON CLI per package, exit codes, what each install gives you
+- [MCP tools](https://albertosca.github.io/moonlighter/reference/mcp-tools/): the 17 tools the MCP server exposes
+- [Configuration](https://albertosca.github.io/moonlighter/reference/config/): config.yaml keys and defaults
+- [Engineering](https://albertosca.github.io/moonlighter/engineering/): design decisions, trade-offs, architecture, quality gates
+- [FAQ](https://albertosca.github.io/moonlighter/faq/): does it apply for me, can it get an answer wrong, what leaves my machine, troubleshooting
+
+## Source
+
+- [GitHub repository](https://github.com/albertosca/moonlighter): code, issues, discussions; packages on PyPI as moonlighter, moonlighter-core, moonlighter-scan, moonlighter-apply, moonlighter-email

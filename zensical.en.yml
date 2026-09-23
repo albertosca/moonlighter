@@ -34,3 +34,17 @@ extra:
       lang: pt
 nav:
   - Home: index.md
+  - Getting started:
+      - Install: getting-started/install.md
+      - First scan: getting-started/first-scan.md
+      - Gmail tracking: getting-started/gmail.md
+  - Guides:
+      - Tailored CV: guides/tailored-cv.md
+      - Answer bank: guides/answer-bank.md
+      - Extensions: guides/extensions.md
+  - Reference:
+      - CLI: reference/cli.md
+      - MCP tools: reference/mcp-tools.md
+      - Configuration: reference/config.md
+  - Engineering: engineering.md
+  - FAQ: faq.md
