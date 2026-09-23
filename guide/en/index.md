@@ -1,4 +1,4 @@
-🇺🇸 [English](index.md) · 🇧🇷 [Português](https://albertosca.github.io/moonlighter/pt/)
+🇺🇸 [English](https://albertosca.github.io/moonlighter/) · 🇧🇷 [Português](https://albertosca.github.io/moonlighter/pt/)
 
 # moonlighter
 
@@ -21,7 +21,7 @@ Scans the job boards you choose, scores each posting against your profile, and d
 
 - **It never sends an application.** It drafts the sheet; you paste the answers into the employer's form and send it yourself.
 - **Your pipeline lives in a local SQLite file.** Jobs, drafts and application history are stored under `MOONLIGHTER_HOME`. What leaves your machine is only what goes to the LLM and the APIs you configure — Claude, Gmail, the job boards. [PRIVACY.md](https://github.com/albertosca/moonlighter/blob/main/PRIVACY.md) has the details.
-- **The model never answers a question the guards recognise as salary, compliance or demographic.** Those come from your config or are left to you. The guards match known phrasings, and on the paste path the model still reads the whole page to find the questions.
+- **The model never answers a question the guards recognise as salary, compliance or demographic.** Those come from your profile or config, or are left to you. The guards match known phrasings, and on the paste path the model still reads the whole page to find the questions.
 
 The model can still get an answer wrong — which is why every sheet is yours to review.
 

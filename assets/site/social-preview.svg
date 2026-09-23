@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-label="moonlighter: The job-application assistant that leaves the last word to you.">
   <!-- The proof line below is an image, so scripts/check_readme_facts.py cannot read it.
-       Keep it identical to the README facts block and update it in the same commit
-       whenever the facts block changes. -->
+       Keep the same NUMBERS as the facts blocks (the wording is shorter on purpose)
+       and update it in the same commit whenever those numbers change. -->
   <rect width="1280" height="640" fill="#1F2B47"/>
   <g font-family="system-ui, -apple-system, Segoe UI, sans-serif" fill="#EEF1F6">
     <text x="96" y="250" font-size="72" font-weight="700">moonlighter</text>
