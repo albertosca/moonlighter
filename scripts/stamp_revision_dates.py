@@ -25,10 +25,10 @@ class StampError(Exception):
 
 def _git(cwd: Path, *args: str) -> str:
     result = subprocess.run(  # noqa: S603 - literal argv, git on PATH
-        ["git", "-C", str(cwd), *args],
+        ["git", "-C", str(cwd), *args],  # noqa: S607 - literal argv, git on PATH
         check=True,
         capture_output=True,
-        text=True,  # noqa: S607 - literal argv, git on PATH
+        text=True,
     )
     return result.stdout.strip()
 
