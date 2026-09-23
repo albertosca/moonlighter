@@ -33,7 +33,7 @@ moonlighter-scan --no-eval | jq '.saved[] | select(.status == "needs_review") | 
 
 O exemplo acima sai com `1` em todo dia sem novidade (nenhuma vaga nova), o que dispara `set -e`/`pipefail` num script que o encadeia com `jq` — confira o código de saída antes de tratar isso como falha do script. `--no-eval` é zero-**LLM**, não offline: o `archive_stale_jobs` continua fazendo requisições HTTP para checar se vagas já salvas fecharam.
 
-## O que cada instalação te dá
+## O que cada instalação oferece
 
 Os cinco pacotes são fatias de uma ferramenta só. Instale as que você precisa; cada comando conta no `--help` o que consegue fazer nessa combinação e o que uma fatia faltando acrescentaria, e o `doctor` imprime o mesmo em JSON.
 

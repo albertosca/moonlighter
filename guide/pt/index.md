@@ -21,7 +21,7 @@ Escaneia os portais de vagas que você escolhe, dá uma nota a cada vaga compara
 
 - **Ele nunca envia uma candidatura.** Ele rascunha a folha; você cola as respostas no formulário do empregador e envia por conta própria.
 - **Seu pipeline mora num arquivo SQLite local.** Vagas, rascunhos e histórico de candidaturas são guardados em `MOONLIGHTER_HOME`. O que sai da sua máquina é só o que vai para o LLM e para as APIs que você configura — Claude, Gmail, os portais de vagas. O [PRIVACY.md](https://github.com/albertosca/moonlighter/blob/main/PRIVACY.md) (em inglês) tem os detalhes.
-- **O modelo nunca responde uma pergunta que as guardas reconhecem como de salário, compliance ou dados demográficos.** Essas respostas vêm da sua config ou ficam com você. As guardas reconhecem redações conhecidas, e no caminho da colagem o modelo ainda lê a página inteira para encontrar as perguntas.
+- **O modelo nunca responde uma pergunta que as guardas reconhecem como de salário, compliance ou dados demográficos.** Essas respostas vêm da sua config ou ficam com você. As guardas reconhecem formulações conhecidas, e no caminho da colagem o modelo ainda lê a página inteira para encontrar as perguntas.
 
 O modelo ainda pode errar uma resposta — e é por isso que toda folha passa pela sua revisão.
 

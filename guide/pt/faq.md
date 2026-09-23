@@ -31,6 +31,6 @@ Seu pipeline — vagas, respostas rascunhadas, histórico de candidaturas — é
 - **Avisos de "missing profile / CV"** — peça ao Claude para rodar o `get_pipeline`: além do funil, ele reporta exatamente qual arquivo de configuração falta e onde ele deve ficar.
 - **A sincronização do Gmail não faz nada** — o acompanhamento por e-mail é opcional e fica desligado até o `setup_email` completar o fluxo OAuth; veja [Acompanhamento pelo Gmail](getting-started/gmail.md).
 
-Continua travado? [Abra uma discussion](https://github.com/albertosca/moonlighter/discussions) — um relato que inclui o que o `get_pipeline` imprimiu anda mais rápido.
+Continua travado? [Abra uma discussion](https://github.com/albertosca/moonlighter/discussions) — um relato que inclui o que o `get_pipeline` imprimiu é resolvido mais rápido.
 
 [← Voltar ao README](https://github.com/albertosca/moonlighter/blob/main/README.pt.md)

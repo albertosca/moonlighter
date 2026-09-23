@@ -37,7 +37,7 @@ Só para o [acompanhamento pelo Gmail](../getting-started/gmail.md).
 | `email.mark_processed` | `false` | `true` marca com label no Gmail os e-mails processados; por padrão a deduplicação fica numa tabela local |
 | `email.processed_label` | `moonlighter/processed` | O label usado quando `mark_processed` está ligado |
 | `email.archive_ref_matched` | `false` | Arquiva as respostas casadas pelo alias que avançaram uma candidatura |
-| `email.archive_all_classified` | `false` | Arquiva também os e-mails classificados como casamento aproximado ou incerto; e-mail sem relação nunca é tocado |
+| `email.archive_all_classified` | `false` | Arquiva também os e-mails com correspondência aproximada ou incerta; e-mail sem relação nunca é tocado |
 | `email.interview_stages` | `[]` | Nomes de etapa que uma resposta classificada pode definir; o arquivo de exemplo lista quatro, e uma sincronização acrescenta, enquanto durar aquela execução, as etapas novas que o classificador propuser |
 
 Marcar com label e arquivar precisam do escopo `gmail.modify`; o `setup_email` pede o seu consentimento de novo se o seu token for só de leitura.

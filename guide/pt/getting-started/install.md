@@ -18,10 +18,10 @@ O moonlighter roda na sua própria máquina como um servidor MCP para o Claude C
 Com pressa? O caminho inteiro é:
 
 ```bash
-uvx moonlighter init                  # wizard: writes config.yaml
-# fill in profile.yaml and company_list.yaml (examples below)
+uvx moonlighter init                  # assistente: grava o config.yaml
+# preencha profile.yaml e company_list.yaml (exemplos abaixo)
 claude mcp add-json --scope user moonlighter '{"command":"uvx","args":["moonlighter"]}'
-# new Claude session → "scan my companies"
+# nova sessão do Claude → "escaneia minhas empresas"
 ```
 
 Os detalhes:

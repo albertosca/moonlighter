@@ -9,18 +9,18 @@ O moonlighter rascunha candidaturas que saem com o seu nome, então a régua é 
 | Decisão | Custo aceito |
 |---|---|
 | Deixamos de dirigir o browser | Cada candidatura custa a você uma colagem e um clique |
-| Guardas determinísticas em volta da etapa de redação | Elas só reconhecem redações conhecidas |
+| Guardas determinísticas em volta da etapa de redação | Elas só reconhecem formulações conhecidas |
 | Texto do modelo escapado no LaTeX do CV, nunca validado | A saída do modelo não carrega formatação LaTeX além de negrito |
 | Cinco fatias com fronteira de import testada e releases em lockstep | Todo release sobe a versão de cinco pacotes à mão |
 | 100% de cobertura de branches como gate, gates provados por canários | Todo branch novo custa um teste |
 
 ### Deixamos de dirigir o browser
 
-O moonlighter preenchia formulários de ATS num browser de verdade. Em 12/08/2026 ([`37b1ac2`](https://github.com/albertosca/moonlighter/commit/37b1ac2)) esses preenchedores via browser saíram da `main` para uma branch própria, e o produto passou a ser assistido: ele rascunha a folha de respostas inteira, e você a cola no formulário e envia. O custo é um passo manual em cada candidatura. O que ele compra: a ferramenta não consegue enviar nada em seu nome, e não depende mais de marcação de formulário, captchas e regras de plataforma que ela não controla.
+O moonlighter preenchia formulários de ATS num browser de verdade. Em 12/08/2026 ([`37b1ac2`](https://github.com/albertosca/moonlighter/commit/37b1ac2)) esses preenchedores via browser saíram da `main` para uma branch própria, e o produto passou a ser assistido: ele rascunha a folha de respostas inteira, e você a cola no formulário e envia. O custo é um passo manual em cada candidatura. O que se ganha com isso: a ferramenta não consegue enviar nada em seu nome, e não depende mais de marcação de formulário, captchas e regras de plataforma que ela não controla.
 
 ### Guardas determinísticas em volta da etapa de redação
 
-Algumas perguntas não deveriam ser respondidas por um modelo. Antes da redação, código comum reconhece perguntas de salário (respondidas a partir da pretensão que você configurou, ou sinalizadas quando as unidades não batem — [`field_map.py`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/answers/field_map.py)), declarações de compliance (sempre deixadas para você — [`compliance.py`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/answers/compliance.py)) e autodeclaração demográfica (respondida só com o que você escreveu no `profile.yaml`, senão deixada para você). Depois da redação, o [`composer.py`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/assisted/composer.py) transforma em lacuna qualquer resposta de texto livre dirigida ao operador ("o candidato deve informar…"); respostas de múltipla escolha não passam por essa checagem. O custo: as guardas reconhecem redações conhecidas, então uma formulação incomum pode passar por elas — os próprios comentários da regra de salário registram versões anteriores em que isso aconteceu. É mais um motivo para toda folha ser revisada.
+Algumas perguntas não deveriam ser respondidas por um modelo. Antes da redação, código comum reconhece perguntas de salário (respondidas a partir da pretensão que você configurou, ou sinalizadas quando as unidades não batem — [`field_map.py`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/answers/field_map.py)), declarações de compliance (sempre deixadas para você — [`compliance.py`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/answers/compliance.py)) e autodeclaração demográfica (respondida só com o que você escreveu no `profile.yaml`, senão deixada para você). Depois da redação, o [`composer.py`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/assisted/composer.py) transforma em lacuna qualquer resposta de texto livre dirigida ao operador ("o candidato deve informar…"); respostas de múltipla escolha não passam por essa checagem. O custo: as guardas reconhecem formulações conhecidas, então uma formulação incomum pode passar por elas — os próprios comentários da regra de salário registram versões anteriores em que isso aconteceu. É mais um motivo para toda folha ser revisada.
 
 ### Texto do modelo escapado, nunca validado, no LaTeX do CV
 
@@ -41,7 +41,7 @@ O `--cov-fail-under=100` está no `pyproject.toml`, então a suíte de testes fa
   <img alt="Antes da redação, perguntas reconhecidas como de salário, compliance ou dados demográficos vão para a sua config ou para você; depois da redação, uma resposta de texto livre dirigida ao operador vira uma lacuna" src="https://albertosca.github.io/moonlighter/assets/diagrams/llm-guards-light.svg">
 </picture>
 
-*Dois pontos de controle. Antes da redação, uma pergunta que as guardas reconhecem como de salário, compliance ou dados demográficos recebe o valor que você configurou ou fica como lacuna para você. Depois da redação, uma resposta de texto livre dirigida ao operador vira uma lacuna. Só o resto chega à folha. As guardas reconhecem redações conhecidas, e no caminho da colagem o modelo ainda lê a página inteira para encontrar as perguntas.*
+*Dois pontos de controle. Antes da redação, uma pergunta que as guardas reconhecem como de salário, compliance ou dados demográficos recebe o valor que você configurou ou fica como lacuna para você. Depois da redação, uma resposta de texto livre dirigida ao operador vira uma lacuna. Só o resto chega à folha. As guardas reconhecem formulações conhecidas, e no caminho da colagem o modelo ainda lê a página inteira para encontrar as perguntas.*
 
 ## Arquitetura
 

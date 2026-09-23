@@ -12,14 +12,14 @@ De um pipeline vazio a uma candidatura pronta para colar, numa conversa só com 
 4. **Escaneie sem gastar chamadas de LLM** (opcional). Num shell, `moonlighter-scan --no-eval` descobre e grava as vagas sem nota, como `needs_review`; dê nota a uma delas depois com `verify_job`. Veja [Linha de comando](../reference/cli.md).
 
 ```text
-You: scan my companies
+Você: escaneia minhas empresas
 
-moonlighter: 3 sources scanned — 41 postings, 38 already known, 3 new
-  ✓ NEW — Acme Robotics / Senior Backend Engineer
-    Score: 8.1/10  (threshold: 6.5)
-  ✓ NEW — Nimbus Health / Staff Engineer
-    Score: 7.4/10
-  ✗ Vandelay Industries / .NET Architect — 3.2/10, archived (hard filter: .NET)
+moonlighter: 3 fontes escaneadas — 41 vagas, 38 já conhecidas, 3 novas
+  ✓ NOVA — Acme Robotics / Senior Backend Engineer
+    Nota: 8.1/10  (limiar: 6.5)
+  ✓ NOVA — Nimbus Health / Staff Engineer
+    Nota: 7.4/10
+  ✗ Vandelay Industries / .NET Architect — 3.2/10, arquivada (filtro duro: .NET)
 ```
 
 A conversa é ilustrativa: o Claude repassa a saída da ferramenta com as próprias palavras. A ferramenta em si reporta quantas vagas processou, quantas passaram do limiar (com uma tabela delas) e quantas foram filtradas pelo título, arquivadas pela localização ou ficaram abaixo do limiar.

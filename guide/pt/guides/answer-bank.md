@@ -6,7 +6,7 @@ O banco de respostas guarda as respostas de triagem que você aprovou, para que 
 
 ## Como as respostas são reaproveitadas
 
-Toda resposta de triagem que não é de múltipla escolha e que você aprova — "anos de Elixir", "prazo de aviso prévio", qualquer coisa que um formulário pergunta e que não é um campo fixo do perfil — fica em cache por vaga e também é promovida para um banco compartilhado entre vagas, então uma pergunta com a mesma redação numa candidatura futura reaproveita a resposta em vez de perguntar de novo ao LLM.
+Toda resposta de triagem que não é de múltipla escolha e que você aprova — "anos de Elixir", "prazo de aviso prévio", qualquer coisa que um formulário pergunta e que não é um campo fixo do perfil — fica em cache por vaga e também é promovida para um banco compartilhado entre vagas, então uma pergunta com a mesma formulação numa candidatura futura reaproveita a resposta em vez de perguntar de novo ao LLM.
 
 Uma resposta é promovida quando você marca a candidatura dela como enviada (`update_status` com `submitted`), ou quando o `sync_email_responses` vê uma resposta de recrutador avançar essa candidatura. As duas coisas acontecem no servidor MCP; o comando avulso `moonlighter-email sync` não alimenta o banco (veja [Linha de comando](../reference/cli.md)).
 
