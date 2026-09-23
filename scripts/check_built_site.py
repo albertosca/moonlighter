@@ -5,7 +5,10 @@ the site is assembled by scripts/build_docs.sh from two per-language builds plus
 assets. This checks that:
 - the night-shift stylesheet exists in both language outputs;
 - llms.txt is at the site root;
-- every Pages URL a guide file references exists in the assembled site;
+- every Pages URL a guide file or README references exists in the assembled site, and a
+  URL's #fragment names an id on the target page (a renamed heading would otherwise
+  dead-link the README with the build green); the READMEs are the root README.md and
+  README.pt.md plus packages/*/README*.md, the repository root being GUIDE's parent;
 - every guide page produced an HTML page, and (with --require-dates) that page renders a
   revision date — proof the stamp ran and the dates reached the theme.
 
@@ -20,6 +23,8 @@ from pathlib import Path
 SITE_URL = "https://albertosca.github.io/moonlighter/"
 STYLESHEET = "stylesheets/night-shift.css"
 _PAGES_URL = re.compile(re.escape(SITE_URL) + r"([^\s\"'()<>]*)")
+# A bare URL that ends a sentence: the punctuation belongs to the prose, not the URL.
+_TRAILING_PUNCTUATION = ".,;:!?"
 _DATE_MARK = "md-source-file__fact"
 _LANG_OUTPUT = {"en": Path(), "pt": Path("pt")}
 
@@ -37,6 +42,25 @@ def _url_target(site: Path, rel: str) -> Path:
     return target
 
 
+def pages_urls(text: str) -> list[str]:
+    return [rel.rstrip(_TRAILING_PUNCTUATION) for rel in _PAGES_URL.findall(text)]
+
+
+def _readmes(root: Path) -> list[Path]:
+    found = [root / "README.md", root / "README.pt.md", *root.glob("packages/*/README*.md")]
+    return sorted(path for path in found if path.is_file())
+
+
+def _url_problem(source: Path, site: Path, rel: str) -> str | None:
+    target = _url_target(site, rel)
+    if not target.is_file():
+        return f"{source}: {SITE_URL}{rel} is not in the built site"
+    fragment = rel.partition("#")[2]
+    if fragment and f'id="{fragment}"' not in target.read_text():
+        return f'{source}: {SITE_URL}{rel} has no id="{fragment}" in {target}'
+    return None
+
+
 def site_problems(site: Path, guide: Path, require_dates: bool) -> list[str]:
     problems: list[str] = []
     for lang_root in (site, site / "pt"):
@@ -44,11 +68,12 @@ def site_problems(site: Path, guide: Path, require_dates: bool) -> list[str]:
             problems.append(f"missing {lang_root / STYLESHEET}")
     if not (site / "llms.txt").is_file():
         problems.append("missing llms.txt at the site root")
-    sources = sorted([*guide.rglob("*.md"), *guide.rglob("*.txt")])
+    sources = sorted([*guide.rglob("*.md"), *guide.rglob("*.txt")]) + _readmes(guide.parent)
     for source in sources:
-        for rel in _PAGES_URL.findall(source.read_text()):
-            if not _url_target(site, rel).is_file():
-                problems.append(f"{source}: {SITE_URL}{rel} is not in the built site")
+        for rel in pages_urls(source.read_text()):
+            problem = _url_problem(source, site, rel)
+            if problem:
+                problems.append(problem)
     for lang, out_prefix in _LANG_OUTPUT.items():
         for md in sorted((guide / lang).rglob("*.md")):
             html = site / out_prefix / page_output(md.relative_to(guide / lang))

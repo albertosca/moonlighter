@@ -92,3 +92,47 @@ def test_main_exit_codes(tmp_path, capsys):
     (site / "llms.txt").unlink()
     assert _cbs().main(["x", str(site), str(guide)]) == 1
     assert "llms.txt" in capsys.readouterr().err
+
+
+def test_a_readme_pages_url_missing_from_the_site_is_reported(tmp_path):
+    site, guide = _good_site(tmp_path)
+    _write(tmp_path / "README.md", "[FAQ](https://albertosca.github.io/moonlighter/faq/)")
+    [problem] = _cbs().site_problems(site, guide, require_dates=False)
+    assert (
+        problem
+        == f"{tmp_path / 'README.md'}: https://albertosca.github.io/moonlighter/faq/ is not in the built site"
+    )
+
+
+def test_package_readmes_are_scanned_too(tmp_path):
+    site, guide = _good_site(tmp_path)
+    _write(
+        tmp_path / "packages/scan/README.pt.md", "https://albertosca.github.io/moonlighter/pt/faq/"
+    )
+    [problem] = _cbs().site_problems(site, guide, require_dates=False)
+    assert "packages/scan/README.pt.md" in problem and "pt/faq/" in problem
+
+
+def test_a_readme_anchor_missing_from_the_target_page_is_reported(tmp_path):
+    site, guide = _good_site(tmp_path)
+    (site / "guides/cv/index.html").write_text(DATE + '<h2 id="kept">Kept</h2>')
+    _write(
+        tmp_path / "README.md",
+        "[a](https://albertosca.github.io/moonlighter/guides/cv/#kept) "
+        "[b](https://albertosca.github.io/moonlighter/guides/cv/#renamed)",
+    )
+    [problem] = _cbs().site_problems(site, guide, require_dates=False)
+    assert problem == (
+        f"{tmp_path / 'README.md'}: https://albertosca.github.io/moonlighter/guides/cv/#renamed "
+        f'has no id="renamed" in {site / "guides/cv/index.html"}'
+    )
+
+
+def test_a_bare_url_ending_a_sentence_keeps_its_punctuation_out(tmp_path):
+    site, guide = _good_site(tmp_path)
+    _write(
+        guide / "en/llms.txt",
+        "See https://albertosca.github.io/moonlighter/guides/cv/. Or "
+        "https://albertosca.github.io/moonlighter/pt/, https://albertosca.github.io/moonlighter/llms.txt!",
+    )
+    assert _cbs().site_problems(site, guide, require_dates=False) == []
