@@ -31,10 +31,12 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # full history: a shallow clone dates every page with the newest commit
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
       - uses: astral-sh/setup-uv@v7
         with:
           version: "0.7.6"
-          python-version: "3.14"
       - name: Build (stamped, checked)
         run: bash scripts/build_docs.sh --stamp
       - uses: actions/upload-pages-artifact@v5
