@@ -1,0 +1,94 @@
+import sys
+from pathlib import Path
+
+_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
+DATE = '<span class="md-source-file__fact">2026-01-15</span>'
+
+
+def _cbs():
+    if str(_SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(_SCRIPTS_DIR))
+    import check_built_site
+
+    return check_built_site
+
+
+def _write(path: Path, text: str = "") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+
+
+def _good_site(root: Path) -> tuple[Path, Path]:
+    site, guide = root / "site", root / "guide"
+    for lang_root in (site, site / "pt"):
+        _write(lang_root / "stylesheets/night-shift.css", ":root{}")
+        _write(lang_root / "index.html", DATE)
+        _write(lang_root / "guides/cv/index.html", DATE)
+    _write(site / "llms.txt", "# moonlighter")
+    _write(site / "assets/diagrams/how-light.svg", "<svg/>")
+    for lang in ("en", "pt"):
+        _write(
+            guide / lang / "index.md",
+            "![how](https://albertosca.github.io/moonlighter/assets/diagrams/how-light.svg)",
+        )
+        _write(guide / lang / "guides/cv.md", "# CV")
+    _write(guide / "en/llms.txt", "https://albertosca.github.io/moonlighter/pt/")
+    return site, guide
+
+
+def test_page_output_maps_index_and_pages():
+    cbs = _cbs()
+    assert cbs.page_output(Path("index.md")) == Path("index.html")
+    assert cbs.page_output(Path("guides/cv.md")) == Path("guides/cv/index.html")
+    assert cbs.page_output(Path("guides/index.md")) == Path("guides/index.html")
+
+
+def test_a_good_site_has_no_problems(tmp_path):
+    site, guide = _good_site(tmp_path)
+    assert _cbs().site_problems(site, guide, require_dates=True) == []
+
+
+def test_missing_stylesheet_in_one_language_is_reported(tmp_path):
+    site, guide = _good_site(tmp_path)
+    (site / "pt/stylesheets/night-shift.css").unlink()
+    assert _cbs().site_problems(site, guide, require_dates=False) == [
+        f"missing {site / 'pt/stylesheets/night-shift.css'}"
+    ]
+
+
+def test_missing_llms_txt_is_reported(tmp_path):
+    site, guide = _good_site(tmp_path)
+    (site / "llms.txt").unlink()
+    assert _cbs().site_problems(site, guide, require_dates=False) == [
+        "missing llms.txt at the site root"
+    ]
+
+
+def test_a_pages_url_with_no_built_file_is_reported(tmp_path):
+    site, guide = _good_site(tmp_path)
+    (site / "assets/diagrams/how-light.svg").unlink()
+    problems = _cbs().site_problems(site, guide, require_dates=False)
+    assert len(problems) == 2 and all("how-light.svg" in p for p in problems)
+
+
+def test_a_page_without_a_revision_date_fails_only_when_required(tmp_path):
+    site, guide = _good_site(tmp_path)
+    (site / "pt/guides/cv/index.html").write_text("<p>no date</p>")
+    assert _cbs().site_problems(site, guide, require_dates=False) == []
+    [problem] = _cbs().site_problems(site, guide, require_dates=True)
+    assert "pt/guides/cv/index.html" in problem
+
+
+def test_a_markdown_page_with_no_html_output_is_reported(tmp_path):
+    site, guide = _good_site(tmp_path)
+    (site / "guides/cv/index.html").unlink()
+    [problem] = _cbs().site_problems(site, guide, require_dates=True)
+    assert "guides/cv/index.html" in problem
+
+
+def test_main_exit_codes(tmp_path, capsys):
+    site, guide = _good_site(tmp_path)
+    assert _cbs().main(["x", str(site), str(guide), "--require-dates"]) == 0
+    (site / "llms.txt").unlink()
+    assert _cbs().main(["x", str(site), str(guide)]) == 1
+    assert "llms.txt" in capsys.readouterr().err

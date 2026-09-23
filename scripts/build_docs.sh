@@ -27,4 +27,6 @@ if [ -d assets/diagrams ]; then cp -R assets/diagrams site/assets/diagrams; fi
 cp assets/site/night-shift.css site/stylesheets/night-shift.css
 cp assets/site/night-shift.css site/pt/stylesheets/night-shift.css
 if [ -f assets/site/social-preview.png ]; then mkdir -p site/assets/site && cp assets/site/social-preview.png site/assets/site/; fi
-echo "Site assembled in site/"
+REQUIRE_DATES=""
+if [ "$STAMP" = "--stamp" ]; then REQUIRE_DATES="--require-dates"; fi
+uv run python scripts/check_built_site.py site guide $REQUIRE_DATES
