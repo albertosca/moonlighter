@@ -4,7 +4,7 @@
 # feature. Copy this to MOONLIGHTER_HOME/cv-pool.yaml and edit it by hand,
 # or run the `bootstrap_cv_pool` MCP tool / `moonlighter-apply bootstrap-cv`
 # CLI command to have moonlighter draft one from your own profile.yaml
-# instead (see the README's "Tailored CV per job" section).
+# instead (see https://albertosca.github.io/moonlighter/guides/tailored-cv/).
 #
 # Schema:
 #   experiences: one entry per job. Each needs company/title/period/location

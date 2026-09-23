@@ -4,9 +4,13 @@
 
 A fatia de respostas do moonlighter: ela lê cada pergunta que um formulário de candidatura faz e redige uma resposta pra cada uma, curada do teu perfil — e entrega tudo numa folha única revisável. Você lê, você cola, você aperta enviar. **Ela nunca abre browser, nunca toca no formulário, nunca envia.**
 
+![Como o moonlighter funciona](https://albertosca.github.io/moonlighter/assets/diagrams/how-it-works-light.svg)
+
+Documentação: https://albertosca.github.io/moonlighter/pt/
+
 - **Perguntas direto da fonte** — onde o ATS publica o schema do formulário (Greenhouse, Recruitee), o `prepare_application` busca as perguntas reais, obrigatoriedades e opções direto da API.
 - **Qualquer outro formulário** — o `prepare_application_from_paste` faz o mesmo a partir do texto que você copia da página; funciona em qualquer ATS, inclusive atrás de login.
-- **Curado, não inventado** — as respostas saem de um subconjunto filtrado do teu perfil; o que o perfil não responde honestamente vira lacuna sinalizada pra você, nunca improviso.
+- **Rascunhado do teu perfil, lacunas sinalizadas** — as respostas são rascunhadas a partir de um subconjunto filtrado do teu perfil; o modelo é instruído a responder UNKNOWN quando o perfil não dá base, e essa pergunta volta pra você como lacuna.
 - **Recusa em vez de converter** — campo ambíguo (salário em moeda errada, pergunta de visto confusa) volta pra tua revisão em vez de virar chute silencioso.
 - **Rastreio embutido** — cada folha carrega o alias de rastreio da candidatura, então a resposta do empregador pousa de volta no teu pipeline (ver [moonlighter-email](https://pypi.org/project/moonlighter-email/)).
 
@@ -18,7 +22,7 @@ Dificilmente você instala esta fatia sozinha — o [moonlighter](https://pypi.o
 |---|---|
 | [moonlighter](https://pypi.org/project/moonlighter/) | O pipeline inteiro como servidor MCP — comece por aqui |
 | [moonlighter-core](https://pypi.org/project/moonlighter-core/) | Banco, config, perfil, cliente de LLM — a fundação |
-| [moonlighter-scan](https://pypi.org/project/moonlighter-scan/) | Descoberta de vagas em seis ATS, com nota de aderência por LLM |
+| [moonlighter-scan](https://pypi.org/project/moonlighter-scan/) | Descoberta de vagas em sete ATS, com nota de aderência por LLM |
 | **moonlighter-apply** | ← você está aqui — redação de respostas; você revisa, você envia |
 | [moonlighter-email](https://pypi.org/project/moonlighter-email/) | Rastreio de respostas de empregador via Gmail, casado com cada candidatura |
 
