@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 300" role="img" aria-label="Each moonlighter package works alone; installing two adds commands between them">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 300" role="img" aria-label="Each moonlighter package works alone; installing two lets them work together">
+  <rect x="0" y="0" width="880" height="300" fill="{{ground}}"/>
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="{{fg}}"/></marker>
   </defs>
@@ -14,6 +15,6 @@
     <path d="M30 96 V235 H640 V96" fill="none" stroke="{{fg}}"/>
     <path d="M640 235 H775 V98" fill="none" stroke="{{fg}}" marker-end="url(#a)"/>
     <text x="745" y="253" font-size="11">installs the three + moonlighter-core</text>
-    <text x="440" y="285" font-size="11" fill="{{muted}}">same JSON output whatever you install — combinations add commands, never dialects</text>
+    <text x="440" y="285" font-size="11" fill="{{muted}}">every command prints one JSON document, whatever you install — pairs add workflows, not commands</text>
   </g>
 </svg>

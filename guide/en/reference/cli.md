@@ -39,10 +39,10 @@ The five packages are slices of one tool. Install the ones you need; each comman
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://albertosca.github.io/moonlighter/assets/diagrams/fitting-dark.svg">
-  <img alt="Each moonlighter package works alone; installing two adds commands between them" src="https://albertosca.github.io/moonlighter/assets/diagrams/fitting-light.svg">
+  <img alt="Each moonlighter package works alone; installing two lets them work together" src="https://albertosca.github.io/moonlighter/assets/diagrams/fitting-light.svg">
 </picture>
 
-*Each package works alone, and installing two adds commands between them; `moonlighter` installs the three plus `moonlighter-core`. The JSON output is the same whatever you install.*
+*Each package works alone, and installing two lets them work together: scan results feed `prepare`, and the +alias a sheet mints is the one `sync` matches replies against. `moonlighter` installs the three plus `moonlighter-core`. Every command prints one JSON document, whatever you install.*
 
 | You install | You get |
 |---|---|

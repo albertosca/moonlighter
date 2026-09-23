@@ -39,10 +39,10 @@ Os cinco pacotes são fatias de uma ferramenta só. Instale as que você precisa
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://albertosca.github.io/moonlighter/assets/diagrams/fitting-dark.svg">
-  <img alt="Cada pacote do moonlighter funciona sozinho; instalar dois acrescenta comandos entre eles" src="https://albertosca.github.io/moonlighter/assets/diagrams/fitting-light.svg">
+  <img alt="Cada pacote do moonlighter funciona sozinho; instalar dois faz eles trabalharem juntos" src="https://albertosca.github.io/moonlighter/assets/diagrams/fitting-light.svg">
 </picture>
 
-*Cada pacote funciona sozinho, e instalar dois acrescenta comandos entre eles; o `moonlighter` instala os três mais o `moonlighter-core`. A saída JSON é a mesma, seja o que for que você instale.*
+*Cada pacote funciona sozinho, e instalar dois faz eles trabalharem juntos: o resultado do scan alimenta o `prepare`, e o +alias que uma folha de respostas cria é o mesmo que o `sync` usa para casar os e-mails de retorno. O `moonlighter` instala os três mais o `moonlighter-core`. Todo comando imprime um único documento JSON, seja o que for que você instale.*
 
 | Você instala | Você ganha |
 |---|---|

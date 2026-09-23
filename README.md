@@ -98,7 +98,7 @@ You need [uv](https://docs.astral.sh/uv/) (it fetches Python 3.14 for you) and a
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/fitting-dark.svg">
-  <img alt="Each moonlighter package works alone; installing two adds commands between them" src="assets/diagrams/fitting-light.svg">
+  <img alt="Each moonlighter package works alone; installing two lets them work together" src="assets/diagrams/fitting-light.svg">
 </picture>
 
 ## Documentation
