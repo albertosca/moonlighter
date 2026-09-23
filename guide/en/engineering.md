@@ -20,7 +20,7 @@ moonlighter used to fill ATS forms in a real browser. On 2026-08-12 ([`37b1ac2`]
 
 ### Deterministic guards around the drafting step
 
-Some questions should not be answered by a model at all. Before drafting, plain code recognises salary questions (answered from your configured target, or flagged when the units disagree — [`field_map.py`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/answers/field_map.py)), compliance declarations (always left to you — [`compliance.py`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/answers/compliance.py)) and demographic self-identification (answered only from what you wrote in `profile.yaml`, otherwise left to you). After drafting, [`composer.py`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/assisted/composer.py) turns any answer addressed to the operator ("the candidate should provide…") into a gap. The trade-off: the guards match known phrasings, so an unusual wording can slip past them — the salary rule's own comments record earlier versions that did. That is one more reason every sheet is reviewed.
+Some questions should not be answered by a model at all. Before drafting, plain code recognises salary questions (answered from your configured target, or flagged when the units disagree — [`field_map.py`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/answers/field_map.py)), compliance declarations (always left to you — [`compliance.py`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/answers/compliance.py)) and demographic self-identification (answered only from what you wrote in `profile.yaml`, otherwise left to you). After drafting, [`composer.py`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/assisted/composer.py) turns any free-text answer addressed to the operator ("the candidate should provide…") into a gap; choice answers are not checked this way. The trade-off: the guards match known phrasings, so an unusual wording can slip past them — the salary rule's own comments record earlier versions that did. That is one more reason every sheet is reviewed.
 
 ### Model text escaped, never validated, into the CV's LaTeX
 
@@ -41,7 +41,7 @@ The five PyPI packages each install on their own, and a `pip install moonlighter
   <img alt="Before drafting, recognised salary, compliance and demographic questions go to your config or to you; after drafting, answers addressed to the operator become gaps" src="https://albertosca.github.io/moonlighter/assets/diagrams/llm-guards-light.svg">
 </picture>
 
-*Two checkpoints. Before drafting, a question the guards recognise as salary, compliance or demographic gets your configured value or is left as a gap for you. After drafting, an answer addressed to the operator becomes a gap. Only the rest reaches the sheet. The guards match known phrasings, and on the paste path the model still reads the whole page to find the questions.*
+*Two checkpoints. Before drafting, a question the guards recognise as salary, compliance or demographic gets your configured value or is left as a gap for you. After drafting, a free-text answer addressed to the operator becomes a gap. Only the rest reaches the sheet. The guards match known phrasings, and on the paste path the model still reads the whole page to find the questions.*
 
 ## Architecture
 
@@ -58,9 +58,9 @@ A [uv workspace](https://docs.astral.sh/uv/concepts/workspaces/) of 5 namespace 
 ## Quality gates
 
 - **Test suite with 100% branch coverage** — the current test count is on the [README's proof line](https://github.com/albertosca/moonlighter#readme), checked by CI; coverage is enforced as a CI gate (`--cov-fail-under=100`), not a dashboard number.
-- **mypy strict** across all nine `moonlighter.*` packages; **ruff** with the security (`S`) ruleset on.
+- **mypy strict** across all nine `moonlighter.*` modules (the mypy `--package` targets); **ruff** with the security (`S`) ruleset on.
 - **Lockstep releases** — the five packages must agree on version, pins and tag before anything uploads; the check runs before the build, because PyPI uploads are irreversible.
 - **Protected main** — every change lands by pull request, with the CLA, the test suite and a security audit as required checks.
-- **Drafted from your profile, gaps flagged** — answers are drafted only from your profile; a question with no basis there, or an ambiguous field (a salary in the wrong currency, an unclear visa question), comes back to you as a gap instead of a guess. The model can still get an answer wrong, which is why you review every sheet.
+- **Drafted from your profile, gaps flagged** — answers are drafted from your profile, and the model is told to answer UNKNOWN when your profile gives it no basis; that comes back to you as a gap. Some fields are decided in code, not by the model: a salary whose units disagree with your configured target, or a work-authorization question whose country can't be inferred, is always returned to you as a gap. The model can still get an answer wrong, which is why you review every sheet.
 
 [← Back to the README](https://github.com/albertosca/moonlighter#readme)

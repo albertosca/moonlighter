@@ -22,13 +22,13 @@ moonlighter: 3 sources scanned — 41 postings, 38 already known, 3 new
   ✗ Vandelay Industries / .NET Architect — 3.2/10, archived (hard filter: .NET)
 ```
 
-The conversation is illustrative; the output format is the real one.
+The conversation is illustrative: Claude relays the tool's output in its own words. The tool itself reports how many jobs were processed, how many passed the threshold (with a table of them), and how many were filtered by title, archived for location, or scored below the threshold.
 
 ## How to read the scores
 
 1. **Each score is 0–10**, from the LLM comparing the posting against your `profile.yaml`, including the hard and soft filters under `criteria`.
-2. **Below the threshold, the job is archived automatically.** The threshold is `score_threshold` in `config.yaml`, 6.5 by default. A posting that breaks a hard filter (".NET" above) scores low and is archived with the reason.
-3. **Some jobs are filtered before any LLM call.** A title matching `title_blocklist` in `config.yaml` is discarded without scoring.
+2. **Below the threshold, the job is archived automatically.** The threshold is `score_threshold` in `config.yaml`, 6.5 by default. A posting that breaks one of your hard filters (".NET" above) scores low and is archived with the reason.
+3. **Some jobs are archived before any LLM call.** A title matching `title_blocklist` in `config.yaml` is saved as `archived` with a note, unscored. So is an onsite or hybrid posting outside Belo Horizonte, Brazil: that region is fixed in the code today, and making it configurable is planned. A remote posting, or one whose location doesn't settle the question, goes on to be scored.
 4. **An empty description can't be scored.** Those jobs wait as `needs_review`: ask for `list_jobs` with status `needs_review`, open the posting, copy the whole page, and pass it to `verify_job` to score it.
 5. **Browse what passed** with `list_jobs` (status `new` by default) and open one with `get_job` for its full details and history.
 
@@ -36,13 +36,13 @@ The conversation is illustrative; the output format is the real one.
 
 1. **Ask for the sheet.** "Prepare the application for the Acme one" runs `prepare_application`. Where the ATS API publishes the form's questions (Greenhouse, Recruitee), moonlighter reads them from there.
 2. **No API? Paste the page.** When the questions aren't published, it asks you to open the application page, select all, copy, and hand the text over — that runs `prepare_application_from_paste`.
-3. **Review the whole sheet.** Every question gets an answer drafted from your profile, or a flag saying why it needs you:
+3. **Review the whole sheet.** Every question gets an answer drafted from your profile, or a flag saying why it needs you. This excerpt is in the tool's real format; the model is told to answer UNKNOWN when your profile gives it no basis, and that comes back as a gap:
 
    ```text
-   [5/9] Do you hold a US work visa?  (required)
+   [5/9] How many years have you run Elixir in production?  (required)
    !! I DON'T KNOW — no basis in your profile to answer
 
-   8 of 9 answered · 1 needs you
+   1 of 9 need you
    ```
 
    Answer the flagged ones yourself, and read the drafted ones too — the model can still get an answer wrong.

@@ -12,7 +12,7 @@ No. moonlighter never sends an application. It scans, scores and drafts a comple
 
 ### Can it get an answer wrong?
 
-Yes — any LLM can. moonlighter narrows the room for it: answers are drafted only from your profile; a question it has no basis for is flagged for you instead of guessed; questions the guards recognise as salary, compliance or demographic get your configured value or are left to you, never a drafted answer; and an answer addressed to you instead of the employer is turned into a gap. None of that makes a drafted answer correct by construction, which is why you review every sheet before sending it.
+Yes — any LLM can. moonlighter narrows the room for it: answers are drafted from your profile, and the model is told to answer UNKNOWN when your profile gives it no basis, which comes back to you as a gap; questions the guards recognise as salary, compliance or demographic get your configured value or are left to you, never a drafted answer; and a free-text answer addressed to you instead of the employer is turned into a gap. None of that makes a drafted answer correct by construction, which is why you review every sheet before sending it.
 
 ### Does it work without Claude?
 
@@ -20,7 +20,7 @@ Partly. The [command-line tools](reference/cli.md) run from any shell or cron jo
 
 ### What leaves my machine?
 
-Your pipeline — jobs, drafted answers, application history — is a local SQLite file under `MOONLIGHTER_HOME`. What leaves is what goes to the services you configure: job descriptions and a filtered subset of your profile to the LLM (Claude), read-only requests to the job boards, and, if you turn on [Gmail tracking](getting-started/gmail.md), your recent mail, read through the Gmail API and sent to the LLM to be classified. There is no moonlighter server and no telemetry. [PRIVACY.md](https://github.com/albertosca/moonlighter/blob/main/PRIVACY.md) lists every item.
+Your pipeline — jobs, drafted answers, application history — is a local SQLite file under `MOONLIGHTER_HOME`. What leaves is what goes to the services you configure. To the LLM (Claude): job descriptions, a filtered subset of your profile, your CV pool's bullets when the [tailored CV](guides/tailored-cv.md) is on, and any page text you paste into `prepare_application_from_paste`. Beyond that: read-only requests to the job boards, and, if you turn on [Gmail tracking](getting-started/gmail.md), your recent mail, read through the Gmail API and sent to the LLM to be classified. There is no moonlighter server and no telemetry. [PRIVACY.md](https://github.com/albertosca/moonlighter/blob/main/PRIVACY.md) has the details.
 
 ## Troubleshooting
 
