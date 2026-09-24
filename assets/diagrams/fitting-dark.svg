@@ -15,6 +15,6 @@
     <path d="M30 96 V235 H640 V96" fill="none" stroke="#EEF1F6"/>
     <path d="M640 235 H775 V98" fill="none" stroke="#EEF1F6" marker-end="url(#a)"/>
     <text x="745" y="253" font-size="11">installs the three + moonlighter-core</text>
-    <text x="440" y="285" font-size="11" fill="#9AA8C4">every moonlighter-* command prints one JSON document, whatever you install — pairs add workflows, not commands</text>
+    <text x="440" y="285" font-size="11" fill="#EEF1F6">every moonlighter-* command prints one JSON document, whatever you install — pairs add workflows, not commands</text>
   </g>
 </svg>
