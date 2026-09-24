@@ -80,3 +80,14 @@ def snapshot_text(request):
         assert actual == path.read_text()
 
     return _check
+
+
+@pytest.fixture(autouse=True)
+def _no_real_api_env_file(tmp_path_factory, monkeypatch):
+    # load_config fills ANTHROPIC_API_KEY from ~/.config/anthropic/api.env on the
+    # api backend; without this, any test loading an api config would read the
+    # developer's real key into the test process.
+    import moonlighter.core.config as config_module
+
+    missing_file = tmp_path_factory.mktemp("no-api-env") / "api.env"
+    monkeypatch.setattr(config_module, "anthropic_api_env_file", lambda: missing_file)

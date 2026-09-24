@@ -57,7 +57,8 @@ def _check_llm_backend(config: dict[str, Any]) -> StartupWarning | None:
             return None
         return StartupWarning(
             "error",
-            "llm_backend is 'api' but ANTHROPIC_API_KEY is not in the environment. "
+            "llm_backend is 'api' but ANTHROPIC_API_KEY is not in the environment "
+            "nor in ~/.config/anthropic/api.env. "
             "scan_and_evaluate and prepare_application will not work. Set the key, or switch to "
             "llm_backend: cli in config.yaml to use your Claude subscription instead.",
         )

@@ -6,6 +6,7 @@ import yaml
 from moonlighter.core.config import (
     DEFAULTS,
     ConfigError,
+    anthropic_api_env_file,
     load_company_list,
     load_config,
     load_profile,
@@ -580,3 +581,82 @@ class TestAnswerBankMaxAge:
 
     def test_default_is_ninety_days(self):
         assert DEFAULTS["answer_bank_max_age_days"] == 90
+
+
+# ── ANTHROPIC_API_KEY from ~/.config/anthropic/api.env ────────────────────────
+
+
+@pytest.fixture
+def api_env_file(tmp_path, monkeypatch):
+    import moonlighter.core.config as config_module
+
+    env_file = tmp_path / "api.env"
+    monkeypatch.setattr(config_module, "anthropic_api_env_file", lambda: env_file)
+    # setenv first so teardown restores the variable even when load_config sets it.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "placeholder")
+    monkeypatch.delenv("ANTHROPIC_API_KEY")
+    return env_file
+
+
+def _config_with_backend(tmp_path, backend: str) -> Path:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(f"llm_backend: {backend}\n")
+    return config_path
+
+
+def test_api_backend_loads_the_key_from_the_provider_file(tmp_path, api_env_file):
+    import os
+
+    api_env_file.write_text("# comment\nOTHER_NAME=ignored\nANTHROPIC_API_KEY=sk-from-file\n")
+    load_config(_config_with_backend(tmp_path, "api"))
+    assert os.environ.get("ANTHROPIC_API_KEY") == "sk-from-file"
+    assert "OTHER_NAME" not in os.environ
+
+
+def test_a_key_already_in_the_environment_wins_over_the_file(tmp_path, api_env_file, monkeypatch):
+    import os
+
+    api_env_file.write_text("ANTHROPIC_API_KEY=sk-from-file\n")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-from-env")
+    load_config(_config_with_backend(tmp_path, "api"))
+    assert os.environ["ANTHROPIC_API_KEY"] == "sk-from-env"
+
+
+def test_cli_backend_never_loads_the_key(tmp_path, api_env_file):
+    import os
+
+    api_env_file.write_text("ANTHROPIC_API_KEY=sk-from-file\n")
+    load_config(_config_with_backend(tmp_path, "cli"))
+    assert "ANTHROPIC_API_KEY" not in os.environ
+
+
+def test_a_missing_or_unreadable_file_is_not_an_error(tmp_path, api_env_file):
+    import os
+
+    load_config(_config_with_backend(tmp_path, "api"))  # file absent
+    api_env_file.mkdir()  # a directory where the file should be
+    load_config(_config_with_backend(tmp_path, "api"))
+    assert "ANTHROPIC_API_KEY" not in os.environ
+
+
+def test_a_non_utf8_file_is_not_an_error(tmp_path, api_env_file):
+    import os
+
+    api_env_file.write_bytes(b"ANTHROPIC_API_KEY=\xff\xfe\n")
+    load_config(_config_with_backend(tmp_path, "api"))
+    assert "ANTHROPIC_API_KEY" not in os.environ
+
+
+def test_a_file_without_a_usable_key_line_leaves_the_key_unset(tmp_path, api_env_file):
+    import os
+
+    api_env_file.write_text("OTHER_NAME=value\nANTHROPIC_API_KEY=\n")
+    load_config(_config_with_backend(tmp_path, "api"))
+    assert "ANTHROPIC_API_KEY" not in os.environ
+
+
+def test_the_provider_file_lives_under_home(tmp_path, monkeypatch):
+    # Imported at collection time, so this is the real function, not the
+    # autouse fixture's stand-in.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert anthropic_api_env_file() == tmp_path / ".config" / "anthropic" / "api.env"

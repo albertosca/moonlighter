@@ -8,7 +8,7 @@
 
 | Key | Default | What it does |
 |---|---|---|
-| `llm_backend` | `cli` | `cli` shells out to the Claude Code CLI (your Claude subscription); `api` uses the Anthropic SDK and needs `ANTHROPIC_API_KEY` |
+| `llm_backend` | `cli` | `cli` shells out to the Claude Code CLI (your Claude subscription); `api` uses the Anthropic SDK and needs `ANTHROPIC_API_KEY`, read from the environment or else from `~/.config/anthropic/api.env` |
 | `score_threshold` | `6.5` | Jobs scoring below it are archived after a scan |
 | `title_blocklist` | `[]` | Title substrings (case-insensitive) discarded before any LLM call |
 | `answer_bank_max_age_days` | `90` | Days after its last submission that a banked answer stops being replayed; `null` disables expiry — see [Answer bank](../guides/answer-bank.md) |
