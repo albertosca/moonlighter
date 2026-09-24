@@ -65,6 +65,9 @@ preferences:
 # criteria drives the LLM score. hard_filters are non-negotiable dealbreakers:
 # if any is triggered by a posting, the score is forced to <= 2.0.
 criteria:
+  # Optional. Set it and on-site/hybrid postings in any other city are archived
+  # before the LLM scores them; leave it out and nothing is cut by location.
+  # home_city: "São Paulo"
   hard_filters:
     - "requires .NET"
     - "on-site only (no remote)"

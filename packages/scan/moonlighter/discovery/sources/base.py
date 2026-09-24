@@ -47,8 +47,8 @@ def normalize_remote_type(location: str | None) -> str | None:
     EN and PT-BR vocabularies (live bug iFood #2811, 2026-08-24: "Remoto"
     derived 'onsite'). A bare place name returns None, never 'onsite': the
     old default invented on-site for anything unrecognized, and once the
-    regional eligibility filter began cutting onsite/hybrid outside Belo
-    Horizonte deterministically, an invented 'onsite' became an invented
+    regional eligibility filter began cutting onsite/hybrid outside the home
+    city deterministically, an invented 'onsite' became an invented
     archive. Unknown stays unknown and the evaluator decides, seeing both
     fields."""
     if not location:

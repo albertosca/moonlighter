@@ -284,6 +284,7 @@ async def _evaluate_and_store(
     threshold = config["score_threshold"]
     model = _model_for(config)
     blocklist: list[str] = config.get("title_blocklist", [])
+    home_city = (profile.get("criteria") or {}).get("home_city")
     concurrency: int = config.get("scan_concurrency", 5)
     batch_size: int = config.get("scan_batch_size", 5)
     stop = asyncio.Event()
@@ -311,9 +312,12 @@ async def _evaluate_and_store(
                     )
                     if job is not None:
                         results.append(job)
-                elif classify_location(raw.location, raw.remote_type) is Eligibility.INELIGIBLE:
-                    # Onsite/hybrid outside Belo Horizonte: no JD wording can fix
-                    # that — archived without spending an LLM call (see eligibility.py).
+                elif (
+                    classify_location(raw.location, raw.remote_type, home_city)
+                    is Eligibility.INELIGIBLE
+                ):
+                    # Onsite/hybrid outside the profile's home city: no JD wording
+                    # can fix that — archived without an LLM call (see eligibility.py).
                     job = _persist(
                         raw,
                         score=0.0,

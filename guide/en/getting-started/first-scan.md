@@ -28,7 +28,7 @@ The conversation is illustrative: Claude relays the tool's output in its own wor
 
 1. **Each score is 0–10**, from the LLM comparing the posting against your `profile.yaml`, including the hard and soft filters under `criteria`.
 2. **Below the threshold, the job is archived automatically.** The threshold is `score_threshold` in `config.yaml`, 6.5 by default. A posting that breaks one of your hard filters (".NET" above) scores low and is archived with the reason.
-3. **Some jobs are archived before any LLM call.** A title matching `title_blocklist` in `config.yaml` is saved as `archived` with a note, unscored. So is an onsite or hybrid posting outside Belo Horizonte, Brazil: that region is fixed in the code today, and making it configurable is planned. A remote posting, or one whose location doesn't settle the question, goes on to be scored.
+3. **Some jobs are archived before any LLM call.** A title matching `title_blocklist` in `config.yaml` is saved as `archived` with a note, unscored. So is an onsite or hybrid posting outside the city you set as `criteria.home_city` in `profile.yaml`; without that key, nothing is archived by location. A remote posting, or one whose location doesn't settle the question, goes on to be scored.
 4. **An empty description can't be scored.** Those jobs wait as `needs_review`: ask for `list_jobs` with status `needs_review`, open the posting, copy the whole page, and pass it to `verify_job` to score it.
 5. **Browse what passed** with `list_jobs` (status `new` by default) and open one with `get_job` for its full details and history.
 

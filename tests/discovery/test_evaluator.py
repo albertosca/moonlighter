@@ -1385,3 +1385,15 @@ async def test_evaluate_job_blank_salary_currency_becomes_none():
         company="C", title="T", description=JD, profile=PROFILE, _caller=caller
     )
     assert result.salary_currency is None
+
+
+async def test_eval_prefixes_name_no_city():
+    # The regional rule used to say "The candidate works from Belo Horizonte",
+    # capping every non-Brazil posting at 2.0 for any user. Where the candidate
+    # lives belongs to their profile (criteria), never to the prompt.
+    from moonlighter.discovery.evaluator import EVAL_BATCH_PREFIX, EVAL_PREFIX
+
+    for prefix in (EVAL_PREFIX, EVAL_BATCH_PREFIX):
+        assert "Belo Horizonte" not in prefix
+        assert "Brazil" not in prefix
+        assert "## Regional eligibility" in prefix

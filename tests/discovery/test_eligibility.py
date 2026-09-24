@@ -15,7 +15,10 @@ from moonlighter.discovery.eligibility import Eligibility, classify_location
 
 class TestEligible:
     def test_belo_horizonte_onsite(self):
-        assert classify_location("Belo Horizonte, Brazil", "onsite") is Eligibility.ELIGIBLE
+        assert (
+            classify_location("Belo Horizonte, Brazil", "onsite", home_city="Belo Horizonte")
+            is Eligibility.ELIGIBLE
+        )
 
     def test_remote_worldwide(self):
         assert classify_location("Remote - Worldwide", "remote") is Eligibility.ELIGIBLE
@@ -37,17 +40,29 @@ class TestIneligible:
     def test_onsite_abroad(self):
         # The gitlab-class case when the board is explicit: onsite in another
         # country can never be worked from Belo Horizonte.
-        assert classify_location("Bangalore, India", "onsite") is Eligibility.INELIGIBLE
+        assert (
+            classify_location("Bangalore, India", "onsite", home_city="Belo Horizonte")
+            is Eligibility.INELIGIBLE
+        )
 
     def test_hybrid_abroad(self):
-        assert classify_location("London, UK", "hybrid") is Eligibility.INELIGIBLE
+        assert (
+            classify_location("London, UK", "hybrid", home_city="Belo Horizonte")
+            is Eligibility.INELIGIBLE
+        )
 
     def test_onsite_brazil_outside_bh(self):
         # "Brasil onsite só conta se for Belo Horizonte."
-        assert classify_location("São Paulo, Brazil", "onsite") is Eligibility.INELIGIBLE
+        assert (
+            classify_location("São Paulo, Brazil", "onsite", home_city="Belo Horizonte")
+            is Eligibility.INELIGIBLE
+        )
 
     def test_hybrid_brazil_outside_bh(self):
-        assert classify_location("Rio de Janeiro, Brazil", "hybrid") is Eligibility.INELIGIBLE
+        assert (
+            classify_location("Rio de Janeiro, Brazil", "hybrid", home_city="Belo Horizonte")
+            is Eligibility.INELIGIBLE
+        )
 
 
 class TestAmbiguous:
@@ -71,3 +86,29 @@ class TestAmbiguous:
         # No explicit onsite signal: the JD may still say remote-worldwide.
         # The LLM decides — now seeing the location field.
         assert classify_location("Bangalore, India", None) is Eligibility.AMBIGUOUS
+
+
+class TestHomeCity:
+    def test_without_a_home_city_onsite_is_never_ruled_out(self):
+        # A public user who has not said where they live: the LLM decides,
+        # nothing is archived by location.
+        assert classify_location("Bangalore, India", "onsite") is Eligibility.AMBIGUOUS
+
+    def test_without_a_home_city_no_city_counts_as_home(self):
+        assert classify_location("Belo Horizonte, MG", "hybrid") is Eligibility.AMBIGUOUS
+
+    def test_the_home_city_is_whatever_the_profile_names(self):
+        assert classify_location("Berlin, Germany", "onsite", home_city="berlin") is (
+            Eligibility.ELIGIBLE
+        )
+        assert classify_location("Munich, Germany", "onsite", home_city="Berlin") is (
+            Eligibility.INELIGIBLE
+        )
+
+    def test_the_home_city_is_matched_literally_not_as_a_pattern(self):
+        assert classify_location("Stx Gallen", "onsite", home_city="St. Gallen") is (
+            Eligibility.INELIGIBLE
+        )
+
+    def test_a_blank_home_city_is_no_home_city(self):
+        assert classify_location("London, UK", "onsite", home_city="  ") is Eligibility.AMBIGUOUS
