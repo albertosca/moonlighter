@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 THEMES: dict[str, dict[str, str]] = {
-    "light": {"fg": "#1F2B47", "muted": "#9AA8C4", "accent": "#E3A23B", "ground": "#EEF1F6"},
+    "light": {"fg": "#1F2B47", "muted": "#586C96", "accent": "#916115", "ground": "#EEF1F6"},
     "dark": {"fg": "#EEF1F6", "muted": "#9AA8C4", "accent": "#E3A23B", "ground": "#1F2B47"},
 }
 _TOKEN = re.compile(r"\{\{(\w+)\}\}")
