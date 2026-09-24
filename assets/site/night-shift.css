@@ -1,0 +1,24 @@
+/* "Night shift" identity — see spec §5. Single source: scripts/build_docs.sh copies
+   this file into every language build (Zensical's --strict does not validate extra_css). */
+:root {
+  --ms-ink: #1F2B47;
+  --ms-paper: #EEF1F6;
+  --ms-silver: #9AA8C4;
+  --ms-amber: #E3A23B;
+  --ms-green: #2E8B57;
+}
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: var(--ms-ink);
+  --md-primary-fg-color--light: var(--ms-silver);
+  --md-primary-fg-color--dark: var(--ms-ink);
+  --md-accent-fg-color: var(--ms-amber);
+  --md-default-bg-color: var(--ms-paper);
+  --md-typeset-a-color: var(--ms-ink);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: var(--ms-ink);
+  --md-accent-fg-color: var(--ms-amber);
+  --md-typeset-a-color: var(--ms-silver);
+}

@@ -4,8 +4,12 @@
 
 The discovery slice of moonlighter: it sweeps the job boards you care about and hands you only the postings worth your time — each one scored against **your** profile by an LLM, with the reasoning written down.
 
-- **Six ATS platforms** — Greenhouse, Lever, Ashby, Recruitee (custom career domains included), Workable and SmartRecruiters, driven by a company list you configure.
-- **Optional portals** — RemoteOK, Remotive, WeWorkRemotely and HN Who's Hiring, config-gated off by default, with keyword filtering.
+![How moonlighter works](https://albertosca.github.io/moonlighter/assets/diagrams/how-it-works-light.svg)
+
+Docs: https://albertosca.github.io/moonlighter/
+
+- **Seven ATS platforms** — Greenhouse, Lever, Ashby, Recruitee (custom career domains included), Workable, SmartRecruiters and InHire, driven by a company list you configure.
+- **Optional portals** — Gupy, RemoteOK, Remotive, WeWorkRemotely and HN Who's Hiring, config-gated off by default, with keyword filtering.
 - **Ad-hoc scans** — point `scan_company` at any company slug ("what's open at trm-labs on Ashby?") without touching your config.
 - **LLM evaluation** — every new posting is scored against your profile and hard filters; below-threshold jobs are archived automatically, with the verdict kept for audit.
 - **Dedup that holds** — URL-normalized, so the same job through two doors stays one row.

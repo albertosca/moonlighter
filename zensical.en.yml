@@ -1,0 +1,53 @@
+site_name: moonlighter
+site_url: https://albertosca.github.io/moonlighter/
+site_description: The job-application assistant that leaves the last word to you.
+repo_url: https://github.com/albertosca/moonlighter
+docs_dir: guide/en
+site_dir: .docs-build/en
+theme:
+  name: material
+  language: en
+  font:
+    text: Atkinson Hyperlegible
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  custom_dir: overrides
+  features:
+    - navigation.tabs
+extra_css:
+  - stylesheets/night-shift.css
+extra:
+  alternate:
+    - name: English
+      link: /moonlighter/
+      lang: en
+    - name: Português
+      link: /moonlighter/pt/
+      lang: pt
+nav:
+  - Home: index.md
+  - Getting started:
+      - Install: getting-started/install.md
+      - First scan: getting-started/first-scan.md
+      - Gmail tracking: getting-started/gmail.md
+  - Guides:
+      - Tailored CV: guides/tailored-cv.md
+      - Answer bank: guides/answer-bank.md
+      - Extensions: guides/extensions.md
+  - Reference:
+      - CLI: reference/cli.md
+      - MCP tools: reference/mcp-tools.md
+      - Configuration: reference/config.md
+  - Engineering: engineering.md
+  - FAQ: faq.md
+  - LinkedIn: https://www.linkedin.com/in/albertosca/

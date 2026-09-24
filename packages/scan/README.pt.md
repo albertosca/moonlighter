@@ -4,8 +4,12 @@
 
 A fatia de descoberta do moonlighter: ela varre os job boards que te interessam e te entrega só as vagas que valem teu tempo — cada uma com nota dada por LLM contra o **seu** perfil, com o raciocínio registrado.
 
-- **Seis plataformas de ATS** — Greenhouse, Lever, Ashby, Recruitee (domínios de carreira customizados inclusos), Workable e SmartRecruiters, guiadas por uma lista de empresas que você configura.
-- **Portais opcionais** — RemoteOK, Remotive, WeWorkRemotely e HN Who's Hiring, desligados por padrão na config, com filtro de palavras-chave.
+![Como o moonlighter funciona](https://albertosca.github.io/moonlighter/assets/diagrams/how-it-works-light.svg)
+
+Documentação: https://albertosca.github.io/moonlighter/pt/
+
+- **Sete plataformas de ATS** — Greenhouse, Lever, Ashby, Recruitee (domínios de carreira customizados inclusos), Workable, SmartRecruiters e InHire, guiadas por uma lista de empresas que você configura.
+- **Portais opcionais** — Gupy, RemoteOK, Remotive, WeWorkRemotely e HN Who's Hiring, desligados por padrão na config, com filtro de palavras-chave.
 - **Varredura avulsa** — aponta o `scan_company` pra qualquer empresa ("o que a trm-labs tem aberto no Ashby?") sem mexer na tua config.
 - **Avaliação por LLM** — toda vaga nova ganha nota contra teu perfil e teus filtros duros; o que fica abaixo do corte é arquivado sozinho, com o veredito guardado pra auditoria.
 - **Dedup que segura** — URL normalizada, então a mesma vaga por duas portas continua sendo uma linha só.

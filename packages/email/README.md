@@ -4,6 +4,10 @@
 
 The tracking slice of moonlighter: it watches your Gmail for employer replies, matches each one back to the application that caused it, and moves your pipeline forward — so "did they ever answer?" is a query, not an archaeology dig.
 
+![How moonlighter works](https://albertosca.github.io/moonlighter/assets/diagrams/how-it-works-light.svg)
+
+Docs: https://albertosca.github.io/moonlighter/
+
 - **Matched by tracking alias** — each application carries its own reply-to alias, so a rejection, an ack or an interview invite lands on the right application automatically.
 - **Classified by LLM, in memory** — each message is classified (interview scheduled, rejection, offer…) and only a one-line summary is persisted; **the raw subject and body never reach the local database.**
 - **Read-only by default** — your own Gmail OAuth credentials, no label or state touched unless you opt in.
@@ -17,7 +21,7 @@ You rarely install this slice alone — [moonlighter](https://pypi.org/project/m
 |---|---|
 | [moonlighter](https://pypi.org/project/moonlighter/) | The whole pipeline as an MCP server — start here |
 | [moonlighter-core](https://pypi.org/project/moonlighter-core/) | Storage, config, profile, LLM client — the foundation |
-| [moonlighter-scan](https://pypi.org/project/moonlighter-scan/) | Job discovery across six ATS platforms, plus LLM fit-scoring |
+| [moonlighter-scan](https://pypi.org/project/moonlighter-scan/) | Job discovery across seven ATS platforms, plus LLM fit-scoring |
 | [moonlighter-apply](https://pypi.org/project/moonlighter-apply/) | Answer composition for application forms — you review, you submit |
 | **moonlighter-email** | ← you are here — employer-reply tracking via Gmail |
 

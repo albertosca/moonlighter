@@ -2,14 +2,15 @@
 
 # moonlighter
 
-[![PyPI](https://img.shields.io/pypi/v/moonlighter)](https://pypi.org/project/moonlighter/)
-[![Python](https://img.shields.io/badge/python-3.14%2B-blue)](https://pypi.org/project/moonlighter/)
-[![CI](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml/badge.svg)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml)
-[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
-[![Lint: ruff](https://img.shields.io/badge/lint-ruff-261230)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml)
-[![Coverage: 100%](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml)
+**O assistente de candidaturas que deixa a última palavra com você.**
 
-Pipeline de candidatura a vagas com IA. Escaneia portais de emprego, avalia o fit do candidato via LLM e compõe todas as respostas que um formulário de candidatura pede — tudo orquestrado pelo Claude através de um servidor [Model Context Protocol](https://modelcontextprotocol.io) (MCP). O moonlighter nunca abre um browser pra preencher ou enviar um formulário, e nunca envia uma candidatura em seu nome — veja [Como funciona](#como-funciona) abaixo e [DISCLAIMER.md](DISCLAIMER.md) (em inglês).
+Escaneia os portais de vagas que você escolhe, dá uma nota a cada vaga comparando com o seu perfil e rascunha uma folha de respostas completa a partir dos seus próprios dados, sinalizando o que não consegue responder.
+
+Feito por Alberto Cavalcanti · [Fale comigo no LinkedIn](https://www.linkedin.com/in/albertosca/) · [Leia a documentação](https://albertosca.github.io/moonlighter/pt/) · [Instale](https://albertosca.github.io/moonlighter/pt/getting-started/install/)
+
+<!-- facts -->1.700+ testes · 100% de cobertura de branches (gate no CI) · 5 pacotes no PyPI · mypy strict<!-- /facts -->
+
+[![PyPI](https://img.shields.io/pypi/v/moonlighter)](https://pypi.org/project/moonlighter/) [![Python](https://img.shields.io/badge/python-3.14%2B-blue)](https://pypi.org/project/moonlighter/) [![CI](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml/badge.svg)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml) [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE) [![Lint: ruff](https://img.shields.io/badge/lint-ruff-261230)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml) [![Coverage: 100%](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml)
 
 ## Sessenta segundos disso
 
@@ -31,10 +32,10 @@ moonlighter: Senior Backend Engineer — Acme Robotics
   Ana Lima
 
   [2/9] Email  (required)
-  ana.jobs+k3xv9q@gmail.com     ← alias de rastreio: a resposta da Acme casa sozinha com esta candidatura
+  ana.jobs+k3xv9qhm@gmail.com     ← alias de rastreio: a resposta da Acme casa sozinha com esta candidatura
 
   [3/9] Why do you want to work at Acme?  (required)
-  Três frases honestas compostas do perfil da Ana — e só dele.
+  Três frases rascunhadas a partir do perfil da Ana.
 
   [4/9] Desired salary  (required)
   BRL 28.000/month
@@ -42,305 +43,79 @@ moonlighter: Senior Backend Engineer — Acme Robotics
   [5/9] Do you hold a US work visa?  (required)
   !! I DON'T KNOW — no basis in your profile to answer
 
-  8 de 9 respondidas · 1 precisa de você
+  1 of 9 need you
 
 Você: (revisa, cola no formulário, aperta enviar — o moonlighter nunca aperta)
 ```
 
-A conversa é ilustrativa; os formatos de saída são os reais, inclusive a parte em que ele se recusa a inventar resposta que não tem.
+A conversa é ilustrativa: o Claude repassa a saída das ferramentas com as próprias palavras. A lacuna é comportamento real — o modelo é instruído a responder UNKNOWN quando o seu perfil não dá base para responder, e a folha devolve essa pergunta para você.
 
 ## Como funciona
 
-```mermaid
-flowchart LR
-    A["Conversa no Claude<br/>(ferramentas MCP)"] --> B["scan<br/>Greenhouse · Lever · Ashby<br/>Recruitee · Workable · SmartRecruiters"]
-    B --> C["evaluate<br/>nota por LLM contra o seu perfil"]
-    C --> D["prepare<br/>folha de respostas completa"]
-    D --> E{"VOCÊ revisa,<br/>cola e envia"}
-    E --> F["ATS do empregador"]
-    F -. resposta .-> G["track<br/>Gmail, casado por alias"]
-    G --> A
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/how-it-works-dark.svg">
+  <img alt="o moonlighter escaneia, dá nota e rascunha; só você cola e envia a candidatura" src="assets/diagrams/how-it-works-light.svg">
+</picture>
 
-1. **Scan** — busca vagas no Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters e InHire para a lista de empresas que você configura, além de portais remote-first opcionais (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring) e Gupy, ambos desativados por padrão (config-gated). O scan do LinkedIn está disponível como uma extensão separada, distribuída de forma privada — veja [Extensões (adicionando um novo scanner de ATS)](#extensões-adicionando-um-novo-scanner-de-ats) abaixo.
-2. **Avaliação** — pontua cada vaga em relação ao seu perfil via LLM; vagas abaixo do limiar são arquivadas automaticamente.
-3. **Preparo** — `prepare_application` lê as perguntas do formulário (via API do ATS quando ela publica isso, ex: Greenhouse/Recruitee) e compõe uma resposta pra cada pergunta que conseguir, com base no seu perfil. Ele renderiza uma única folha revisável — a candidatura inteira, não um screenshot de uma fração dela — com qualquer pergunta que não conseguiu responder sinalizada pra você. Quando nenhuma API publica as perguntas, `prepare_application_from_paste` faz o mesmo a partir de um texto que você mesmo copia da página. Nos dois casos, você é quem cola as respostas no formulário e envia — o moonlighter nunca toca o formulário nem clica em enviar.
-4. **Monitoramento** — monitora sua caixa do Gmail em busca de convites para entrevista e atualiza o status do pipeline.
+- **Scan** — lê as vagas no Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters e InHire das empresas que você lista, além de portais de vagas opcionais que você liga na config.
+- **Avaliação** — um LLM dá nota a cada vaga comparando com o seu perfil; vagas abaixo do seu corte são arquivadas.
+- **Preparo** — rascunha uma resposta para cada pergunta do formulário numa folha só, que você revisa, cola e envia; opcionalmente, um CV de uma página sob medida para a vaga.
+- **Rastreio** — casa as respostas de recrutadores no Gmail com a candidatura certa pelo `+alias` e move o seu pipeline adiante.
 
-Todas as etapas são expostas como ferramentas MCP e orquestradas pelo Claude numa conversa.
+Você comanda tudo de uma conversa com o Claude, por ferramentas MCP; os pacotes scan, apply e email também instalam linhas de comando em JSON para shells e cron jobs.
 
-### CV adaptado por vaga (opcional)
+## O que ele não faz
 
-Quando `cv.pool` no `config.yaml` aponta para um banco de bullets curado (`cv-pool.yaml`), `prepare_application` também adapta seu CV à vaga: uma chamada de LLM seleciona e ordena bullets do seu banco (ele também consegue responder "o CV base já serve" e não mudar nada), o resultado renderiza pelo seu próprio template LaTeX e compila com `pdflatex` quando instalado. O resultado tem sempre uma página (o prompt carrega o orçamento, e o orquestrador descarta os bullets menos relevantes até o pdflatex reportar uma página só) e só texto latino: um campo do modelo com emoji, símbolo ou alfabeto não latino é substituído inteiro pelo seu texto curado, nunca editado. Papéis consecutivos na mesma empresa renderizam como um bloco só, com o período total, em vez de duas entradas separadas. O modelo nunca faz uma afirmação factual — só seleciona do que você já curou — e a folha sempre avisa pra revisar o PDF gerado antes de fazer upload. Sem arquivo de banco nenhum CV é gerado e nenhuma chamada extra de LLM acontece — mas o `prepare_application` oferece rascunhar um pra você, devolvendo essa oferta no lugar da folha, até você criar um banco ou dispensar a oferta (veja abaixo).
+- **Ele nunca envia uma candidatura.** Ele rascunha a folha; você cola as respostas no formulário do empregador e envia por conta própria.
+- **Seu pipeline mora num arquivo SQLite local.** Vagas, rascunhos e histórico de candidaturas são guardados em `MOONLIGHTER_HOME`. O que sai da sua máquina é só o que vai para o LLM e para as APIs que você configura — Claude, Gmail, os portais de vagas. O [PRIVACY.md](PRIVACY.md) (em inglês) tem os detalhes.
+- **O modelo nunca responde uma pergunta que as guardas reconhecem como de salário, compliance ou dados demográficos.** Essas respostas vêm do seu perfil ou config, ou ficam com você. As guardas reconhecem formulações conhecidas, e quando você cola o texto de uma página, o modelo ainda lê o texto inteiro para encontrar as perguntas.
 
-Chaves de config: `cv.pool`, `cv.template_dir` (contendo `cv-template.en.tex`, opcionalmente `cv-template.pt.tex` para vagas em português), `cv.generated_dir` (padrão `~/.moonlighter/cv-generated`).
+O modelo ainda pode errar uma resposta — e é por isso que toda folha passa pela sua revisão.
 
-O resultado de cada vaga fica em cache em `<generated_dir>/<job_id>/`, então nenhuma vaga é gerada duas vezes — depois de editar seu banco ou seu template, apague esse diretório para que o próximo `prepare_application` regenere o CV daquela vaga.
+## Decisões de engenharia
 
-Sem `cv.pool` ainda? `prepare_application` oferece rascunhar um a partir do seu `profile.yaml` sempre que ele estiver faltando (ou rode `moonlighter-apply bootstrap-cv` do shell) — um rascunho que você revisa e edita. Ele é construído a partir do [banco de exemplo](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/cvgen/templates/cv-pool.example.yaml) e do [template de exemplo](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/cvgen/templates/cv-template.en.example.tex) genéricos, que também servem de referência de schema se você preferir escrever um banco à mão. Os dois vêm dentro do pacote instalado também, em `moonlighter/application/cvgen/templates/`, então não é preciso ter um checkout pra lê-los.
+As candidaturas saem com o seu nome, então a régua é confiança. Cada decisão abaixo comprou segurança a um preço; a [página de Engenharia](https://albertosca.github.io/moonlighter/pt/engineering/) registra o que cada uma custou e onde conferir isso no código.
 
-## Arquitetura
-
-Um [workspace uv](https://docs.astral.sh/uv/concepts/workspaces/) com 5 namespace packages (`moonlighter.*`), organizados por feature:
-
-| Package | Namespace | Propósito |
-|---------|-----------|-----------|
-| `moonlighter-core` | `moonlighter.core` | DB (Peewee/SQLite), config, browser driver opcional (extra `[browser]`), cliente LLM |
-| `moonlighter-scan` | `moonlighter.discovery` | Scrapers de ATS e scoring de vagas via LLM |
-| `moonlighter-apply` | `moonlighter.application` | Compositor de respostas (perfil curado → respostas via LLM) e work-auth |
-| `moonlighter-email` | `moonlighter.tracking` | Sincronização com Gmail e classificação de estágios de entrevista |
-| `moonlighter` | `moonlighter.server` | Servidor FastMCP — conecta todos os pacotes |
-
-## Requisitos
-
-- [uv](https://docs.astral.sh/uv/) — baixa o Python 3.14 pra você; não precisa instalar separado
-- Chrome, Chromium ou Brave — opcional, só necessário se você instalar uma extensão de scan baseada em browser (ex: scan do LinkedIn, veja [Extensões](#extensões-adicionando-um-novo-scanner-de-ats) abaixo). O produto base (escanear as APIs de ATS configuradas e preparar candidaturas) nunca abre um browser.
-- Um backend de LLM, alternável no `config.yaml` a qualquer momento:
-  - `llm_backend: cli` (padrão) — o [Claude Code CLI](https://claude.ai/code), cobrado na sua
-    assinatura do Claude. Sem API key.
-  - `llm_backend: api` — o SDK da Anthropic, cobrado em créditos de API. Exige `ANTHROPIC_API_KEY`
-    no ambiente.
-- Credenciais OAuth do Gmail (opcional — só para rastreamento de e-mails)
+| Decisão | Custo que aceitamos |
+|---|---|
+| [Deixamos de dirigir o browser](https://albertosca.github.io/moonlighter/pt/engineering/#deixamos-de-dirigir-o-browser) | Cada candidatura custa a você uma colagem e um clique |
+| [Guardas determinísticas em volta da etapa de redação](https://albertosca.github.io/moonlighter/pt/engineering/#guardas-deterministicas-em-volta-da-etapa-de-redacao) | Elas só reconhecem formulações conhecidas |
+| [Texto do modelo escapado no LaTeX do CV, nunca validado](https://albertosca.github.io/moonlighter/pt/engineering/#texto-do-modelo-escapado-nunca-validado-no-latex-do-cv) | A saída do modelo não carrega formatação LaTeX além de negrito |
+| [Cinco fatias com fronteira de import testada e releases em lockstep](https://albertosca.github.io/moonlighter/pt/engineering/#cinco-fatias-com-fronteira-de-import-testada-e-releases-em-lockstep) | Todo release sobe a versão de cinco pacotes à mão |
+| [100% de cobertura de branches como gate, gates provados por canários](https://albertosca.github.io/moonlighter/pt/engineering/#100-de-cobertura-de-branches-como-gate-gates-provados-por-canarios) | Todo branch novo custa um teste |
 
 ## Instalação
 
-Com pressa? O caminho inteiro é:
+Você precisa do [uv](https://docs.astral.sh/uv/) (ele baixa o Python 3.14 para você) e de um backend de LLM: o Claude Code CLI por padrão, ou uma API key da Anthropic.
 
-```bash
-uvx moonlighter init                  # wizard: escreve o config.yaml
-# preencha profile.yaml e company_list.yaml (exemplos abaixo)
-claude mcp add-json --scope user moonlighter '{"command":"uvx","args":["moonlighter"]}'
-# sessão nova do Claude → "varre minhas empresas"
-```
+- **Claude Code:** `/plugin marketplace add albertosca/moonlighter`, depois `/plugin install moonlighter@moonlighter`.
+- **Qualquer outro cliente MCP:** registre o comando do servidor `uvx moonlighter`.
+- **Depois:** `uvx moonlighter init` escreve a sua config; preencha `profile.yaml` e `company_list.yaml` e peça ao Claude "varre minhas empresas".
 
-Os detalhes:
+[Guia completo de instalação →](https://albertosca.github.io/moonlighter/pt/getting-started/install/)
 
-### Opção A — plugin do Claude Code (recomendado)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/fitting-dark.svg">
+  <img alt="Cada pacote do moonlighter funciona sozinho; instalar dois faz eles trabalharem juntos" src="assets/diagrams/fitting-light.svg">
+</picture>
 
-```
-/plugin marketplace add albertosca/moonlighter
-/plugin install moonlighter@moonlighter
-```
+## Documentação
 
-O primeiro comando registra o marketplace; o segundo instala o plugin a partir dele.
+- [Primeiros passos](https://albertosca.github.io/moonlighter/pt/getting-started/install/) — requisitos, o assistente de configuração, o registro do servidor MCP
+- [CV sob medida](https://albertosca.github.io/moonlighter/pt/guides/tailored-cv/) — um CV LaTeX de uma página por vaga, montado a partir dos bullets que você curou
+- [Banco de respostas](https://albertosca.github.io/moonlighter/pt/guides/answer-bank/) — respostas de triagem que você aprovou, reaproveitadas na próxima candidatura
+- [Linha de comando](https://albertosca.github.io/moonlighter/pt/reference/cli/) — uma CLI em JSON por fatia, códigos de saída, o que cada instalação oferece
+- [Ferramentas MCP](https://albertosca.github.io/moonlighter/pt/reference/mcp-tools/) — as 17 ferramentas que o Claude chama por você
+- [Extensões](https://albertosca.github.io/moonlighter/pt/guides/extensions/) — adicione uma fonte de vagas como um pacote separado
 
-Depois rode o assistente de configuração:
-
-```bash
-uvx moonlighter init
-```
-
-### Opção B — qualquer cliente MCP
-
-```bash
-uvx moonlighter init
-```
-
-Depois registre o servidor MCP:
-
-```bash
-claude mcp add-json --scope user moonlighter '{"command":"uvx","args":["moonlighter"]}'
-```
-
-Usa outro cliente MCP? Registre o mesmo comando e argumentos (`uvx` / `["moonlighter"]`) com o
-mecanismo de registro do seu próprio cliente — o comando `claude mcp add-json` acima é específico
-da CLI do Claude Code.
-
-### Depois de qualquer uma das opções
-
-O assistente grava o `config.yaml` no `MOONLIGHTER_HOME` (padrão: `~/.moonlighter/`). Dois arquivos
-ainda precisam da sua entrada:
-
-| Arquivo | O que colocar |
-|---------|----------------|
-| `profile.yaml` | Sua experiência, skills e `criteria` (os filtros hard e soft que guiam o scoring) |
-| `company_list.yaml` | As empresas a escanear e qual ATS cada uma usa |
-
-Comece a partir de [`profile.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/profile.example.yaml) e [`company_list.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/company_list.example.yaml).
-
-O assistente grava um `config.yaml` mínimo; o [`config.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/config.example.yaml) documenta o resto da superfície de configuração, principalmente o bloco `cv` (só é necessário para usar um currículo diferente por empresa — por
-padrão o `prepare_application` aponta o `cv.pdf` do `MOONLIGHTER_HOME` pra pergunta de upload de arquivo
-do formulário, e avisa claramente se nenhum estiver configurado) e o bloco `email`. `profile.yaml`,
-`company_list.yaml`, `config.yaml` e `cv.pdf` (seu currículo — o moonlighter só te diz o nome dele pra
-você anexar, nunca faz o upload sozinho) ficam todos em `MOONLIGHTER_HOME` (padrão: `~/.moonlighter/`).
-
-Depois de conectado, peça ao Claude para rodar `get_pipeline` — além do funil de candidaturas, ele reporta problemas de configuração como perfil, currículo ou navegador ausentes.
-
-Reinicie o Claude Code, ou inicie uma nova sessão, para que as ferramentas do moonlighter apareçam.
-
-### Rastreamento por Gmail (opcional)
-
-1. Crie um projeto no [Google Cloud Console](https://console.cloud.google.com), ative a API do
-   Gmail e baixe as credenciais OAuth como `client.json`.
-2. Coloque o arquivo como `gmail-client.json` dentro do `MOONLIGHTER_HOME` (padrão `~/.moonlighter/`).
-3. Na primeira chamada a `setup_email`, um browser abrirá para autorização e o token será salvo.
-
-### Desenvolvendo no moonlighter
-
-Pra trabalhar no código em vez de só usar a ferramenta, veja [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Ferramentas MCP
-
-| Ferramenta | Descrição |
-|------------|-----------|
-| `scan_and_evaluate` | Busca e pontua vagas de todas as fontes ATS configuradas |
-| `list_jobs` | Lista vagas por status (`new`, `scored`, `applied`, `archived`, …) |
-| `get_job` | Exibe detalhes completos e histórico de pipeline de uma vaga |
-| `add_job` | Adiciona uma vaga manualmente por URL |
-| `prepare_application` | Compõe todas as respostas do formulário de candidatura de uma vaga numa única folha revisável, pra você colar e enviar |
-| `prepare_application_from_paste` | O mesmo que `prepare_application`, pra um formulário cujas perguntas nenhuma API publica — passe o texto que você copiou da página |
-| `update_status` | Move uma vaga manualmente pelo pipeline |
-| `list_answer_bank` | Toda resposta de triagem banqueada, da mais recente pra mais antiga; as expiradas marcadas |
-| `forget_answer` | Apaga uma resposta banqueada pra próxima candidatura perguntar ao LLM de novo |
-| `setup_email` | Autoriza OAuth do Gmail |
-| `sync_email_responses` | Busca respostas recentes e classifica estágios de entrevista |
-| `get_pipeline` | Resumo completo do pipeline |
-| `bootstrap_cv_pool` | Rascunhe um banco de CV + template a partir do seu profile.yaml — um rascunho pra revisar |
-| `skip_cv_bootstrap` | Recuse a oferta de bootstrap do banco de CV uma vez, permanentemente |
-
-### Answer bank
-
-Toda resposta de triagem não-múltipla-escolha que você aprova — "anos de Elixir", "prazo de aviso",
-qualquer coisa que um formulário pergunta e não é um campo estático do perfil — é guardada em cache por
-vaga e também promovida pra um banco entre vagas, então uma pergunta com a mesma redação numa candidatura
-futura reaproveita a resposta em vez de perguntar de novo ao LLM. Uma resposta banqueada expira depois de
-`answer_bank_max_age_days` (padrão 90, `config.example.yaml`; `null` desliga a expiração), contado a
-partir da última vez que foi enviada — assim uma resposta de prazo de aviso ou disponibilidade que ficou
-velha volta a ser perguntada em vez de repetida pra sempre. `list_answer_bank` mostra o que está em cache
-(as expiradas marcadas); `forget_answer` apaga uma pra próxima candidatura perguntar de novo.
-
-## Linha de comando
-
-Toda fatia também instala um comando que você pode disparar de um shell ou de um cron job, sem nenhuma conversa com LLM envolvida. Cada um imprime exatamente um documento JSON no stdout (os logs vão pro stderr) e sai com `0` em caso de sucesso, `1` quando não havia nada a fazer (nenhuma vaga nova, vaga não encontrada, nenhuma pergunta), `2` num erro de uso ou de config, `3` num erro inesperado (o JSON então traz `kind: "error"` e o traceback vai pro stderr).
-
-| Comando | O que faz |
-|---|---|
-| `moonlighter-scan [--phase all] [--keywords ...]` | Roda um scan; `--company SOURCE SLUG` escaneia só um board. `--no-eval` descobre e grava as vagas como `needs_review` sem chamar o LLM — pontue depois com `verify_job`. |
-| `moonlighter-apply prepare JOB_ID [--paste FILE]` | Compõe a folha pronta pra colar; `--paste -` lê o texto da página do stdin. |
-| `moonlighter-apply prepare --url URL [--company X --title Y] [--paste FILE]` | Ingere a vaga primeiro: pela API do ATS quando a URL tem um formato conhecido, senão a partir da própria página com `--company` e `--title` informados; grava sem pontuar, depois prepara. Nenhuma chamada ao LLM na ingestão. |
-| `moonlighter-email sync` | Classifica respostas recentes e avança candidaturas. Sozinho ele não alimenta o banco de respostas — quem faz isso é o `sync_email_responses` do servidor MCP. |
-| `moonlighter-email register JOB_ID` | Marca uma vaga como candidatada na mão e gera o alias de rastreio `+ref`, pra respostas a ela serem casadas pelo `sync`. |
-| `moonlighter-scan doctor` · `moonlighter-apply doctor` · `moonlighter-email doctor` · `moonlighter doctor` | Onde o estado mora e se a config carrega, em JSON; sai com `1` quando a config está faltando ou inválida. |
-
-```sh
-moonlighter-scan --no-eval | jq '.saved[] | select(.status == "needs_review") | .url'
-```
-
-O exemplo acima sai com `1` em todo dia sem vaga nova, o que dispara `set -e`/`pipefail` num script que encadeia com `jq` — confira o código de saída antes de tratar isso como falha do script. `--no-eval` é zero-**LLM**, não offline: `archive_stale_jobs` continua fazendo requisições HTTP pra checar se vagas já salvas fecharam.
-
-### O que cada instalação te dá
-
-Os cinco pacotes são fatias de uma ferramenta só. Instale só as que você precisa; cada comando conta no `--help` o que ele faz nessa combinação e o que uma fatia faltando acrescentaria, e o `doctor` imprime a mesma informação em JSON.
-
-| Você instala | Você ganha |
-|---|---|
-| `moonlighter-scan` | `moonlighter-scan`: boards e portais escaneados, vagas pontuadas (ou salvas sem pontuar com `--no-eval`), as fechadas arquivadas |
-| `moonlighter-apply` | `moonlighter-apply prepare`: a folha pronta pra colar, a partir de um id de vaga ou direto de uma URL |
-| `moonlighter-email` | `moonlighter-email register` e `sync`: candidaturas registradas na mão, respostas do Gmail casadas de volta com elas |
-| `moonlighter-scan` + `moonlighter-apply` | um script só: escaneia, escolhe pela pontuação, prepara uma folha pra cada uma |
-| `moonlighter-apply` + `moonlighter-email` | o alias de rastreio que uma folha gera é o mesmo que o `sync` usa pra casar as respostas |
-| `moonlighter` (tudo) | tudo isso acima mais o servidor MCP pro Claude Code, e a promoção pro banco de respostas quando uma resposta avança uma candidatura |
-
-```sh
-moonlighter-apply doctor | jq '.slices, .capabilities.missing[].name'
-```
-
-## Extensões (adicionando um novo scanner de ATS)
-
-Toda integração de ATS que você vê acima (Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters,
-Gupy) é parte normal deste repositório — mas o moonlighter também suporta **extensões de scanner**:
-pacotes Python separados, instalados de forma independente, que registram uma nova fonte de vagas sem
-precisar dar fork ou modificar este repositório de jeito nenhum. É assim que o scan do LinkedIn é
-distribuído — não porque o mecanismo seja específico do LinkedIn, mas porque os próprios Termos de Uso do
-LinkedIn proíbem automação de forma explícita e inequívoca (veja [DISCLAIMER.md](DISCLAIMER.md)), então
-essa integração é distribuída como uma extensão opcional em vez de código embutido que qualquer um que
-clonar este repo já ganha por padrão.
-
-Preenchimento e envio de formulário via browser não fazem parte deste repositório de jeito nenhum (veja
-[Como funciona](#como-funciona) acima) e não é um ponto de extensão — `prepare_application` compõe as
-respostas pra você colar, pra qualquer ATS.
-
-### Como funciona
-
-Uma extensão é um pacote Python normal que:
-
-1. Depende de `moonlighter-core` e `moonlighter-scan`, fixado numa tag lançada deste repositório.
-2. Traz seu próprio módulo implementando uma subclasse de `BaseScanner` (veja
-   `packages/scan/moonlighter/discovery/sources/base.py`).
-3. Se declara via `entry_points` no próprio `pyproject.toml` — nenhum código deste repositório importa ou
-   cita a extensão em nenhum momento:
-
-```toml
-[project.entry-points."moonlighter.scanners"]
-minha_plataforma = "meu_pacote.meu_modulo:MeuScanner"
-
-# Opcional: checagem de vaga obsoleta via browser pra uma fonte sem API de listagem
-[project.entry-points."moonlighter.staleness_checkers"]
-minha_plataforma = "meu_pacote.meu_modulo:check_staleness"
-```
-
-Um scanner baseado em browser (como costumam ser as entradas de `moonlighter.scanners`) precisa de
-`moonlighter-core[browser]` — veja [Requisitos](#requisitos) acima; um scanner puramente HTTP não precisa
-de nada extra.
-
-4. Precisa estar presente no **mesmo** ambiente Python de onde o moonlighter roda, pra que seus entry
-   points sejam descobertos em tempo de execução. Se você instalou o moonlighter via `uvx moonlighter`,
-   não existe um ambiente persistente pra adicionar um pacote — use uma das opções:
-   - `uvx --with meu-pacote-de-extensao moonlighter` — efêmero, por invocação
-   - `uv tool install moonlighter --with meu-pacote-de-extensao` — instalação persistente da ferramenta
-   Se você está desenvolvendo direto neste repositório, `uv add --editable`/`pip install` o pacote da
-   sua extensão no mesmo ambiente continua funcionando como antes. Em tempo de execução,
-   `moonlighter.core.plugins.discover_entry_points`/`discover_entry_points_by_name` enumeram o que estiver
-   registrado em cada grupo — um ambiente sem nenhuma extensão instalada se comporta exatamente como hoje
-   (lista/dict vazio, nada quebra).
-
-Como o pacote de nível raiz `moonlighter` é um [namespace package PEP 420](https://peps.python.org/pep-0420/)
-(sem `__init__.py` nesse nível), uma extensão pode até trazer seu próprio subpacote de nível raiz (ex:
-`moonlighter/minha_extensao/`) que coexiste com `moonlighter.core`/`moonlighter.discovery`/etc. — só não
-coloque arquivos *dentro* de um subpacote já existente como `moonlighter/discovery/sources/`, já que esse
-é um pacote regular (não-namespace) pertencente inteiramente às distribuições deste repositório, e uma
-segunda distribuição escrevendo no mesmo caminho colide silenciosamente na instalação. Dê à sua extensão
-o próprio diretório de nível raiz.
-
-### Exemplo real
-
-A extensão privada `moonlighter-linkedin` (não publicada, pelo motivo acima) segue exatamente esse padrão
-pro scan — o `LinkedInScanner` dela vive no próprio pacote `moonlighter/linkedin_ext/`, registrado via o
-grupo de entry_points `moonlighter.scanners` acima. Se você for construir sua própria extensão de scanner,
-essa é a forma de referência a copiar.
-
-## Solução de problemas
-
-- **As ferramentas do moonlighter não aparecem no Claude** — servidores MCP são lidos no início da sessão: reinicie o Claude Code (ou abra sessão nova) depois de registrar.
-- **`uvx moonlighter` roda versão velha** — o uvx faz cache de ambientes; rode `uvx --refresh moonlighter` uma vez depois de um release.
-- **Scan não acha nada** — confira o `company_list.yaml`: cada entrada precisa do slug real da empresa no ATS (a parte da URL de careers), sob a chave de source certa. Teste uma empresa com `scan_company` antes de varrer tudo.
-- **Erros de LLM com `llm_backend: cli`** — o backend padrão chama o [CLI do Claude Code](https://claude.ai/code); ele precisa estar instalado e logado. Troque para `llm_backend: api` + `ANTHROPIC_API_KEY` se preferir cobrar em créditos de API.
-- **Avisos de "missing profile / CV"** — peça ao Claude pra rodar `get_pipeline`: além do funil, ele reporta exatamente qual arquivo de setup falta e onde deve ficar.
-- **Sync do Gmail não faz nada** — o rastreio de email é opcional e desligado até o `setup_email` completar o fluxo OAuth; veja a seção do Gmail acima.
-
-Continua travado? [Abra uma discussion](https://github.com/albertosca/moonlighter/discussions) — relato que inclui o que o `get_pipeline` imprimiu anda mais rápido.
-
-## Engenharia
-
-O pipeline se candidata a vagas com o seu nome nelas, então a régua é confiança:
-
-- **1171 testes, 100% de cobertura de branches** — imposta como gate de CI (`--cov-fail-under=100`), não número de dashboard.
-- **mypy strict** nos nove pacotes `moonlighter.*`; **ruff** com o ruleset de segurança (`S`) ligado.
-- **Releases em lockstep** — os cinco pacotes precisam concordar em versão, pins e tag antes de qualquer upload; a checagem roda antes do build, porque upload no PyPI é irreversível.
-- **main protegido** — toda mudança entra por pull request, com CLA, suite de testes e auditoria de segurança como checks obrigatórios.
-- **Curado, nunca inventado** — respostas saem só do seu perfil; campo ambíguo (salário em moeda errada, pergunta de visto confusa) volta pra sua revisão em vez de virar chute silencioso.
+Dúvidas e solução de problemas: [Perguntas frequentes](https://albertosca.github.io/moonlighter/pt/faq/). Para mexer no código: [CONTRIBUTING.md](CONTRIBUTING.md) (em inglês).
 
 ## Licença
 
-AGPL-3.0 — veja [LICENSE](LICENSE): use, faça fork, modifique — desde que o que você distribuir
-ou servir pela rede continue aberto.
+AGPL-3.0 — veja [LICENSE](LICENSE): use, faça fork, modifique, desde que o que você distribuir ou servir pela rede continue aberto. Quer oferecer o moonlighter como serviço hospedado ou pago sem as obrigações da AGPL? Existe licença comercial — [abra uma issue](https://github.com/albertosca/moonlighter/issues) para começar essa conversa; o [CLA](CLA.md) que todo contribuidor assina mantém essa oferta possível.
 
-### Licenciamento comercial
+O [DISCLAIMER.md](DISCLAIMER.md) (em inglês) trata de termos de serviço, automação e uso do backend de LLM; o [PRIVACY.md](PRIVACY.md) (em inglês) trata do que a ferramenta guarda e para onde vai.
 
-Se você quiser oferecer o moonlighter como serviço hospedado ou pago sem as obrigações da AGPL,
-existe licença comercial — [abra uma issue](https://github.com/albertosca/moonlighter/issues) pra
-começar essa conversa. O [CLA](CLA.md) que todo contribuidor assina existe exatamente pra manter
-essa oferta possível.
+---
 
-Veja [DISCLAIMER.md](DISCLAIMER.md) para notas importantes sobre ToS, automação e uso do backend LLM.
-Veja [PRIVACY.md](PRIVACY.md) (em inglês) para o que esta ferramenta armazena e pra onde vai.
+Feito por Alberto Cavalcanti — [Fale comigo no LinkedIn](https://www.linkedin.com/in/albertosca/)

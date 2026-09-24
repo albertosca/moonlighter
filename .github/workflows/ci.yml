@@ -49,7 +49,16 @@ jobs:
           uv run mypy scripts/
 
       - name: Tests (unit, coverage gate 100%)
-        run: uv run pytest -m "not e2e"
+        run: uv run pytest -m "not e2e" --junitxml=test-report.xml
+
+      - name: README facts and links
+        run: uv run python scripts/check_readme_facts.py --junit test-report.xml
+
+      - name: Docs EN/PT parity
+        run: uv run python scripts/check_docs_parity.py
+
+      - name: Docs site builds (strict)
+        run: bash scripts/build_docs.sh
 
   security-audit:
     runs-on: ubuntu-latest

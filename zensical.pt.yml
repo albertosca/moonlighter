@@ -1,0 +1,53 @@
+site_name: moonlighter
+site_url: https://albertosca.github.io/moonlighter/pt/
+site_description: O assistente de candidaturas que deixa a última palavra com você.
+repo_url: https://github.com/albertosca/moonlighter
+docs_dir: guide/pt
+site_dir: .docs-build/pt
+theme:
+  name: material
+  language: pt
+  font:
+    text: Atkinson Hyperlegible
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Mudar para o modo escuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Mudar para o modo claro
+  custom_dir: overrides
+  features:
+    - navigation.tabs
+extra_css:
+  - stylesheets/night-shift.css
+extra:
+  alternate:
+    - name: English
+      link: /moonlighter/
+      lang: en
+    - name: Português
+      link: /moonlighter/pt/
+      lang: pt
+nav:
+  - Início: index.md
+  - Primeiros passos:
+      - Instalação: getting-started/install.md
+      - Primeiro scan: getting-started/first-scan.md
+      - Acompanhamento pelo Gmail: getting-started/gmail.md
+  - Guias:
+      - CV sob medida: guides/tailored-cv.md
+      - Banco de respostas: guides/answer-bank.md
+      - Extensões: guides/extensions.md
+  - Referência:
+      - CLI: reference/cli.md
+      - Ferramentas MCP: reference/mcp-tools.md
+      - Configuração: reference/config.md
+  - Engenharia: engineering.md
+  - Perguntas frequentes: faq.md
+  - LinkedIn: https://www.linkedin.com/in/albertosca/

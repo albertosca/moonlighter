@@ -23,3 +23,11 @@ TODO.md
 .coverage.*
 htmlcov/
 coverage.xml
+
+# Docs site build output (scripts/build_docs.sh). Anchored to the repo root
+# (leading slash): an unanchored "site/" also matches assets/site/, which
+# holds the tracked night-shift.css and (later) social-preview.png.
+.docs-build/
+/site/
+# JUnit report consumed by scripts/check_readme_facts.py
+test-report.xml

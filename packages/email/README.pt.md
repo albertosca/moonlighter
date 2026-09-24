@@ -4,6 +4,10 @@
 
 A fatia de rastreio do moonlighter: ela vigia teu Gmail atrás de respostas de empregador, casa cada uma com a candidatura que a causou e move teu pipeline adiante — pra "eles chegaram a responder?" virar consulta, não arqueologia.
 
+![Como o moonlighter funciona](https://albertosca.github.io/moonlighter/assets/diagrams/how-it-works-light.svg)
+
+Documentação: https://albertosca.github.io/moonlighter/pt/
+
 - **Casada por alias de rastreio** — cada candidatura carrega seu próprio alias de resposta, então rejeição, confirmação ou convite de entrevista pousa na candidatura certa sozinho.
 - **Classificada por LLM, em memória** — cada mensagem é classificada (entrevista marcada, rejeição, oferta…) e só um resumo de uma linha é persistido; **assunto e corpo crus nunca chegam ao banco local.**
 - **Somente leitura por padrão** — tuas próprias credenciais OAuth do Gmail, nenhum label ou estado tocado sem opt-in.
@@ -17,7 +21,7 @@ Dificilmente você instala esta fatia sozinha — o [moonlighter](https://pypi.o
 |---|---|
 | [moonlighter](https://pypi.org/project/moonlighter/) | O pipeline inteiro como servidor MCP — comece por aqui |
 | [moonlighter-core](https://pypi.org/project/moonlighter-core/) | Banco, config, perfil, cliente de LLM — a fundação |
-| [moonlighter-scan](https://pypi.org/project/moonlighter-scan/) | Descoberta de vagas em seis ATS, com nota de aderência por LLM |
+| [moonlighter-scan](https://pypi.org/project/moonlighter-scan/) | Descoberta de vagas em sete ATS, com nota de aderência por LLM |
 | [moonlighter-apply](https://pypi.org/project/moonlighter-apply/) | Redação de respostas de formulário — você revisa, você envia |
 | **moonlighter-email** | ← você está aqui — rastreio de respostas de empregador via Gmail |
 

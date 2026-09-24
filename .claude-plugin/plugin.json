@@ -1,7 +1,7 @@
 {
   "name": "moonlighter",
   "version": "0.1.0",
-  "description": "AI-powered job application pipeline. Scans job boards, scores fit with an LLM, and fills applications in a real browser.",
+  "description": "The job-application assistant that leaves the last word to you. Scans the job boards you choose, scores each posting against your profile, and drafts complete answer sheets from your own data for you to review and send.",
   "author": {
     "name": "Alberto de Sá Cavalcanti de Albuquerque",
     "url": "https://github.com/albertosca"
