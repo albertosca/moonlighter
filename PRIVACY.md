@@ -16,6 +16,9 @@ plain SQLite and files — never uploaded anywhere by moonlighter itself:
 | Job postings found | `moonlighter.db` (`Job` table) | Scraped listing text (company, title, description, salary if stated) — third-party content, not your personal data. |
 | Your applications | `moonlighter.db` (`Application` table) | The composed answers moonlighter drafted for your review (`form_data`) — this **is** your personal data, since it's the same name/email/phone/etc. that goes into the employer's form once you paste it in and submit it yourself. Kept indefinitely; no automatic expiry. |
 | Browser session (optional) | `browser-session/` | Only exists if you install the optional `moonlighter-core[browser]` extra and enable a browser-based scanner plugin (e.g. the privately-distributed LinkedIn add-on). The Playwright/Chromium profile that plugin logs in with (cookies, local storage) — not used by the core scan/evaluate/apply flow, which never opens a browser. |
+| Answer bank | `moonlighter.db` (`AnswerBankEntry` table) | Answers you approved on a submitted application, keyed by the normalised question, so the same question on another job reuses them. Entries older than `answer_bank_max_age_days` (default 90) are skipped on read, never deleted; `forget_answer` removes one. |
+| Tailored-CV pool and templates (optional) | `cv-pool.yaml`, `cv-templates/` | Only if you turn the tailored CV on. Your CV bullets per experience, written by you or drafted by `bootstrap_cv_pool` from your profile. |
+| Tailored CVs (optional) | `cv-generated/<job id>/` | The `.tex` and compiled `cv.pdf` generated for one job. Delete the folder to regenerate it. |
 | Email sync dedup | `moonlighter.db` (`ProcessedEmail` table) | Only a Gmail message ID and a timestamp, so the sync doesn't reprocess the same email twice. **Not** the email body or subject — see below. |
 
 None of this is encrypted at rest by moonlighter itself; it relies on your OS/disk-level
@@ -32,13 +35,7 @@ protections, same as any local application storing config files.
   install the optional `moonlighter-core[browser]` extra and enable a browser-based scanner plugin
   (e.g. the LinkedIn add-on), that plugin additionally drives a real browser to log in and scan
   listings, sending the same kind of traffic a manual session on that platform would.
-- **LLM calls** — job descriptions and a filtered subset of your profile (see
-  `profile_for_answers`/`_ANSWER_PROFILE_KEYS` in `base.py` — headline, summary, skills,
-  experience, education, languages, publications; **not** salary targets, hard filters, or
-  contact fields) are sent to Anthropic to generate application answers and score job fit, under
-  whichever backend you configured (`llm_backend: cli` uses your own claude.ai session;
-  `llm_backend: api` uses your own `ANTHROPIC_API_KEY`). See `DISCLAIMER.md` for Anthropic's Usage
-  Policy.
+- **LLM calls** — sent to Anthropic under whichever backend you configured (`llm_backend: cli` uses your own claude.ai session; `llm_backend: api` uses your own `ANTHROPIC_API_KEY`); see `DISCLAIMER.md` for Anthropic's Usage Policy. What goes: job descriptions; a filtered subset of your profile (see `profile_for_answers`/`_ANSWER_PROFILE_KEYS` in `base.py` — headline, summary, skills, experience, education, languages, publications; **not** salary targets, hard filters, or contact fields), used to score job fit and draft answers; any page text you paste into `prepare_application_from_paste` (up to its first 20,000 characters), since the model reads the questions out of it; and, only if you turn the tailored CV on, your CV pool (every bullet, the summary facts and your base summary and expertise lines) each time a CV is tailored to a job. `bootstrap_cv_pool` sends the same filtered profile plus your `location` field, which it uses as the default location of each drafted entry.
 - **Gmail** (optional, only if you run `setup_email`) — the sync reads your inbox via the Gmail
   API under your own OAuth credentials to detect interview-related emails. It is **read-only by
   default** (`mark_processed: false`) — it never modifies or labels your mail unless you opt in.
