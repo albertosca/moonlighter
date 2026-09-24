@@ -68,8 +68,9 @@ def test_slice_epilog_tolerates_a_dict_missing_some_slice_keys():
 
 
 def test_slice_epilog_pins_one_missing_line_verbatim():
-    # The README's jq example and a human reading --help both depend on this
-    # exact wording ("install X -> would add: NAME (cmds) -- summary").
+    # A human reading --help depends on this exact wording ("install X ->
+    # would add: NAME (cmds) -- summary"); scripts read doctor's JSON instead
+    # (the jq example in guide/*/reference/cli.md).
     # Membership checks (as in the test above) pass under a renamed field or
     # a reordered/reworded line -- this test fails the moment the format
     # actually changes, which is the point of a pin.
