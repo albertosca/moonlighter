@@ -80,7 +80,8 @@ jobs:
         run: uv sync --all-packages --all-extras
 
       - name: Export the locked dependency set
-        run: uv export --no-hashes --frozen --all-extras -o requirements.txt
+        # --all-groups: without it the docs group (zensical and its deps) is never audited.
+        run: uv export --no-hashes --frozen --all-extras --all-groups -o requirements.txt
 
       - name: Security audit (pip-audit against the lockfile)
         run: uv run --with pip-audit pip-audit --requirement requirements.txt

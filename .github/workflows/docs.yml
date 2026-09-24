@@ -20,9 +20,11 @@ permissions:
   pages: write
   id-token: write
 
+# Per-ref groups: a PR build no longer queues behind (or ahead of) a main deploy;
+# main deploys still serialize, and a newer PR push cancels its stale build.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: pages-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
