@@ -13,8 +13,14 @@ def _crf():
     return check_readme_facts
 
 
-def _facts(tests=1777, coverage=100, packages=5):
-    return _crf().Facts(tests=tests, coverage=coverage, packages=packages)
+def _facts(tests=1777, coverage=100, packages=5, branch_coverage=True, mypy_strict=True):
+    return _crf().Facts(
+        tests=tests,
+        coverage=coverage,
+        packages=packages,
+        branch_coverage=branch_coverage,
+        mypy_strict=mypy_strict,
+    )
 
 
 def _block(text: str) -> str:
@@ -71,6 +77,32 @@ def test_missing_or_duplicated_block_fails_instead_of_passing_vacuously():
     ]
 
 
+def test_a_branch_coverage_claim_needs_branch_coverage_on():
+    text = _block("1,700+ tests · 100% branch coverage (CI-gated) · 5 packages")
+    [problem] = _crf().fact_problems("README.md", text, _facts(branch_coverage=False))
+    assert "branch" in problem
+
+
+def test_the_portuguese_branch_claim_is_checked_too():
+    text = _block("1.700+ testes · 100% de cobertura de branches · 5 pacotes")
+    [problem] = _crf().fact_problems("README.pt.md", text, _facts(branch_coverage=False))
+    assert "branch" in problem
+
+
+def test_a_mypy_strict_claim_needs_strict_mypy():
+    text = _block("1,700+ tests · 100% · 5 packages · mypy strict")
+    [problem] = _crf().fact_problems("README.md", text, _facts(mypy_strict=False))
+    assert "mypy" in problem
+
+
+def test_facts_not_claimed_are_not_required():
+    text = _block("1,700+ tests · 100% · 5 packages")
+    assert (
+        _crf().fact_problems("README.md", text, _facts(branch_coverage=False, mypy_strict=False))
+        == []
+    )
+
+
 def test_a_block_missing_one_fact_is_reported():
     [problem] = _crf().fact_problems("README.md", _block("100% · 5 packages"), _facts())
     assert "test count" in problem
@@ -95,7 +127,21 @@ def test_real_facts_read_the_repo(tmp_path):
         (tmp_path / "packages" / slug / "pyproject.toml").write_text("")
     report = tmp_path / "r.xml"
     report.write_text('<testsuite tests="3"/>')
-    assert _crf().real_facts(tmp_path, report) == _facts(tests=3, coverage=100, packages=2)
+    assert _crf().real_facts(tmp_path, report) == _facts(
+        tests=3, coverage=100, packages=2, branch_coverage=False, mypy_strict=False
+    )
+
+
+def test_real_facts_read_branch_coverage_and_strict_mypy(tmp_path):
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.pytest.ini_options]\naddopts = "--cov-fail-under=100"\n'
+        "[tool.coverage.run]\nbranch = true\n"
+        "[tool.mypy]\nstrict = true\n"
+    )
+    report = tmp_path / "r.xml"
+    report.write_text('<testsuite tests="3"/>')
+    facts = _crf().real_facts(tmp_path, report)
+    assert facts.branch_coverage and facts.mypy_strict
 
 
 def test_slug_follows_github_rules():
