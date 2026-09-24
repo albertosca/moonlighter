@@ -6,7 +6,7 @@ Toda fatia também instala um comando que você pode disparar de um shell ou de 
 
 ## Saída e códigos de saída
 
-Cada comando imprime exatamente um documento JSON no stdout (os logs vão para o stderr) e sai com:
+Todo comando `moonlighter-*`, e o `moonlighter doctor`, imprime exatamente um documento JSON no stdout (os logs vão para o stderr) e sai com o código abaixo — o `moonlighter` puro é o servidor MCP via stdio e o `moonlighter init` é um assistente interativo, então nenhum dos dois imprime JSON:
 
 | Código | Significado |
 |---|---|
@@ -42,7 +42,7 @@ Os cinco pacotes são fatias de uma ferramenta só. Instale as que você precisa
   <img alt="Cada pacote do moonlighter funciona sozinho; instalar dois faz eles trabalharem juntos" src="https://albertosca.github.io/moonlighter/assets/diagrams/fitting-light.svg">
 </picture>
 
-*Cada pacote funciona sozinho, e instalar dois faz eles trabalharem juntos: o resultado do scan alimenta o `prepare`, e o +alias que uma folha de respostas cria é o mesmo que o `sync` usa para casar os e-mails de retorno. O `moonlighter` instala os três mais o `moonlighter-core`. Todo comando imprime um único documento JSON, seja o que for que você instale.*
+*Cada pacote funciona sozinho, e instalar dois faz eles trabalharem juntos: o resultado do scan alimenta o `prepare`, e o +alias que uma folha de respostas cria é o mesmo que o `sync` usa para casar os e-mails de retorno. O `moonlighter` instala os três mais o `moonlighter-core`. Todo comando `moonlighter-*` imprime um único documento JSON, seja o que for que você instale.*
 
 | Você instala | Você ganha |
 |---|---|
