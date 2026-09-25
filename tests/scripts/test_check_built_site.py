@@ -33,6 +33,8 @@ def _good_site(root: Path) -> tuple[Path, Path]:
         _write(lang_root / "stylesheets/night-shift.css", ":root{}")
         _write(lang_root / "index.html", DATE + _alternates(""))
         _write(lang_root / "guides/cv/index.html", DATE + _alternates("guides/cv/"))
+        _write(lang_root / "sitemap.xml", "<urlset/>")
+        _write(lang_root / "guides/cv/sitemap.xml", "<urlset/>")
     _write(site / "llms.txt", "# moonlighter")
     _write(site / "assets/diagrams/how-light.svg", "<svg/>")
     for lang in ("en", "pt"):
@@ -179,3 +181,12 @@ def test_theme_links_left_beside_the_right_ones_are_reported(tmp_path):
     _write(site / "guides/cv/index.html", DATE + theme_links + _alternates("guides/cv/"))
     [problem] = _cbs().site_problems(site, guide, require_dates=False)
     assert "hreflang" in problem
+
+
+def test_a_page_directory_without_its_sitemap_copy_is_reported(tmp_path):
+    # The theme's language switcher fetches sitemap.xml beside every hreflang
+    # URL; with per-page hreflang, a page directory without a copy is a 404.
+    site, guide = _good_site(tmp_path)
+    (site / "pt/guides/cv/sitemap.xml").unlink()
+    [problem] = _cbs().site_problems(site, guide, require_dates=False)
+    assert "sitemap.xml" in problem and "pt/guides/cv" in problem

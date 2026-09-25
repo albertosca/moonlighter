@@ -13,7 +13,8 @@ assets. This checks that:
   revision date — proof the stamp ran and the dates reached the theme;
 - every such page carries absolute hreflang links to itself in both languages plus
   x-default (the theme's own links named each language's home, relatively, which Google
-  discards).
+  discards), and a sitemap.xml beside it (the theme's language switcher fetches one next
+  to every hreflang URL; build_docs.sh copies it there).
 
 Usage:
     python scripts/check_built_site.py SITE GUIDE [--require-dates]
@@ -109,6 +110,8 @@ def site_problems(site: Path, guide: Path, require_dates: bool) -> list[str]:
                 problems.append(f"{html}: no revision date rendered")
             page_path = page_output(md.relative_to(guide / lang)).parent.as_posix()
             page_path = "" if page_path == "." else f"{page_path}/"
+            if not (html.parent / "sitemap.xml").is_file():
+                problems.append(f"{html.parent}: no sitemap.xml copy for the language switcher")
             expected = sorted(expected_alternates(page_path).items())
             if page_alternates(page_html) != expected:
                 problems.append(

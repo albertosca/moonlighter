@@ -27,6 +27,13 @@ if [ -d assets/diagrams ]; then cp -R assets/diagrams site/assets/diagrams; fi
 cp assets/site/night-shift.css site/stylesheets/night-shift.css
 cp assets/site/night-shift.css site/pt/stylesheets/night-shift.css
 if [ -f assets/site/social-preview.png ]; then mkdir -p site/assets/site && cp assets/site/social-preview.png site/assets/site/; fi
+# The theme's language switcher fetches sitemap.xml beside each hreflang URL, and ours are
+# per page (overrides/main.html): each page directory gets its language's sitemap, or
+# every page view fires two 404s.
+find site -name index.html -not -path 'site/pt/*' -not -path site/index.html \
+  -exec dirname {} \; | while read -r page_dir; do cp site/sitemap.xml "$page_dir/"; done
+find site/pt -name index.html -not -path site/pt/index.html \
+  -exec dirname {} \; | while read -r page_dir; do cp site/pt/sitemap.xml "$page_dir/"; done
 REQUIRE_DATES=""
 if [ "$STAMP" = "--stamp" ]; then REQUIRE_DATES="--require-dates"; fi
 uv run python scripts/check_built_site.py site guide $REQUIRE_DATES
