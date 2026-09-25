@@ -1,30 +1,27 @@
-> **[Leia em Português](https://github.com/albertosca/moonlighter/blob/main/packages/core/README.pt.md)**
+🇺🇸 [English](https://github.com/albertosca/moonlighter/blob/main/packages/core/README.md) · 🇧🇷 [Português](https://github.com/albertosca/moonlighter/blob/main/packages/core/README.pt.md)
 
 # moonlighter-core
 
-The foundation every other moonlighter slice stands on: the SQLite storage (Peewee models for jobs, applications and processed emails), the `MOONLIGHTER_HOME` configuration layer, your candidate profile, and the LLM client the whole pipeline shares.
+The foundation of [moonlighter](https://albertosca.github.io/moonlighter/): the local storage, the configuration, your candidate profile and the LLM client that the other slices share. It has no command of its own; you get it with any of them.
 
 ![How moonlighter works](https://albertosca.github.io/moonlighter/assets/diagrams/how-it-works-light.svg)
 
-Docs: https://albertosca.github.io/moonlighter/
-
-- **Storage** — plain SQLite under `~/.moonlighter/`, no server, no account: your pipeline is a file on your own disk you can query.
-- **Profile** — one `profile.yaml` describing who you are; every answer the pipeline drafts is drafted from it, and a question it gives no basis for comes back to you as a gap.
-- **LLM client** — switchable per config between the Claude Code CLI (billed to your Claude subscription, no API key) and the Anthropic SDK (your `ANTHROPIC_API_KEY`).
-- **Browser driver** — optional `[browser]` extra, used only by browser-based scan extensions. The core product never needs it.
+- **Storage** — a SQLite file under `MOONLIGHTER_HOME` (`~/.moonlighter` by default), no server and no account. Your pipeline is a file you can query.
+- **Profile** — one `profile.yaml` that says who you are. Every answer the pipeline drafts starts from it, and `criteria` holds the hard and soft filters that drive scoring.
+- **LLM client** — `llm_backend: cli` runs the Claude Code CLI on your Claude subscription; `llm_backend: api` uses the Anthropic SDK with your `ANTHROPIC_API_KEY`, read from the environment or from `~/.config/anthropic/api.env`.
+- **Doctor** — every slice's `doctor` command reports, as JSON, where the state lives, whether the config loads, and which slices are installed.
+- **Browser driver** — the optional `[browser]` extra, used only by browser-based scan extensions. The core flow never opens a browser.
 
 ## Part of moonlighter
 
-You rarely install this slice alone — [moonlighter](https://pypi.org/project/moonlighter/) pins it together with its three siblings and wires everything into an MCP server for Claude (`uvx moonlighter`).
-
 | Package | What it is |
 |---|---|
-| [moonlighter](https://pypi.org/project/moonlighter/) | The whole pipeline as an MCP server — start here |
-| **moonlighter-core** | ← you are here — storage, config, profile, LLM client |
-| [moonlighter-scan](https://pypi.org/project/moonlighter-scan/) | Job discovery across seven ATS platforms, plus LLM fit-scoring |
-| [moonlighter-apply](https://pypi.org/project/moonlighter-apply/) | Answer composition for application forms — you review, you submit |
-| [moonlighter-email](https://pypi.org/project/moonlighter-email/) | Employer-reply tracking via Gmail, matched back to each application |
+| [moonlighter](https://pypi.org/project/moonlighter/) | Everything below, plus the MCP server for Claude — start here |
+| **moonlighter-core** | ← you are here — storage, config, profile and the LLM client every slice shares |
+| [moonlighter-scan](https://pypi.org/project/moonlighter-scan/) | Finds postings on seven ATS platforms and scores them against your profile |
+| [moonlighter-apply](https://pypi.org/project/moonlighter-apply/) | Drafts the paste-ready answer sheet for one posting |
+| [moonlighter-email](https://pypi.org/project/moonlighter-email/) | Matches employer replies in Gmail back to each application |
 
 ## License
 
-[AGPL-3.0-only](https://github.com/albertosca/moonlighter/blob/main/LICENSE). Contributions require signing the [CLA](https://github.com/albertosca/moonlighter/blob/main/CLA.md).
+[AGPL-3.0-only](https://github.com/albertosca/moonlighter/blob/main/LICENSE). Contributions require signing the [CLA](https://github.com/albertosca/moonlighter/blob/main/CLA.md). What leaves your machine is in [PRIVACY.md](https://github.com/albertosca/moonlighter/blob/main/PRIVACY.md).

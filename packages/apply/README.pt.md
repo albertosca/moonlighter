@@ -1,31 +1,40 @@
-> **[Read in English](https://github.com/albertosca/moonlighter/blob/main/packages/apply/README.md)**
+🇺🇸 [English](https://github.com/albertosca/moonlighter/blob/main/packages/apply/README.md) · 🇧🇷 [Português](https://github.com/albertosca/moonlighter/blob/main/packages/apply/README.pt.md)
 
 # moonlighter-apply
 
-A fatia de respostas do moonlighter: ela lê cada pergunta que um formulário de candidatura faz e redige uma resposta pra cada uma, curada do teu perfil — e entrega tudo numa folha única revisável. Você lê, você cola, você aperta enviar. **Ela nunca abre browser, nunca toca no formulário, nunca envia.**
+A fatia de respostas do [moonlighter](https://albertosca.github.io/moonlighter/pt/): para uma vaga, ela reúne todas as perguntas do formulário de candidatura e rascunha uma resposta para cada uma a partir do seu perfil, numa folha só que você revisa e cola. **Ela nunca abre o formulário e nunca envia.**
 
 ![Como o moonlighter funciona](https://albertosca.github.io/moonlighter/assets/diagrams/how-it-works-light.svg)
 
-Documentação: https://albertosca.github.io/moonlighter/pt/
+## Use sozinho
 
-- **Perguntas direto da fonte** — onde o ATS publica o schema do formulário (Greenhouse, Recruitee), o `prepare_application` busca as perguntas reais, obrigatoriedades e opções direto da API.
-- **Qualquer outro formulário** — o `prepare_application_from_paste` faz o mesmo a partir do texto que você copia da página; funciona em qualquer ATS, inclusive atrás de login.
-- **Rascunhado do teu perfil, lacunas sinalizadas** — as respostas são rascunhadas a partir de um subconjunto filtrado do teu perfil; o modelo é instruído a responder UNKNOWN quando o perfil não dá base, e essa pergunta volta pra você como lacuna.
-- **Recusa em vez de converter** — campo ambíguo (salário em moeda errada, pergunta de visto confusa) volta pra tua revisão em vez de virar chute silencioso.
-- **Rastreio embutido** — cada folha carrega o alias de rastreio da candidatura, então a resposta do empregador pousa de volta no teu pipeline (ver [moonlighter-email](https://pypi.org/project/moonlighter-email/)).
+```bash
+uvx moonlighter-apply prepare 42                    # perguntas pela API do ATS da vaga
+uvx moonlighter-apply prepare 42 --paste page.txt   # perguntas lidas de um texto que você copiou
+uvx moonlighter-apply prepare --url https://...     # cadastra a vaga pela URL e prepara
+uvx moonlighter-apply doctor
+```
 
-## Parte do moonlighter
+Todo comando imprime um documento JSON no stdout.
 
-Dificilmente você instala esta fatia sozinha — o [moonlighter](https://pypi.org/project/moonlighter/) pina ela junto das três irmãs e liga tudo num servidor MCP pro Claude (`uvx moonlighter`).
+- **As perguntas de verdade** — onde o ATS publica o formulário (Greenhouse, Recruitee), as perguntas, a obrigatoriedade e as opções vêm direto da API.
+- **Qualquer outro formulário** — cole o texto da página e as perguntas são lidas dele; funciona em qualquer ATS, inclusive atrás de login.
+- **Lacunas em vez de chutes** — as respostas são rascunhadas a partir de uma parte filtrada do seu perfil. Uma pergunta sem base no perfil volta para você como lacuna, e perguntas que ele reconhece como de salário, compliance ou dados demográficos são preenchidas pela sua config ou deixadas para você, nunca respondidas pelo modelo.
+- **Um CV sob medida, se você quiser** — um CV de uma página em LaTeX para a vaga, com bullets escolhidos de um banco que você escreveu; o `bootstrap-cv` rascunha um primeiro banco a partir do seu perfil.
+- **Rastreio embutido** — cada folha leva o alias de rastreio da candidatura.
+
+## Funciona melhor com
+
+Com o [moonlighter-email](https://pypi.org/project/moonlighter-email/), as respostas para esse alias avançam a candidatura. Com o [moonlighter-scan](https://pypi.org/project/moonlighter-scan/), você prepara folhas direto da fila com nota.
 
 | Pacote | O que é |
 |---|---|
-| [moonlighter](https://pypi.org/project/moonlighter/) | O pipeline inteiro como servidor MCP — comece por aqui |
-| [moonlighter-core](https://pypi.org/project/moonlighter-core/) | Banco, config, perfil, cliente de LLM — a fundação |
-| [moonlighter-scan](https://pypi.org/project/moonlighter-scan/) | Descoberta de vagas em sete ATS, com nota de aderência por LLM |
-| **moonlighter-apply** | ← você está aqui — redação de respostas; você revisa, você envia |
-| [moonlighter-email](https://pypi.org/project/moonlighter-email/) | Rastreio de respostas de empregador via Gmail, casado com cada candidatura |
+| [moonlighter](https://pypi.org/project/moonlighter/) | Tudo abaixo, mais o servidor MCP para o Claude — comece por aqui |
+| [moonlighter-core](https://pypi.org/project/moonlighter-core/) | Armazenamento, config, perfil e o cliente de LLM que todas as fatias compartilham |
+| [moonlighter-scan](https://pypi.org/project/moonlighter-scan/) | Encontra vagas em sete plataformas de ATS e dá nota a cada uma contra o seu perfil |
+| **moonlighter-apply** | ← você está aqui — rascunha a folha de respostas pronta para colar de uma vaga |
+| [moonlighter-email](https://pypi.org/project/moonlighter-email/) | Liga as respostas das empresas no Gmail a cada candidatura |
 
 ## Licença
 
-[AGPL-3.0-only](https://github.com/albertosca/moonlighter/blob/main/LICENSE). Contribuições exigem assinar o [CLA](https://github.com/albertosca/moonlighter/blob/main/CLA.md).
+[AGPL-3.0-only](https://github.com/albertosca/moonlighter/blob/main/LICENSE). Contribuições exigem assinar o [CLA](https://github.com/albertosca/moonlighter/blob/main/CLA.md). O que sai da sua máquina está no [PRIVACY.md](https://github.com/albertosca/moonlighter/blob/main/PRIVACY.md) (em inglês).
