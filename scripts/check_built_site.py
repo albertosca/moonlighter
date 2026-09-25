@@ -10,7 +10,10 @@ assets. This checks that:
   dead-link the README with the build green); the READMEs are the root README.md and
   README.pt.md plus packages/*/README*.md, the repository root being GUIDE's parent;
 - every guide page produced an HTML page, and (with --require-dates) that page renders a
-  revision date — proof the stamp ran and the dates reached the theme.
+  revision date — proof the stamp ran and the dates reached the theme;
+- every such page carries absolute hreflang links to itself in both languages plus
+  x-default (the theme's own links named each language's home, relatively, which Google
+  discards).
 
 Usage:
     python scripts/check_built_site.py SITE GUIDE [--require-dates]
@@ -27,6 +30,8 @@ _PAGES_URL = re.compile(re.escape(SITE_URL) + r"([^\s\"'()<>]*)")
 _TRAILING_PUNCTUATION = ".,;:!?"
 _DATE_MARK = "md-source-file__fact"
 _LANG_OUTPUT = {"en": Path(), "pt": Path("pt")}
+_ALTERNATE_LINK = re.compile(r"<link\b[^>]*\brel=\"alternate\"[^>]*>")
+_ATTRIBUTE = re.compile(r'(\w[\w-]*)="([^"]*)"')
 
 
 def page_output(rel_md: Path) -> Path:
@@ -61,6 +66,25 @@ def _url_problem(source: Path, site: Path, rel: str) -> str | None:
     return None
 
 
+def expected_alternates(page_path: str) -> dict[str, str]:
+    return {
+        "en": f"{SITE_URL}{page_path}",
+        "pt": f"{SITE_URL}pt/{page_path}",
+        "x-default": f"{SITE_URL}{page_path}",
+    }
+
+
+def page_alternates(html: str) -> list[tuple[str, str]]:
+    """Every (hreflang, href) pair, duplicates kept: a stray second link for one
+    language must not hide behind the right one."""
+    alternates: list[tuple[str, str]] = []
+    for link in _ALTERNATE_LINK.findall(html):
+        attributes = dict(_ATTRIBUTE.findall(link))
+        if "hreflang" in attributes:
+            alternates.append((attributes["hreflang"], attributes.get("href", "")))
+    return sorted(alternates)
+
+
 def site_problems(site: Path, guide: Path, require_dates: bool) -> list[str]:
     problems: list[str] = []
     for lang_root in (site, site / "pt"):
@@ -79,8 +103,17 @@ def site_problems(site: Path, guide: Path, require_dates: bool) -> list[str]:
             html = site / out_prefix / page_output(md.relative_to(guide / lang))
             if not html.is_file():
                 problems.append(f"{md}: no built page at {html}")
-            elif require_dates and _DATE_MARK not in html.read_text():
+                continue
+            page_html = html.read_text()
+            if require_dates and _DATE_MARK not in page_html:
                 problems.append(f"{html}: no revision date rendered")
+            page_path = page_output(md.relative_to(guide / lang)).parent.as_posix()
+            page_path = "" if page_path == "." else f"{page_path}/"
+            expected = sorted(expected_alternates(page_path).items())
+            if page_alternates(page_html) != expected:
+                problems.append(
+                    f"{html}: hreflang links {page_alternates(page_html)} != {expected}"
+                )
     return problems
 
 

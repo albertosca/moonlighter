@@ -29,10 +29,10 @@ extra_css:
 extra:
   alternate:
     - name: English
-      link: /moonlighter/
+      link: https://albertosca.github.io/moonlighter/
       lang: en
     - name: Português
-      link: /moonlighter/pt/
+      link: https://albertosca.github.io/moonlighter/pt/
       lang: pt
 nav:
   - Home: index.md
