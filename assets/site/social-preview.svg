@@ -8,6 +8,6 @@
     <rect x="96" y="275" width="220" height="6" fill="#E3A23B"/>
     <text x="96" y="330" font-size="40">The job-application assistant</text>
     <text x="96" y="385" font-size="40">that leaves the last word to you.</text>
-    <text x="96" y="520" font-size="26" fill="#9AA8C4">1,700+ tests · 100% branch coverage · 5 packages on PyPI</text>
+    <text x="96" y="520" font-size="26" fill="#9AA8C4"><!-- facts -->1,700+ tests · 100% branch coverage · 5 packages on PyPI<!-- /facts --></text>
   </g>
 </svg>

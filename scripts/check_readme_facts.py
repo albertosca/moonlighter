@@ -1,5 +1,5 @@
-"""Keeps the proof numbers on the READMEs, the site home and llms.txt true, and the
-READMEs' relative links alive.
+"""Keeps the proof numbers on the READMEs, the site home, llms.txt and the social
+preview true, and the READMEs' relative links alive.
 
 Facts live between `<!-- facts -->` and `<!-- /facts -->`. Rules:
 - tests: the written "N+" must not exceed the real count (a false claim) and must not
@@ -29,6 +29,7 @@ FACT_FILES = (
     "guide/en/index.md",
     "guide/pt/index.md",
     "guide/en/llms.txt",
+    "assets/site/social-preview.svg",
 )
 LINK_FILES = ("README.md", "README.pt.md")
 STALE_BAND = 200
