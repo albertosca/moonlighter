@@ -26,7 +26,7 @@ Outside `packages/`: `guide/en|pt` (docs site source) · `scripts/` (CI checks, 
 - Zensical is pre-1.0: build a Dependabot bump locally (`uv run --group docs --with zensical==X zensical build --strict -f zensical.en.yml`) before merging it.
 - After a social-preview PNG change, re-upload it in GitHub Settings → Social preview (UI only); verify with `curl -s https://github.com/albertosca/moonlighter | grep og:image`.
 - Diagrams: edit `assets/diagrams/src/*.svg` ({{fg}}/{{muted}}/{{accent}}/{{ground}}), then `uv run python scripts/render_diagrams.py` — never hand-edit the generated `*-light.svg`/`*-dark.svg`.
-- A workflow using `setup-uv` pinned to 0.7.6 needs `actions/setup-python` 3.14 first — alone, uv 0.7.6 picks cpython-3.14.0a7 and Zensical crashes.
+- CI pins uv to the version that writes the lock locally (0.12.19 since 2026-09-25) and keeps `actions/setup-python` 3.14 before `setup-uv`: the old 0.7.6 pin, alone, picked cpython-3.14.0a7 and Zensical crashed. `setup-uv` has no floating major tags since v8 — pin an exact tag.
 - Zensical strips accents from heading anchors, GitHub keeps them: README links into the site are absolute site URLs, checked with their `#anchors` by `scripts/check_built_site.py`.
 - `.gitignore` anchors `/site/` on purpose — unanchored `site/` also ignores `assets/site/`.
 - Public copy (READMEs, guide/, plugin and package descriptions): banned claims and the approved headline live in `docs/superpowers/product-marketing.md` — read it first.
