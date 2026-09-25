@@ -28,7 +28,7 @@ A conversa é ilustrativa: o Claude repassa a saída da ferramenta com as própr
 
 1. **Cada nota vai de 0 a 10**, dada pelo LLM ao comparar a vaga com o seu `profile.yaml`, incluindo os filtros duros e flexíveis em `criteria`.
 2. **Abaixo do limiar, a vaga é arquivada automaticamente.** O limiar é o `score_threshold` do `config.yaml`, 6.5 por padrão. Uma vaga que quebra um dos seus filtros duros (".NET" acima) recebe nota baixa e é arquivada com o motivo.
-3. **Algumas vagas são arquivadas antes de qualquer chamada de LLM.** Um título que casa com o `title_blocklist` do `config.yaml` é gravado como `archived` com uma observação, sem receber nota. O mesmo vale para uma vaga presencial ou híbrida fora de Belo Horizonte (MG): essa região está fixa no código hoje, e torná-la configurável está planejado. Uma vaga remota, ou uma cuja localização não resolve a questão, segue para receber nota.
+3. **Algumas vagas são arquivadas antes de qualquer chamada de LLM.** Um título que casa com o `title_blocklist` do `config.yaml` é gravado como `archived` com uma observação, sem receber nota. O mesmo vale para uma vaga presencial ou híbrida fora da cidade que você definir em `criteria.home_city` no `profile.yaml`; sem essa chave, nada é arquivado por localização. Uma vaga remota, ou uma cuja localização não resolve a questão, segue para receber nota.
 4. **Uma descrição vazia não pode receber nota.** Essas vagas esperam como `needs_review`: peça o `list_jobs` com status `needs_review`, abra a vaga, copie a página inteira e passe o texto ao `verify_job` para dar a nota.
 5. **Veja o que passou** com o `list_jobs` (status `new` por padrão) e abra uma vaga com o `get_job` para ver os detalhes completos e o histórico.
 

@@ -22,9 +22,9 @@ jobs:
         run: python scripts/check_version_lockstep.py
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10.2.0
         with:
-          version: "0.7.6"
+          version: "0.12.19"
 
       - name: Install dependencies
         run: uv sync --all-packages --all-extras
@@ -72,15 +72,16 @@ jobs:
           python-version: "3.14"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10.2.0
         with:
-          version: "0.7.6"
+          version: "0.12.19"
 
       - name: Install dependencies
         run: uv sync --all-packages --all-extras
 
       - name: Export the locked dependency set
-        run: uv export --no-hashes --frozen --all-extras -o requirements.txt
+        # --all-groups: without it the docs group (zensical and its deps) is never audited.
+        run: uv export --no-hashes --frozen --all-extras --all-groups -o requirements.txt
 
       - name: Security audit (pip-audit against the lockfile)
         run: uv run --with pip-audit pip-audit --requirement requirements.txt

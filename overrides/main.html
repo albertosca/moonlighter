@@ -1,4 +1,19 @@
 {% extends "base.html" %}
+{% block site_meta %}
+  {#- The theme links every page to each language's HOME, relatively; Google wants
+      absolute hreflang URLs to the same page. The EN and PT trees are identical, so the
+      counterpart is the language root plus this page's path. -#}
+  {%- set meta = namespace(html=super()) -%}
+  {%- for alt in config.extra.alternate -%}
+    {%- set meta.html = meta.html | replace('<link rel="alternate" href="' ~ (alt.link | url) ~ '" hreflang="' ~ alt.lang ~ '">', '') -%}
+  {%- endfor -%}
+  {{ meta.html }}
+  {%- set page_path = page.url if page and page.url else "" %}
+  {%- for alt in config.extra.alternate %}
+  <link rel="alternate" href="{{ alt.link }}{{ page_path }}" hreflang="{{ alt.lang }}">
+  {%- endfor %}
+  <link rel="alternate" href="{{ config.extra.alternate[0].link }}{{ page_path }}" hreflang="x-default">
+{% endblock %}
 {% block extrahead %}
   <meta property="og:image" content="https://albertosca.github.io/moonlighter/assets/site/social-preview.png">
   <meta property="og:image:width" content="1280">

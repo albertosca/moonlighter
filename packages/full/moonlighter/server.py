@@ -374,7 +374,7 @@ async def update_status(
 ) -> str:
     """
     Update application status manually.
-    status: 'screening' | 'interview' | 'offer' | 'rejected' | 'submitted' | 'draft'
+    status: 'screening' | 'interviews' | 'offer' | 'rejected' | 'submitted' | 'draft'
     notes: free text notes appended to history
     next_action: e.g. 'follow up on 2026-06-01'
     """

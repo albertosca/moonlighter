@@ -56,11 +56,11 @@ If ANY hard filter is triggered by the job posting, the score MUST be ≤ 2.0, r
 List the violated filter(s) in `caveats`.
 
 ## Regional eligibility
-The candidate works from Belo Horizonte, Brazil. A posting is eligible only when it is remote with
-coverage that includes Brazil (Brazil/LATAM/Americas/global/worldwide), or on-site/hybrid in Belo
-Horizonte itself. When a Location line names another country, region or city and neither it nor the
-description grants such coverage, that is a triggered hard filter — do not reinterpret the stated
-location as an inconsistency to discount; score it ≤ 2.0 and record the reason in `caveats`.
+When a hard filter concerns where the candidate can work from, judge it against the posting's
+Location and Remote type lines as well as the description. When a Location line names a country,
+region or city that neither it nor the description opens to the candidate, that is a triggered hard
+filter — do not reinterpret the stated location as an inconsistency to discount; score it ≤ 2.0 and
+record the reason in `caveats`. With no such hard filter, location alone never caps the score.
 
 ## Mandatory requirements
 When the posting marks a requirement as mandatory/required/must-have/non-negotiable and the
@@ -268,11 +268,11 @@ If ANY hard filter is triggered by a posting, that posting's score MUST be ≤ 2
 List the violated filter(s) in `caveats`.
 
 ## Regional eligibility
-The candidate works from Belo Horizonte, Brazil. A posting is eligible only when it is remote with
-coverage that includes Brazil (Brazil/LATAM/Americas/global/worldwide), or on-site/hybrid in Belo
-Horizonte itself. When a Location line names another country, region or city and neither it nor the
-description grants such coverage, that is a triggered hard filter — do not reinterpret the stated
-location as an inconsistency to discount; score it ≤ 2.0 and record the reason in `caveats`.
+When a hard filter concerns where the candidate can work from, judge it against the posting's
+Location and Remote type lines as well as the description. When a Location line names a country,
+region or city that neither it nor the description opens to the candidate, that is a triggered hard
+filter — do not reinterpret the stated location as an inconsistency to discount; score it ≤ 2.0 and
+record the reason in `caveats`. With no such hard filter, location alone never caps the score.
 
 ## Mandatory requirements
 When the posting marks a requirement as mandatory/required/must-have/non-negotiable and the

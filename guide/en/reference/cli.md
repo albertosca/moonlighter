@@ -6,7 +6,7 @@ Every slice also installs a command you can drive from a shell or a cron job, wi
 
 ## Output and exit codes
 
-Each command prints exactly one JSON document on stdout (logs go to stderr) and exits:
+Every `moonlighter-*` command, and `moonlighter doctor`, prints exactly one JSON document on stdout (logs go to stderr) and exits — bare `moonlighter` is the MCP server over stdio and `moonlighter init` is an interactive wizard, so neither prints JSON:
 
 | Exit | Meaning |
 |---|---|
@@ -42,7 +42,7 @@ The five packages are slices of one tool. Install the ones you need; each comman
   <img alt="Each moonlighter package works alone; installing two lets them work together" src="https://albertosca.github.io/moonlighter/assets/diagrams/fitting-light.svg">
 </picture>
 
-*Each package works alone, and installing two lets them work together: scan results feed `prepare`, and the +alias a sheet mints is the one `sync` matches replies against. `moonlighter` installs the three plus `moonlighter-core`. Every command prints one JSON document, whatever you install.*
+*Each package works alone, and installing two lets them work together: scan results feed `prepare`, and the +alias a sheet mints is the one `sync` matches replies against. `moonlighter` installs the three plus `moonlighter-core`. Every `moonlighter-*` command prints one JSON document, whatever you install.*
 
 | You install | You get |
 |---|---|

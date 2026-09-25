@@ -747,6 +747,25 @@ async def test_update_status_success(tmp_db):
     assert "screening" in result
 
 
+async def test_update_status_documents_exactly_the_accepted_statuses(tmp_db):
+    # The MCP client is an LLM that follows the docstring: a documented
+    # 'interview' against an accepted 'interviews' made correct-looking calls fail.
+    import re
+
+    init_db()
+    job = create_job(tmp_db, url="https://x.com/us-doc")
+    create_application(job)
+    from moonlighter.server import update_status
+
+    doc_line = next(
+        line for line in (update_status.__doc__ or "").splitlines() if "status:" in line
+    )
+    documented = set(re.findall(r"'([a-z_]+)'", doc_line))
+    rejection = await update_status(job_id=job.id, status="?", ctx=make_test_context())
+    accepted = set(rejection.split("Accepted values: ")[1].split(", "))
+    assert documented == accepted
+
+
 async def test_update_status_syncs_job_status(tmp_db):
     # 2026-08-21: 5 jobs sat 'new' with a real submitted Application — the
     # queue nearly offered a duplicate application twice in one session.

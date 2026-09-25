@@ -10,7 +10,7 @@ O moonlighter roda na sua própria máquina como um servidor MCP para o Claude C
 - Chrome, Chromium ou Brave — opcional, só necessário se você instalar uma extensão de scan baseada em browser (ex.: scan do LinkedIn, veja [Extensões](../guides/extensions.md)). O produto base (escanear as APIs de ATS configuradas e preparar candidaturas) nunca abre um browser.
 - Um backend de LLM, alternável no `config.yaml` a qualquer momento:
   - `llm_backend: cli` (padrão) — o [Claude Code CLI](https://claude.ai/code), cobrado na sua assinatura do Claude. Sem API key.
-  - `llm_backend: api` — o SDK da Anthropic, cobrado em créditos de API. Exige `ANTHROPIC_API_KEY` no ambiente.
+  - `llm_backend: api` — o SDK da Anthropic, cobrado em créditos de API. Exige `ANTHROPIC_API_KEY`: do ambiente ou, quando ela não estiver lá, de uma linha `ANTHROPIC_API_KEY=...` em `~/.config/anthropic/api.env`.
 - Credenciais OAuth do Gmail (opcional — só para o [acompanhamento pelo Gmail](gmail.md))
 
 ## Configuração

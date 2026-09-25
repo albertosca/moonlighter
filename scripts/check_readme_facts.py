@@ -1,5 +1,5 @@
-"""Keeps the proof numbers on the READMEs, the site home and llms.txt true, and the
-READMEs' relative links alive.
+"""Keeps the proof numbers on the READMEs, the site home, llms.txt and the social
+preview true, and the READMEs' relative links alive.
 
 Facts live between `<!-- facts -->` and `<!-- /facts -->`. Rules:
 - tests: the written "N+" must not exceed the real count (a false claim) and must not
@@ -8,6 +8,8 @@ Facts live between `<!-- facts -->` and `<!-- /facts -->`. Rules:
   35-56 s and, without --no-cov, prints a false coverage FAIL (measured 2026-09-23).
 - coverage: the written percentage must equal --cov-fail-under in pyproject.toml.
 - packages: the written count must equal the number of packages/*/pyproject.toml.
+- "branch" and "mypy strict", when claimed, must match [tool.coverage.run] branch and
+  [tool.mypy] strict in pyproject.toml.
 Every file in FACT_FILES must hold exactly one block — a missing block must not pass.
 
 Usage:
@@ -27,6 +29,7 @@ FACT_FILES = (
     "guide/en/index.md",
     "guide/pt/index.md",
     "guide/en/llms.txt",
+    "assets/site/social-preview.svg",
 )
 LINK_FILES = ("README.md", "README.pt.md")
 STALE_BAND = 200
@@ -35,6 +38,8 @@ _BLOCK = re.compile(r"<!-- facts -->(.*?)<!-- /facts -->", re.DOTALL)
 _TESTS = re.compile(r"(\d[\d.,]*)\+\s*(?:tests|testes)")
 _COVERAGE = re.compile(r"(\d+)%")
 _PACKAGES = re.compile(r"(\d+)\s*(?:packages|pacotes)")
+_BRANCH_CLAIM = re.compile(r"\bbranch(?:es)?\b", re.IGNORECASE)
+_MYPY_STRICT_CLAIM = re.compile(r"\bmypy strict\b", re.IGNORECASE)
 _FENCE = re.compile(r"^\s*(```|~~~)")
 _HEADING = re.compile(r"^#{1,6}\s+(.*?)\s*#*\s*$")
 _MD_LINK = re.compile(r"\]\(([^)\s]+)")
@@ -46,6 +51,8 @@ class Facts:
     tests: int
     coverage: int
     packages: int
+    branch_coverage: bool
+    mypy_strict: bool
 
 
 def junit_test_count(junit: Path) -> int:
@@ -55,14 +62,19 @@ def junit_test_count(junit: Path) -> int:
 
 
 def real_facts(repo: Path, junit: Path) -> Facts:
-    addopts = tomllib.loads((repo / "pyproject.toml").read_text())["tool"]["pytest"]["ini_options"][
-        "addopts"
-    ]
+    tool = tomllib.loads((repo / "pyproject.toml").read_text())["tool"]
+    addopts = tool["pytest"]["ini_options"]["addopts"]
     gate = re.search(r"--cov-fail-under=(\d+)", addopts)
     if gate is None:
         raise ValueError("pyproject.toml addopts has no --cov-fail-under")
     packages = len(list((repo / "packages").glob("*/pyproject.toml")))
-    return Facts(tests=junit_test_count(junit), coverage=int(gate.group(1)), packages=packages)
+    return Facts(
+        tests=junit_test_count(junit),
+        coverage=int(gate.group(1)),
+        packages=packages,
+        branch_coverage=tool.get("coverage", {}).get("run", {}).get("branch", False) is True,
+        mypy_strict=tool.get("mypy", {}).get("strict", False) is True,
+    )
 
 
 def _number(raw: str) -> int:
@@ -94,6 +106,10 @@ def fact_problems(name: str, text: str, real: Facts) -> list[str]:
     packages = _PACKAGES.search(block)
     if packages is None or int(packages.group(1)) != real.packages:
         problems.append(f"{name}: package count must read {real.packages}")
+    if _BRANCH_CLAIM.search(block) and not real.branch_coverage:
+        problems.append(f"{name}: claims branch coverage but [tool.coverage.run] branch is off")
+    if _MYPY_STRICT_CLAIM.search(block) and not real.mypy_strict:
+        problems.append(f"{name}: claims mypy strict but [tool.mypy] strict is off")
     return problems
 
 

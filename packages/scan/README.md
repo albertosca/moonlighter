@@ -1,31 +1,41 @@
-> **[Leia em Português](https://github.com/albertosca/moonlighter/blob/main/packages/scan/README.pt.md)**
+🇺🇸 [English](https://github.com/albertosca/moonlighter/blob/main/packages/scan/README.md) · 🇧🇷 [Português](https://github.com/albertosca/moonlighter/blob/main/packages/scan/README.pt.md)
 
 # moonlighter-scan
 
-The discovery slice of moonlighter: it sweeps the job boards you care about and hands you only the postings worth your time — each one scored against **your** profile by an LLM, with the reasoning written down.
+The discovery slice of [moonlighter](https://albertosca.github.io/moonlighter/): it checks the job boards of the companies you list and scores each new posting against your profile, so you only read the ones worth reading.
 
 ![How moonlighter works](https://albertosca.github.io/moonlighter/assets/diagrams/how-it-works-light.svg)
 
-Docs: https://albertosca.github.io/moonlighter/
+## Use it on its own
 
-- **Seven ATS platforms** — Greenhouse, Lever, Ashby, Recruitee (custom career domains included), Workable, SmartRecruiters and InHire, driven by a company list you configure.
-- **Optional portals** — Gupy, RemoteOK, Remotive, WeWorkRemotely and HN Who's Hiring, config-gated off by default, with keyword filtering.
-- **Ad-hoc scans** — point `scan_company` at any company slug ("what's open at trm-labs on Ashby?") without touching your config.
-- **LLM evaluation** — every new posting is scored against your profile and hard filters; below-threshold jobs are archived automatically, with the verdict kept for audit.
-- **Dedup that holds** — URL-normalized, so the same job through two doors stays one row.
+```bash
+uvx moonlighter-scan                          # scan company_list.yaml, score new postings
+uvx moonlighter-scan --company ashby trm-labs # one company's board
+uvx moonlighter-scan --no-eval                # store postings unscored, no LLM call
+uvx moonlighter-scan doctor
+```
 
-## Part of moonlighter
+Every command prints one JSON document on stdout and exits `1` on a quiet day with nothing new, so it fits a cron job and `jq`.
 
-You rarely install this slice alone — [moonlighter](https://pypi.org/project/moonlighter/) pins it together with its three siblings and wires everything into an MCP server for Claude (`uvx moonlighter`).
+- **Seven ATS platforms** — Greenhouse, Lever, Ashby, Recruitee (custom career domains included), Workable, SmartRecruiters and InHire.
+- **Optional portals** — Gupy, RemoteOK, Remotive, We Work Remotely and HN Who's Hiring, off until you enable them, filtered by keyword.
+- **Scored with the reasoning kept** — each posting gets 0–10 against your profile and hard filters; below your threshold it is archived, with the verdict kept.
+- **Cheap cuts first** — titles on your blocklist, and on-site or hybrid postings outside the `criteria.home_city` you set in your profile, are archived before any LLM call.
+- **Closed postings archived** — jobs that disappeared from their board are archived on the next scan.
+- **One row per job** — URLs are normalised, so the same posting found twice stays one job.
+
+## Works better with
+
+With [moonlighter-apply](https://pypi.org/project/moonlighter-apply/), one script scans, picks by score and prepares a sheet for each pick. With [moonlighter](https://pypi.org/project/moonlighter/), you ask Claude instead.
 
 | Package | What it is |
 |---|---|
-| [moonlighter](https://pypi.org/project/moonlighter/) | The whole pipeline as an MCP server — start here |
-| [moonlighter-core](https://pypi.org/project/moonlighter-core/) | Storage, config, profile, LLM client — the foundation |
-| **moonlighter-scan** | ← you are here — job discovery and LLM fit-scoring |
-| [moonlighter-apply](https://pypi.org/project/moonlighter-apply/) | Answer composition for application forms — you review, you submit |
-| [moonlighter-email](https://pypi.org/project/moonlighter-email/) | Employer-reply tracking via Gmail, matched back to each application |
+| [moonlighter](https://pypi.org/project/moonlighter/) | Everything below, plus the MCP server for Claude — start here |
+| [moonlighter-core](https://pypi.org/project/moonlighter-core/) | Storage, config, profile and the LLM client every slice shares |
+| **moonlighter-scan** | ← you are here — finds postings on seven ATS platforms and scores them against your profile |
+| [moonlighter-apply](https://pypi.org/project/moonlighter-apply/) | Drafts the paste-ready answer sheet for one posting |
+| [moonlighter-email](https://pypi.org/project/moonlighter-email/) | Matches employer replies in Gmail back to each application |
 
 ## License
 
-[AGPL-3.0-only](https://github.com/albertosca/moonlighter/blob/main/LICENSE). Contributions require signing the [CLA](https://github.com/albertosca/moonlighter/blob/main/CLA.md).
+[AGPL-3.0-only](https://github.com/albertosca/moonlighter/blob/main/LICENSE). Contributions require signing the [CLA](https://github.com/albertosca/moonlighter/blob/main/CLA.md). What leaves your machine is in [PRIVACY.md](https://github.com/albertosca/moonlighter/blob/main/PRIVACY.md).

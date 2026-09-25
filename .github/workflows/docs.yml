@@ -20,9 +20,11 @@ permissions:
   pages: write
   id-token: write
 
+# Per-ref groups: a PR build no longer queues behind (or ahead of) a main deploy;
+# main deploys still serialize, and a newer PR push cancels its stale build.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: pages-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -34,9 +36,9 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
-          version: "0.7.6"
+          version: "0.12.19"
       - name: Build (stamped, checked)
         run: bash scripts/build_docs.sh --stamp
       - uses: actions/upload-pages-artifact@v5

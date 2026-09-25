@@ -22,6 +22,7 @@ CONFIG = {
     "title_blocklist": ["staff accountant"],
 }
 PROFILE: dict = {}
+HOME_BH: dict = {"criteria": {"home_city": "Belo Horizonte"}}
 
 
 def _eval(score=8.0, caveats=None):
@@ -486,7 +487,9 @@ class _FakeBrowserScanner:
         return self._jobs
 
 
-async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=None, config=None):
+async def _run_scan(
+    raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=None, config=None, profile=None
+):
     """Runs scan_and_evaluate with mocked HTTP scanners serving `raws`.
 
     linkedin_exc: the exception the registered browser-scanner plugin's scan()
@@ -525,7 +528,9 @@ async def _run_scan(raws, *, eval_mock=None, linkedin_exc=None, linkedin_jobs=No
         MockLV.return_value.scan = AsyncMock(return_value=[])
         MockAB.return_value.scan = AsyncMock(return_value=[])
         mock_browser.new_page = AsyncMock(return_value=AsyncMock())
-        report = await scan_service.scan_and_evaluate("", "all", cfg, PROFILE, MagicMock())
+        report = await scan_service.scan_and_evaluate(
+            "", "all", cfg, profile if profile is not None else PROFILE, MagicMock()
+        )
         return render_scan_report(report)
 
 
@@ -582,12 +587,31 @@ async def test_scan_ineligible_location_archives_without_llm(tmp_db):
         description="A detailed job description that goes on.",
     )
     boom = AsyncMock(side_effect=AssertionError("LLM must not run for ineligible locations"))
-    result = await _run_scan([raw], eval_mock=boom)
+    result = await _run_scan([raw], eval_mock=boom, profile=HOME_BH)
     job = Job.get(Job.url == "https://x.com/scan/abroad")
     assert job.status == "archived"
     assert job.score == 0.0
     assert "location ineligible" in job.score_notes
     assert "location ineligible" in result.lower()
+
+
+async def test_scan_without_a_home_city_never_archives_by_location(tmp_db):
+    # A profile with no criteria.home_city (every public user by default):
+    # onsite abroad is not impossible for them, so the LLM decides.
+    init_db()
+    raw = RawJob(
+        source="greenhouse",
+        company="Abroad Co",
+        title="Engineer",
+        url="https://x.com/scan/abroad-no-home",
+        location="Bangalore, India",
+        remote_type="onsite",
+        description="A detailed job description that goes on.",
+    )
+    await _run_scan([raw])
+    job = Job.get(Job.url == "https://x.com/scan/abroad-no-home")
+    assert "location ineligible" not in (job.score_notes or "")
+    assert job.score == 8.0
 
 
 async def test_scan_ambiguous_location_still_reaches_the_llm(tmp_db):
@@ -711,7 +735,7 @@ async def test_scan_location_ineligible_integrity_error_skips_silently(tmp_db):
         remote_type="onsite",
         description="A detailed job description that goes on.",
     )
-    result = await _run_scan([raw])
+    result = await _run_scan([raw], profile=HOME_BH)
     assert "processed" in result and "No new jobs found" not in result
 
 

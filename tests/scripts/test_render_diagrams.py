@@ -46,3 +46,14 @@ def test_every_shipped_source_renders_in_both_themes():
                 and "<style" not in out
                 and "foreignObject" not in out
             )
+
+
+def test_no_text_is_painted_in_a_low_contrast_token():
+    # On the light ground muted measures 2.11:1 and accent 1.95:1 (WCAG asks
+    # 4.5:1 for text). The amber stays on strokes; text uses the ink.
+    import re
+
+    low_contrast_text = re.compile(r'<text[^>]*fill="\{\{(?:muted|accent)\}\}"')
+    sources = sorted((_SCRIPTS_DIR.parent / "assets/diagrams/src").glob("*.svg"))
+    offenders = [source.name for source in sources if low_contrast_text.search(source.read_text())]
+    assert offenders == []

@@ -238,6 +238,30 @@ def validate_config(config: dict[str, Any]) -> None:
                     )
 
 
+def anthropic_api_env_file() -> Path:
+    """The per-provider credential file: `NAME=value` lines, no quotes, mode 0600."""
+    return Path.home() / ".config" / "anthropic" / "api.env"
+
+
+def _fill_api_key_from_file() -> None:
+    """Set ANTHROPIC_API_KEY from the provider file when the environment lacks it.
+
+    The environment always wins; a missing or unreadable file is silently
+    skipped, so the startup check still reports the absent key.
+    """
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return
+    try:
+        lines = anthropic_api_env_file().read_text().splitlines()
+    except OSError, UnicodeDecodeError:
+        return
+    for line in lines:
+        name, separator, value = line.partition("=")
+        if separator and name.strip() == "ANTHROPIC_API_KEY" and value.strip():
+            os.environ["ANTHROPIC_API_KEY"] = value.strip()
+            return
+
+
 def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
     """
     Load configuration from YAML file, merging with defaults.
@@ -283,6 +307,10 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
             merged = list(dict.fromkeys(manual + learned_patterns))  # dedup, manual first
             config["title_blocklist"] = merged
 
+    # Only the api backend needs the key; the cli backend strips it on purpose
+    # (llm.py) so `claude -p` bills the subscription.
+    if config.get("llm_backend") == "api":
+        _fill_api_key_from_file()
     return config
 
 
