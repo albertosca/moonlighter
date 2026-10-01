@@ -16,11 +16,11 @@ Pode — qualquer LLM pode. O moonlighter reduz o espaço para isso: as resposta
 
 ### Funciona sem o Claude?
 
-Em parte. As [ferramentas de linha de comando](reference/cli.md) rodam de qualquer shell ou cron job sem o Claude como cliente MCP, e `moonlighter-scan --no-eval` escaneia sem nenhuma chamada de LLM. Dar nota às vagas, rascunhar respostas e classificar respostas de recrutadores precisa de um backend de LLM: hoje é o da Anthropic, pelo Claude Code CLI (`llm_backend: cli`) ou pela API (`llm_backend: api`).
+Em parte. As [ferramentas de linha de comando](reference/cli.md) rodam de qualquer shell ou cron job sem o Claude como cliente MCP, e `moonlighter-scan --no-eval` escaneia sem nenhuma chamada de LLM. Dar nota às vagas, rascunhar respostas e classificar respostas de recrutadores precisa de um backend de LLM: o da Anthropic, pelo Claude Code CLI (`llm_backend: cli`) ou pela API (`llm_backend: api`), ou o do Cursor, pela CLI do Cursor (`llm_backend: cursor`).
 
 ### O que sai da minha máquina?
 
-Seu pipeline — vagas, respostas rascunhadas, histórico de candidaturas — é um arquivo SQLite local em `MOONLIGHTER_HOME`. O que sai é o que vai para os serviços que você configura. Para o LLM (Claude): descrições de vagas, um subconjunto filtrado do seu perfil, os bullets do seu banco de CV quando o [CV sob medida](guides/tailored-cv.md) está ligado e qualquer texto de página que você cole no `prepare_application_from_paste`. Além disso: requisições só de leitura aos portais de vagas e, se você ligar o [acompanhamento pelo Gmail](getting-started/gmail.md), seus e-mails recentes, lidos pela API do Gmail e enviados ao LLM para serem classificados. Não existe servidor do moonlighter nem telemetria. O [PRIVACY.md](https://github.com/albertosca/moonlighter/blob/main/PRIVACY.md) (em inglês) tem os detalhes.
+Seu pipeline — vagas, respostas rascunhadas, histórico de candidaturas — é um arquivo SQLite local em `MOONLIGHTER_HOME`. O que sai é o que vai para os serviços que você configura. Para o LLM: descrições de vagas, um subconjunto filtrado do seu perfil, os bullets do seu banco de CV quando o [CV sob medida](guides/tailored-cv.md) está ligado e qualquer texto de página que você cole no `prepare_application_from_paste`. Com `cli` ou `api` esse provedor é a Anthropic; com `cursor`, é o Cursor e o modelo da conta. Além disso: requisições só de leitura aos portais de vagas e, se você ligar o [acompanhamento pelo Gmail](getting-started/gmail.md), seus e-mails recentes, lidos pela API do Gmail e enviados ao LLM para serem classificados. Não existe servidor do moonlighter nem telemetria. O [PRIVACY.md](https://github.com/albertosca/moonlighter/blob/main/PRIVACY.md) (em inglês) tem os detalhes.
 
 ## Solução de problemas
 
@@ -28,6 +28,7 @@ Seu pipeline — vagas, respostas rascunhadas, histórico de candidaturas — é
 - **`uvx moonlighter` roda uma versão velha** — o uvx faz cache de ambientes; rode `uvx --refresh moonlighter` uma vez depois de um release.
 - **O scan não acha nada** — confira o `company_list.yaml`: cada entrada precisa do slug real da empresa no ATS (a parte da URL da página de vagas dela), sob a chave de fonte certa. Teste uma empresa com o `scan_company` antes de escanear tudo.
 - **Erros de LLM com `llm_backend: cli`** — o backend padrão chama o [Claude Code CLI](https://claude.ai/code); ele precisa estar instalado e logado. Troque para `llm_backend: api` + `ANTHROPIC_API_KEY` se preferir pagar em créditos de API.
+- **Erros de LLM com `llm_backend: cursor`** — a CLI do Cursor (`agent`, ou `cursor-agent`) precisa estar instalada, e o `agent login` feito.
 - **Avisos de "missing profile / CV"** — peça ao Claude para rodar o `get_pipeline`: além do funil, ele reporta exatamente qual arquivo de configuração falta e onde ele deve ficar.
 - **A sincronização do Gmail não faz nada** — o acompanhamento por e-mail é opcional e fica desligado até o `setup_email` completar o fluxo OAuth; veja [Acompanhamento pelo Gmail](getting-started/gmail.md).
 

@@ -11,6 +11,7 @@ O moonlighter roda na sua própria máquina como um servidor MCP para o Claude C
 - Um backend de LLM, alternável no `config.yaml` a qualquer momento:
   - `llm_backend: cli` (padrão) — o [Claude Code CLI](https://claude.ai/code), cobrado na sua assinatura do Claude. Sem API key.
   - `llm_backend: api` — o SDK da Anthropic, cobrado em créditos de API. Exige `ANTHROPIC_API_KEY`: do ambiente ou, quando ela não estiver lá, de uma linha `ANTHROPIC_API_KEY=...` em `~/.config/anthropic/api.env`.
+  - `llm_backend: cursor` — a [CLI do Cursor](https://cursor.com/docs/cli/overview) (`agent`, ou `cursor-agent`), depois de `agent login`. Sem API key. `cursor_model` é opcional; sem ele, vale o modelo padrão da conta.
 - Credenciais OAuth do Gmail (opcional — só para o [acompanhamento pelo Gmail](gmail.md))
 
 ## Configuração

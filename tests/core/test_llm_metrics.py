@@ -3,11 +3,20 @@ active — CLI records time only (no token usage exposed), API records real
 message.usage tokens."""
 
 import contextlib
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from anthropic.types import TextBlock
-from moonlighter.core.llm import _call_cli, make_api_caller
+from moonlighter.core.llm import _call_cli, _call_cursor, make_api_caller
 from moonlighter.core.metrics import operation_metrics
+
+
+@pytest.fixture(autouse=True)
+def _no_real_cursor_projects(monkeypatch):
+    monkeypatch.setattr(
+        "moonlighter.core.llm._cursor_projects_root", lambda: Path("/no/such/cursor/projects")
+    )
 
 
 async def test_cli_caller_records_a_call():
@@ -42,6 +51,41 @@ async def test_cli_caller_records_even_on_failure():
         contextlib.suppress(RuntimeError),
     ):
         await _call_cli("hi", "model")
+
+    assert m.calls == 1
+
+
+async def test_cursor_caller_records_a_call():
+    mock_proc = MagicMock()
+    mock_proc.returncode = 0
+    mock_proc.communicate = AsyncMock(return_value=(b"ok", b""))
+
+    with (
+        patch("moonlighter.core.llm.shutil.which", return_value="/usr/local/bin/agent"),
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
+        operation_metrics("op") as m,
+    ):
+        out = await _call_cursor("hi", "model")
+
+    assert out == "ok"
+    assert m.calls == 1
+    assert m.total_seconds >= 0.0
+    assert m.input_tokens == 0
+    assert m.output_tokens == 0
+
+
+async def test_cursor_caller_records_even_on_failure():
+    mock_proc = MagicMock()
+    mock_proc.returncode = 1
+    mock_proc.communicate = AsyncMock(return_value=(b"", b"boom"))
+
+    with (
+        patch("moonlighter.core.llm.shutil.which", return_value="/usr/local/bin/agent"),
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
+        operation_metrics("op") as m,
+        contextlib.suppress(RuntimeError),
+    ):
+        await _call_cursor("hi", "model")
 
     assert m.calls == 1
 
