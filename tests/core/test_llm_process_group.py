@@ -27,8 +27,11 @@ async def test_a_timed_out_cli_call_takes_its_children_down_too(tmp_path, monkey
     monkeypatch.setattr(llm.shutil, "which", lambda name: str(fake_cli))
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
 
+    # 5 s, not 1: under heavy load the timeout fired before bash had started the
+    # child and written its pid, so the test died on a missing child.pid
+    # (2026-10-05, load 25-40). The fake CLI hangs for 30 s either way.
     with pytest.raises(RuntimeError, match="did not answer"):
-        await llm._call_cli("prompt", "model", timeout_seconds=1)
+        await llm._call_cli("prompt", "model", timeout_seconds=5)
 
     child_pid = int(child_pid_file.read_text())
     for _ in range(50):
