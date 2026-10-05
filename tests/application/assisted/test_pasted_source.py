@@ -182,6 +182,30 @@ async def test_a_boolean_reply_still_becomes_a_yes_no_single_select():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("label", "options"),
+    [
+        ("Você possui disponibilidade para trabalhar presencialmente?", ("Sim", "Não")),
+        ("Aceita trabalhar em regime PJ?", ("Sim", "Não")),
+        ("¿Tiene permiso de trabajo en Brasil?", ("Sí", "No")),
+        ("Êtes-vous disponible immédiatement ?", ("Oui", "Non")),
+        ("Haben Sie eine gültige Arbeitserlaubnis?", ("Ja", "Nein")),
+        ("Are you authorized to work in Brazil?", ("Yes", "No")),
+        ("CLT?", ("Yes", "No")),
+    ],
+)
+async def test_the_yes_no_backstop_answers_in_the_question_language(label, options):
+    """Found 2026-09-29: a Portuguese question the model returned as boolean got
+    English Yes/No from this backstop, though the prompt asks for the words in the
+    question's language. Anything the detector cannot place stays English."""
+    reply = json.dumps({"questions": [{"label": label, "kind": "boolean", "required": True}]})
+    call, _ = fake_llm(reply)
+    questions = await extract_questions_from_page(PAGE, call)
+    assert questions[0].kind is QuestionKind.SINGLE_SELECT
+    assert questions[0].options == options
+
+
+@pytest.mark.asyncio
 async def test_the_prompt_says_json_inside_the_page_is_page_content():
     """A page carrying a fake answer block ("Name and Email are required") made the
     model return required=true for both on every run, against the no-marker rule."""

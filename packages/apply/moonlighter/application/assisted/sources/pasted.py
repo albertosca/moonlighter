@@ -67,6 +67,74 @@ Rules:
 # on the sheet (2026-09-29). A statement to tick (consent) stays boolean.
 _YES_NO = ("Yes", "No")
 
+# The backstop answers in the question's language, as the prompt asks the model
+# to (2026-10-05: a Portuguese question got English Yes/No). Words that mark a
+# language in a short form question; the most hits wins, and a tie or no hit at
+# all stays English. The languages are the ones the prompt names.
+_YES_NO_BY_LANGUAGE: dict[str, tuple[str, str]] = {
+    "en": _YES_NO,
+    "pt": ("Sim", "Não"),
+    "es": ("Sí", "No"),
+    "fr": ("Oui", "Non"),
+    "de": ("Ja", "Nein"),
+}
+_LANGUAGE_MARKERS: dict[str, frozenset[str]] = {
+    "en": frozenset({"you", "your", "are", "do", "have", "will", "can", "work", "authorized"}),
+    "pt": frozenset(
+        {
+            "você",
+            "voce",
+            "possui",
+            "tem",
+            "aceita",
+            "deseja",
+            "concorda",
+            "está",
+            "já",
+            "sua",
+            "seu",
+            "em",
+            "trabalhar",
+            "disponibilidade",
+            "não",
+            "pode",
+            "é",
+        }
+    ),
+    "es": frozenset(
+        {
+            "usted",
+            "tiene",
+            "tienes",
+            "puede",
+            "acepta",
+            "permiso",
+            "trabajo",
+            "trabajar",
+            "en",
+            "su",
+            "es",
+        }
+    ),
+    "fr": frozenset({"vous", "êtes", "avez", "votre", "est", "disponible", "acceptez"}),
+    "de": frozenset({"sie", "haben", "sind", "können", "ihre", "ihr", "eine", "einen", "besitzen"}),
+}
+
+
+def _yes_no_for(label: str) -> tuple[str, str]:
+    words = re.findall(r"[^\W\d_]+", label.lower())
+    scores = {
+        language: sum(word in markers for word in words)
+        for language, markers in _LANGUAGE_MARKERS.items()
+    }
+    if label.lstrip().startswith("¿"):
+        scores["es"] += 2
+    best = max(scores.values())
+    leaders = [language for language, score in scores.items() if score == best]
+    if best == 0 or len(leaders) > 1:
+        return _YES_NO
+    return _YES_NO_BY_LANGUAGE[leaders[0]]
+
 
 # The label is the question; whether it is required travels in `required`
 # (decided 2026-09-29). A marker sits on a line of its own before the label
@@ -139,7 +207,7 @@ async def extract_questions_from_page(
         is_question = label.endswith("?")
         if str(item.get("kind")) == QuestionKind.BOOLEAN.value and is_question:
             item_kind: Any = QuestionKind.SINGLE_SELECT.value
-            options = options or _YES_NO
+            options = options or _yes_no_for(label)
         else:
             item_kind = item.get("kind")
         kind = _kind(item_kind, options)
