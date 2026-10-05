@@ -10,7 +10,7 @@ from typing import Any
 
 import httpx
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.sources.base import SourceMatch
+from moonlighter.application.assisted.sources.base import SourceMatch, yes_no_question
 from moonlighter.core.db import Job
 
 API = "https://boards-api.greenhouse.io/v1/boards/{board}/jobs/{job_id}?questions=true"
@@ -55,6 +55,13 @@ def parse_greenhouse_questions(payload: dict[str, Any]) -> list[FormQuestion]:
         field = fields[0]
         kind = _KINDS.get(str(field.get("type")), QuestionKind.LONG_TEXT)
         options = _options(field)
+        # A `boolean` is a Yes/No question, one shape whatever the source
+        # (2026-09-29); its `values` carry the labels the page shows. Never seen
+        # live: 80 postings over 10 boards (2026-10-05) asked Yes/No questions as
+        # multi_value_single_select.
+        if kind is QuestionKind.BOOLEAN:
+            questions.append(yes_no_question(str(label), bool(item.get("required")), options))
+            continue
         # A select whose options did not come through cannot be answered as a
         # select; degrade to free text so the question still reaches the human —
         # to LONG_TEXT, the bank-ineligible one, for the reason given above the
