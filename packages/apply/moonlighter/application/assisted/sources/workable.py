@@ -13,7 +13,7 @@ from typing import Any
 
 import httpx
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.sources.base import SourceMatch
+from moonlighter.application.assisted.sources.base import SourceMatch, yes_no_question
 from moonlighter.core.db import Job
 
 API = "https://apply.workable.com/api/v1/jobs/{shortcode}/form"
@@ -26,6 +26,10 @@ _URL = re.compile(r"apply\.workable\.com/(?:[^/]+/)?j/(?P<shortcode>[A-Za-z0-9]+
 # Anything not listed becomes LONG_TEXT (see greenhouse.py for why that side).
 # `group` (Education/Experience) nests sub-fields; it reaches the human as one
 # free-text question under its own label rather than being guessed apart.
+# `boolean` is Workable's Yes/No question type: the page renders YES/NO buttons
+# whatever the label's grammar (Seeq, live 2026-10-05; a Devsu label reads
+# "Selecting 'No' means..."), never a lone tick box — so every one becomes the
+# Yes/No single_select, as Lever and paste give the same questions.
 _KINDS = {
     "text": QuestionKind.TEXT,
     "email": QuestionKind.TEXT,
@@ -72,6 +76,13 @@ def parse_workable_form(payload: object) -> list[FormQuestion]:
             if not isinstance(field, dict) or not field.get("label"):
                 continue
             kind = _kind(field)
+            if kind is QuestionKind.BOOLEAN:
+                questions.append(
+                    yes_no_question(
+                        str(field["label"]), bool(field.get("required")), _options(field)
+                    )
+                )
+                continue
             options = _options(field) if kind in _CHOICE_KINDS else ()
             if kind in _CHOICE_KINDS and not options:
                 kind = QuestionKind.LONG_TEXT
