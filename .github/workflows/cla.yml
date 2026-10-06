@@ -26,7 +26,8 @@ jobs:
         with:
           # Signatures live on their own branch: the main ruleset requires PRs and status
           # checks, which would reject the action's direct signature commits to main.
-          path-to-signatures: 'signatures/version1/cla.json'
+          path-to-signatures: 'signatures/version2/cla.json'
+          # Version 2 since 2026-10-05; version 1 signatures stay in signatures/version1/cla.json.
           # Pinned to the commit that last changed CLA.md's text, not a moving branch ref: any
           # future wording change to CLA.md must (1) update this SHA, (2) bump
           # path-to-signatures to a new signatures/versionN path, and (3) have existing signers
@@ -34,8 +35,8 @@ jobs:
           # The same SHA must also be in custom-notsigned-prcomment below: when that custom
           # text is set, the action never shows path-to-document, so the comment's own link
           # is the one signers actually click (found 2026-10-05; #28 and #115 saw blob/main).
-          path-to-document: 'https://github.com/albertosca/moonlighter/blob/c249a815684003bb69e9d7f5effabd950e732c4a/CLA.md'
+          path-to-document: 'https://github.com/albertosca/moonlighter/blob/dea1d5a87d4f4d5b4f84f2fc3c3b235fdb9b4849/CLA.md'
           branch: 'cla-signatures'
           allowlist: albertosca,claude,dependabot[bot],github-actions[bot],renovate[bot]
-          custom-notsigned-prcomment: 'Thanks for your contribution. Before this can be merged, please sign the [Contributor License Agreement](https://github.com/albertosca/moonlighter/blob/c249a815684003bb69e9d7f5effabd950e732c4a/CLA.md) by commenting exactly the sentence below.'
+          custom-notsigned-prcomment: 'Thanks for your contribution. Before this can be merged, please sign the [Contributor License Agreement](https://github.com/albertosca/moonlighter/blob/dea1d5a87d4f4d5b4f84f2fc3c3b235fdb9b4849/CLA.md) by commenting exactly the sentence below. If you signed version 1 before: version 2 adds a few clarifications (the license also covers people who receive the software, a note on AI-assisted contributions, legal age, moral rights, and the right to transfer the agreement); nothing you already granted is taken back.'
           custom-pr-sign-comment: 'I have read the CLA Document and I hereby sign the CLA'
