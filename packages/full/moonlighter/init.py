@@ -80,7 +80,7 @@ def main() -> None:  # pragma: no cover - interactive I/O boundary
     answers = {
         "browser_path": _ask("Browser executable path", detected or ""),
         "citizenship_country": _ask("Your citizenship country (for work authorization)"),
-        "llm_backend": _ask("LLM backend -- 'cli' (Claude Code) or 'api'", "cli"),
+        "llm_backend": _ask("LLM backend -- 'cli' (Claude Code), 'api', or 'cursor'", "cli"),
     }
 
     try:

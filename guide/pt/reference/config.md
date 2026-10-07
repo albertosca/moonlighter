@@ -8,7 +8,7 @@ O `config.yaml` fica em `MOONLIGHTER_HOME` (padrão `~/.moonlighter/`); o `uvx m
 
 | Chave | Padrão | O que faz |
 |---|---|---|
-| `llm_backend` | `cli` | `cli` chama o Claude Code CLI (sua assinatura do Claude); `api` usa o SDK da Anthropic e precisa de `ANTHROPIC_API_KEY`, lida do ambiente ou, na falta dela, de `~/.config/anthropic/api.env` |
+| `llm_backend` | `cli` | `cli` chama o Claude Code CLI (sua assinatura do Claude); `api` usa o SDK da Anthropic e precisa de `ANTHROPIC_API_KEY`, lida do ambiente ou, na falta dela, de `~/.config/anthropic/api.env`; `cursor` chama a CLI do Cursor (`agent`, ou `cursor-agent`). `cursor_model`, opcional, é passado como `--model` quando preenchido; sem ele, a nota usa o modelo padrão da conta |
 | `llm_timeout_seconds` | `180` | Segundos que uma chamada `cli` pode levar antes de ser morta e falhar com erro, em vez de travar o scan |
 | `score_threshold` | `6.5` | Vagas com nota abaixo disso são arquivadas depois de um scan |
 | `title_blocklist` | `[]` | Trechos de título (sem diferenciar maiúsculas) descartados antes de qualquer chamada de LLM |

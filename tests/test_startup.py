@@ -100,6 +100,36 @@ def test_validate_startup_cli_backend_skips_api_key_error(monkeypatch):
     assert not any("ANTHROPIC_API_KEY" in warning.message for warning in warnings)
 
 
+def test_validate_startup_cursor_backend_without_the_cli_produces_error(monkeypatch):
+    monkeypatch.setattr("moonlighter.startup.cursor_executable", lambda: None)
+    warnings = validate_startup(config={"llm_backend": "cursor"}, profile={"skills": []})
+    errors = [w for w in warnings if w.level == "error"]
+    assert len(errors) == 1
+    assert "agent login" in errors[0].message
+    assert "claude" not in errors[0].message.lower()
+
+
+def test_validate_startup_cursor_backend_with_agent_is_quiet(monkeypatch):
+    monkeypatch.setattr("moonlighter.startup.cursor_executable", lambda: "/usr/local/bin/agent")
+    warnings = validate_startup(config={"llm_backend": "cursor"}, profile={"skills": []})
+    assert not any(w.level == "error" for w in warnings)
+
+
+def test_validate_startup_cursor_backend_accepts_cursor_agent_fallback(monkeypatch):
+    monkeypatch.setattr(
+        "moonlighter.startup.cursor_executable", lambda: "/usr/local/bin/cursor-agent"
+    )
+    warnings = validate_startup(config={"llm_backend": "cursor"}, profile={"skills": []})
+    assert not any(w.level == "error" for w in warnings)
+
+
+def test_validate_startup_cursor_backend_does_not_demand_an_api_key(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr("moonlighter.startup.cursor_executable", lambda: "/usr/local/bin/agent")
+    warnings = validate_startup(config={"llm_backend": "cursor"}, profile={"skills": []})
+    assert not any("ANTHROPIC_API_KEY" in w.message for w in warnings)
+
+
 # ── cv.pdf ────────────────────────────────────────────────────────────────────
 
 
