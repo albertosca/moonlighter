@@ -467,6 +467,7 @@ def test_llm_backend_returns_the_configured_value():
 
     assert llm_backend({"llm_backend": "api"}) == "api"
     assert llm_backend({"llm_backend": "cli"}) == "cli"
+    assert llm_backend({"llm_backend": "cursor"}) == "cursor"
 
 
 @pytest.mark.parametrize("bad", ["CLI", "Api", "clii", "subscription", ""])
@@ -475,18 +476,37 @@ def test_llm_backend_rejects_anything_else_naming_the_valid_values(bad):
     most plausible typo, and the most expensive, since it demands an API key."""
     from moonlighter.core.config import llm_backend
 
-    with pytest.raises(ConfigError, match="cli, api"):
+    with pytest.raises(ConfigError, match="cli, api, cursor"):
         llm_backend({"llm_backend": bad})
 
 
 def test_validate_config_rejects_an_unknown_llm_backend():
-    with pytest.raises(ConfigError, match="cli, api"):
+    with pytest.raises(ConfigError, match="cli, api, cursor"):
         validate_config({"llm_backend": "CLI"})
 
 
-def test_validate_config_accepts_both_backends():
+def test_validate_config_accepts_known_backends():
     validate_config({"llm_backend": "cli"})
     validate_config({"llm_backend": "api"})
+    validate_config({"llm_backend": "cursor"})
+
+
+def test_validate_config_accepts_cursor_model():
+    validate_config({"cursor_model": "gpt-5"})
+
+
+def test_validate_config_rejects_a_non_string_cursor_model():
+    with pytest.raises(ConfigError, match="cursor_model"):
+        validate_config({"cursor_model": 1})
+
+
+def test_load_config_keeps_cursor_model_and_does_not_invent_it(tmp_path, monkeypatch):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "config.yaml").write_text("llm_backend: cursor\ncursor_model: gpt-5\n")
+    assert load_config(tmp_path / "config.yaml")["cursor_model"] == "gpt-5"
+
+    (tmp_path / "config.yaml").write_text("score_threshold: 7.0\n")
+    assert "cursor_model" not in load_config(tmp_path / "config.yaml")
 
 
 def test_load_config_fills_llm_backend_from_defaults(tmp_path, monkeypatch):
@@ -627,6 +647,14 @@ def test_cli_backend_never_loads_the_key(tmp_path, api_env_file):
 
     api_env_file.write_text("ANTHROPIC_API_KEY=sk-from-file\n")
     load_config(_config_with_backend(tmp_path, "cli"))
+    assert "ANTHROPIC_API_KEY" not in os.environ
+
+
+def test_cursor_backend_never_loads_the_key(tmp_path, api_env_file):
+    import os
+
+    api_env_file.write_text("ANTHROPIC_API_KEY=sk-from-file\n")
+    load_config(_config_with_backend(tmp_path, "cursor"))
     assert "ANTHROPIC_API_KEY" not in os.environ
 
 

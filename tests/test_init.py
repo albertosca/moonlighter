@@ -63,7 +63,7 @@ def test_ask_falls_back_to_default_when_blank(monkeypatch):
 def test_run_init_rejects_an_invalid_llm_backend(tmp_path):
     """The wizard must not write a config that the next boot refuses to load --
     the user would be told to fix a file they were just walked through."""
-    with pytest.raises(ConfigError, match="cli, api"):
+    with pytest.raises(ConfigError, match="cli, api, cursor"):
         run_init(
             tmp_path,
             {"browser_path": "/x", "citizenship_country": "Brazil", "llm_backend": "CLI"},

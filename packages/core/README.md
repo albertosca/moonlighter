@@ -8,7 +8,7 @@ The foundation of [moonlighter](https://albertosca.github.io/moonlighter/): the 
 
 - **Storage** — a SQLite file under `MOONLIGHTER_HOME` (`~/.moonlighter` by default), no server and no account. Your pipeline is a file you can query.
 - **Profile** — one `profile.yaml` that says who you are. Every answer the pipeline drafts starts from it, and `criteria` holds the hard and soft filters that drive scoring.
-- **LLM client** — `llm_backend: cli` runs the Claude Code CLI on your Claude subscription; `llm_backend: api` uses the Anthropic SDK with your `ANTHROPIC_API_KEY`, read from the environment or from `~/.config/anthropic/api.env`.
+- **LLM client** — `llm_backend: cli` runs the Claude Code CLI on your Claude subscription; `llm_backend: api` uses the Anthropic SDK with your `ANTHROPIC_API_KEY`, read from the environment or from `~/.config/anthropic/api.env`; `llm_backend: cursor` runs the Cursor CLI (`agent login`), with an optional `cursor_model` or else the account's default model.
 - **Doctor** — every slice's `doctor` command reports, as JSON, where the state lives, whether the config loads, and which slices are installed.
 - **Browser driver** — the optional `[browser]` extra, used only by browser-based scan extensions. The core flow never opens a browser.
 

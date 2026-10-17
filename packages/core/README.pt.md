@@ -8,7 +8,7 @@ A base do [moonlighter](https://albertosca.github.io/moonlighter/pt/): o armazen
 
 - **Armazenamento** — um arquivo SQLite em `MOONLIGHTER_HOME` (`~/.moonlighter` por padrão), sem servidor e sem conta. O seu pipeline é um arquivo que você pode consultar.
 - **Perfil** — um `profile.yaml` que diz quem você é. Toda resposta que o pipeline rascunha parte dele, e o `criteria` guarda os filtros eliminatórios e de preferência que definem a nota.
-- **Cliente de LLM** — `llm_backend: cli` roda o Claude Code CLI na sua assinatura do Claude; `llm_backend: api` usa o SDK da Anthropic com a sua `ANTHROPIC_API_KEY`, lida do ambiente ou de `~/.config/anthropic/api.env`.
+- **Cliente de LLM** — `llm_backend: cli` roda o Claude Code CLI na sua assinatura do Claude; `llm_backend: api` usa o SDK da Anthropic com a sua `ANTHROPIC_API_KEY`, lida do ambiente ou de `~/.config/anthropic/api.env`; `llm_backend: cursor` roda a CLI do Cursor (`agent login`), com `cursor_model` opcional ou, sem ele, o modelo padrão da conta.
 - **Doctor** — o comando `doctor` de cada fatia informa, em JSON, onde o estado mora, se a config carrega e quais fatias estão instaladas.
 - **Driver de navegador** — o extra opcional `[browser]`, usado só por extensões de varredura baseadas em navegador. O fluxo principal nunca abre um navegador.
 

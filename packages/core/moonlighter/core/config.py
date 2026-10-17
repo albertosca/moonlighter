@@ -56,6 +56,10 @@ DEFAULTS: dict[str, Any] = {
     # Which LLM backend runs evaluations and answer generation.
     #   "cli" -> the `claude` CLI, using the claude.ai subscription. No API key.
     #   "api" -> the Anthropic SDK. Requires ANTHROPIC_API_KEY.
+    #   "cursor" -> the Cursor `agent` CLI (`cursor-agent` if `agent` is absent).
+    #               Account login (`agent login`). llm_model is not forwarded:
+    #               those ids belong to Anthropic and the Cursor CLI rejects them.
+    #               Optional `cursor_model` is forwarded as `--model` when set.
     # Default is "cli" because that is what `moonlighter init`, the README, and
     # config.example.yaml all lead with -- an installer coming through
     # `uvx moonlighter` has Claude Code far more often than an API key.
@@ -137,6 +141,7 @@ _CONFIG_SCHEMA: dict[str, tuple[type, ...]] = {
     "llm_model": (str,),
     "eval_model": (str,),
     "llm_backend": (str,),
+    "cursor_model": (str,),
     "llm_timeout_seconds": _NUM,
     "title_blocklist": (list,),
     "cv": (dict,),
@@ -196,7 +201,7 @@ def _check_type(key: str, value: Any, types: tuple[type, ...]) -> None:
         )
 
 
-LLM_BACKENDS = ("cli", "api")
+LLM_BACKENDS = ("cli", "api", "cursor")
 
 
 def llm_backend(config: dict[str, Any]) -> str:
@@ -315,8 +320,8 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
             merged = list(dict.fromkeys(manual + learned_patterns))  # dedup, manual first
             config["title_blocklist"] = merged
 
-    # Only the api backend needs the key; the cli backend strips it on purpose
-    # (llm.py) so `claude -p` bills the subscription.
+    # Only the api backend needs the key. cli strips it so `claude -p` bills the
+    # subscription; cursor authenticates with `agent login` and never reads it.
     if config.get("llm_backend") == "api":
         _fill_api_key_from_file()
     return config
