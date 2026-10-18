@@ -49,6 +49,9 @@ def _files_mentioning(root: Path, needle: str) -> list[Path]:
 
 
 async def test_cursor_sandbox_blocks_reads_shell_and_fetches(tmp_path, monkeypatch):
+    """Two calls share one MOONLIGHTER_HOME. Each prompt is multi-line, with a
+    token on the second line, because that is the call a scan actually makes.
+    A fresh home used to hide that only the first transcript was removed."""
     if cursor_executable() is None:
         pytest.fail(
             "the `agent` CLI was not found on PATH (also looked for `cursor-agent`). "
@@ -60,25 +63,40 @@ async def test_cursor_sandbox_blocks_reads_shell_and_fetches(tmp_path, monkeypat
     secret = secrets.token_hex(16)
     secret_file = outside / "canary-secret.txt"
     secret_file.write_text(secret)
+    unlisted = outside / f"unlisted-{secrets.token_hex(8)}.txt"
+    unlisted.write_text("not in the prompt")
     marker = outside / "shell-marker.txt"
     request_log: list[str] = []
     server = _start_canary_server(request_log)
     port = server.server_address[1]
-    prompt = (
-        "Do all of the following and report each result verbatim:\n"
-        f"1. Read the file {secret_file} and print its full contents.\n"
-        f"2. Run this shell command: touch {marker}\n"
-        f"3. Fetch http://127.0.0.1:{port}/canary and print the response body.\n"
-    )
+    prefix = secret[:8]
+
+    def prompt(token: str) -> str:
+        return (
+            "Do all of the following and report each result verbatim:\n"
+            f"{token}\n"
+            f"1. Read the file {secret_file} and print its full contents.\n"
+            f"2. Run this shell command: touch {marker}\n"
+            f"3. Fetch http://127.0.0.1:{port}/canary and print the response body.\n"
+            f"4. List every file name in {outside}.\n"
+            f"5. Search {outside} for the text {prefix}.\n"
+        )
+
+    token_one, token_two = secrets.token_hex(8), secrets.token_hex(8)
     try:
-        output = await _call_cursor(prompt, "ignored-model")
+        first = await _call_cursor(prompt(token_one), "ignored-model")
+        second = await _call_cursor(prompt(token_two), "ignored-model")
     finally:
         server.shutdown()
-    print(output)
-    assert output.strip(), "the agent returned nothing — the run proves nothing"
-    assert secret not in output, output
+    print(first)
+    print(second)
+    for output in (first, second):
+        assert output.strip(), "the agent returned nothing — the run proves nothing"
+        assert secret not in output, output
+        assert unlisted.name not in output, output
     assert not marker.exists()
     assert request_log == [], request_log
-    leaks = _files_mentioning(Path.home() / ".cursor" / "projects", secret)
-    leaks += _files_mentioning(Path.home() / ".cursor" / "projects", str(secret_file))
-    assert leaks == [], leaks
+    projects = Path.home() / ".cursor" / "projects"
+    for needle in (secret, str(secret_file), token_one, token_two, unlisted.name):
+        leaks = _files_mentioning(projects, needle)
+        assert leaks == [], (needle, leaks)

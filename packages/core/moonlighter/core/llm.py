@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import signal
+import tempfile
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Protocol
@@ -11,7 +12,10 @@ from typing import Any, Protocol
 import anthropic
 from anthropic.types import TextBlock
 from moonlighter.core.config import DEFAULTS, llm_backend, moonlighter_home
+from moonlighter.core.log import get_logger
 from moonlighter.core.metrics import record_call
+
+logger = get_logger(__name__)
 
 
 class LLMCaller(Protocol):
@@ -68,7 +72,8 @@ def make_caller(config: dict[str, Any]) -> LLMCaller:
         return _call
     if backend == "cursor":
         chosen = str(config.get("cursor_model") or "").strip()
-        return _cursor_caller(chosen or None)
+        timeout_seconds = config.get("llm_timeout_seconds", DEFAULTS["llm_timeout_seconds"])
+        return _cursor_caller(chosen or None, timeout_seconds)
     return make_api_caller()
 
 
@@ -170,7 +175,8 @@ async def _call_cli(
 # workspace — that is the permissions file below, and the file is rejected
 # unless `allow` is present, even empty. Nothing here is --force / --yolo /
 # --approve-mcps. There is no --no-session-persistence (a temporary HOME drops
-# `agent login`), so transcripts are removed after the call instead.
+# `agent login`), so each call gets its own workdir and that call's project
+# directory is removed when the call returns.
 _CURSOR_SANDBOX_ARGS: tuple[str, ...] = (
     "--print",
     "--output-format",
@@ -192,11 +198,20 @@ def cursor_executable() -> str | None:
     return shutil.which("agent") or shutil.which("cursor-agent")
 
 
-def _cursor_caller(cursor_model: str | None) -> LLMCaller:
-    """Bind the optional Cursor model. The `model` argument stays the Anthropic id."""
+def _cursor_caller(cursor_model: str | None, timeout_seconds: float) -> LLMCaller:
+    """Bind the optional Cursor model and the shared call timeout.
+
+    The `model` argument stays the Anthropic id the rest of the pipeline passes.
+    """
 
     async def _call(prompt: str, model: str, cache_prefix: str | None = None) -> str:
-        return await _call_cursor(prompt, model, cache_prefix, cursor_model=cursor_model)
+        return await _call_cursor(
+            prompt,
+            model,
+            cache_prefix,
+            cursor_model=cursor_model,
+            timeout_seconds=timeout_seconds,
+        )
 
     return _call
 
@@ -208,57 +223,89 @@ def _write_cursor_permissions(workdir: Path) -> None:
     (cursor_dir / "cli.json").write_text(_CURSOR_PERMISSIONS_JSON)
 
 
+def _cursor_call_workdir() -> Path:
+    """A private 0700 directory for one call. `mkdtemp` already uses that mode;
+    the chmod repeats it so a umask change cannot widen it."""
+    home = moonlighter_home()
+    home.mkdir(parents=True, exist_ok=True)
+    workdir = Path(tempfile.mkdtemp(prefix="cursor-", dir=home))
+    workdir.chmod(0o700)
+    return workdir
+
+
 def _cursor_projects_root() -> Path:
     return Path.home() / ".cursor" / "projects"
 
 
-def _snapshot_cursor_projects() -> dict[Path, tuple[int, int]]:
-    """mtime and size of every file under the Cursor projects dir, if it exists."""
-    root = _cursor_projects_root()
-    if not root.is_dir():
-        return {}
-    snap: dict[Path, tuple[int, int]] = {}
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
-        stat = path.stat()
-        snap[path] = (stat.st_mtime_ns, stat.st_size)
-    return snap
+def _cursor_project_slug(path: Path) -> str:
+    """Directory name Cursor gives a workspace.
+
+    The absolute path, no leading slash. `/`, `.` and `_` each become a dash,
+    and a run of dashes collapses to one: `~/.moonlighter` would otherwise stay
+    a dotted name the CLI does not create. Checked against project directories
+    the CLI wrote on macOS. A name that still does not match is found by
+    `.workspace-trusted`.
+    """
+    slug = str(path).lstrip("/").replace("/", "-").replace(".", "-").replace("_", "-")
+    return re.sub(r"-{2,}", "-", slug)
 
 
-def _forget_cursor_transcripts(
-    before: dict[Path, tuple[int, int]], workdir: Path, prompt: str
-) -> None:
-    """Remove agent transcripts this call just wrote.
+def _trust_names(project: Path, marks: set[str]) -> bool:
+    """True when this project's `.workspace-trusted` quotes the workdir."""
+    trusted = project / ".workspace-trusted"
+    try:
+        if not trusted.is_file():
+            return False
+        text = trusted.read_text(errors="replace")
+    except OSError:
+        return False
+    return any(mark in text for mark in marks)
 
-    The jsonl quotes the prompt, not the workspace path. A sibling written in
-    the same project dir (`.workspace-trusted`) quotes the workspace path. Either
-    mark, on a file that appeared or changed during the call, selects that
-    project. Only its `agent-transcripts` directory is removed, so a concurrent
-    Cursor session and an unchanged history are left alone. The slug is whatever
-    directory the CLI created — it is not recomputed here.
+
+def _cursor_projects_for(workdir: Path) -> list[Path]:
+    """Project dirs this call created.
+
+    The usual name is the workspace path with slashes turned into dashes, and
+    `.workspace-trusted` quotes that path. A miss on the computed name reads
+    that one file in each project, not every transcript under the tree.
     """
     root = _cursor_projects_root()
     if not root.is_dir():
-        return
+        return []
     marks = {str(workdir), str(workdir.resolve())}
-    if prompt:
-        marks.add(prompt)
-    projects: set[Path] = set()
-    for path in root.rglob("*"):
-        if not path.is_file():
+    named = [root / _cursor_project_slug(path) for path in (workdir, workdir.resolve())]
+    if any(_trust_names(path, marks) for path in named):
+        candidates = named
+    else:
+        try:
+            candidates = [path for path in root.iterdir() if path.is_dir()]
+        except OSError:
+            return []
+    found: list[Path] = []
+    for project in candidates:
+        if project in found:
             continue
-        stat = path.stat()
-        if before.get(path) == (stat.st_mtime_ns, stat.st_size):
-            continue
-        text = path.read_text(errors="replace")
-        if not any(mark in text for mark in marks):
-            continue
-        projects.add(root / path.relative_to(root).parts[0])
-    for project in projects:
-        transcripts = project / "agent-transcripts"
-        if transcripts.is_dir():
-            shutil.rmtree(transcripts)
+        if _trust_names(project, marks):
+            found.append(project)
+    return found
+
+
+def _remove_quietly(path: Path) -> None:
+    """Remove a tree. An OSError is logged and swallowed so cleanup cannot
+    replace the call's result, including a usage-limit error."""
+    if not path.exists():
+        return
+    try:
+        shutil.rmtree(path)
+    except OSError:
+        logger.exception("cursor cleanup failed for %s", path)
+
+
+def _forget_cursor_call(workdir: Path) -> None:
+    """Remove this call's Cursor project directory and its private workdir."""
+    for project in _cursor_projects_for(workdir):
+        _remove_quietly(project)
+    _remove_quietly(workdir)
 
 
 async def _call_cursor(
@@ -266,6 +313,7 @@ async def _call_cursor(
     model: str,
     cache_prefix: str | None = None,
     cursor_model: str | None = None,
+    timeout_seconds: float = DEFAULTS["llm_timeout_seconds"],
 ) -> str:
     """Call Cursor via the installed `agent` CLI.
 
@@ -276,14 +324,18 @@ async def _call_cursor(
     default is used, and that default can change between calls. `cache_prefix`
     is concatenated before the prompt — the CLI has no cache_control.
 
-    `--workspace` is the same 0700 directory `_call_cli` uses, so this
-    repository's MCP servers are not in scope. The user's global
+    `--workspace` is a fresh 0700 directory under `MOONLIGHTER_HOME`, so this
+    repository's MCP servers are not in scope and two calls never share a
+    permissions file or a transcript directory. The user's global
     `~/.cursor/mcp.json` still is: the CLI walks project, then global, then
     nested config. In the PR 115 canary a global MCP tool was listed and the
     call was blocked in ask mode.
 
     `<workdir>/.cursor/cli.json` denies `Read(/**)` and `Read(~/**)` before the
     process starts. Ask mode alone still read a file outside the workspace.
+
+    A call that has not answered within timeout_seconds is killed, process
+    group included, the same way `_call_cli` ends a hung `claude -p`.
     """
     full = f"{cache_prefix}\n\n{prompt}" if cache_prefix is not None else prompt
     exe = cursor_executable()
@@ -292,33 +344,46 @@ async def _call_cursor(
             "the `agent` CLI was not found on PATH (also looked for `cursor-agent`). "
             "Install the Cursor CLI and run `agent login`."
         )
-    workdir = _cli_workdir()
+    workdir = _cursor_call_workdir()
     _write_cursor_permissions(workdir)
     argv = [exe, *_CURSOR_SANDBOX_ARGS]
     if cursor_model:
         argv.extend(["--model", cursor_model])
     argv.extend(["--workspace", str(workdir)])
     # Same posture as `_call_cli`: the agent has no use for the Anthropic key.
-    env = {key: value for key, value in os.environ.items() if key != "ANTHROPIC_API_KEY"}
-    before = _snapshot_cursor_projects()
+    environment = {key: value for key, value in os.environ.items() if key != "ANTHROPIC_API_KEY"}
     start = perf_counter()
     try:
-        proc = await asyncio.create_subprocess_exec(
+        process = await asyncio.create_subprocess_exec(
             *argv,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=env,
+            env=environment,
             cwd=str(workdir),
+            # Its own process group, so a timeout can take down whatever the CLI
+            # started too: killing the direct process alone left a child running
+            # as an orphan (2026-09-29 review of the claude CLI).
+            start_new_session=True,
         )
-        stdout, stderr = await proc.communicate(input=full.encode())
-        if proc.returncode != 0:
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(input=full.encode()), timeout=timeout_seconds
+            )
+        except TimeoutError:
+            _kill_process_group(process.pid)
+            await process.wait()
+            raise RuntimeError(
+                f"agent CLI did not answer within {timeout_seconds} s — killed "
+                "(raise llm_timeout_seconds in config.yaml if your calls are legitimately slow)"
+            ) from None
+        if process.returncode != 0:
             detail = stderr.decode().strip() or stdout.decode().strip()
-            raise RuntimeError(f"agent CLI exited with code {proc.returncode}: {detail[:300]}")
+            raise RuntimeError(f"agent CLI exited with code {process.returncode}: {detail[:300]}")
         return stdout.decode()
     finally:
         try:
-            _forget_cursor_transcripts(before, workdir, full)
+            _forget_cursor_call(workdir)
         finally:
             record_call(perf_counter() - start)
 
