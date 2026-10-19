@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-browser = ["playwright>=1.47"]
+browser = ["playwright>=1.64.0"]
 
 [project.urls]
 Homepage = "https://github.com/albertosca/moonlighter"
