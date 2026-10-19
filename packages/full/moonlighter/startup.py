@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from moonlighter.application.answers.cv import configured_cv_path
 from moonlighter.core.config import browser_executable, llm_backend, moonlighter_home
+from moonlighter.core.llm import cursor_executable
 from moonlighter.discovery.evaluator import LOCATION_PRECEDENCES
 
 
@@ -63,11 +64,12 @@ def _check_location_precedence(profile: dict[str, Any]) -> StartupWarning | None
 def _check_llm_backend(config: dict[str, Any]) -> StartupWarning | None:
     """Whichever backend is configured needs its own credential to exist.
 
-    Both arms are checked, from the same resolved backend: guarding only the
+    Every arm is checked, from the same resolved backend: guarding only the
     api arm left `llm_backend: cli` without an installed `claude` to fail per
     job, mid-scan, instead of once at startup.
     """
-    if llm_backend(config) == "api":
+    backend = llm_backend(config)
+    if backend == "api":
         if os.environ.get("ANTHROPIC_API_KEY"):
             return None
         return StartupWarning(
@@ -76,6 +78,15 @@ def _check_llm_backend(config: dict[str, Any]) -> StartupWarning | None:
             "nor in ~/.config/anthropic/api.env. "
             "scan_and_evaluate and prepare_application will not work. Set the key, or switch to "
             "llm_backend: cli in config.yaml to use your Claude subscription instead.",
+        )
+    if backend == "cursor":
+        if cursor_executable() is not None:
+            return None
+        return StartupWarning(
+            "error",
+            "llm_backend is 'cursor' but the `agent` CLI was not found on PATH. "
+            "scan_and_evaluate and prepare_application will not work. "
+            "Install the Cursor CLI and run `agent login`.",
         )
     if shutil.which("claude") is not None:
         return None

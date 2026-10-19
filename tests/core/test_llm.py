@@ -1,12 +1,29 @@
 import asyncio
 import inspect
+import json
+import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from anthropic.types import TextBlock
 from moonlighter.core.config import ConfigError
-from moonlighter.core.llm import LLMCaller, _call_cli, is_spend_limit, make_api_caller, make_caller
+from moonlighter.core.llm import (
+    LLMCaller,
+    _call_cli,
+    _call_cursor,
+    is_spend_limit,
+    make_api_caller,
+    make_caller,
+)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_cursor_projects(monkeypatch):
+    """Transcript cleanup must not walk the developer's ~/.cursor/projects."""
+    monkeypatch.setattr(
+        "moonlighter.core.llm._cursor_projects_root", lambda: Path("/no/such/cursor/projects")
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -45,6 +62,12 @@ def test_make_caller_api_returns_callable():
     assert inspect.iscoroutinefunction(caller)
 
 
+def test_make_caller_cursor_returns_a_cursor_caller():
+    caller = make_caller({"llm_backend": "cursor"})
+    assert caller is not _call_cursor
+    assert inspect.iscoroutinefunction(caller)
+
+
 def test_make_caller_defaults_to_cli_when_backend_omitted():
     """No 'llm_backend' key → the CLI backend, matching DEFAULTS.
 
@@ -66,7 +89,7 @@ def test_make_caller_rejects_an_unknown_backend():
     It used to fall through to the api caller, so a typo like 'CLI' silently
     demanded an API key instead of using the subscription.
     """
-    with pytest.raises(ConfigError, match="cli, api"):
+    with pytest.raises(ConfigError, match="cli, api, cursor"):
         make_caller({"llm_backend": "CLI"})
 
 
@@ -521,6 +544,578 @@ async def test_api_no_cache_prefix_sends_plain_string():
     call_keyword_arguments = mock_client.messages.create.call_args.kwargs
     content = call_keyword_arguments["messages"][0]["content"]
     assert content == "PROMPT_ONLY"
+
+
+# ── _call_cursor ──────────────────────────────────────────────────────────────
+
+
+def _cursor_proc(stdout: bytes = b"ok", stderr: bytes = b"", code: int = 0) -> MagicMock:
+    mock_proc = MagicMock()
+    mock_proc.returncode = code
+    mock_proc.communicate = AsyncMock(return_value=(stdout, stderr))
+    return mock_proc
+
+
+async def test_call_cursor_uses_sandbox_argv_and_stdin():
+    """Prompt stays off argv (same reason as the Claude CLI: it must not show up
+    in `ps`). Sandbox flags are fixed; the account model is not overridden."""
+    from moonlighter.core.llm import _CURSOR_SANDBOX_ARGS
+
+    mock_proc = _cursor_proc(b"hello from cursor\n")
+
+    with (
+        patch(
+            "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+        ) as mock_exec,
+        patch("moonlighter.core.llm.shutil.which", return_value="/usr/local/bin/agent"),
+    ):
+        result = await _call_cursor("my prompt", "claude-sonnet-4-6")
+
+    assert result == "hello from cursor\n"
+    args, kwargs = mock_exec.call_args
+    assert args == (
+        "/usr/local/bin/agent",
+        *_CURSOR_SANDBOX_ARGS,
+        "--workspace",
+        kwargs["cwd"],
+    )
+    assert "my prompt" not in args
+    assert "claude-sonnet-4-6" not in args
+    assert "--model" not in args
+    assert "--force" not in args
+    assert "--yolo" not in args
+    assert "--approve-mcps" not in args
+    assert kwargs["stdin"] == asyncio.subprocess.PIPE
+    assert kwargs["stdout"] == asyncio.subprocess.PIPE
+    assert kwargs["stderr"] == asyncio.subprocess.PIPE
+    assert kwargs["start_new_session"] is True
+    assert mock_proc.communicate.call_args.kwargs["input"] == b"my prompt"
+
+
+async def test_call_cursor_sandbox_args_contents():
+    from moonlighter.core.llm import _CURSOR_SANDBOX_ARGS
+
+    assert _CURSOR_SANDBOX_ARGS == (
+        "--print",
+        "--output-format",
+        "text",
+        "--mode",
+        "ask",
+        "--sandbox",
+        "enabled",
+        "--trust",
+    )
+    assert "--force" not in _CURSOR_SANDBOX_ARGS
+    assert "--yolo" not in _CURSOR_SANDBOX_ARGS
+    assert "--approve-mcps" not in _CURSOR_SANDBOX_ARGS
+
+
+async def test_call_cursor_workspace_is_a_private_directory_per_call(tmp_path, monkeypatch):
+    """Two calls in one home never share a workdir, and each directory is gone
+    after the call. Mode is recorded while the process is starting: cleanup
+    removes the directory before this function resumes."""
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    seen: list[tuple[Path, str]] = []
+
+    def start(*args: object, **kwargs: object) -> MagicMock:
+        workdir = Path(str(kwargs["cwd"]))
+        seen.append((workdir, oct(workdir.stat().st_mode)[-3:]))
+        return _cursor_proc()
+
+    with patch(
+        "moonlighter.core.llm.asyncio.create_subprocess_exec", side_effect=start
+    ) as mock_exec:
+        await _call_cursor("first line\nTOKEN_ONE", "claude-haiku-4-5-20251001")
+        await _call_cursor("first line\nTOKEN_TWO", "claude-haiku-4-5-20251001")
+
+    assert len(seen) == 2
+    first, second = seen
+    assert first[0] != second[0]
+    assert first[0].parent == tmp_path
+    assert second[0].parent == tmp_path
+    assert first[1] == "700"
+    assert second[1] == "700"
+    assert not first[0].exists()
+    assert not second[0].exists()
+    for call in mock_exec.call_args_list:
+        args = call.args
+        assert args[args.index("--workspace") + 1] == call.kwargs["cwd"]
+
+
+async def test_call_cursor_ignores_model_param():
+    mock_proc = _cursor_proc(b"output")
+
+    with patch(
+        "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+    ) as mock_exec:
+        await _call_cursor("prompt", "claude-opus-99")
+
+    assert "claude-opus-99" not in mock_exec.call_args.args
+    assert b"claude-opus-99" not in mock_proc.communicate.call_args.kwargs["input"]
+
+
+async def test_call_cursor_raises_on_nonzero_exit():
+    mock_proc = _cursor_proc(b"", b"some error message", code=1)
+
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
+        pytest.raises(RuntimeError) as exc_info,
+    ):
+        await _call_cursor("prompt", "model")
+
+    assert "code 1" in str(exc_info.value)
+    assert "some error message" in str(exc_info.value)
+
+
+async def test_call_cursor_stderr_truncated_to_300_chars():
+    mock_proc = _cursor_proc(b"", b"E" * 500, code=2)
+
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
+        pytest.raises(RuntimeError) as exc_info,
+    ):
+        await _call_cursor("p", "m")
+
+    error_msg = str(exc_info.value)
+    assert "E" * 300 in error_msg
+    assert "E" * 301 not in error_msg
+
+
+async def test_call_cursor_uses_stdout_when_stderr_is_empty():
+    mock_proc = _cursor_proc(b"stdout detail", b"", code=1)
+
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc),
+        pytest.raises(RuntimeError, match="stdout detail"),
+    ):
+        await _call_cursor("prompt", "model")
+
+
+async def test_call_cursor_empty_prompt_still_calls_subprocess():
+    mock_proc = _cursor_proc(b"response")
+
+    with patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
+        result = await _call_cursor("", "model")
+
+    assert result == "response"
+    assert mock_proc.communicate.call_args.kwargs["input"] == b""
+
+
+async def test_cursor_launch_invariants():
+    mock_proc = _cursor_proc(b"answer")
+
+    with (
+        patch(
+            "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+        ) as mock_exec,
+        patch("moonlighter.core.llm.shutil.which", return_value="/usr/local/bin/agent"),
+    ):
+        await _call_cursor("the prompt", "model")
+
+    args = mock_exec.call_args.args
+    kwargs = mock_exec.call_args.kwargs
+    assert args[0] == "/usr/local/bin/agent"
+    assert Path(args[0]).is_absolute()
+    assert all(isinstance(a, str) for a in args)
+    assert "shell" not in kwargs
+    assert "the prompt" not in args
+    assert kwargs["stdin"] is asyncio.subprocess.PIPE
+
+
+async def test_call_cursor_errors_clearly_when_no_binary_is_on_path():
+    with (
+        patch("moonlighter.core.llm.shutil.which", return_value=None),
+        pytest.raises(RuntimeError, match="agent login"),
+    ):
+        await _call_cursor("the prompt", "model")
+
+
+async def test_call_cursor_prefers_agent_over_cursor_agent():
+    mock_proc = _cursor_proc()
+
+    def which(name: str) -> str | None:
+        return {
+            "agent": "/usr/local/bin/agent",
+            "cursor-agent": "/usr/local/bin/cursor-agent",
+        }.get(name)
+
+    with (
+        patch(
+            "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+        ) as mock_exec,
+        patch("moonlighter.core.llm.shutil.which", side_effect=which) as mock_which,
+    ):
+        await _call_cursor("prompt", "model")
+
+    assert mock_exec.call_args.args[0] == "/usr/local/bin/agent"
+    mock_which.assert_called_once_with("agent")
+
+
+async def test_call_cursor_falls_back_to_cursor_agent():
+    mock_proc = _cursor_proc()
+
+    def which(name: str) -> str | None:
+        if name == "cursor-agent":
+            return "/opt/cursor-agent"
+        return None
+
+    with (
+        patch(
+            "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+        ) as mock_exec,
+        patch("moonlighter.core.llm.shutil.which", side_effect=which),
+    ):
+        await _call_cursor("prompt", "model")
+
+    assert mock_exec.call_args.args[0] == "/opt/cursor-agent"
+
+
+async def test_cursor_caller_satisfies_llm_caller_contract():
+    mock_proc = _cursor_proc(b"result")
+
+    with patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
+        result = await _call_cursor("hello", "any-model")
+
+    assert isinstance(result, str)
+
+
+async def test_cursor_concatenates_cache_prefix():
+    captured: dict[str, bytes] = {}
+
+    async def fake_communicate(*args: object, **kwargs: object) -> tuple[bytes, bytes]:
+        captured["input"] = kwargs["input"]  # type: ignore[assignment]
+        return (b"ok", b"")
+
+    mock_proc = MagicMock()
+    mock_proc.returncode = 0
+    mock_proc.communicate = fake_communicate
+
+    with patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
+        await _call_cursor("DYN", "m", cache_prefix="STATIC")
+    assert captured["input"] == b"STATIC\n\nDYN"
+
+
+async def test_call_cursor_strips_anthropic_api_key_from_the_subprocess_env(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    mock_proc = _cursor_proc()
+
+    with patch(
+        "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+    ) as mock_exec:
+        await _call_cursor("prompt", "model")
+
+    env = mock_exec.call_args.kwargs["env"]
+    assert "ANTHROPIC_API_KEY" not in env
+    assert env["PATH"] == os.environ["PATH"]
+
+
+async def test_call_cursor_writes_read_denies_before_the_subprocess(tmp_path, monkeypatch):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    written: dict[str, str] = {}
+
+    def start(*args: object, **kwargs: object) -> MagicMock:
+        workdir = Path(str(kwargs["cwd"]))
+        written["text"] = (workdir / ".cursor" / "cli.json").read_text()
+        written["path"] = str(workdir)
+        return _cursor_proc()
+
+    with patch("moonlighter.core.llm.asyncio.create_subprocess_exec", side_effect=start):
+        await _call_cursor("prompt", "model")
+
+    assert json.loads(written["text"]) == {
+        "permissions": {"allow": [], "deny": ["Read(/**)", "Read(~/**)"]},
+    }
+    assert '"allow": []' in written["text"]
+    assert not Path(written["path"]).exists()
+
+
+async def test_call_cursor_forwards_cursor_model_and_ignores_a_blank_one():
+    mock_proc = _cursor_proc()
+
+    with patch(
+        "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+    ) as mock_exec:
+        await _call_cursor("prompt", "claude-sonnet-4-6", cursor_model="gpt-5")
+
+    args = mock_exec.call_args.args
+    assert args[args.index("--model") + 1] == "gpt-5"
+    assert "claude-sonnet-4-6" not in args
+
+    with patch(
+        "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+    ) as mock_exec:
+        caller = make_caller({"llm_backend": "cursor", "cursor_model": "  "})
+        await caller("prompt", "claude-sonnet-4-6")
+    assert "--model" not in mock_exec.call_args.args
+
+
+async def test_make_caller_cursor_delegates_with_the_configured_timeout():
+    delegate = AsyncMock(return_value="answer")
+    with patch("moonlighter.core.llm._call_cursor", delegate):
+        caller = make_caller(
+            {"llm_backend": "cursor", "llm_timeout_seconds": 42, "cursor_model": "gpt-5"}
+        )
+        assert await caller("prompt", "model", cache_prefix="prefix") == "answer"
+    delegate.assert_awaited_once_with(
+        "prompt", "model", "prefix", cursor_model="gpt-5", timeout_seconds=42
+    )
+
+
+async def test_make_caller_cursor_defaults_to_a_180_second_timeout():
+    delegate = AsyncMock(return_value="answer")
+    with patch("moonlighter.core.llm._call_cursor", delegate):
+        await make_caller({"llm_backend": "cursor"})("prompt", "model")
+    assert delegate.await_args.kwargs["timeout_seconds"] == 180
+    assert delegate.await_args.kwargs["cursor_model"] is None
+
+
+async def test_make_caller_cursor_forwards_cursor_model_and_omits_it_when_unset():
+    mock_proc = _cursor_proc()
+
+    with patch(
+        "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+    ) as mock_exec:
+        await make_caller({"llm_backend": "cursor", "cursor_model": "gpt-5"})(
+            "prompt", "claude-haiku-4-5-20251001"
+        )
+    args = mock_exec.call_args.args
+    assert args[args.index("--model") + 1] == "gpt-5"
+    assert "claude-haiku-4-5-20251001" not in args
+
+    with patch(
+        "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc
+    ) as mock_exec:
+        await make_caller({"llm_backend": "cursor"})("prompt", "claude-sonnet-4-6")
+    assert "--model" not in mock_exec.call_args.args
+
+
+def test_cursor_project_slug_matches_the_directory_cursor_creates():
+    """Dots and underscores are dashes, and a doubled dash collapses. A path
+    under ~/.moonlighter misses the real directory if either rule is dropped."""
+    from moonlighter.core.llm import _cursor_project_slug
+
+    assert (
+        _cursor_project_slug(Path("/Users/ada/.moonlighter/cli-workdir"))
+        == "Users-ada-moonlighter-cli-workdir"
+    )
+    assert (
+        _cursor_project_slug(Path("/var/folders/x/abc_def/T/tmp.token"))
+        == "var-folders-x-abc-def-T-tmp-token"
+    )
+
+
+def test_forget_cursor_call_removes_the_project_named_after_the_workspace(tmp_path, monkeypatch):
+    """The jsonl stores a newline as the two characters \\n, so matching the
+    prompt text misses every real prompt. The trust file names the workspace,
+    and that is what selects the project. A stranger project stays."""
+    from moonlighter.core.llm import _cursor_project_slug, _forget_cursor_call
+
+    root = tmp_path / "projects"
+    root.mkdir()
+    monkeypatch.setattr("moonlighter.core.llm._cursor_projects_root", lambda: root)
+    workdir = tmp_path / "cursor-one"
+    workdir.mkdir()
+    prompt = "first line\nTOKEN_ONE"
+    project = root / _cursor_project_slug(workdir)
+    transcripts = project / "agent-transcripts"
+    transcripts.mkdir(parents=True)
+    (transcripts / "a.jsonl").write_text(prompt.replace("\n", "\\n"))
+    (project / ".workspace-trusted").write_text('{"workspacePath": "' + str(workdir) + '"}')
+    stranger = root / "other-editor-session" / "agent-transcripts"
+    stranger.mkdir(parents=True)
+    (stranger / "c.jsonl").write_text("brand new but unrelated")
+
+    _forget_cursor_call(workdir)
+
+    assert not project.exists()
+    assert not workdir.exists()
+    assert (stranger / "c.jsonl").read_text() == "brand new but unrelated"
+
+
+def test_forget_cursor_call_finds_a_project_whose_name_is_not_the_slug(tmp_path, monkeypatch):
+    from moonlighter.core.llm import _forget_cursor_call
+
+    root = tmp_path / "projects"
+    root.mkdir()
+    monkeypatch.setattr("moonlighter.core.llm._cursor_projects_root", lambda: root)
+    workdir = tmp_path / "cursor-two"
+    workdir.mkdir()
+    project = root / "whatever-the-cli-picked"
+    (project / "agent-transcripts").mkdir(parents=True)
+    (project / "agent-transcripts" / "a.jsonl").write_text("first line\\nTOKEN_TWO")
+    (project / ".workspace-trusted").write_text(str(workdir.resolve()))
+    untouched = root / "no-trust-file"
+    untouched.mkdir()
+    decoy = root / "other-workspace"
+    decoy.mkdir()
+    (decoy / ".workspace-trusted").write_text("/somewhere/else")
+    (root / "not-a-project").write_text("ignored")
+
+    _forget_cursor_call(workdir)
+
+    assert not project.exists()
+    assert untouched.is_dir()
+    assert (decoy / ".workspace-trusted").read_text() == "/somewhere/else"
+    assert not workdir.exists()
+
+
+def test_forget_cursor_call_skips_an_unreadable_trust_file(tmp_path, monkeypatch):
+    from moonlighter.core.llm import _cursor_projects_for
+
+    root = tmp_path / "projects"
+    root.mkdir()
+    monkeypatch.setattr("moonlighter.core.llm._cursor_projects_root", lambda: root)
+    workdir = tmp_path / "cursor-three"
+    workdir.mkdir()
+    unreadable = root / "unreadable"
+    unreadable.mkdir()
+    (unreadable / ".workspace-trusted").write_text(str(workdir))
+    readable = root / "readable"
+    readable.mkdir()
+    (readable / ".workspace-trusted").write_text(str(workdir))
+    original = Path.read_text
+
+    def read_text(self: Path, *args: object, **kwargs: object) -> str:
+        if self.parent == unreadable:
+            raise OSError("gone")
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read_text)
+
+    assert _cursor_projects_for(workdir) == [readable]
+
+
+def test_forget_cursor_call_gives_up_when_listing_projects_fails(tmp_path, monkeypatch):
+    from moonlighter.core.llm import _cursor_projects_for, _forget_cursor_call
+
+    root = tmp_path / "projects"
+    root.mkdir()
+    monkeypatch.setattr("moonlighter.core.llm._cursor_projects_root", lambda: root)
+    workdir = tmp_path / "cursor-four"
+    workdir.mkdir()
+
+    def iterdir(self: Path):
+        if self == root:
+            raise OSError("denied")
+        return []
+
+    monkeypatch.setattr(Path, "iterdir", iterdir)
+
+    assert _cursor_projects_for(workdir) == []
+    _forget_cursor_call(workdir)
+    assert not workdir.exists()
+
+
+def test_forget_cursor_call_is_a_no_op_when_nothing_is_there(tmp_path, monkeypatch):
+    from moonlighter.core.llm import _forget_cursor_call
+
+    missing = tmp_path / "absent"
+    monkeypatch.setattr("moonlighter.core.llm._cursor_projects_root", lambda: missing)
+    _forget_cursor_call(tmp_path / "workdir")
+
+
+@pytest.mark.parametrize("group_already_gone", [False, True])
+async def test_call_cursor_kills_a_subprocess_that_does_not_answer_in_time(group_already_gone):
+    """Same rule as the claude CLI: a hung agent is killed with its process
+    group, and a group that already exited is not an error."""
+    import signal
+
+    async def never_answers(input=None):
+        await asyncio.sleep(3600)
+
+    mock_process = MagicMock()
+    mock_process.pid = 4242
+    mock_process.communicate = never_answers
+    mock_process.wait = AsyncMock(return_value=-9)
+    killpg = MagicMock(side_effect=ProcessLookupError if group_already_gone else None)
+    with (
+        patch(
+            "moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_process
+        ) as mock_exec,
+        patch("moonlighter.core.llm.os.killpg", killpg),
+        pytest.raises(RuntimeError, match=r"agent CLI did not answer within 0\.05 s"),
+    ):
+        await _call_cursor("prompt", "model", timeout_seconds=0.05)
+    killpg.assert_called_once_with(4242, signal.SIGKILL)
+    mock_process.wait.assert_awaited_once()
+    assert mock_exec.call_args.kwargs["start_new_session"] is True
+
+
+async def test_cursor_cleanup_failure_does_not_replace_the_result(tmp_path, monkeypatch, caplog):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    mock_process = _cursor_proc(b"the answer")
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_process),
+        patch("moonlighter.core.llm.shutil.rmtree", side_effect=OSError("busy")),
+        caplog.at_level("ERROR"),
+    ):
+        result = await _call_cursor("prompt", "model")
+    assert result == "the answer"
+    assert "cursor cleanup failed" in caplog.text
+
+
+async def test_cursor_cleanup_failure_does_not_hide_a_usage_limit(tmp_path, monkeypatch):
+    mock_process = _cursor_proc()
+    mock_process.communicate = AsyncMock(side_effect=RuntimeError("usage limit reached"))
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_process),
+        patch("moonlighter.core.llm.shutil.rmtree", side_effect=OSError("busy")),
+        pytest.raises(RuntimeError, match="usage limit"),
+    ):
+        await _call_cursor("prompt", "model")
+
+
+async def test_parallel_cursor_calls_keep_their_own_permissions_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    seen: list[Path] = []
+
+    async def start(*args: object, **kwargs: object) -> MagicMock:
+        workdir = Path(str(kwargs["cwd"]))
+        seen.append(workdir)
+        permissions = (workdir / ".cursor" / "cli.json").read_text()
+        process = _cursor_proc()
+
+        async def communicate(input: object = None) -> tuple[bytes, bytes]:
+            await asyncio.sleep(0.05)
+            assert (workdir / ".cursor" / "cli.json").read_text() == permissions
+            return b"ok", b""
+
+        process.communicate = communicate
+        return process
+
+    with patch("moonlighter.core.llm.asyncio.create_subprocess_exec", side_effect=start):
+        await asyncio.gather(
+            _call_cursor("first line\nTOKEN_ONE", "model"),
+            _call_cursor("first line\nTOKEN_TWO", "model"),
+        )
+
+    assert len(seen) == 2
+    assert seen[0] != seen[1]
+    assert not seen[0].exists()
+    assert not seen[1].exists()
+
+
+def test_cursor_projects_root_is_the_home_projects_dir(monkeypatch):
+    monkeypatch.undo()
+    from moonlighter.core.llm import _cursor_projects_root
+
+    assert _cursor_projects_root() == Path.home() / ".cursor" / "projects"
+
+
+async def test_cursor_no_cache_prefix_keeps_prompt_unchanged():
+    captured: dict[str, bytes] = {}
+
+    async def fake_communicate(*args: object, **kwargs: object) -> tuple[bytes, bytes]:
+        captured["input"] = kwargs["input"]  # type: ignore[assignment]
+        return (b"ok", b"")
+
+    mock_proc = MagicMock()
+    mock_proc.returncode = 0
+    mock_proc.communicate = fake_communicate
+
+    with patch("moonlighter.core.llm.asyncio.create_subprocess_exec", return_value=mock_proc):
+        await _call_cursor("PROMPT_ONLY", "m")
+    assert captured["input"] == b"PROMPT_ONLY"
 
 
 # ── is_spend_limit ────────────────────────────────────────────────────────────
