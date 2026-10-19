@@ -23,7 +23,7 @@ dependencies = [
     "peewee>=4.5.3",
     "pyyaml>=6.0",
     "rich>=13.7",
-    "anthropic>=1.13.0",
+    "anthropic>=1.15.0",
     "httpx>=0.27",
 ]
 
