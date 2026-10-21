@@ -24,7 +24,7 @@ dependencies = [
     "moonlighter-scan==0.1.8",
     "moonlighter-apply==0.1.8",
     "moonlighter-email==0.1.8",
-    "fastmcp>=4.1.0",
+    "fastmcp>=4.1.1",
 ]
 
 [project.scripts]
