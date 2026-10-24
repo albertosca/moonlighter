@@ -6,7 +6,7 @@
 
 Escaneia os portais de vagas que você escolhe, dá uma nota a cada vaga comparando com o seu perfil e rascunha uma folha de respostas completa a partir dos seus próprios dados, sinalizando o que não consegue responder.
 
-<!-- facts -->1.900+ testes · 100% de cobertura de branches (gate no CI) · 5 pacotes no PyPI · mypy strict<!-- /facts -->
+<!-- facts -->2.100+ testes · 100% de cobertura de branches (gate no CI) · 5 pacotes no PyPI · mypy strict<!-- /facts -->
 
 **[Comece aqui →](getting-started/install.md)**
 

@@ -8,7 +8,7 @@ Escaneia os portais de vagas que você escolhe, dá uma nota a cada vaga compara
 
 Feito por Alberto Cavalcanti · [Fale comigo no LinkedIn](https://www.linkedin.com/in/albertosca/) · [Leia a documentação](https://albertosca.github.io/moonlighter/pt/) · [Instale](https://albertosca.github.io/moonlighter/pt/getting-started/install/)
 
-<!-- facts -->1.900+ testes · 100% de cobertura de branches (gate no CI) · 5 pacotes no PyPI · mypy strict<!-- /facts -->
+<!-- facts -->2.100+ testes · 100% de cobertura de branches (gate no CI) · 5 pacotes no PyPI · mypy strict<!-- /facts -->
 
 [![PyPI](https://img.shields.io/pypi/v/moonlighter)](https://pypi.org/project/moonlighter/) [![Python](https://img.shields.io/badge/python-3.14%2B-blue)](https://pypi.org/project/moonlighter/) [![CI](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml/badge.svg)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml) [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE) [![Lint: ruff](https://img.shields.io/badge/lint-ruff-261230)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml) [![Coverage: 100%](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/albertosca/moonlighter/actions/workflows/ci.yml)
 

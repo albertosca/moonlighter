@@ -2,7 +2,7 @@
 
 > The job-application assistant that leaves the last word to you. Open-source, self-hosted MCP server and CLIs (Python, AGPL-3.0) that scan ATS job boards, score postings against your profile with an LLM, and draft complete application answer sheets for you to review and send. It never sends an application.
 
-<!-- facts -->1,900+ tests · 100% branch coverage (CI-gated) · 5 packages on PyPI · mypy strict<!-- /facts -->
+<!-- facts -->2,100+ tests · 100% branch coverage (CI-gated) · 5 packages on PyPI · mypy strict<!-- /facts -->
 
 moonlighter scans Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters and InHire boards for the companies you list, plus optional portal feeds. It is for developers job hunting from Claude Code (or any MCP client) who want to review every answer before it goes out. Built by Alberto Cavalcanti (https://www.linkedin.com/in/albertosca/).
 
