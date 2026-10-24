@@ -76,12 +76,52 @@ def test_types_map_to_kinds():
     assert _by_label(questions, "Phone").kind is QuestionKind.TEXT
     assert _by_label(questions, "Desired Monthly Salary in USD").kind is QuestionKind.TEXT
     assert _by_label(questions, "Education").kind is QuestionKind.LONG_TEXT
-    boolean = next(
-        question
-        for question in questions
-        if question.label.startswith("Do you have at least 8 years")
-    )
-    assert boolean.kind is QuestionKind.BOOLEAN
+
+
+def _boolean_labels(payload):
+    return [field["label"] for field in _labelled_fields(payload) if field["type"] == "boolean"]
+
+
+def test_every_boolean_field_is_a_yes_no_single_select():
+    # Workable's `boolean` is its Yes/No question type: the page renders it as
+    # YES/NO buttons (Seeq, live 2026-10-05), whether the label ends in "?" or
+    # not ("Expertise in building large React applications with TypeScript"),
+    # and Devsu's label even says "Selecting 'No' means...". Lever and paste
+    # give the same questions as single_select ("Yes", "No"); so does Workable.
+    for payload in (SEEQ, DEVSU):
+        questions = parse_workable_form(payload)
+        labels = _boolean_labels(payload)
+        assert labels, "fixture must contain boolean fields"
+        for label in labels:
+            question = _by_label(questions, label)
+            assert question.kind is QuestionKind.SINGLE_SELECT, label
+            assert question.options == ("Yes", "No"), label
+
+
+def test_a_boolean_field_keeps_workables_own_option_labels():
+    payload = [
+        {
+            "fields": [
+                {
+                    "label": "Are you based in Brazil?",
+                    "type": "boolean",
+                    "required": True,
+                    "options": [{"name": "Y", "value": "Sí"}, {"name": "N", "value": "No"}],
+                }
+            ]
+        }
+    ]
+    [question] = parse_workable_form(payload)
+    assert question.kind is QuestionKind.SINGLE_SELECT
+    assert question.options == ("Sí", "No")
+    assert question.required is True
+
+
+def test_a_boolean_field_without_options_answers_in_the_question_language():
+    payload = [{"fields": [{"label": "Você possui CNPJ ativo?", "type": "boolean"}]}]
+    [question] = parse_workable_form(payload)
+    assert question.options == ("Sim", "Não")
+    assert question.required is False
 
 
 def test_an_unknown_type_falls_back_to_long_text():

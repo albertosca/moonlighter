@@ -1,5 +1,7 @@
 🇺🇸 [English](https://github.com/albertosca/moonlighter/blob/main/packages/full/README.md) · 🇧🇷 [Português](https://github.com/albertosca/moonlighter/blob/main/packages/full/README.pt.md)
 
+<!-- mcp-name: io.github.albertosca/moonlighter -->
+
 # moonlighter
 
 **The job-application assistant that leaves the last word to you.**

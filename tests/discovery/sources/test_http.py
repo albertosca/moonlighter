@@ -48,10 +48,10 @@ LEVER_RESPONSE = [
 
 @pytest.mark.asyncio
 async def test_greenhouse_scan():
-    with patch("httpx.AsyncClient") as mock_client_cls:
+    with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+        mock_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = GREENHOUSE_RESPONSE
@@ -69,10 +69,10 @@ async def test_greenhouse_scan():
 
 @pytest.mark.asyncio
 async def test_lever_scan():
-    with patch("httpx.AsyncClient") as mock_client_cls:
+    with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+        mock_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = LEVER_RESPONSE
@@ -91,10 +91,10 @@ async def test_lever_scan():
 
 @pytest.mark.asyncio
 async def test_greenhouse_404_skips_company():
-    with patch("httpx.AsyncClient") as mock_client_cls:
+    with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+        mock_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
         mock_response = MagicMock()
         mock_response.status_code = 404
         mock_client.get = AsyncMock(return_value=mock_response)
@@ -108,16 +108,16 @@ async def test_greenhouse_404_skips_company():
 # --- helper ---
 
 
-def _make_mock_client(response_json=None, status_code=200, raise_exc=None):
+def _make_mock_client(response_json=None, status_code=200, raise_exception=None):
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.status_code = status_code
     if response_json is not None:
         mock_response.json.return_value = response_json
 
-    if raise_exc:
-        mock_client.get = AsyncMock(side_effect=raise_exc)
-        mock_client.post = AsyncMock(side_effect=raise_exc)
+    if raise_exception:
+        mock_client.get = AsyncMock(side_effect=raise_exception)
+        mock_client.post = AsyncMock(side_effect=raise_exception)
     else:
         mock_client.get = AsyncMock(return_value=mock_response)
         mock_client.post = AsyncMock(return_value=mock_response)
@@ -208,7 +208,7 @@ async def test_greenhouse_missing_location():
 
 
 async def test_greenhouse_network_exception_skips_company():
-    mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
+    mock_client = _make_mock_client(raise_exception=httpx.ConnectError("timeout"))
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
@@ -307,7 +307,7 @@ async def test_lever_missing_created_at():
 
 
 async def test_lever_network_exception_skips_company():
-    mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
+    mock_client = _make_mock_client(raise_exception=httpx.ConnectError("timeout"))
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
@@ -345,15 +345,15 @@ async def test_greenhouse_partial_failure_continues():
     }
     call_count = [0]
 
-    async def get_with_partial_failure(url, **kwargs):
+    async def get_with_partial_failure(url, **keyword_arguments):
         call_count[0] += 1
-        resp = MagicMock()
+        http_response = MagicMock()
         if call_count[0] == 2:
-            resp.status_code = 500
+            http_response.status_code = 500
         else:
-            resp.status_code = 200
-            resp.json.return_value = success_response
-        return resp
+            http_response.status_code = 200
+            http_response.json.return_value = success_response
+        return http_response
 
     mock_client = MagicMock()
     mock_client.get = get_with_partial_failure
@@ -541,14 +541,14 @@ async def test_workable_maps_fields_and_strips_html():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WorkableScanner().scan(["acme"])
     assert len(jobs) == 1
-    j = jobs[0]
-    assert j.source == "workable"
-    assert j.company == "acme"
-    assert j.title == "Staff Engineer"
-    assert j.url == "https://apply.workable.com/j/ABC123/apply"
-    assert j.location == "Lisbon, Portugal"
-    assert j.remote_type == "remote"  # telecommuting True wins over location
-    assert j.description == "Build  things"
+    scanned_job = jobs[0]
+    assert scanned_job.source == "workable"
+    assert scanned_job.company == "acme"
+    assert scanned_job.title == "Staff Engineer"
+    assert scanned_job.url == "https://apply.workable.com/j/ABC123/apply"
+    assert scanned_job.location == "Lisbon, Portugal"
+    assert scanned_job.remote_type == "remote"  # telecommuting True wins over location
+    assert scanned_job.description == "Build  things"
 
 
 async def test_workable_skips_entry_without_title():
@@ -619,7 +619,7 @@ async def test_workable_500_response_skips_company():
 
 
 async def test_workable_network_exception_skips_company():
-    mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
+    mock_client = _make_mock_client(raise_exception=httpx.ConnectError("timeout"))
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs == []
@@ -661,14 +661,16 @@ async def test_recruitee_maps_fields_and_strips_html():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert len(jobs) == 1
-    j = jobs[0]
-    assert j.source == "recruitee"
-    assert j.company == "acme"
-    assert j.title == "Backend Dev"
-    assert j.url == "https://x.recruitee.com/o/backend-dev/c/new"
-    assert j.location == "Amsterdam, Netherlands"
-    assert j.remote_type is None  # remote False + bare city: unknown, never invented onsite
-    assert j.description == "Go"
+    scanned_job = jobs[0]
+    assert scanned_job.source == "recruitee"
+    assert scanned_job.company == "acme"
+    assert scanned_job.title == "Backend Dev"
+    assert scanned_job.url == "https://x.recruitee.com/o/backend-dev/c/new"
+    assert scanned_job.location == "Amsterdam, Netherlands"
+    assert (
+        scanned_job.remote_type is None
+    )  # remote False + bare city: unknown, never invented onsite
+    assert scanned_job.description == "Go"
 
 
 async def test_recruitee_remote_flag_true():
@@ -712,7 +714,7 @@ async def test_recruitee_500_response_skips_company():
 
 
 async def test_recruitee_network_exception_skips_company():
-    mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
+    mock_client = _make_mock_client(raise_exception=httpx.ConnectError("timeout"))
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
@@ -736,10 +738,10 @@ async def test_recruitee_custom_domain_entry():
     """An entry containing a dot is a custom career domain. Live-verified
     2026-08-12: careers.tellent.com and jobs.channable.com serve the same
     /api/offers/ payload as {slug}.recruitee.com."""
-    ok = MagicMock(status_code=200)
-    ok.json.return_value = RECRUITEE_RESPONSE
+    ok_response = MagicMock(status_code=200)
+    ok_response.json.return_value = RECRUITEE_RESPONSE
     mock_client = AsyncMock()
-    mock_client.get = AsyncMock(return_value=ok)
+    mock_client.get = AsyncMock(return_value=ok_response)
     with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
         jobs = await RecruiteeScanner().scan(["jobs.channable.com"])
     assert len(jobs) > 0
@@ -749,10 +751,10 @@ async def test_recruitee_custom_domain_entry():
 
 
 async def test_recruitee_slug_entry_unchanged():
-    ok = MagicMock(status_code=200)
-    ok.json.return_value = RECRUITEE_RESPONSE
+    ok_response = MagicMock(status_code=200)
+    ok_response.json.return_value = RECRUITEE_RESPONSE
     mock_client = AsyncMock()
-    mock_client.get = AsyncMock(return_value=ok)
+    mock_client.get = AsyncMock(return_value=ok_response)
     with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
         await RecruiteeScanner().scan(["acme"])
     assert mock_client.get.call_args.args[0] == "https://acme.recruitee.com/api/offers/"
@@ -897,15 +899,19 @@ async def test_smartrecruiters_pagination_terminates_when_offset_reaches_total()
         await SmartRecruitersScanner().scan(["Visa"])
     # exactly 2 list calls (offset=0, offset=1) then it stops -- proves offset>=total
     # terminates the loop rather than spinning past totalFound.
-    list_calls = [c for c in mock_client.get.await_args_list if "postings?limit=100" in c.args[0]]
+    list_calls = [
+        await_call
+        for await_call in mock_client.get.await_args_list
+        if "postings?limit=100" in await_call.args[0]
+    ]
     assert len(list_calls) == 2
 
 
-def _make_flat_client(response=None, status_code=200, raise_exc=None):
+def _make_flat_client(response=None, status_code=200, raise_exception=None):
     """Like _make_mock_client but scoped locally to keep SmartRecruiters tests grouped."""
     mock_client = MagicMock()
-    if raise_exc:
-        mock_client.get = AsyncMock(side_effect=raise_exc)
+    if raise_exception:
+        mock_client.get = AsyncMock(side_effect=raise_exception)
     else:
         mock_client.get = AsyncMock(return_value=_sr_response(response, status_code=status_code))
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -942,7 +948,11 @@ async def test_smartrecruiters_zero_limit_field_does_not_spin():
         jobs = await SmartRecruitersScanner().scan(["acme"])
 
     assert len(jobs) == 1
-    list_calls = [c for c in mock_client.get.await_args_list if "postings?limit=100" in c.args[0]]
+    list_calls = [
+        await_call
+        for await_call in mock_client.get.await_args_list
+        if "postings?limit=100" in await_call.args[0]
+    ]
     assert len(list_calls) == 2
 
 
@@ -967,7 +977,7 @@ async def test_smartrecruiters_non_dict_list_response_returns_empty():
 
 
 async def test_smartrecruiters_network_exception_on_list_skips_company():
-    mock_client = _make_flat_client(raise_exc=httpx.ConnectError("timeout"))
+    mock_client = _make_flat_client(raise_exception=httpx.ConnectError("timeout"))
     with (
         patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
         patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
@@ -1282,18 +1292,18 @@ async def test_gupy_no_description_yields_none():
 
 
 async def test_gupy_paginates_across_pages():
-    p1 = {
+    first_posting = {
         "data": [{"id": 1, "name": "Eng One", "jobUrl": "https://acme.gupy.io/1"}],
         "pagination": {"total": 2, "limit": 1, "offset": 0},
     }
-    p2 = {
+    second_posting = {
         "data": [{"id": 2, "name": "Eng Two", "jobUrl": "https://acme.gupy.io/2"}],
         "pagination": {"total": 2, "limit": 1, "offset": 1},
     }
-    mock_client = _make_gupy_client({"offset=0": p1, "offset=1": p2})
+    mock_client = _make_gupy_client({"offset=0": first_posting, "offset=1": second_posting})
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await GupyScanner().scan(keywords="eng")
-    assert [j.title for j in jobs] == ["Eng One", "Eng Two"]
+    assert [scanned_job.title for scanned_job in jobs] == ["Eng One", "Eng Two"]
     assert mock_client.get.await_count == 2
 
 
@@ -1652,7 +1662,9 @@ async def test_wwr_title_without_colon_falls_back_to_source_name_company():
     mock_client = _make_rss_client(_WWR_RSS)
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WeWorkRemotelyScanner().scan()
-    no_colon_job = next(j for j in jobs if j.title == "Frontend Developer Wanted")
+    no_colon_job = next(
+        scanned_job for scanned_job in jobs if scanned_job.title == "Frontend Developer Wanted"
+    )
     assert no_colon_job.company == "WeWorkRemotely"
 
 
@@ -1758,11 +1770,12 @@ async def test_hn_scan_finds_thread_and_parses_pipe_separated_title():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await HNWhoIsHiringScanner().scan()
 
-    acme = next(j for j in jobs if j.company == "Acme")
+    acme = next(scanned_job for scanned_job in jobs if scanned_job.company == "Acme")
     assert acme.source == "hn_whoishiring"
     assert acme.title == "Remote | Full-time Build things."
     assert acme.url == "https://news.ycombinator.com/item?id=201"
-    assert acme.remote_type is None
+    assert acme.remote_type == "remote"  # the header says so
+    assert acme.location == "Remote"
 
 
 async def test_hn_parse_title_truncates_long_rest_after_separator():
@@ -1780,7 +1793,7 @@ async def test_hn_parse_title_truncates_long_rest_after_separator():
     mock_client = _make_hn_client(url_map)
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await HNWhoIsHiringScanner().scan()
-    job = next(j for j in jobs if j.company == "Acme")
+    job = next(scanned_job for scanned_job in jobs if scanned_job.company == "Acme")
     assert len(job.title) <= 81  # 80 chars + the "…" ellipsis
     assert job.title.endswith("…")
 
@@ -1790,7 +1803,7 @@ async def test_hn_scan_falls_back_to_prose_when_no_separator():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await HNWhoIsHiringScanner().scan()
 
-    fallback = next(j for j in jobs if j.url.endswith("id=202"))
+    fallback = next(scanned_job for scanned_job in jobs if scanned_job.url.endswith("id=202"))
     assert fallback.company == "HN Who's Hiring"
     assert "No separator in this first line" in fallback.title
 
@@ -1799,7 +1812,7 @@ async def test_hn_scan_skips_deleted_comments():
     mock_client = _make_hn_client(_hn_url_map())
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await HNWhoIsHiringScanner().scan()
-    assert all(not j.url.endswith("id=203") for j in jobs)
+    assert all(not scanned_job.url.endswith("id=203") for scanned_job in jobs)
 
 
 async def test_hn_no_who_is_hiring_thread_found_returns_empty():
@@ -2105,14 +2118,18 @@ async def test_ashby_500_response_skips_company():
 
 
 async def test_ashby_network_exception_skips_company():
-    mock_client = _make_mock_client(raise_exc=httpx.ConnectError("timeout"))
+    mock_client = _make_mock_client(raise_exception=httpx.ConnectError("timeout"))
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_ashby_missing_published_at_returns_none():
-    job = {k: v for k, v in ASHBY_JOB.items() if k != "publishedAt"}
+    job = {
+        field_name: field_value
+        for field_name, field_value in ASHBY_JOB.items()
+        if field_name != "publishedAt"
+    }
     mock_client = _make_mock_client(_ashby_response(job))
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
@@ -2144,7 +2161,11 @@ async def test_ashby_empty_jobs_returns_empty():
 
 
 async def test_ashby_missing_title_skips_job():
-    job = {k: v for k, v in ASHBY_JOB.items() if k != "title"}
+    job = {
+        field_name: field_value
+        for field_name, field_value in ASHBY_JOB.items()
+        if field_name != "title"
+    }
     mock_client = _make_mock_client(_ashby_response(job))
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
@@ -2152,7 +2173,11 @@ async def test_ashby_missing_title_skips_job():
 
 
 async def test_ashby_missing_url_skips_job():
-    job = {k: v for k, v in ASHBY_JOB.items() if k != "jobUrl"}
+    job = {
+        field_name: field_value
+        for field_name, field_value in ASHBY_JOB.items()
+        if field_name != "jobUrl"
+    }
     mock_client = _make_mock_client(_ashby_response(job))
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await AshbyScanner().scan(["co"])
@@ -2184,10 +2209,10 @@ async def test_ashby_non_dict_response_returns_empty():
 
 
 def _mock_client_cls(mock_client):
-    cls = MagicMock()
-    cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-    cls.return_value.__aexit__ = AsyncMock(return_value=False)
-    return cls
+    client_class = MagicMock()
+    client_class.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+    client_class.return_value.__aexit__ = AsyncMock(return_value=False)
+    return client_class
 
 
 @pytest.mark.asyncio
@@ -2245,11 +2270,11 @@ def test_require_dict_raises_on_none():
 async def test_gather_jobs_counts_failures_per_source():
     """One slug succeeds, one errors: the error is COUNTED in stats, not silently
     dropped — [] from a broken API must stay distinguishable from no openings."""
-    ok = MagicMock(status_code=200)
-    ok.json.return_value = GREENHOUSE_RESPONSE
+    ok_response = MagicMock(status_code=200)
+    ok_response.json.return_value = GREENHOUSE_RESPONSE
     boom = MagicMock(status_code=500)
     mock_client = AsyncMock()
-    mock_client.get = AsyncMock(side_effect=[ok, boom])
+    mock_client.get = AsyncMock(side_effect=[ok_response, boom])
     with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
         stats: ScanStats = {}
         jobs = await GreenhouseScanner().scan(["stripe", "deadco"], stats=stats)
@@ -2259,10 +2284,10 @@ async def test_gather_jobs_counts_failures_per_source():
 
 @pytest.mark.asyncio
 async def test_scan_without_stats_still_works():
-    ok = MagicMock(status_code=200)
-    ok.json.return_value = GREENHOUSE_RESPONSE
+    ok_response = MagicMock(status_code=200)
+    ok_response.json.return_value = GREENHOUSE_RESPONSE
     mock_client = AsyncMock()
-    mock_client.get = AsyncMock(return_value=ok)
+    mock_client.get = AsyncMock(return_value=ok_response)
     with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
         jobs = await GreenhouseScanner().scan(["stripe"])
     assert len(jobs) == 1
@@ -2284,10 +2309,10 @@ async def test_remoteok_records_stats_on_failure():
 
 @pytest.mark.asyncio
 async def test_remoteok_records_stats_on_success():
-    ok = MagicMock(status_code=200)
-    ok.json.return_value = _REMOTEOK_RESPONSE
+    ok_response = MagicMock(status_code=200)
+    ok_response.json.return_value = _REMOTEOK_RESPONSE
     mock_client = AsyncMock()
-    mock_client.get = AsyncMock(return_value=ok)
+    mock_client.get = AsyncMock(return_value=ok_response)
     with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
         stats: ScanStats = {}
         jobs = await RemoteOKScanner().scan(stats=stats)
@@ -2308,10 +2333,10 @@ async def test_remotive_records_stats_on_failure():
 
 @pytest.mark.asyncio
 async def test_remotive_records_stats_on_success():
-    ok = MagicMock(status_code=200)
-    ok.json.return_value = _REMOTIVE_RESPONSE
+    ok_response = MagicMock(status_code=200)
+    ok_response.json.return_value = _REMOTIVE_RESPONSE
     mock_client = AsyncMock()
-    mock_client.get = AsyncMock(return_value=ok)
+    mock_client.get = AsyncMock(return_value=ok_response)
     with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
         stats: ScanStats = {}
         jobs = await RemotiveScanner().scan(stats=stats)
@@ -2332,10 +2357,10 @@ async def test_wwr_records_stats_on_failure():
 
 @pytest.mark.asyncio
 async def test_wwr_records_stats_on_success():
-    ok = MagicMock(status_code=200)
-    ok.text = _WWR_RSS
+    ok_response = MagicMock(status_code=200)
+    ok_response.text = _WWR_RSS
     mock_client = AsyncMock()
-    mock_client.get = AsyncMock(return_value=ok)
+    mock_client.get = AsyncMock(return_value=ok_response)
     with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
         stats: ScanStats = {}
         jobs = await WeWorkRemotelyScanner().scan(stats=stats)
@@ -2356,10 +2381,10 @@ async def test_gupy_records_stats_on_failure():
 
 @pytest.mark.asyncio
 async def test_gupy_records_stats_on_success():
-    ok = MagicMock(status_code=200)
-    ok.json.return_value = _GUPY_P1
+    ok_response = MagicMock(status_code=200)
+    ok_response.json.return_value = _GUPY_P1
     mock_client = AsyncMock()
-    mock_client.get = AsyncMock(return_value=ok)
+    mock_client.get = AsyncMock(return_value=ok_response)
     with patch("httpx.AsyncClient", _mock_client_cls(mock_client)):
         stats: ScanStats = {}
         jobs = await GupyScanner().scan(keywords="eng", stats=stats)
@@ -2435,10 +2460,10 @@ async def test_hn_comment_fetch_failures_count_as_errors_deleted_do_not():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await HNWhoIsHiringScanner().scan(stats=stats)
 
-    assert [j.company for j in jobs] == ["Acme"]
-    s = stats["hn_whoishiring"]
-    assert s.jobs == 1
-    assert s.errors == 1  # the 404; the deleted comment 203 is not an error
+    assert [scanned_job.company for scanned_job in jobs] == ["Acme"]
+    source_stats = stats["hn_whoishiring"]
+    assert source_stats.jobs == 1
+    assert source_stats.errors == 1  # the 404; the deleted comment 203 is not an error
 
 
 # ── InHire ──────────────────────────────────────────────────────────────────
@@ -2489,17 +2514,17 @@ def _make_inhire_client(page=INHIRE_PAGE, details=INHIRE_DETAIL, detail_status=2
     mock_client = MagicMock()
 
     async def get(url, headers=None):
-        resp = MagicMock()
+        http_response = MagicMock()
         job_id = url.rsplit("/", 1)[-1]
         if url.endswith("/job-posts/public/pages"):
-            resp.status_code = 200
-            resp.json.return_value = page
+            http_response.status_code = 200
+            http_response.json.return_value = page
         elif job_id in details and detail_status == 200:
-            resp.status_code = 200
-            resp.json.return_value = details[job_id]
+            http_response.status_code = 200
+            http_response.json.return_value = details[job_id]
         else:
-            resp.status_code = detail_status
-        return resp
+            http_response.status_code = detail_status
+        return http_response
 
     mock_client.get = AsyncMock(side_effect=get)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -2512,7 +2537,10 @@ async def test_inhire_scan_parses_published_jobs_only():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await InHireScanner().scan(["alice"])
 
-    assert [j.title for j in jobs] == ["Design l Creative Design", "Backend Engineer"]
+    assert [scanned_job.title for scanned_job in jobs] == [
+        "Design l Creative Design",
+        "Backend Engineer",
+    ]
     assert jobs[0].source == "inhire"
     assert jobs[0].company == "alice"
     # Slug derived from displayName: without it the SPA renders a black screen
@@ -2536,7 +2564,7 @@ async def test_inhire_detail_failure_keeps_the_listing_job():
     mock_client = _make_inhire_client(detail_status=500)
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await InHireScanner().scan(["alice"])
-    assert [j.description for j in jobs] == [None, None]
+    assert [scanned_job.description for scanned_job in jobs] == [None, None]
     assert len(jobs) == 2
 
 
@@ -2547,7 +2575,7 @@ async def test_inhire_detail_wrong_shape_degrades_to_no_description():
     mock_client = _make_inhire_client(details=details)
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await InHireScanner().scan(["alice"])
-    assert [j.description for j in jobs] == [None, None]
+    assert [scanned_job.description for scanned_job in jobs] == [None, None]
 
 
 def test_inhire_slug_reproduces_the_measured_pipe_case():
@@ -2597,3 +2625,161 @@ async def test_inhire_non_list_jobs_page_counts_as_error():
         jobs = await InHireScanner().scan(["alice"], stats=stats)
     assert jobs == []
     assert stats["inhire"].errors == 1
+
+
+# --- remote_type from the structured workplace field (BACKLOG bug 2026-10-15) ---
+
+
+def _lever_posting(*, location, workplace_type=None):
+    posting = {
+        "id": "abc",
+        "text": "Engineer",
+        "hostedUrl": "https://jobs.lever.co/co/abc",
+        "categories": {"location": location},
+    }
+    if workplace_type is not None:
+        posting["workplaceType"] = workplace_type
+    return posting
+
+
+async def _lever_remote_type(posting):
+    mock_client = _make_mock_client([posting])
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await LeverScanner().scan(["co"])
+    return jobs[0].remote_type
+
+
+@pytest.mark.parametrize(
+    ("location", "workplace_type", "expected"),
+    [
+        ("San Francisco", "onsite", "onsite"),
+        ("London", "hybrid", "hybrid"),
+        ("Anywhere", "remote", "remote"),
+        ("San Francisco", "unspecified", None),
+        ("San Francisco", None, None),
+        # Explicit text wins over the API: a live Lever board (shieldai) says
+        # "Remote" in the location and `onsite` in workplaceType. Trusting the
+        # API there would archive a remote job outside the home city.
+        ("Remote", "onsite", "remote"),
+        ("Hybrid - Berlin", "onsite", "hybrid"),
+    ],
+)
+async def test_lever_remote_type_fills_from_workplace_type_only_when_text_is_silent(
+    location, workplace_type, expected
+):
+    posting = _lever_posting(location=location, workplace_type=workplace_type)
+    assert await _lever_remote_type(posting) == expected
+
+
+@pytest.mark.parametrize(
+    ("location", "is_remote", "workplace_type", "expected"),
+    [
+        ("Berlin", False, "OnSite", "onsite"),
+        ("Berlin", False, "Hybrid", "hybrid"),
+        ("Anywhere", False, "Remote", "remote"),
+        ("Berlin", False, None, None),
+        ("Berlin", False, "Unknown", None),
+        ("Hybrid - NYC", False, "OnSite", "hybrid"),  # text wins
+        ("Berlin", True, "OnSite", "remote"),  # isRemote keeps its precedence
+    ],
+)
+async def test_ashby_remote_type_fills_from_workplace_type_only_when_text_is_silent(
+    location, is_remote, workplace_type, expected
+):
+    job = {**ASHBY_JOB, "location": location, "isRemote": is_remote}
+    if workplace_type is not None:
+        job["workplaceType"] = workplace_type
+    mock_client = _make_mock_client(_ashby_response(job))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs[0].remote_type == expected
+
+
+async def _hn_job(text):
+    url_map = _hn_url_map(kids=(201,))
+    url_map[f"{_HN_BASE}/item/201.json"] = {"id": 201, "text": text}
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    return jobs[0]
+
+
+@pytest.mark.parametrize(
+    ("header", "remote_type", "location"),
+    [
+        ("Acme | Backend Engineer | Memphis, TN | ONSITE | Full-time", "onsite", None),
+        ("Acme | Backend Engineer | REMOTE | Full-time", "remote", "REMOTE"),
+        (
+            "Acme | Backend Engineer | Remote (Worldwide) | Full-time",
+            "remote",
+            "Remote (Worldwide)",
+        ),
+        ("Acme | Backend Engineer | Berlin | HYBRID", "hybrid", None),
+        ("Acme | Backend Engineer | Austin | In-Office", "onsite", None),
+        # Ambiguous or silent headers stay unknown, never guessed.
+        ("Acme | Backend Engineer | Varies between REMOTE and HYBRID", None, None),
+        ("Acme | Backend Engineer | ONSITE or REMOTE", None, None),
+        ("Acme | Backend Engineer | ONSITE | Remote (US)", None, None),
+        ("Acme | Backend Engineer | Austin | Full-time", None, None),
+        ("Acme - Backend Engineer in Austin", None, None),
+    ],
+)
+async def test_hn_header_segments_fill_remote_type_and_location(header, remote_type, location):
+    job = await _hn_job(header)
+    assert job.remote_type == remote_type
+    assert job.location == location
+
+
+async def test_hn_remote_word_in_the_body_does_not_set_remote_type():
+    """Only the pipe-separated header counts: 'remote' in the prose of the JD is
+    not a statement about this posting's workplace."""
+    body = "Acme | Backend Engineer | Austin " + ("blah " * 80) + "| we are not remote-friendly"
+    job = await _hn_job(body)
+    assert job.remote_type is None
+
+
+# --- every location of a multi-location posting reaches the evaluator ---
+
+
+async def test_lever_location_lists_every_place_and_remote_among_them_wins():
+    posting = _lever_posting(location="San Francisco", workplace_type="onsite")
+    posting["categories"]["allLocations"] = ["San Francisco", "Remote (US)", "Toronto"]
+    mock_client = _make_mock_client([posting])
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await LeverScanner().scan(["co"])
+    assert jobs[0].location == "San Francisco; Remote (US); Toronto"
+    # A remote option among the places is a statement the text makes, so it beats
+    # the API's onsite instead of letting a hard archive decide without the LLM.
+    assert jobs[0].remote_type == "remote"
+
+
+async def test_lever_without_all_locations_keeps_the_primary_only():
+    posting = _lever_posting(location="Berlin", workplace_type="hybrid")
+    mock_client = _make_mock_client([posting])
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await LeverScanner().scan(["co"])
+    assert jobs[0].location == "Berlin"
+    assert jobs[0].remote_type == "hybrid"
+
+
+async def test_ashby_location_lists_secondary_locations_and_remote_wins():
+    job = {
+        **ASHBY_JOB,
+        "location": "San Francisco",
+        "isRemote": False,
+        "workplaceType": "OnSite",
+        "secondaryLocations": [{"location": "Remote"}, {"location": "Toronto"}, {"location": ""}],
+    }
+    mock_client = _make_mock_client(_ashby_response(job))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs[0].location == "San Francisco; Remote; Toronto"
+    assert jobs[0].remote_type == "remote"
+
+
+async def test_ashby_malformed_secondary_locations_fall_back_to_the_primary():
+    job = {**ASHBY_JOB, "location": "Berlin", "isRemote": False, "secondaryLocations": "oops"}
+    mock_client = _make_mock_client(_ashby_response(job))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs[0].location == "Berlin"

@@ -3,7 +3,10 @@ from datetime import datetime
 from moonlighter.discovery.sources.base import (
     RawJob,
     ScannerSessionExpiredError,
+    join_locations,
     normalize_remote_type,
+    remote_type_from_workplace,
+    remote_types_mentioned,
 )
 
 
@@ -107,6 +110,43 @@ def test_rawjob_posted_at_is_datetime():
 
 
 def test_scanner_session_expired_error_is_an_exception():
-    err = ScannerSessionExpiredError("session expired")
-    assert isinstance(err, Exception)
-    assert str(err) == "session expired"
+    error = ScannerSessionExpiredError("session expired")
+    assert isinstance(error, Exception)
+    assert str(error) == "session expired"
+
+
+def test_remote_type_from_workplace_maps_api_vocabularies():
+    assert remote_type_from_workplace("onsite") == "onsite"
+    assert remote_type_from_workplace("OnSite") == "onsite"
+    assert remote_type_from_workplace("Hybrid") == "hybrid"
+    assert remote_type_from_workplace("remote") == "remote"
+    assert remote_type_from_workplace("unspecified") is None
+    assert remote_type_from_workplace("") is None
+    assert remote_type_from_workplace(None) is None
+    assert remote_type_from_workplace(42) is None  # malformed payload, never a crash
+
+
+def test_remote_types_mentioned_reports_every_kind_in_a_segment():
+    assert remote_types_mentioned("ONSITE or REMOTE") == {"onsite", "remote"}
+    assert remote_types_mentioned("Remote (US)") == {"remote"}
+    assert remote_types_mentioned("In-Office") == {"onsite"}
+    assert remote_types_mentioned("Memphis, TN") == set()
+    assert remote_types_mentioned("") == set()
+
+
+def test_join_locations_puts_primary_first_and_drops_repeats():
+    assert join_locations("Seattle", ["Dallas", "Seattle", "Dallas", "Remote (US)"]) == (
+        "Seattle; Dallas; Remote (US)"
+    )
+
+
+def test_join_locations_ignores_blank_and_non_string_entries():
+    assert join_locations(None, [" ", None, "Berlin", 3]) == "Berlin"
+    assert join_locations("  ", []) is None
+    assert join_locations(None, None) is None
+
+
+def test_join_locations_keeps_only_the_first_eight():
+    places = [f"City {number}" for number in range(12)]
+    joined = join_locations(places[0], places[1:])
+    assert joined == "; ".join(places[:8])

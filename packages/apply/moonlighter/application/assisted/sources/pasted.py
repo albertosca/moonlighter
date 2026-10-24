@@ -9,6 +9,7 @@ import re
 from typing import Any
 
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.application.assisted.sources.base import is_question, yes_no_for
 from moonlighter.core.llm import LLMCaller
 from moonlighter.core.parsing import parse_llm_json, wrap_untrusted
 
@@ -62,10 +63,9 @@ Rules:
 """
 
 # A Yes/No QUESTION the model returns as boolean anyway becomes the shape the
-# prompt asks for, so the shape downstream never depends on the run:
-# single_select pins the answer to an offered option and shows the one not chosen
-# on the sheet (2026-09-29). A statement to tick (consent) stays boolean.
-_YES_NO = ("Yes", "No")
+# prompt asks for, so the shape downstream never depends on the run: the rule
+# and the language-aware backstop answers live in base.py, shared with every
+# API source (2026-09-29). A statement to tick (consent) stays boolean.
 
 
 # The label is the question; whether it is required travels in `required`
@@ -135,11 +135,9 @@ async def extract_questions_from_page(
         if not label:
             continue
         options = tuple(str(option) for option in item.get("options") or [])
-        # The label is copied exactly, so a required marker may trail the "?".
-        is_question = label.endswith("?")
-        if str(item.get("kind")) == QuestionKind.BOOLEAN.value and is_question:
+        if str(item.get("kind")) == QuestionKind.BOOLEAN.value and is_question(label):
             item_kind: Any = QuestionKind.SINGLE_SELECT.value
-            options = options or _YES_NO
+            options = options or yes_no_for(label)
         else:
             item_kind = item.get("kind")
         kind = _kind(item_kind, options)

@@ -19,7 +19,11 @@ from typing import Any
 
 import httpx
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.sources.base import SourceMatch
+from moonlighter.application.assisted.sources.base import (
+    SourceMatch,
+    is_question,
+    yes_no_question,
+)
 from moonlighter.core.db import Job
 
 API = "https://{host}/api/offers/{offer}"
@@ -85,6 +89,11 @@ def _question(item: dict[str, Any]) -> FormQuestion | None:
     if not label:
         return None
     kind_name = str(item.get("kind") or "")
+    # How Recruitee renders `boolean` was never observed live, so the paste
+    # path's rule decides: a question becomes the Yes/No single_select every
+    # source gives (2026-09-29), a statement to tick (consent) stays boolean.
+    if kind_name == "boolean" and is_question(str(label)):
+        return yes_no_question(str(label), bool(item.get("required")))
     options: tuple[str, ...] = ()
     if kind_name == "multi_choice":
         options = _choice_options(item)
