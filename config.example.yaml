@@ -12,6 +12,19 @@ browser_path: ""
 #   "cli" -> uses the Claude Code CLI (no API key; uses the claude.ai session).
 #   "api" -> uses the Anthropic SDK (requires ANTHROPIC_API_KEY: the environment wins;
 #            otherwise a line ANTHROPIC_API_KEY=... in ~/.config/anthropic/api.env).
+#   "cursor" -> uses the Cursor CLI (`agent`, or `cursor-agent` if `agent` is
+#               absent). No API key; run `agent login`. The profile subset, the
+#               CV-pool bullets and pasted page text go to Cursor and to the
+#               model the account uses, not to Anthropic. Whether Cursor retains
+#               them depends on the account's Privacy Mode. The CLI also writes
+#               the prompt and the reply under ~/.cursor/projects/; moonlighter
+#               deletes that call's agent-transcripts directory when the call
+#               returns. A crash in between can leave one transcript, and the
+#               directory name is Cursor's. llm_model and eval_model are
+#               Anthropic ids and are not forwarded. Without cursor_model,
+#               scoring uses the account's default model, which can change
+#               between calls, so scores may not stay comparable.
+# cursor_model: gpt-5
 # Anything else is rejected at startup rather than silently falling back.
 llm_backend: cli
 

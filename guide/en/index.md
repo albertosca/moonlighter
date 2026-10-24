@@ -6,7 +6,7 @@
 
 Scans the job boards you choose, scores each posting against your profile, and drafts a complete answer sheet from your own data, flagging what it can't answer.
 
-<!-- facts -->1,900+ tests · 100% branch coverage (CI-gated) · 5 packages on PyPI · mypy strict<!-- /facts -->
+<!-- facts -->2,100+ tests · 100% branch coverage (CI-gated) · 5 packages on PyPI · mypy strict<!-- /facts -->
 
 **[Get started →](getting-started/install.md)**
 
