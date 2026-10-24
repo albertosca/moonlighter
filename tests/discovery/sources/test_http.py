@@ -2736,3 +2736,50 @@ async def test_hn_remote_word_in_the_body_does_not_set_remote_type():
     body = "Acme | Backend Engineer | Austin " + ("blah " * 80) + "| we are not remote-friendly"
     job = await _hn_job(body)
     assert job.remote_type is None
+
+
+# --- every location of a multi-location posting reaches the evaluator ---
+
+
+async def test_lever_location_lists_every_place_and_remote_among_them_wins():
+    posting = _lever_posting(location="San Francisco", workplace_type="onsite")
+    posting["categories"]["allLocations"] = ["San Francisco", "Remote (US)", "Toronto"]
+    mock_client = _make_mock_client([posting])
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await LeverScanner().scan(["co"])
+    assert jobs[0].location == "San Francisco; Remote (US); Toronto"
+    # A remote option among the places is a statement the text makes, so it beats
+    # the API's onsite instead of letting a hard archive decide without the LLM.
+    assert jobs[0].remote_type == "remote"
+
+
+async def test_lever_without_all_locations_keeps_the_primary_only():
+    posting = _lever_posting(location="Berlin", workplace_type="hybrid")
+    mock_client = _make_mock_client([posting])
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await LeverScanner().scan(["co"])
+    assert jobs[0].location == "Berlin"
+    assert jobs[0].remote_type == "hybrid"
+
+
+async def test_ashby_location_lists_secondary_locations_and_remote_wins():
+    job = {
+        **ASHBY_JOB,
+        "location": "San Francisco",
+        "isRemote": False,
+        "workplaceType": "OnSite",
+        "secondaryLocations": [{"location": "Remote"}, {"location": "Toronto"}, {"location": ""}],
+    }
+    mock_client = _make_mock_client(_ashby_response(job))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs[0].location == "San Francisco; Remote; Toronto"
+    assert jobs[0].remote_type == "remote"
+
+
+async def test_ashby_malformed_secondary_locations_fall_back_to_the_primary():
+    job = {**ASHBY_JOB, "location": "Berlin", "isRemote": False, "secondaryLocations": "oops"}
+    mock_client = _make_mock_client(_ashby_response(job))
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await AshbyScanner().scan(["co"])
+    assert jobs[0].location == "Berlin"

@@ -18,6 +18,7 @@ from moonlighter.discovery.sources.base import (
     RawJob,
     ScanStats,
     SourceStats,
+    join_locations,
     normalize_remote_type,
     remote_type_from_workplace,
     remote_types_mentioned,
@@ -109,7 +110,8 @@ class LeverScanner(BaseScanner):
             url = item.get("hostedUrl", "")
             if not title or not url:
                 continue
-            location = item.get("categories", {}).get("location")
+            categories = item.get("categories", {})
+            location = join_locations(categories.get("location"), categories.get("allLocations"))
             posted_at = None
             if item.get("createdAt"):
                 posted_at = datetime.fromtimestamp(item["createdAt"] / 1000, tz=UTC)
@@ -162,7 +164,13 @@ class AshbyScanner(BaseScanner):
             # still reachable but is not accepting applications.
             if not title or not url or item.get("isListed") is False:
                 continue
-            location = item.get("location")
+            secondary = item.get("secondaryLocations")
+            location = join_locations(
+                item.get("location"),
+                [place.get("location") for place in secondary if isinstance(place, dict)]
+                if isinstance(secondary, list)
+                else None,
+            )
             remote_type = (
                 "remote"
                 if item.get("isRemote")

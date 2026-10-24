@@ -3,6 +3,7 @@ from datetime import datetime
 from moonlighter.discovery.sources.base import (
     RawJob,
     ScannerSessionExpiredError,
+    join_locations,
     normalize_remote_type,
     remote_type_from_workplace,
     remote_types_mentioned,
@@ -131,3 +132,21 @@ def test_remote_types_mentioned_reports_every_kind_in_a_segment():
     assert remote_types_mentioned("In-Office") == {"onsite"}
     assert remote_types_mentioned("Memphis, TN") == set()
     assert remote_types_mentioned("") == set()
+
+
+def test_join_locations_puts_primary_first_and_drops_repeats():
+    assert join_locations("Seattle", ["Dallas", "Seattle", "Dallas", "Remote (US)"]) == (
+        "Seattle; Dallas; Remote (US)"
+    )
+
+
+def test_join_locations_ignores_blank_and_non_string_entries():
+    assert join_locations(None, [" ", None, "Berlin", 3]) == "Berlin"
+    assert join_locations("  ", []) is None
+    assert join_locations(None, None) is None
+
+
+def test_join_locations_keeps_only_the_first_eight():
+    places = [f"City {number}" for number in range(12)]
+    joined = join_locations(places[0], places[1:])
+    assert joined == "; ".join(places[:8])

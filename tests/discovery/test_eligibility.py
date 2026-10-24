@@ -112,3 +112,16 @@ class TestHomeCity:
 
     def test_a_blank_home_city_is_no_home_city(self):
         assert classify_location("London, UK", "onsite", home_city="  ") is Eligibility.AMBIGUOUS
+
+
+def test_home_city_among_several_locations_is_eligible():
+    assert (
+        classify_location("San Francisco; Belo Horizonte", "onsite", "Belo Horizonte")
+        == Eligibility.ELIGIBLE
+    )
+
+
+def test_a_remote_option_among_several_places_is_not_cut_without_the_llm():
+    assert classify_location("San Francisco; Remote (US)", "remote", "Belo Horizonte") == (
+        Eligibility.AMBIGUOUS
+    )
