@@ -79,6 +79,28 @@ def normalize_remote_type(location: str | None) -> str | None:
     return None
 
 
+_MAXIMUM_LOCATIONS = 8
+
+
+def join_locations(primary: object, extras: object) -> str | None:
+    """One location string for a posting that lists several places.
+
+    Boards like Lever (`allLocations`) and Ashby (`secondaryLocations`) publish
+    a primary place plus others; keeping only the primary hid a "Remote" option
+    that sat among them (116 Ashby and 7 Lever postings, measured 2026-10-24).
+    Primary first, repeats and blanks dropped, capped so the evaluator prompt
+    stays small. The text stays literal: no region enum, the evaluator reads it."""
+    candidates = [primary, *(extras if isinstance(extras, list) else [])]
+    places: list[str] = []
+    for candidate in candidates:
+        if not isinstance(candidate, str):
+            continue
+        place = candidate.strip()
+        if place and place not in places:
+            places.append(place)
+    return "; ".join(places[:_MAXIMUM_LOCATIONS]) or None
+
+
 def remote_type_from_workplace(workplace_type: object) -> str | None:
     """Map a board API's structured workplace field (Lever `workplaceType`:
     onsite/hybrid/remote/unspecified; Ashby: OnSite/Hybrid/Remote) to remote_type.
