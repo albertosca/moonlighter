@@ -73,10 +73,13 @@ title_blocklist:
 # scan_remoteok: true         # remoteok.com — remote jobs, all categories
 # scan_remotive: true         # remotive.com — ToS caps polling at 4 requests/DAY;
 #                             # there is no rate limiter here, you are the control
-# scan_wwr: true              # weworkremotely.com — programming category RSS
+# remotive_category: design   # optional: one Remotive category slug; omit for all categories
+# scan_wwr: true              # weworkremotely.com — the all-jobs RSS feed
+# wwr_category: design        # optional: one WWR category (remote-<name>-jobs); omit for all
 # scan_hn_whoishiring: true   # HN's monthly "Who is hiring?" thread; free-text
 #                             # comments, so titles/companies are best-effort
-# scan_gupy: true             # gupy.io — BR-focused portal, keyword-driven
+# scan_gupy: true             # gupy.io — BR-focused portal, keyword-driven (skipped, with
+#                             # a warning, when no keywords are passed)
 
 # Country-dependent work authorization. Empty -> always __NEEDS_REVIEW__ (never guesses).
 # citizenship_country accepts free forms ("Brazil"/"Brasil"/"BR"/"USA"/"United States").

@@ -19,7 +19,11 @@ from moonlighter.core.plugins import discover_entry_points
 from moonlighter.core.posting import fetch_description, fetch_posting_via_ats
 from moonlighter.core.urls import normalize_job_url
 from moonlighter.discovery.archive import archive_stale_jobs as archive_stale_jobs
-from moonlighter.discovery.eligibility import Eligibility, classify_location
+from moonlighter.discovery.eligibility import (
+    Eligibility,
+    classify_location,
+    eligible_regions_from,
+)
 from moonlighter.discovery.evaluator import (
     EvalInput,
     evaluate_job,
@@ -180,6 +184,11 @@ async def _collect_raw_jobs(
         if warning:
             warnings.append(warning)
 
+    if config.get("scan_gupy") and not keywords.strip():
+        warnings.append(
+            "⚠️  scan_gupy is on but no keywords were given: Gupy is a keyword feed and "
+            "moonlighter has no built-in search term, so it was skipped. Pass keywords."
+        )
     raw_jobs.extend(await _scan_gupy(keywords, config, stats))
     raw_jobs.extend(await _scan_remoteok(config, stats, keywords))
     raw_jobs.extend(await _scan_remotive(config, stats, keywords))
@@ -195,11 +204,11 @@ async def _scan_gupy(keywords: str, config: dict[str, Any], stats: ScanStats) ->
     per-company board), so it's dispatched here like LinkedIn rather than through
     the SOURCES registry -- and gated hard behind a config flag (default off)
     since an ungated run returns all-BR jobs that would flood the pipeline."""
-    if not config.get("scan_gupy"):
+    if not config.get("scan_gupy") or not keywords.strip():
         return []
     from moonlighter.discovery.sources.http import GupyScanner
 
-    return await GupyScanner().scan(keywords=keywords or "software engineer", stats=stats)
+    return await GupyScanner().scan(keywords=keywords, stats=stats)
 
 
 def _matches_keywords(title: str, keywords: str) -> bool:
@@ -235,7 +244,7 @@ async def _scan_remotive(config: dict[str, Any], stats: ScanStats, keywords: str
         return []
     from moonlighter.discovery.sources.http import RemotiveScanner
 
-    jobs = await RemotiveScanner().scan(stats=stats)
+    jobs = await RemotiveScanner().scan(category=config.get("remotive_category"), stats=stats)
     return [job for job in jobs if _matches_keywords(job.title, keywords)]
 
 
@@ -247,7 +256,7 @@ async def _scan_wwr(config: dict[str, Any], stats: ScanStats, keywords: str) -> 
         return []
     from moonlighter.discovery.sources.http import WeWorkRemotelyScanner
 
-    jobs = await WeWorkRemotelyScanner().scan(stats=stats)
+    jobs = await WeWorkRemotelyScanner().scan(category=config.get("wwr_category"), stats=stats)
     return [job for job in jobs if _matches_keywords(job.title, keywords)]
 
 
@@ -285,6 +294,7 @@ async def _evaluate_and_store(
     model = _model_for(config)
     blocklist: list[str] = config.get("title_blocklist", [])
     home_city = (profile.get("criteria") or {}).get("home_city")
+    eligible_regions = eligible_regions_from(profile)
     concurrency: int = config.get("scan_concurrency", 5)
     batch_size: int = config.get("scan_batch_size", 5)
     stop = asyncio.Event()
@@ -313,7 +323,7 @@ async def _evaluate_and_store(
                     if job is not None:
                         results.append(job)
                 elif (
-                    classify_location(raw.location, raw.remote_type, home_city)
+                    classify_location(raw.location, raw.remote_type, home_city, eligible_regions)
                     is Eligibility.INELIGIBLE
                 ):
                     # Onsite/hybrid outside the profile's home city: no JD wording

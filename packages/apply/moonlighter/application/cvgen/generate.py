@@ -39,7 +39,7 @@ Every line of CV content you may use, each with an id and angle tags. You select
 you never author a new factual claim — facts outside this pool and the profile do not exist.
 The profile's skills notes are limits as well as strengths: a technology noted as studied,
 basic, or not used in production never appears as production experience in the summary or
-the technical expertise line. Leaving a technology out is fine; a claim the profile denies is not.
+the expertise line. Leaving a technology out is fine; a claim the profile denies is not.
 {pool}
 
 ## Summary guidance
@@ -48,7 +48,7 @@ the technical expertise line. Leaving a technology out is fine; a claim the prof
 ## The base CV's current summary
 {base_summary}
 
-## The base CV's current technical expertise
+## The base CV's current expertise line
 {base_expertise}
 
 ## Instructions
@@ -89,9 +89,10 @@ def _prefix(pool: CVPool, profile: dict[str, Any], base_summary: str, base_exper
             pool_lines.append(f"  [{bullet.id}] ({', '.join(bullet.angles)}) {bullet.latex}")
         if exp.prose_id:
             pool_lines.append(f"  [{exp.prose_id}] (prose) {exp.prose}")
-    pool_lines.append("Open source:")
-    for bullet in pool.open_source:
-        pool_lines.append(f"  [{bullet.id}] ({', '.join(bullet.angles)}) {bullet.latex}")
+    if pool.open_source:
+        pool_lines.append("Open source:")
+        for bullet in pool.open_source:
+            pool_lines.append(f"  [{bullet.id}] ({', '.join(bullet.angles)}) {bullet.latex}")
     return _PREFIX.format(
         profile=str(profile_for_answers(profile)),
         pool="\n".join(pool_lines),
