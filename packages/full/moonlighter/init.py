@@ -7,7 +7,7 @@ single largest source of setup friction for a new user.
 from pathlib import Path
 
 import yaml
-from moonlighter.core.config import llm_backend
+from moonlighter.core.config import llm_backend, validate_config
 
 # Common install locations, most-preferred first. Chromium-family only -- moonlighter drives a
 # real browser profile so the user's logged-in sessions are reusable.
@@ -38,6 +38,12 @@ def run_init(home: Path, answers: dict[str, str]) -> Path:
     # Validate before touching the filesystem: a wizard that writes a config the
     # next boot rejects sends the user to fix a file it just walked them through.
     llm_backend({"llm_backend": answers["llm_backend"]})
+    codex_models: dict[str, str] = {}
+    if answers["llm_backend"] == "codex":
+        model = answers.get("llm_model", "").strip()
+        eval_model = answers.get("eval_model", "").strip() or model
+        codex_models = {"llm_model": model, "eval_model": eval_model}
+        validate_config({"llm_backend": "codex", **codex_models})
 
     config_path = home / "config.yaml"
     if config_path.exists():
@@ -50,6 +56,7 @@ def run_init(home: Path, answers: dict[str, str]) -> Path:
     config = {
         "browser_path": answers["browser_path"],
         "llm_backend": answers["llm_backend"],
+        **codex_models,
         "work_authorization": {
             "citizenship_country": answers["citizenship_country"],
             "authorized_answer": "Yes",
@@ -80,14 +87,19 @@ def main() -> None:  # pragma: no cover - interactive I/O boundary
     answers = {
         "browser_path": _ask("Browser executable path", detected or ""),
         "citizenship_country": _ask("Your citizenship country (for work authorization)"),
-        "llm_backend": _ask("LLM backend -- 'cli' (Claude Code), 'api', or 'cursor'", "cli"),
+        "llm_backend": _ask(
+            "LLM backend -- 'cli' (Claude Code), 'api', 'cursor', or 'codex'", "cli"
+        ),
     }
+    if answers["llm_backend"] == "codex":
+        answers["llm_model"] = _ask("Codex model for answers (not a Claude id, e.g. gpt-6-luna)")
+        answers["eval_model"] = _ask("Codex model for evaluations", answers["llm_model"])
 
     try:
         config_path = run_init(home, answers)
-    except FileExistsError as exc:
-        print(f"\n{exc}")
-        raise SystemExit(1) from exc
+    except FileExistsError as existing_error:
+        print(f"\n{existing_error}")
+        raise SystemExit(1) from existing_error
 
     print(f"\nWrote {config_path}")
     print(f"\nNext: add your profile at {home / 'profile.yaml'} and the companies to scan")

@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from moonlighter.application.answers.cv import configured_cv_path
 from moonlighter.core.config import browser_executable, llm_backend, moonlighter_home
-from moonlighter.core.llm import cursor_executable
+from moonlighter.core.llm import codex_executable, cursor_executable
 from moonlighter.discovery.evaluator import LOCATION_PRECEDENCES
 
 
@@ -26,12 +26,12 @@ def validate_startup(
     cv_path: if None, resolves the CV through config exactly as the applier does,
     falling back to <MOONLIGHTER_HOME>/cv.pdf when config maps nothing."""
     configured = configured_cv_path(config)
-    cv = cv_path or str(configured or moonlighter_home() / "cv.pdf")
+    resume_path = cv_path or str(configured or moonlighter_home() / "cv.pdf")
     checks = [
         _check_profile(profile),
         _check_location_precedence(profile),
         _check_llm_backend(config),
-        _check_cv(cv),
+        _check_cv(resume_path),
         _check_browser(config),
     ]
     return [warning for warning in checks if warning is not None]
@@ -87,6 +87,15 @@ def _check_llm_backend(config: dict[str, Any]) -> StartupWarning | None:
             "llm_backend is 'cursor' but the `agent` CLI was not found on PATH. "
             "scan_and_evaluate and prepare_application will not work. "
             "Install the Cursor CLI and run `agent login`.",
+        )
+    if backend == "codex":
+        if codex_executable() is not None:
+            return None
+        return StartupWarning(
+            "error",
+            "llm_backend is 'codex' but the `codex` CLI was not found on PATH. "
+            "scan_and_evaluate and prepare_application will not work. "
+            "Install the Codex CLI and run `codex login` with your ChatGPT account.",
         )
     if shutil.which("claude") is not None:
         return None
