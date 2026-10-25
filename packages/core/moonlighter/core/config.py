@@ -60,6 +60,10 @@ DEFAULTS: dict[str, Any] = {
     #               Account login (`agent login`). llm_model is not forwarded:
     #               those ids belong to Anthropic and the Cursor CLI rejects them.
     #               Optional `cursor_model` is forwarded as `--model` when set.
+    #   "codex" -> the OpenAI `codex` CLI on a ChatGPT login (`codex login`); an API
+    #              key is refused. Unlike cursor it forwards llm_model / eval_model
+    #              as `--model`, so both must name a non-Claude model (eval_model
+    #              defaults to llm_model when omitted).
     # Default is "cli" because that is what `moonlighter init`, the README, and
     # config.example.yaml all lead with -- an installer coming through
     # `uvx moonlighter` has Claude Code far more often than an API key.
@@ -201,7 +205,7 @@ def _check_type(key: str, value: Any, types: tuple[type, ...]) -> None:
         )
 
 
-LLM_BACKENDS = ("cli", "api", "cursor")
+LLM_BACKENDS = ("cli", "api", "cursor", "codex")
 
 
 def llm_backend(config: dict[str, Any]) -> str:
@@ -220,6 +224,23 @@ def llm_backend(config: dict[str, Any]) -> str:
             f"config key 'llm_backend' must be one of {', '.join(LLM_BACKENDS)}, got {backend!r}"
         )
     return backend
+
+
+def _require_codex_models(config: dict[str, Any]) -> None:
+    """The Codex CLI runs OpenAI models: a Claude id (the shipped defaults) or an
+    empty one would fail on every call, so refuse it at load time instead."""
+    for key in ("llm_model", "eval_model"):
+        model = config.get(key, DEFAULTS[key])
+        if (
+            isinstance(model, str)
+            and model.strip()
+            and not model.strip().lower().startswith("claude")
+        ):
+            continue
+        raise ConfigError(
+            f"config key '{key}' must name a model the Codex CLI can run (for example "
+            f"'gpt-6-luna') when llm_backend is 'codex', got {model!r}"
+        )
 
 
 def validate_config(config: dict[str, Any]) -> None:
@@ -249,6 +270,8 @@ def validate_config(config: dict[str, Any]) -> None:
                     raise ConfigError(
                         f"config key 'email.lookback_days' must be positive, got {sub_value}"
                     )
+    if config.get("llm_backend") == "codex":
+        _require_codex_models(config)
 
 
 def anthropic_api_env_file() -> Path:
@@ -296,6 +319,7 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
         "browser_session_dir": str(home / "browser-session"),
         "screenshots_dir": str(home / "screenshots"),
     }
+    user: dict[str, Any] = {}
     if config_path.exists():
         user = yaml.safe_load(config_path.read_text()) or {}
         for key, value in user.items():
@@ -307,6 +331,10 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
                 config[key] = {**config[key], **value}
             else:
                 config[key] = value
+    if config.get("llm_backend") == "codex" and "eval_model" not in user:
+        # The shipped eval_model is a Claude id; one model to name is enough for a
+        # user who did not pick a cheaper one for evaluations.
+        config["eval_model"] = config["llm_model"]
     for key in _PATH_KEYS:
         config[key] = str(Path(config[key]).expanduser())
 
@@ -321,7 +349,7 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
             config["title_blocklist"] = merged
 
     # Only the api backend needs the key. cli strips it so `claude -p` bills the
-    # subscription; cursor authenticates with `agent login` and never reads it.
+    # subscription; cursor and codex authenticate with their own login and never read it.
     if config.get("llm_backend") == "api":
         _fill_api_key_from_file()
     return config

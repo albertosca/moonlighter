@@ -25,6 +25,16 @@ browser_path: ""
 #               scoring uses the account's default model, which can change
 #               between calls, so scores may not stay comparable.
 # cursor_model: gpt-5
+#   "codex" -> uses the OpenAI Codex CLI (`codex`) on a ChatGPT login: run
+#              `codex login`. An API key is refused. The profile subset, the
+#              CV-pool bullets and pasted page text go to OpenAI and to the model
+#              you name, not to Anthropic. Each call runs --ephemeral in a
+#              private temporary directory, under a permission profile that
+#              denies every path outside it and all network. Unlike cursor,
+#              llm_model and eval_model ARE forwarded, so both must name a
+#              non-Claude model (eval_model defaults to llm_model if omitted):
+# llm_model: gpt-6-luna
+# eval_model: gpt-6-luna
 # Anything else is rejected at startup rather than silently falling back.
 llm_backend: cli
 

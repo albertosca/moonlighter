@@ -8,7 +8,7 @@
 
 | Key | Default | What it does |
 |---|---|---|
-| `llm_backend` | `cli` | `cli` shells out to the Claude Code CLI (your Claude subscription); `api` uses the Anthropic SDK and needs `ANTHROPIC_API_KEY`, read from the environment or else from `~/.config/anthropic/api.env`; `cursor` shells out to the Cursor CLI (`agent`, or `cursor-agent`). Optional `cursor_model` is passed as `--model` when set; without it, scoring uses the account's default model |
+| `llm_backend` | `cli` | `cli` shells out to the Claude Code CLI (your Claude subscription); `api` uses the Anthropic SDK and needs `ANTHROPIC_API_KEY`, read from the environment or else from `~/.config/anthropic/api.env`; `cursor` shells out to the Cursor CLI (`agent`, or `cursor-agent`). Optional `cursor_model` is passed as `--model` when set; without it, scoring uses the account's default model; `codex` shells out to the Codex CLI on a ChatGPT login (`codex login`, no API key) and forwards `llm_model` / `eval_model` as `--model`, so both must name a non-Claude model (`eval_model` defaults to `llm_model` when omitted) |
 | `llm_timeout_seconds` | `180` | Seconds a `cli` call may run before it is killed and fails with an error, instead of hanging the scan |
 | `score_threshold` | `6.5` | Jobs scoring below it are archived after a scan |
 | `title_blocklist` | `[]` | Title substrings (case-insensitive) discarded before any LLM call |

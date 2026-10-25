@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import json
 import os
 import re
 import shutil
@@ -59,6 +60,9 @@ def make_caller(config: dict[str, Any]) -> LLMCaller:
     llm_backend: "cursor"  → uses the Cursor `agent --print` CLI (`agent login`).
                              Optional config key `cursor_model` is forwarded as
                              `--model`; `llm_model` / `eval_model` are not.
+    llm_backend: "codex"   → uses `codex exec` on the user's ChatGPT login
+                             (`codex login`). `llm_model` / `eval_model` must name
+                             non-Claude models and are forwarded as `--model`.
     Default: "cli". Anything else raises ConfigError rather than silently
     selecting a backend the user did not ask for.
     """
@@ -74,6 +78,15 @@ def make_caller(config: dict[str, Any]) -> LLMCaller:
         chosen = str(config.get("cursor_model") or "").strip()
         timeout_seconds = config.get("llm_timeout_seconds", DEFAULTS["llm_timeout_seconds"])
         return _cursor_caller(chosen or None, timeout_seconds)
+    if backend == "codex":
+        codex_timeout_seconds = config.get("llm_timeout_seconds", DEFAULTS["llm_timeout_seconds"])
+
+        async def _call_with_codex(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+            return await _call_codex(
+                prompt, model, cache_prefix, timeout_seconds=codex_timeout_seconds
+            )
+
+        return _call_with_codex
     return make_api_caller()
 
 
@@ -218,19 +231,23 @@ def _cursor_caller(cursor_model: str | None, timeout_seconds: float) -> LLMCalle
 
 def _write_cursor_permissions(workdir: Path) -> None:
     """Deny reads outside the workspace. Ask mode alone does not."""
-    cursor_dir = workdir / ".cursor"
-    cursor_dir.mkdir(parents=True, exist_ok=True)
-    (cursor_dir / "cli.json").write_text(_CURSOR_PERMISSIONS_JSON)
+    cursor_directory = workdir / ".cursor"
+    cursor_directory.mkdir(parents=True, exist_ok=True)
+    (cursor_directory / "cli.json").write_text(_CURSOR_PERMISSIONS_JSON)
 
 
-def _cursor_call_workdir() -> Path:
+def _private_call_workdir(prefix: str) -> Path:
     """A private 0700 directory for one call. `mkdtemp` already uses that mode;
     the chmod repeats it so a umask change cannot widen it."""
     home = moonlighter_home()
     home.mkdir(parents=True, exist_ok=True)
-    workdir = Path(tempfile.mkdtemp(prefix="cursor-", dir=home))
+    workdir = Path(tempfile.mkdtemp(prefix=prefix, dir=home))
     workdir.chmod(0o700)
     return workdir
+
+
+def _cursor_call_workdir() -> Path:
+    return _private_call_workdir("cursor-")
 
 
 def _cursor_projects_root() -> Path:
@@ -384,6 +401,194 @@ async def _call_cursor(
     finally:
         try:
             _forget_cursor_call(workdir)
+        finally:
+            record_call(perf_counter() - start)
+
+
+# The canary on Codex CLI 0.164.0 (2026-10-25): `--sandbox read-only` blocks
+# writes and the network but still reads every file the user can, including
+# `~/.codex/auth.json` (the ChatGPT token) and `~/.ssh`. A permission profile
+# denies the whole filesystem except the call's own workdir, and `--sandbox` is
+# never passed: it selects the old policy and the profile is ignored. Each
+# feature below adds a tool or a connector the scoring prompts have no use for;
+# the apps connectors live outside the filesystem sandbox, so they go too.
+_CODEX_PROFILE = "moonlighter-locked"
+_CODEX_DISABLED_FEATURES: tuple[str, ...] = (
+    "shell_tool",
+    "unified_exec",
+    "apps",
+    "plugins",
+    "remote_plugin",
+    "multi_agent",
+    "hooks",
+    "browser_use",
+    "browser_use_external",
+    "computer_use",
+    "image_generation",
+    "in_app_browser",
+    "skill_search",
+    "tool_suggest",
+)
+# Never reach the child: the backend exists to bill the ChatGPT plan, so an API
+# key or a base URL in the environment must not redirect the call.
+_CODEX_STRIPPED_ENVIRONMENT = frozenset(
+    {"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "CODEX_API_KEY", "OPENAI_BASE_URL"}
+)
+_CODEX_LOGIN_TIMEOUT_SECONDS = 20.0
+
+
+def codex_executable() -> str | None:
+    return shutil.which("codex")
+
+
+def _codex_permission_args(executable: str) -> list[str]:
+    """`-c` overrides for the locked profile.
+
+    Besides the workdir, the profile grants read on the directory of the binary
+    and of the file a symlink resolves to: the CLI starts itself again inside the
+    sandbox to load its instructions, and with only `:minimal` readable that
+    start fails with `Operation not permitted`.
+    """
+    binary_directories = dict.fromkeys(
+        [str(Path(executable).parent), str(Path(os.path.realpath(executable)).parent)]
+    )
+    entries = [f'{json.dumps(":minimal")}="read"', f'{json.dumps(":root")}="deny"']
+    entries.extend(f'{json.dumps(directory)}="read"' for directory in binary_directories)
+    entries.append(f'{json.dumps(":workspace_roots")}={{"."="read"}}')
+    return [
+        "-c",
+        f'default_permissions="{_CODEX_PROFILE}"',
+        "-c",
+        f"permissions.{_CODEX_PROFILE}.filesystem={{{','.join(entries)}}}",
+        "-c",
+        f"permissions.{_CODEX_PROFILE}.network={{enabled=false}}",
+    ]
+
+
+async def _run_codex(
+    argv: list[str],
+    *,
+    stdin: bytes,
+    environment: dict[str, str],
+    workdir: Path,
+    timeout_seconds: float,
+) -> tuple[int | None, bytes, bytes]:
+    """One `codex` process in its own process group, killed whole on timeout."""
+    process = await asyncio.create_subprocess_exec(
+        *argv,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=environment,
+        cwd=str(workdir),
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(
+            process.communicate(input=stdin), timeout=timeout_seconds
+        )
+    except TimeoutError:
+        _kill_process_group(process.pid)
+        await process.wait()
+        raise RuntimeError(
+            f"codex CLI did not answer within {timeout_seconds} s — killed "
+            "(raise llm_timeout_seconds in config.yaml if your calls are legitimately slow)"
+        ) from None
+    return process.returncode, stdout, stderr
+
+
+async def _call_codex(
+    prompt: str,
+    model: str,
+    cache_prefix: str | None = None,
+    *,
+    timeout_seconds: float = DEFAULTS["llm_timeout_seconds"],
+) -> str:
+    """Call a model through `codex exec`, on the user's ChatGPT login.
+
+    Same contract as `_call_cursor`: prompt over STDIN, never argv; a private
+    0700 workdir per call, removed when the call returns; a hung call is killed
+    with its process group. `model` is forwarded as `--model`, and a Claude id
+    is refused: the pipeline's defaults are Anthropic's and Codex cannot run them.
+
+    The call refuses to start unless `codex login status` reports a ChatGPT
+    login, so a stray API key can never turn it into a billed call. The answer
+    is read from `--output-last-message`, not stdout, which carries the event log.
+    """
+    if not model.strip() or model.lower().startswith("claude"):
+        raise RuntimeError(
+            f"llm_backend 'codex' needs a non-Claude llm_model and eval_model in config.yaml, "
+            f"got {model!r}. Set both to a model your ChatGPT plan offers."
+        )
+    executable = codex_executable()
+    if executable is None:
+        raise RuntimeError(
+            "the `codex` CLI was not found on PATH. Install it "
+            "(`brew install --cask codex`) and run `codex login` with your ChatGPT account."
+        )
+    full = f"{cache_prefix}\n\n{prompt}" if cache_prefix is not None else prompt
+    environment = {
+        name: value for name, value in os.environ.items() if name not in _CODEX_STRIPPED_ENVIRONMENT
+    }
+    workdir = _private_call_workdir("codex-")
+    start = perf_counter()
+    try:
+        code, stdout, stderr = await _run_codex(
+            [executable, "login", "status"],
+            stdin=b"",
+            environment=environment,
+            workdir=workdir,
+            timeout_seconds=_CODEX_LOGIN_TIMEOUT_SECONDS,
+        )
+        status = (stdout + stderr).decode(errors="replace").lower()
+        if code != 0 or "logged in using chatgpt" not in status:
+            raise RuntimeError(
+                "llm_backend 'codex' needs a ChatGPT login (an API key is not used). "
+                "Run `codex login` and sign in with your ChatGPT account."
+            )
+        output = workdir / "final-message.txt"
+        argv = [
+            executable,
+            "--ask-for-approval",
+            "never",
+            "exec",
+            "--ignore-user-config",
+            "--ephemeral",
+            "--skip-git-repo-check",
+            "-c",
+            'model_provider="openai"',
+            "-c",
+            'web_search="disabled"',
+            *_codex_permission_args(executable),
+        ]
+        for feature in _CODEX_DISABLED_FEATURES:
+            argv.extend(["--disable", feature])
+        argv.extend(["--model", model, "--output-last-message", str(output), "-"])
+        code, stdout, stderr = await _run_codex(
+            argv,
+            stdin=full.encode(),
+            environment=environment,
+            workdir=workdir,
+            timeout_seconds=timeout_seconds,
+        )
+        if code != 0:
+            detail = (
+                stderr.decode(errors="replace").strip() or stdout.decode(errors="replace").strip()
+            )
+            # Structured error names use underscores (`usage_limit_reached`); the
+            # spend-limit markers are words.
+            limited = is_spend_limit(RuntimeError(detail.replace("_", " ")))
+            prefix = "usage limit: " if limited else ""
+            raise RuntimeError(f"codex CLI exited with code {code}: {prefix}{detail[:300]}")
+        if not output.is_file():
+            raise RuntimeError("codex CLI wrote no final response")
+        answer = output.read_text(encoding="utf-8")
+        if not answer.strip():
+            raise RuntimeError("codex CLI returned an empty final response")
+        return answer
+    finally:
+        try:
+            _remove_quietly(workdir)
         finally:
             record_call(perf_counter() - start)
 
