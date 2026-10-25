@@ -18,7 +18,10 @@ location field.
 """
 
 import re
+from collections.abc import Sequence
 from enum import StrEnum
+from functools import lru_cache
+from typing import Any
 
 
 class Eligibility(StrEnum):
@@ -27,21 +30,40 @@ class Eligibility(StrEnum):
     AMBIGUOUS = "ambiguous"
 
 
-_ELIGIBLE_REGION = re.compile(
-    r"\bbra[sz]il\b|\blatam\b|latin america|south america|\bamericas\b"
-    r"|\bworldwide\b|\bglobal\b|\banywhere\b",
-    re.IGNORECASE,
-)
 _ONSITE_KINDS = frozenset({"onsite", "hybrid"})
 
 
+def eligible_regions_from(profile: dict[str, Any]) -> tuple[str, ...]:
+    """`criteria.eligible_regions` as a tuple of non-empty strings. Absent, not a
+    list, or holding non-strings: those entries are unknown, never a default."""
+    criteria = profile.get("criteria")
+    regions = criteria.get("eligible_regions") if isinstance(criteria, dict) else None
+    if not isinstance(regions, list):
+        return ()
+    return tuple(region.strip() for region in regions if isinstance(region, str) and region.strip())
+
+
+@lru_cache(maxsize=32)
+def _region_pattern(regions: tuple[str, ...]) -> re.Pattern[str] | None:
+    """The profile's own words, escaped, matched as whole words (a lookaround
+    pair instead of \\b so a name ending in punctuation still matches)."""
+    if not regions:
+        return None
+    alternatives = "|".join(rf"(?<!\w){re.escape(region)}(?!\w)" for region in regions)
+    return re.compile(alternatives, re.IGNORECASE)
+
+
 def classify_location(
-    location: str | None, remote_type: str | None, home_city: str | None = None
+    location: str | None,
+    remote_type: str | None,
+    home_city: str | None = None,
+    eligible_regions: Sequence[str] = (),
 ) -> Eligibility:
     """Classify a posting's structured location/remote_type against the rule above.
 
     ELIGIBLE and INELIGIBLE are decided here, without the LLM; AMBIGUOUS falls
-    through to the evaluator, whose prompt now carries both fields.
+    through to the evaluator, whose prompt now carries both fields. Without
+    `eligible_regions` no location is ever ELIGIBLE by region.
     """
     if not location or not location.strip():
         return Eligibility.AMBIGUOUS
@@ -52,6 +74,7 @@ def classify_location(
         # A named place that is not the home city, explicitly on-site or
         # hybrid: no JD wording can make that workable from home.
         return Eligibility.INELIGIBLE
-    if _ELIGIBLE_REGION.search(location):
+    pattern = _region_pattern(tuple(eligible_regions))
+    if pattern is not None and pattern.search(location):
         return Eligibility.ELIGIBLE
     return Eligibility.AMBIGUOUS

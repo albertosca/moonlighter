@@ -154,7 +154,9 @@ _CONFIG_SCHEMA: dict[str, tuple[type, ...]] = {
     "scan_gupy": (bool,),
     "scan_remoteok": (bool,),
     "scan_remotive": (bool,),
+    "remotive_category": (str,),
     "scan_wwr": (bool,),
+    "wwr_category": (str,),
     "scan_hn_whoishiring": (bool,),
     "portal_max_age_days": _INT,
     "answer_bank_max_age_days": (*_INT, type(None)),  # null disables expiry

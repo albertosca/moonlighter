@@ -870,12 +870,19 @@ async def test_eval_prefixes_carry_the_engagement_type_rule():
     # same score as permanent roles. He still wants them in the queue, just
     # lower — a discount, never a cut, same philosophy as the stale-Elixir
     # discount and the unmet-mandatory rule.
-    from moonlighter.discovery.evaluator import EVAL_BATCH_PREFIX, EVAL_PREFIX
+    from moonlighter.discovery.evaluator import (
+        EVAL_BATCH_PREFIX,
+        EVAL_PREFIX,
+        engagement_section,
+    )
 
+    # The rule is now the profile's (preferences.engagement), no longer baked in.
+    section = engagement_section({"preferences": {"engagement": "permanent full-time"}})
+    assert "targets permanent full-time positions" in section
+    assert "contract-based:" in section
+    assert "NOT a hard filter" in section
     for prefix in (EVAL_PREFIX, EVAL_BATCH_PREFIX):
-        assert "## Engagement type" in prefix
-        assert "contract-based:" in prefix
-        assert "NOT a hard filter" in prefix.split("## Engagement type")[1]
+        assert "{engagement_section}" in prefix
 
 
 async def test_evaluate_job_omits_location_lines_when_absent():

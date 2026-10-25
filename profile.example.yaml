@@ -43,6 +43,10 @@ preferences:
   salary_min_usd: 150000
   remote: true
   relocation: false
+  # Optional. The kind of engagement you want, in your own words. When set, postings of
+  # another kind (contract, freelance, fixed-term...) are scored lower, never cut. Leave it
+  # out and moonlighter assumes nothing: no discount for any kind of engagement.
+  # engagement: "permanent full-time"
 
 # Optional. Your own answers to EEO/diversity self-identification questions, so the
 # assistant can fill them in for you instead of leaving a gap.
@@ -73,6 +77,10 @@ criteria:
   # "specific" (the default) trusts the posting's own location; "generic" trusts
   # the company-wide remote claim.
   # location_precedence: specific
+  # Optional. Places or regions you can work from, in your own words ("Brazil", "LATAM",
+  # "EMEA"). A posting whose location names one is classified as eligible; leave it out and
+  # no location counts as eligible by region. Matched as whole words, case-insensitive.
+  # eligible_regions: ["Brazil", "LATAM", "worldwide"]
   hard_filters:
     - "requires .NET"
     - "on-site only (no remote)"

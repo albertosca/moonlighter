@@ -8,6 +8,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Any, ClassVar
+from urllib.parse import quote
 
 import httpx
 from moonlighter.core.http import HEADERS, FetchError, get_json, require_dict
@@ -568,17 +569,21 @@ class RemotiveScanner(BaseScanner):
     flag is the control point; whoever enables this scanner is responsible
     for not scanning more than a few times a day."""
 
-    BASE = "https://remotive.com/api/remote-jobs?category=software-dev"
+    BASE = "https://remotive.com/api/remote-jobs"
 
     async def scan(
         self, company_slugs: list[str] | None = None, **keyword_arguments: Any
     ) -> list[RawJob]:
         stats: ScanStats | None = keyword_arguments.get("stats")
+        category = keyword_arguments.get("category")
+        # No category configured: every category, narrowed afterwards by the title
+        # keywords. Never a built-in profession.
+        url = f"{self.BASE}?category={quote(str(category))}" if category else self.BASE
         jobs: list[RawJob] = []
         errors = 0
         async with httpx.AsyncClient(timeout=15) as client:
             try:
-                data = await get_json(client, self.BASE)
+                data = await get_json(client, url)
             except FetchError as error:
                 logger.warning("[remotive] fetch failed: %s", error, exc_info=True)
                 errors, data = 1, {}
@@ -616,18 +621,27 @@ class WeWorkRemotelyScanner(BaseScanner):
     registered in SOURCES, dispatched separately in service.py, gated
     behind a config flag (off by default)."""
 
-    BASE = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
+    BASE = "https://weworkremotely.com/remote-jobs.rss"
+    CATEGORY_URL = "https://weworkremotely.com/categories/remote-{category}-jobs.rss"
 
     async def scan(
         self, company_slugs: list[str] | None = None, **keyword_arguments: Any
     ) -> list[RawJob]:
         stats: ScanStats | None = keyword_arguments.get("stats")
+        category = keyword_arguments.get("category")
+        # No category configured: the all-jobs feed, narrowed afterwards by the title
+        # keywords. Never a built-in profession.
+        url = (
+            self.CATEGORY_URL.format(category=quote(str(category), safe=""))
+            if category
+            else self.BASE
+        )
         jobs: list[RawJob] = []
         errors = 0
         body = ""
         async with httpx.AsyncClient(timeout=15) as client:
             try:
-                http_response = await client.get(self.BASE, headers=HEADERS)
+                http_response = await client.get(url, headers=HEADERS)
             except Exception as error:
                 logger.warning("[weworkremotely] fetch failed: %s", error, exc_info=True)
                 errors = 1

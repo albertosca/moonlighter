@@ -1260,7 +1260,7 @@ async def test_collect_raw_jobs_calls_remotive_when_config_enabled():
     with patch("moonlighter.discovery.sources.http.RemotiveScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_remotive": True})
-    MockScanner.return_value.scan.assert_awaited_once_with(stats=ANY)
+    MockScanner.return_value.scan.assert_awaited_once_with(category=None, stats=ANY)
     assert raw_jobs == [job]
 
 
@@ -1282,7 +1282,7 @@ async def test_collect_raw_jobs_calls_wwr_when_config_enabled():
     with patch("moonlighter.discovery.sources.http.WeWorkRemotelyScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_wwr": True})
-    MockScanner.return_value.scan.assert_awaited_once_with(stats=ANY)
+    MockScanner.return_value.scan.assert_awaited_once_with(category=None, stats=ANY)
     assert raw_jobs == [job]
 
 
