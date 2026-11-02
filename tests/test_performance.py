@@ -1,90 +1,82 @@
 import asyncio
+import contextlib
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
+
+# Timing rules for this file. A timing assertion compares two measurements taken
+# in the same run, never a number of seconds: a load average far above the core
+# count slows both sides alike, so a ratio survives it and a wall-clock limit does
+# not (2026-11-01: three absolute limits went red at load ~30). Each test also
+# asserts the work actually happened, because a swallowed error is fast.
+
+CONCURRENCY_RATIO = 0.5  # concurrent must take less than half the sequential time
+DELAY_SECONDS = 0.02
+
+
+def _slow_client(payload):
+    """Async-context client whose GET answers `payload` after DELAY_SECONDS."""
+
+    async def slow_get(url, **keyword_arguments):
+        await asyncio.sleep(DELAY_SECONDS)
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = payload
+        return response
+
+    client = MagicMock()
+    client.get = slow_get
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+    return client
+
+
+async def _assert_scan_is_concurrent(scanner, source, payload, company_count):
+    """Scan `company_count` slugs at once, then one by one, and compare."""
+    from moonlighter.discovery.sources.base import SourceStats
+
+    slugs = [f"company-{index}" for index in range(company_count)]
+    client = _slow_client(payload)
+    stats = {}
+
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=client):
+        start_time = time.perf_counter()
+        await scanner.scan(slugs, stats=stats)
+        concurrent_elapsed = time.perf_counter() - start_time
+
+        start_time = time.perf_counter()
+        for slug in slugs:
+            await scanner.scan([slug])
+        sequential_elapsed = time.perf_counter() - start_time
+
+    # Zero errors is what proves the mocked fetch really ran: a mock the scanner
+    # never calls makes every company fail, quickly, and the timing still "passes".
+    assert stats[source] == SourceStats(companies=company_count, jobs=0, errors=0)
+    assert concurrent_elapsed < sequential_elapsed * CONCURRENCY_RATIO, (
+        f"{source}: concurrent {concurrent_elapsed:.3f}s should be under "
+        f"{CONCURRENCY_RATIO:.0%} of sequential {sequential_elapsed:.3f}s"
+    )
+
 
 # ── Scan concorrente ──────────────────────────────────────────────────────────
 
 
 async def test_greenhouse_scan_20_companies_concurrent():
-    """
-    20 companies scanned in parallel should finish much faster than sequential.
-    Each mock HTTP call has a 0.02s delay. Sequential: ~0.4s. Concurrent: ~0.02s.
-    """
     from moonlighter.discovery.sources.http import GreenhouseScanner
 
-    async def slow_get(url, **keyword_arguments):
-        await asyncio.sleep(0.02)
-        response = MagicMock()
-        response.status_code = 200
-        response.json.return_value = {"jobs": []}
-        return response
-
-    mock_client = MagicMock()
-    mock_client.get = slow_get
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-
-    slugs = [f"company-{index}" for index in range(20)]
-
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        start_time = time.perf_counter()
-        await GreenhouseScanner().scan(slugs)
-        elapsed = time.perf_counter() - start_time
-
-    # Concurrent: should be close to 0.02s (one batch), not 0.4s (20 sequential calls)
-    assert elapsed < 0.3, f"Expected < 0.3s (concurrent), got {elapsed:.3f}s"
+    await _assert_scan_is_concurrent(GreenhouseScanner(), "greenhouse", {"jobs": []}, 20)
 
 
 async def test_lever_scan_15_companies_concurrent():
-    """15 Lever companies fetched concurrently."""
     from moonlighter.discovery.sources.http import LeverScanner
 
-    async def slow_get(url, **keyword_arguments):
-        await asyncio.sleep(0.02)
-        response = MagicMock()
-        response.status_code = 200
-        response.json.return_value = []
-        return response
-
-    mock_client = MagicMock()
-    mock_client.get = slow_get
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-
-    slugs = [f"company-{index}" for index in range(15)]
-
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        start_time = time.perf_counter()
-        await LeverScanner().scan(slugs)
-        elapsed = time.perf_counter() - start_time
-
-    assert elapsed < 0.3, f"Expected < 0.3s (concurrent), got {elapsed:.3f}s"
+    await _assert_scan_is_concurrent(LeverScanner(), "lever", [], 15)
 
 
 async def test_ashby_scan_10_companies_concurrent():
-    """10 Ashby companies fetched concurrently via POST."""
+    """Ashby is fetched with GET (the REST posting API), not the retired GraphQL POST."""
     from moonlighter.discovery.sources.http import AshbyScanner
 
-    async def slow_post(url, **keyword_arguments):
-        await asyncio.sleep(0.02)
-        response = MagicMock()
-        response.status_code = 200
-        response.json.return_value = {"data": {"jobPostings": []}}
-        return response
-
-    mock_client = MagicMock()
-    mock_client.post = slow_post
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-
-    slugs = [f"company-{index}" for index in range(10)]
-
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
-        start_time = time.perf_counter()
-        await AshbyScanner().scan(slugs)
-        elapsed = time.perf_counter() - start_time
-
-    assert elapsed < 0.3, f"Expected < 0.3s (concurrent), got {elapsed:.3f}s"
+    await _assert_scan_is_concurrent(AshbyScanner(), "ashby", {"jobs": []}, 10)
 
 
 # ── Batch LLM evaluation ─────────────────────────────────────────────────────
@@ -154,11 +146,9 @@ async def test_evaluate_10_jobs_concurrent_faster_than_sequential():
         )
     sequential_elapsed = time.perf_counter() - start_time
 
-    assert concurrent_elapsed < sequential_elapsed * 0.5, (
+    assert call_count[0] == 2 * len(jobs)  # both passes really called the model
+    assert concurrent_elapsed < sequential_elapsed * CONCURRENCY_RATIO, (
         f"Concurrent ({concurrent_elapsed:.3f}s) should be at least 2x faster than sequential ({sequential_elapsed:.3f}s)"
-    )
-    assert concurrent_elapsed < 0.2, (
-        f"Concurrent should finish in < 0.2s, got {concurrent_elapsed:.3f}s"
     )
 
 
@@ -214,17 +204,25 @@ async def test_evaluate_batch_size_10_processes_all():
 
 
 # ── Queries no DB ─────────────────────────────────────────────────────────────
+#
+# Database cost is checked by counting SQL statements, not seconds: the count does
+# not move with machine load, and the regression worth catching here is a query per
+# row (or a missing LIMIT), which shows up as a count that grows with the table.
 
 
-async def test_list_jobs_1000_records_fast(temporary_database):
-    """list_jobs with 1000 records in DB returns in < 500ms."""
-    from moonlighter.core.db import Job, init_db
+@contextlib.contextmanager
+def _count_queries():
+    from moonlighter.core.db import db
 
-    init_db()
+    with patch.object(db, "execute_sql", wraps=db.execute_sql) as spy:
+        yield spy
 
-    # Insert 1000 jobs
+
+def _insert_jobs(first_index, last_index):
+    from moonlighter.core.db import Job
+
     with Job._meta.database.atomic():
-        for index in range(1000):
+        for index in range(first_index, last_index):
             Job.create(
                 source="greenhouse",
                 company=f"Company{index}",
@@ -234,29 +232,67 @@ async def test_list_jobs_1000_records_fast(temporary_database):
                 status="new",
             )
 
+
+async def test_list_jobs_returns_one_page_with_a_query_count_independent_of_table_size(
+    temporary_database,
+):
+    """100 or 1000 rows in the table: the same number of queries, and only `limit` rows out."""
+    from moonlighter.core.db import init_db
     from moonlighter.server import list_jobs
 
-    start_time = time.perf_counter()
-    result = await list_jobs(status="new", limit=20)
-    elapsed = time.perf_counter() - start_time
+    from tests._context import make_test_context
 
-    assert elapsed < 0.5, f"list_jobs with 1000 records took {elapsed:.3f}s, expected < 0.5s"
-    assert result is not None
+    init_db()
+    context = make_test_context()
+
+    async def call_and_count():
+        with _count_queries() as spy:
+            result = await list_jobs(status="new", limit=20, context=context)
+        return result, spy.call_count
+
+    _insert_jobs(0, 100)
+    small_result, small_query_count = await call_and_count()
+    _insert_jobs(100, 1000)
+    large_result, large_query_count = await call_and_count()
+
+    # A tool that raised comes back as a "tool ... failed" line, so check the content.
+    assert "failed" not in large_result
+    assert small_result.count("Engineer ") == 20
+    assert large_result.count("Engineer ") == 20
+    assert large_query_count == small_query_count
 
 
-async def test_scan_log_dedup_1000_urls_fast(temporary_database):
-    """Dedup check against ScanLog with 1000 entries completes in < 200ms."""
+async def test_drop_already_seen_uses_one_query_whatever_the_scan_log_size(temporary_database):
+    """Dedup of 1000 scanned URLs reads ScanLog once and keeps only the unseen job."""
     from moonlighter.core.db import ScanLog, init_db
+    from moonlighter.discovery.service import _drop_already_seen
+    from moonlighter.discovery.sources.base import RawJob
 
     init_db()
 
-    with ScanLog._meta.database.atomic():
-        for index in range(1000):
-            ScanLog.create(job_url=f"https://example.com/jobs/{index}", source="greenhouse")
+    def raw_job(index):
+        return RawJob(
+            source="greenhouse",
+            company="Acme",
+            title=f"Engineer {index}",
+            url=f"https://example.com/jobs/{index}",
+        )
 
-    start_time = time.perf_counter()
-    seen_urls = {row.job_url for row in ScanLog.select(ScanLog.job_url)}
-    elapsed = time.perf_counter() - start_time
+    def log_urls(first_index, last_index):
+        with ScanLog._meta.database.atomic():
+            for index in range(first_index, last_index):
+                ScanLog.create(job_url=f"https://example.com/jobs/{index}", source="greenhouse")
 
-    assert elapsed < 0.2, f"ScanLog dedup check took {elapsed:.3f}s, expected < 0.2s"
-    assert len(seen_urls) == 1000
+    def drop_and_count(raw_jobs):
+        with _count_queries() as spy:
+            kept = _drop_already_seen(raw_jobs)
+        return kept, spy.call_count
+
+    log_urls(0, 100)
+    small_kept, small_query_count = drop_and_count([raw_job(index) for index in range(101)])
+    log_urls(100, 1000)
+    large_kept, large_query_count = drop_and_count([raw_job(index) for index in range(1001)])
+
+    assert [job.url for job in small_kept] == ["https://example.com/jobs/100"]
+    assert [job.url for job in large_kept] == ["https://example.com/jobs/1000"]
+    assert small_query_count == large_query_count == 1
