@@ -40,6 +40,7 @@ def load_company_list(path: str | Path | None = None, phase: str | None = None) 
 
 
 def _select_entries(value: object, phase: str | None) -> object:
+    """Entries come raw from YAML and stay object until _require_string_entries narrows them."""
     if isinstance(value, list):
         # Legacy format: flat list without phases
         return value
@@ -51,8 +52,8 @@ def _select_entries(value: object, phase: str | None) -> object:
     return []
 
 
-def _concatenate_phases(phases: dict[Any, Any]) -> list[Any]:
-    slugs: list[Any] = []
+def _concatenate_phases(phases: dict[object, object]) -> list[object]:
+    slugs: list[object] = []
     for slugs_in_phase in phases.values():
         if isinstance(slugs_in_phase, list):
             slugs.extend(slugs_in_phase)
