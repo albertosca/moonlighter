@@ -45,8 +45,8 @@ def _required_scope(config: dict[str, Any]) -> str:
     """gmail.modify only when the operator opts into some Gmail mutation
     (marking processed, or the program-C archive flags); readonly by default —
     the sync is 100% read-only save for those opt-ins (S-08)."""
-    email_cfg = config.get("email", {})
-    mutates = any(email_cfg.get(flag, False) for flag in _MUTATING_FLAGS)
+    email_config = config.get("email", {})
+    mutates = any(email_config.get(flag, False) for flag in _MUTATING_FLAGS)
     return SCOPE_MODIFY if mutates else SCOPE_READONLY
 
 
@@ -92,7 +92,7 @@ def _token_scopes(token_path: Path) -> list[str] | None:
         return None
     scopes = data.get("scopes")
     if isinstance(scopes, list) and scopes:
-        return [str(s) for s in scopes]
+        return [str(granted_scope) for granted_scope in scopes]
     scope = data.get("scope")
     if isinstance(scope, str) and scope.strip():
         return scope.split()
@@ -156,7 +156,7 @@ _MAX_PAGES = 10  # hard upper bound: 10 pages × 50/page = 500 messages per sync
 
 
 def fetch_recent_messages(
-    service: Any, lookback_days: int = 30, max_results: int = 50
+    service: Any, lookback_days: int = 30, maximum_results: int = 50
 ) -> list[dict[str, Any]]:
     """Recent messages, whether or not they have been read. Returns a list of
     {id, threadId}.
@@ -172,13 +172,13 @@ def fetch_recent_messages(
     missing.
 
     Paginates via nextPageToken up to _MAX_PAGES pages, so a mailbox with more than
-    max_results messages inside the lookback window doesn't silently lose the older
+    maximum_results messages inside the lookback window doesn't silently lose the older
     ones: Gmail returns newest-first and the query can't exclude already-processed
     messages, so a single unpaginated page truncates and those older messages age out
     of the window before ever being fetched — with no drain mechanism (the previous
     is:unread design had one: marking a message read removed it from the query; this
     time-window design doesn't). The page bound exists so a huge mailbox can't spin
-    forever; hitting it is logged just like hitting max_results on a single page.
+    forever; hitting it is logged just like hitting maximum_results on a single page.
     """
     query = f"newer_than:{lookback_days}d in:anywhere"
     messages: list[dict[str, Any]] = []
@@ -190,19 +190,19 @@ def fetch_recent_messages(
             .list(
                 userId="me",
                 q=query,
-                maxResults=max_results,
+                maxResults=maximum_results,
                 pageToken=page_token,
             )
             .execute()
         )
         page_messages = response.get("messages", [])
         messages.extend(page_messages)
-        if len(page_messages) == max_results:
+        if len(page_messages) == maximum_results:
             logger.warning(
                 "fetch_recent_messages: page %d returned the full %d-message cap — "
                 "more messages may exist in the %dd lookback window",
                 page,
-                max_results,
+                maximum_results,
                 lookback_days,
             )
         page_token = response.get("nextPageToken")
@@ -223,7 +223,7 @@ def parse_message(service: Any, message_id: str) -> dict[str, Any]:
     """Extracts to, from_, subject, body from a Gmail message."""
     raw = service.users().messages().get(userId="me", id=message_id, format="full").execute()
     payload = raw.get("payload", {})
-    headers = {h["name"].lower(): h["value"] for h in payload.get("headers", [])}
+    headers = {header["name"].lower(): header["value"] for header in payload.get("headers", [])}
     return {
         "to": headers.get("to", ""),
         "from_": headers.get("from", ""),

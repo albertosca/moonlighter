@@ -120,8 +120,8 @@ def _confirm_write(patterns: list[str]) -> bool:
     the real blocklist (S-10) — an over-broad hallucinated pattern silently
     filters out good jobs; the user's silence must NEVER count as consent."""
     print(f"\n{len(patterns)} new pattern(s) about to be saved:")
-    for p in patterns:
-        print(f"  - {p!r}")
+    for pattern in patterns:
+        print(f"  - {pattern!r}")
     answer = input("Confirm save? [y/N] ").strip().lower()
     return answer in ("y", "yes", "s", "sim")
 
@@ -158,7 +158,9 @@ async def _propose_for_company(
     model: str,
     profile: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    titles_block = "\n".join(f"- {t}" for t in titles[:80])  # cap at 80 to avoid huge context
+    titles_block = "\n".join(
+        f"- {title}" for title in titles[:80]
+    )  # cap at 80 to avoid huge context
     prompt = _make_proposal_prompt(company, threshold, titles_block, profile)
     try:
         raw = await caller(prompt, model)
@@ -167,15 +169,17 @@ async def _propose_for_company(
         if not isinstance(proposals, list):
             return []
         return [
-            p
-            for p in proposals
-            if isinstance(p, dict) and p.get("safe") is True and p.get("pattern")
+            proposal
+            for proposal in proposals
+            if isinstance(proposal, dict)
+            and proposal.get("safe") is True
+            and proposal.get("pattern")
         ]
-    except Exception as e:
-        err = str(e).lower()
-        if any(m in err for m in QUOTA_MARKERS):
+    except Exception as error:
+        error_text = str(error).lower()
+        if any(marker in error_text for marker in QUOTA_MARKERS):
             raise
-        print(f"  ⚠️  Error processing {company}: {e}")
+        print(f"  ⚠️  Error processing {company}: {error}")
         return []
 
 
@@ -196,7 +200,7 @@ async def _run(
             print("No jobs matched the criteria.")
             return
 
-        total_titles = sum(len(v) for v in grouped.values())
+        total_titles = sum(len(company_titles) for company_titles in grouped.values())
         print(
             f"Jobs to analyze: {total_titles} across {len(grouped)} company/ies  [threshold={threshold}]"
         )
@@ -205,30 +209,32 @@ async def _run(
         existing = set(_load_learned())
         all_new: list[str] = []
 
-        for company, titles in sorted(grouped.items(), key=lambda x: -len(x[1])):
+        for company, titles in sorted(
+            grouped.items(), key=lambda company_and_titles: -len(company_and_titles[1])
+        ):
             print(f"▶ {company} ({len(titles)} jobs)...")
             try:
                 proposals = await _propose_for_company(
                     company, titles, threshold, caller, model, profile
                 )
-            except Exception as e:
-                if any(m in str(e).lower() for m in QUOTA_MARKERS):
-                    print(f"🚫 SPEND LIMIT reached — stopping. Error: {e}")
+            except Exception as error:
+                if any(marker in str(error).lower() for marker in QUOTA_MARKERS):
+                    print(f"🚫 SPEND LIMIT reached — stopping. Error: {error}")
                     break
-                print(f"  ✗ Error: {e}")
+                print(f"  ✗ Error: {error}")
                 continue
 
             if not proposals:
                 print("  (no safe pattern identified)")
                 continue
 
-            for p in proposals:
-                pattern = p["pattern"].lower().strip()
+            for proposal in proposals:
+                pattern = proposal["pattern"].lower().strip()
                 status = (
                     "ALREADY EXISTS" if pattern in existing else ("DRY RUN" if dry_run else "ADDED")
                 )
                 print(f"  + {pattern!r:40s} [{status}]")
-                print(f"    → {p.get('reasoning', '')}")
+                print(f"    → {proposal.get('reasoning', '')}")
                 if pattern not in existing and not dry_run:
                     all_new.append(pattern)
                     existing.add(pattern)
@@ -264,7 +270,7 @@ def main() -> None:
             "always confirm before merging into the real blocklist)."
         ),
     )
-    args = parser.parse_args()
+    arguments = parser.parse_args()
 
     setup_logging()
     config = load_config()
@@ -279,7 +285,17 @@ def main() -> None:
     print(f"Model: {model}  |  blocklist_learned: {learned_path}")
     print()
 
-    asyncio.run(_run(args.threshold, args.company, args.dry_run, model, config, profile, args.yes))
+    asyncio.run(
+        _run(
+            arguments.threshold,
+            arguments.company,
+            arguments.dry_run,
+            model,
+            config,
+            profile,
+            arguments.yes,
+        )
+    )
 
 
 if __name__ == "__main__":

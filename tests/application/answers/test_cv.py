@@ -21,12 +21,12 @@ def test_resolve_cv_path_falls_back_to_default(tmp_path):
 
 
 def test_resolve_cv_path_company_match_is_case_insensitive(tmp_path):
-    cv = tmp_path / "nu.pdf"
-    cv.write_bytes(b"x")
+    nubank_cv = tmp_path / "nu.pdf"
+    nubank_cv.write_bytes(b"x")
     default_cv = tmp_path / "def.pdf"
     default_cv.write_bytes(b"x")
-    config = {"cv": {"default": str(default_cv), "by_company": {"nubank": str(cv)}}}
-    assert resolve_cv_path("Nubank", config) == str(cv)
+    config = {"cv": {"default": str(default_cv), "by_company": {"nubank": str(nubank_cv)}}}
+    assert resolve_cv_path("Nubank", config) == str(nubank_cv)
 
 
 def test_resolve_cv_path_raises_when_mapped_file_missing(tmp_path):
@@ -113,7 +113,7 @@ def test_tilde_in_cv_default_expands_like_the_tailored_cv_keys(monkeypatch, tmp_
     # Before: "~/cvs/x.pdf" became "<MOONLIGHTER_HOME>/~/cvs/x.pdf" while the
     # three cv.* keys next to it expanded "~". One convention for the block.
     monkeypatch.setenv("HOME", str(tmp_path))
-    cv = tmp_path / "cvs" / "x.pdf"
-    cv.parent.mkdir()
-    cv.write_bytes(b"%PDF")
-    assert resolve_cv_path("acme", {"cv": {"default": "~/cvs/x.pdf"}}) == str(cv)
+    default_cv = tmp_path / "cvs" / "x.pdf"
+    default_cv.parent.mkdir()
+    default_cv.write_bytes(b"%PDF")
+    assert resolve_cv_path("acme", {"cv": {"default": "~/cvs/x.pdf"}}) == str(default_cv)

@@ -137,15 +137,15 @@ def _backup(db: Any) -> Path:
     backups = Path(moonlighter_home()) / "backups"
     backups.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-    dest = backups / f"pre-migration-{stamp}.db"
-    target = sqlite3.connect(dest)
+    destination = backups / f"pre-migration-{stamp}.db"
+    target = sqlite3.connect(destination)
     try:
         db.connection().backup(target)  # consistent online backup, not a hot cp
     finally:
         target.close()
     for old in sorted(backups.glob("pre-migration-*.db"))[:-_BACKUP_KEEP]:
         old.unlink()
-    return dest
+    return destination
 
 
 def _run_locked(db: Any, name: str, action: Callable[[], None]) -> None:
@@ -159,8 +159,8 @@ def _run_locked(db: Any, name: str, action: Callable[[], None]) -> None:
             with db.atomic():
                 action()
             return
-        except peewee.OperationalError as e:
-            if "locked" in str(e).lower() and attempt < _LOCK_RETRIES - 1:
+        except peewee.OperationalError as error:
+            if "locked" in str(error).lower() and attempt < _LOCK_RETRIES - 1:
                 logger.warning("%s: DB locked, retrying (%d)", name, attempt + 1)
                 time.sleep(_LOCK_BACKOFF_S)
                 continue
@@ -176,17 +176,23 @@ def run_migrations(db: Any) -> list[str]:
     retried on a B5-style lock — a failure leaves the version at the last
     fully-applied migration, never a torn state."""
     version = current_version(db)
-    pending = [(v, name, fn) for v, name, fn in MIGRATIONS if v > version]
+    pending = [
+        (migration_version, name, migrate)
+        for migration_version, name, migrate in MIGRATIONS
+        if migration_version > version
+    ]
     if not pending:
         return []
     _backup(db)
     _run_locked(db, "schema_version_table", lambda: _ensure_schema_version_table(db))
     applied: list[str] = []
-    for v, name, fn in pending:
+    for migration_version, name, migrate in pending:
 
-        def _apply(v: int = v, fn: Callable[[Any], None] = fn) -> None:
-            fn(db)
-            db.execute_sql("UPDATE schema_version SET version = ?", (v,))
+        def _apply(
+            migration_version: int = migration_version, migrate: Callable[[Any], None] = migrate
+        ) -> None:
+            migrate(db)
+            db.execute_sql("UPDATE schema_version SET version = ?", (migration_version,))
 
         _run_locked(db, name, _apply)
         applied.append(name)

@@ -76,9 +76,9 @@ _SPONSORSHIP_RE = re.compile(
 def infer_country(location: str | None, remote_type: str | None) -> str | None:
     """Returns 'brazil', 'united states', or None (when it can't be asserted)."""
     text = (location or "").lower()
-    if any(m in text for m in _BRAZIL_MARKERS):
+    if any(marker in text for marker in _BRAZIL_MARKERS):
         return "brazil"
-    if any(m in text for m in _US_MARKERS):
+    if any(marker in text for marker in _US_MARKERS):
         return "united states"
     state_match = _US_STATE_RE.search(text)
     if state_match:
@@ -93,12 +93,12 @@ def resolve_work_auth(field_label: str, country: str | None, config: dict[str, A
     or the review sentinel when the country is unknown. Returns None if the field
     is not authorization-related (then the LLM handles it).
     """
-    wa = config.get("work_authorization", {}) or {}
+    work_authorization = config.get("work_authorization", {}) or {}
     # Normalizes to the canonical form: accepts "Brasil"/"Brazil"/"BR" etc. without
     # depending on the exact locale. Empty/missing/unknown → None → review (conservative).
-    citizenship = _canonical_country(wa.get("citizenship_country") or "")
-    yes: str = wa.get("authorized_answer", "Yes")
-    no: str = wa.get("not_authorized_answer", "No")
+    citizenship = _canonical_country(work_authorization.get("citizenship_country") or "")
+    yes: str = work_authorization.get("authorized_answer", "Yes")
+    not_authorized_answer: str = work_authorization.get("not_authorized_answer", "No")
     review: str = NEEDS_REVIEW_SENTINEL
 
     is_auth = bool(_AUTHORIZED_RE.search(field_label))
@@ -111,6 +111,6 @@ def resolve_work_auth(field_label: str, country: str | None, config: dict[str, A
 
     authorized_here = country == citizenship
     if is_auth:
-        return yes if authorized_here else no
+        return yes if authorized_here else not_authorized_answer
     # sponsorship: needs sponsorship exactly when NOT authorized there.
-    return no if authorized_here else yes
+    return not_authorized_answer if authorized_here else yes

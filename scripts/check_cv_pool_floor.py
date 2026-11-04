@@ -38,9 +38,9 @@ def check(pool: CVPool, template: str) -> int | None:
         translations={},
     )
     tex_text = render_cv(template, selection, pool)
-    tex_dir = resolve_under_home("cv-pool-floor-check")
-    tex_dir.mkdir(parents=True, exist_ok=True)
-    tex = tex_dir / "cv.tex"
+    tex_directory = resolve_under_home("cv-pool-floor-check")
+    tex_directory.mkdir(parents=True, exist_ok=True)
+    tex = tex_directory / "cv.tex"
     tex.write_text(tex_text)
     pdf = compile_pdf(tex)
     if pdf is None:
@@ -55,8 +55,8 @@ def main(config: dict[str, Any]) -> int:
         return 1
     try:
         pool = load_pool(resolve_under_home(str(pool_path)))
-    except PoolError as e:
-        print(f"Pool file unusable: {e}")
+    except PoolError as error:
+        print(f"Pool file unusable: {error}")
         return 1
     tdir = (config.get("cv") or {}).get("template_dir")
     if not tdir:

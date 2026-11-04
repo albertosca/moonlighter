@@ -43,8 +43,8 @@ def base_fields(template: str) -> tuple[str, str]:
     string for either is a template that simply declares no base, exactly as
     the per-job path already treats it.
     """
-    summary = m.group(1) if (m := _BASE_SUMMARY.search(template)) else ""
-    expertise = m.group(1) if (m := _BASE_EXPERTISE.search(template)) else ""
+    summary = match.group(1) if (match := _BASE_SUMMARY.search(template)) else ""
+    expertise = match.group(1) if (match := _BASE_EXPERTISE.search(template)) else ""
     return summary, expertise
 
 
@@ -112,15 +112,21 @@ def _shrunk(selection: CVSelection, pool: CVPool) -> CVSelection | None:
     # same company with the same title (a gap between them) would otherwise
     # collapse into one counter and let the "keeps another selected bullet"
     # guard pass when it should not.
-    owner = {b.id: i for i, e in enumerate(pool.experiences) for b in e.bullets}
+    owner = {
+        bullet.id: index
+        for index, experience in enumerate(pool.experiences)
+        for bullet in experience.bullets
+    }
     selected_per_exp: dict[int, int] = {}
     for bid in selection.bullets:
         if bid in owner:
             selected_per_exp[owner[bid]] = selected_per_exp.get(owner[bid], 0) + 1
-    for i in range(len(selection.bullets) - 1, -1, -1):
-        bid = selection.bullets[i]
+    for index in range(len(selection.bullets) - 1, -1, -1):
+        bid = selection.bullets[index]
         if bid in owner and selected_per_exp[owner[bid]] > 1:
-            return replace(selection, bullets=selection.bullets[:i] + selection.bullets[i + 1 :])
+            return replace(
+                selection, bullets=selection.bullets[:index] + selection.bullets[index + 1 :]
+            )
     if selection.open_source:
         return replace(selection, open_source=selection.open_source[:-1])
     return None
@@ -189,13 +195,13 @@ def resolved_template_dir(config: dict[str, Any]) -> Path:
 
 def _template(config: dict[str, Any], language: str) -> str | None:
     tdir = resolved_template_dir(config)
-    en = tdir / "cv-template.en.tex"
-    pt = tdir / "cv-template.pt.tex"
+    english_path = tdir / "cv-template.en.tex"
+    portuguese_path = tdir / "cv-template.pt.tex"
     if language == "pt":
-        if pt.exists():
-            return pt.read_text()
+        if portuguese_path.exists():
+            return portuguese_path.read_text()
         logger.warning("no PT template — rendering the tailored CV in English")
-    return en.read_text() if en.exists() else None
+    return english_path.read_text() if english_path.exists() else None
 
 
 def _relanguage_fallback_fields(
@@ -265,8 +271,8 @@ async def ensure_tailored_cv(
 
     try:
         pool = load_pool(pool_path)
-    except PoolError as e:
-        logger.warning("cv pool unusable, using default CV — %s", e)
+    except PoolError as error:
+        logger.warning("cv pool unusable, using default CV — %s", error)
         return None
     en_template = _template(config, "en")
     if en_template is None:
@@ -276,8 +282,8 @@ async def ensure_tailored_cv(
 
     try:
         selection = await decide_cv(job, pool, profile, base_summary, base_expertise, caller)
-    except Exception as e:
-        if is_spend_limit(e):
+    except Exception as error:
+        if is_spend_limit(error):
             logger.warning("spend limit during cv generation — using default CV")
             return None
         raise

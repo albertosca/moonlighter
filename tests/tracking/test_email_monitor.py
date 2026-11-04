@@ -946,7 +946,7 @@ class TestFetchRecentMessages:
         service = MagicMock()
         service.users().messages().list().execute.return_value = {}
 
-        fetch_recent_messages(service, max_results=10)
+        fetch_recent_messages(service, maximum_results=10)
 
         list_call_arguments = service.users().messages().list.call_args
         assert list_call_arguments.kwargs.get("maxResults") == 10 or 10 in list_call_arguments.args
@@ -968,7 +968,7 @@ class TestFetchRecentMessages:
         service.users().messages().list().execute.return_value = full_page
 
         with caplog.at_level(logging.WARNING, logger="moonlighter.tracking.gmail_client"):
-            result = fetch_recent_messages(service, max_results=3)
+            result = fetch_recent_messages(service, maximum_results=3)
 
         assert len(result) == 3
         assert "3" in caplog.text  # names the cap that was hit
@@ -984,7 +984,7 @@ class TestFetchRecentMessages:
         }
 
         with caplog.at_level(logging.WARNING, logger="moonlighter.tracking.gmail_client"):
-            fetch_recent_messages(service, max_results=50)
+            fetch_recent_messages(service, maximum_results=50)
 
         assert caplog.text == ""
 
@@ -1004,7 +1004,7 @@ class TestFetchRecentMessages:
         ]
         service.users().messages().list().execute.side_effect = responses
 
-        result = fetch_recent_messages(service, max_results=2)
+        result = fetch_recent_messages(service, maximum_results=2)
 
         assert [message["id"] for message in result] == ["m0", "m1", "m2"]
 
@@ -1018,7 +1018,7 @@ class TestFetchRecentMessages:
             {"messages": [{"id": "m1", "threadId": "t1"}]},
         ]
 
-        fetch_recent_messages(service, max_results=1)
+        fetch_recent_messages(service, maximum_results=1)
 
         second_call_keyword_arguments = listing.call_args_list[1].kwargs
         assert second_call_keyword_arguments.get("pageToken") == "page2"
@@ -1040,7 +1040,7 @@ class TestFetchRecentMessages:
         }
 
         with caplog.at_level(logging.WARNING, logger="moonlighter.tracking.gmail_client"):
-            result = fetch_recent_messages(service, max_results=50)
+            result = fetch_recent_messages(service, maximum_results=50)
 
         assert len(result) == _MAX_PAGES
         assert "page" in caplog.text.lower()
