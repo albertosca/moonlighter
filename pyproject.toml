@@ -17,6 +17,9 @@ dev = [
     # 0.15 -> 0.16.3 needed none, verified 2026-08-21.
     "ruff>=0.17.3,<0.18",
     "mypy>=2.4.0",
+    # Cognitive complexity gate (limit in [tool.complexipy]). Upper bound: a new major
+    # may re-score functions, and that re-score should land as its own reviewed change.
+    "complexipy>=8.3,<9",
 ]
 # Docs site (guide/ → GitHub Pages). Deliberately no upper bound: uv.lock pins the
 # exact version and a Dependabot bump lands only if the strict docs build passes.
@@ -36,16 +39,233 @@ markers = [
 [tool.ruff]
 target-version = "py314"
 line-length = 100
+# PEP 420: the shared `moonlighter/` level has no __init__.py on purpose (see CLAUDE.md).
+namespace-packages = [
+    "packages/core/moonlighter",
+    "packages/scan/moonlighter",
+    "packages/apply/moonlighter",
+    "packages/email/moonlighter",
+    "packages/full/moonlighter",
+]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RET", "PTH", "RUF", "S"]
-ignore = ["RUF001", "RUF002", "RUF003", "E501"]
+# Every rule Ruff has. Each ignore below says why it doesn't fit this codebase.
+select = ["ALL"]
+ignore = [
+    # mypy --strict is the type gate; ANN would only restate it.
+    "ANN",
+    # Ruff's own documentation: these two conflict with `ruff format`.
+    "COM812", "ISC001",
+    # Line length is the formatter's job; what it leaves long is prose inside strings.
+    "E501",
+    # Portuguese copy uses en dashes, curly quotes and accents on purpose.
+    "RUF001", "RUF002", "RUF003",
+    # Classes, methods and functions get a docstring when their name and types don't
+    # already say it, never to satisfy a counter. Modules and packages always get one.
+    "D101", "D102", "D103", "D105", "D106", "D107",
+    # A message at the raise site reads better than a one-use exception subclass (TRY003)
+    # or a throwaway variable (EM101, EM102); the traceback duplication they prevent is cosmetic.
+    "TRY003", "EM101", "EM102",
+    # Annotations are evaluated at runtime: FastMCP builds tool schemas from them and
+    # dataclasses read them. Imports moved under TYPE_CHECKING would raise NameError there.
+    "TC001", "TC002", "TC003",
+    # The license (AGPL-3.0) is declared once, at the root and in each package's metadata.
+    "CPY001",
+    # Names are spelled in full here, parameters included: a classmethod's first
+    # parameter says which class it receives (`scanner_class`, `model_class`), never `cls`.
+    "N804",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 6
+
+[tool.ruff.lint.pylint]
+max-args = 5
+max-positional-args = 3
+max-statements = 25
+max-returns = 6
+max-branches = 8
 
 [tool.ruff.lint.per-file-ignores]
-"scripts/*" = ["E402"]
-# S101 assert: pytest's normal idiom. S108 /tmp paths: test fixtures, not runtime.
-# S105 hardcoded password: false positive on a mock dict key named "refresh_token".
-"tests/*" = ["S101", "S105", "S106", "S108"]
+# Scripts are standalone executables run from the repository root: not a package
+# (INP001), stdout is their interface (T201), and some fix sys.path first (E402).
+"scripts/*" = ["E402", "INP001", "T201"]
+# S101: assert is pytest's idiom. S105/S106: mock credentials such as "refresh_token".
+# S108: /tmp paths in fixtures, never at runtime. PLR2004: a literal expected value is
+# the point of an assertion. ARG: fakes must match the signature they replace, and
+# fixtures requested for their side effect arrive as unused arguments.
+# SLF001: unit tests pin the private helpers where a quirk lives.
+# D: a test's name is its documentation.
+"tests/*" = ["S101", "S105", "S106", "S108", "PLR2004", "ARG001", "ARG002", "ARG005", "SLF001", "D"]
+
+# BEGIN ratchet
+# Files not yet migrated to the profile above (plan 2026-11-04, showcase quality).
+# Each task deletes its files' lines; the block is empty and removed at the end.
+"packages/apply/moonlighter/application/__init__.py" = ["D104"]
+"packages/apply/moonlighter/application/answers/__init__.py" = ["D104"]
+"packages/apply/moonlighter/application/answers/answer_bank.py" = ["C901", "D205", "D209", "DTZ005", "PLC0415"]
+"packages/apply/moonlighter/application/answers/compliance.py" = ["D205", "D209"]
+"packages/apply/moonlighter/application/answers/cv.py" = ["D205", "D212", "PLC0415"]
+"packages/apply/moonlighter/application/answers/field_map.py" = ["D205", "D212", "D301", "ERA001", "FURB167", "ISC004", "PLC0415", "PLR0917"]
+"packages/apply/moonlighter/application/answers/option_matcher.py" = ["C901", "D205", "D209", "D212"]
+"packages/apply/moonlighter/application/answers/profile.py" = ["D205", "D212"]
+"packages/apply/moonlighter/application/answers/work_auth.py" = ["ARG001", "D205", "D209", "D212"]
+"packages/apply/moonlighter/application/assisted/__init__.py" = ["D104"]
+"packages/apply/moonlighter/application/assisted/composer.py" = ["C901", "FURB167", "PLC0415", "PLR0912", "PLR0913", "PLR0915", "PLR0917"]
+"packages/apply/moonlighter/application/assisted/service.py" = ["C901", "D205", "D209", "I001", "PLR0917"]
+"packages/apply/moonlighter/application/assisted/sources/__init__.py" = ["D104"]
+"packages/apply/moonlighter/application/assisted/sources/base.py" = ["D205", "D209", "FBT001", "I001"]
+"packages/apply/moonlighter/application/assisted/sources/greenhouse.py" = ["ARG002", "I001", "PLR2004"]
+"packages/apply/moonlighter/application/assisted/sources/inhire.py" = ["ARG002", "I001", "PLR2004"]
+"packages/apply/moonlighter/application/assisted/sources/lever.py" = ["ARG002", "C901", "I001", "PLR2004", "TRY004"]
+"packages/apply/moonlighter/application/assisted/sources/pasted.py" = ["C901", "D205", "D209"]
+"packages/apply/moonlighter/application/assisted/sources/recruitee.py" = ["ARG002", "I001", "PERF401", "PLR2004"]
+"packages/apply/moonlighter/application/assisted/sources/workable.py" = ["ARG002", "C901", "I001", "PLR2004"]
+"packages/apply/moonlighter/application/cli.py" = ["C901", "I001", "PLC0415", "PLR0912", "PLR0915"]
+"packages/apply/moonlighter/application/cvgen/__init__.py" = ["D104"]
+"packages/apply/moonlighter/application/cvgen/bootstrap.py" = ["C901", "D205", "D209", "PLR2004"]
+"packages/apply/moonlighter/application/cvgen/compile.py" = ["D205", "D209", "PLW1510"]
+"packages/apply/moonlighter/application/cvgen/generate.py" = ["C901", "D205", "D209", "PERF401", "PLC0415", "PLR0912", "PLR0913", "PLR0915", "PLR0917"]
+"packages/apply/moonlighter/application/cvgen/links.py" = ["D205", "D209", "D301", "I001", "PLR2004", "PLW2901"]
+"packages/apply/moonlighter/application/cvgen/pool.py" = ["D205", "D209"]
+"packages/apply/moonlighter/application/cvgen/render.py" = ["D205", "D209", "D301", "PLR0917"]
+"packages/apply/moonlighter/application/cvgen/service.py" = ["C901", "D205", "D209", "FBT003", "PLR0911", "PLR0912", "PLR0915", "PLR0917"]
+"packages/apply/moonlighter/application/cvgen/templates/__init__.py" = ["D104"]
+"packages/core/moonlighter/core/__init__.py" = ["D104"]
+"packages/core/moonlighter/core/browser.py" = ["ASYNC220", "ASYNC240", "BLE001", "D100", "D205", "D209", "I001", "PLR0917", "PLW0603", "TRY300"]
+"packages/core/moonlighter/core/cli.py" = ["D205", "D209", "I001", "T201"]
+"packages/core/moonlighter/core/config.py" = ["C901", "D100", "D205", "D209", "D212", "PLR0912"]
+"packages/core/moonlighter/core/db.py" = ["D100", "D205", "D209", "I001", "ICN001", "PLC0415"]
+"packages/core/moonlighter/core/email_alias.py" = ["D415"]
+"packages/core/moonlighter/core/http.py" = ["D205", "D209", "PLR2004"]
+"packages/core/moonlighter/core/ingest.py" = ["D205", "D209", "DTZ005", "ICN001"]
+"packages/core/moonlighter/core/llm.py" = ["ARG001", "C901", "D100", "D205", "D209", "I001", "PLR0912", "PLR0915", "PLR0917", "TRY004"]
+"packages/core/moonlighter/core/log.py" = ["D100", "D205", "D209", "ISC004", "PLC0415", "PLW0603"]
+"packages/core/moonlighter/core/migrations.py" = ["D100", "D205", "D209", "DTZ005", "I001", "PLC0415", "TRY300"]
+"packages/core/moonlighter/core/parsing.py" = ["D100", "D205", "D209", "D212", "D415"]
+"packages/core/moonlighter/core/plugins.py" = ["D205", "D209"]
+"packages/core/moonlighter/core/posting.py" = ["BLE001", "D205", "D209", "I001", "PLR2004"]
+"packages/core/moonlighter/core/slices.py" = ["D205", "D209"]
+"packages/core/moonlighter/core/sources.py" = ["D100"]
+"packages/core/moonlighter/core/urls.py" = ["D205"]
+"packages/core/moonlighter/views.py" = ["I001"]
+"packages/email/moonlighter/tracking/__init__.py" = ["D104"]
+"packages/email/moonlighter/tracking/classification.py" = ["D200", "D205", "D209", "D212", "PLR0917"]
+"packages/email/moonlighter/tracking/cli.py" = ["PLC0415"]
+"packages/email/moonlighter/tracking/email_monitor.py" = ["BLE001", "C901", "D205", "D209", "D212", "DTZ005", "DTZ011", "FBT001", "FBT002", "I001", "ICN001", "PLC0415", "PLR0915", "PLR0917"]
+"packages/email/moonlighter/tracking/gmail_client.py" = ["BLE001", "C901", "D200", "D205", "D209", "D212"]
+"packages/email/moonlighter/tracking/register.py" = ["D205", "DTZ005", "ICN001"]
+"packages/full/moonlighter/_tool_logging.py" = ["D205"]
+"packages/full/moonlighter/init.py" = ["I001", "PLC0415", "T201"]
+"packages/full/moonlighter/priority.py" = ["D205", "D209", "DTZ005", "ICN001"]
+"packages/full/moonlighter/server.py" = ["A002", "ARG001", "ASYNC240", "BLE001", "C901", "D100", "D205", "D209", "D212", "D415", "D417", "DTZ005", "I001", "PLC0415", "PLR0917", "T201", "TRY300"]
+"packages/full/moonlighter/startup.py" = ["C901", "D100", "D205", "D209", "PLR0911"]
+"packages/scan/moonlighter/discovery/__init__.py" = ["D104"]
+"packages/scan/moonlighter/discovery/archive.py" = ["C901", "D205", "D209", "DTZ005", "I001", "ICN001"]
+"packages/scan/moonlighter/discovery/eligibility.py" = ["D205", "D209", "D301", "PLR0917"]
+"packages/scan/moonlighter/discovery/evaluator.py" = ["D100", "D205", "D209", "I001", "PLR0913", "PLR0917", "TRY300"]
+"packages/scan/moonlighter/discovery/results.py" = ["D205", "D209"]
+"packages/scan/moonlighter/discovery/service.py" = ["BLE001", "C901", "D205", "D209", "G201", "I001", "PERF401", "PLC0414", "PLC0415", "PLR0912", "PLR0913", "PLR0915", "PLR0917", "PLR2004", "TC006", "TRY300"]
+"packages/scan/moonlighter/discovery/sources/__init__.py" = ["D104"]
+"packages/scan/moonlighter/discovery/sources/base.py" = ["D100", "D205", "D209"]
+"packages/scan/moonlighter/discovery/sources/http.py" = ["BLE001", "C901", "D100", "D205", "D209", "FURB162", "I001", "PLR0912", "PLR0915", "PLR0917", "PLR2004"]
+"packages/scan/moonlighter/discovery/sources/registry.py" = ["D100"]
+"packages/scan/moonlighter/discovery/staleness.py" = ["C901", "DTZ005", "ICN001", "PLR0912", "PLR0917", "PLW2901"]
+"scripts/build_blocklist.py" = ["BLE001", "C901", "D205", "D209", "FBT001", "FBT003", "PLR0912", "PLR0913", "PLR0915", "PLR0917"]
+"scripts/check_built_site.py" = ["C901", "D205", "D209", "FBT001", "PERF401", "PLR0912"]
+"scripts/check_cv_pool_floor.py" = ["C901", "D205", "D209", "PLR0911"]
+"scripts/check_docs_parity.py" = ["D205"]
+"scripts/check_readme_facts.py" = ["C901", "D205", "PLR0912"]
+"scripts/check_version_lockstep.py" = ["D205"]
+"scripts/reevaluate_bug_victims.py" = ["BLE001", "C901", "D205", "FBT001", "FBT002", "PLR0912", "PLR0913", "PLR0915", "PLR0917"]
+"scripts/render_diagrams.py" = ["ARG001", "D205"]
+"scripts/stamp_revision_dates.py" = ["D205"]
+"tests/_context.py" = ["PLC0415", "PLR0917"]
+"tests/application/answers/test_answer_bank.py" = ["DTZ005", "PLC0415", "PT018"]
+"tests/application/answers/test_compliance.py" = ["ISC004"]
+"tests/application/answers/test_cv.py" = ["PLC0415"]
+"tests/application/answers/test_profile.py" = ["PT018"]
+"tests/application/assisted/test_assisted_service.py" = ["DTZ005", "PLC0415", "PLR0913", "PLR0917", "PT018"]
+"tests/application/assisted/test_composer.py" = ["ISC004", "PLC0415", "PT018"]
+"tests/application/assisted/test_lever_source.py" = ["PT011"]
+"tests/application/assisted/test_pasted_source.py" = ["PT018"]
+"tests/application/assisted/test_sheet.py" = ["FBT001", "FBT002", "PLR0917"]
+"tests/application/assisted/test_sheet_result.py" = ["FBT003", "PLC0415"]
+"tests/application/assisted/test_sources_base.py" = ["PLC0415"]
+"tests/application/assisted/test_workable_source.py" = ["ERA001"]
+"tests/application/cvgen/test_bootstrap.py" = ["PLC0415", "PLE2515"]
+"tests/application/cvgen/test_compile.py" = ["PLC0415", "PT018"]
+"tests/application/cvgen/test_cvgen_service.py" = ["ASYNC240", "FBT003", "PLC0415", "PT018"]
+"tests/application/cvgen/test_generate.py" = ["PT006", "PT018"]
+"tests/application/cvgen/test_links.py" = ["PLC0415"]
+"tests/application/cvgen/test_pool.py" = ["PT006"]
+"tests/application/cvgen/test_render.py" = ["PT018"]
+"tests/application/test_cli.py" = ["PLC0415"]
+"tests/conftest.py" = ["PLC0415", "PLW0603"]
+"tests/core/test_browser.py" = ["PLC0415"]
+"tests/core/test_cli.py" = ["DTZ001", "N818", "PIE807", "PLC0415", "PT018"]
+"tests/core/test_config.py" = ["PLC0415"]
+"tests/core/test_config_codex.py" = ["PLC0415"]
+"tests/core/test_db.py" = ["DTZ001", "DTZ005", "FBT003", "ICN001", "PLC0415"]
+"tests/core/test_ingest.py" = ["PLC0415", "PT018"]
+"tests/core/test_llm.py" = ["A002", "ASYNC240", "FBT001", "PLC0415", "PT006"]
+"tests/core/test_llm_codex.py" = ["ASYNC240", "ASYNC251", "PLW0108"]
+"tests/core/test_llm_codex_live.py" = ["A002", "T201"]
+"tests/core/test_llm_cursor_live.py" = ["A002", "PLR0915", "T201"]
+"tests/core/test_llm_process_group.py" = ["ASYNC251"]
+"tests/core/test_log.py" = ["PLC0415"]
+"tests/core/test_metrics.py" = ["PT011", "PT012", "PT018"]
+"tests/core/test_migrations.py" = ["PLR0917"]
+"tests/core/test_parsing.py" = ["PLC0415", "PT011"]
+"tests/core/test_plugins.py" = ["PLC0415"]
+"tests/core/test_posting.py" = ["PT018"]
+"tests/core/test_slices.py" = ["ISC004", "PLC0415", "PT018"]
+"tests/core/test_sources.py" = ["PLC0415"]
+"tests/discovery/sources/test_base.py" = ["DTZ005"]
+"tests/discovery/sources/test_http.py" = ["N803", "PLC0415", "PLR0917", "PT018"]
+"tests/discovery/test_cli.py" = ["PLC0415"]
+"tests/discovery/test_evaluator.py" = ["FBT003", "PLC0415", "PT018", "TRY002"]
+"tests/discovery/test_profession_agnostic.py" = ["N806", "PLC0415"]
+"tests/discovery/test_scan_report.py" = ["PLC0415"]
+"tests/discovery/test_service.py" = ["DTZ005", "ICN001", "N806", "PLC0415", "PLR0913", "PLR0917", "PT018"]
+"tests/discovery/test_staleness.py" = ["A002", "DTZ005", "ICN001", "PLC0415", "PLR0917", "TRY002"]
+"tests/scripts/test_build_blocklist.py" = ["FBT003", "PLC0415", "PLR0913", "PLR0917"]
+"tests/scripts/test_check_built_site.py" = ["PLC0415", "PT018"]
+"tests/scripts/test_check_cv_pool_floor.py" = ["PLC0415"]
+"tests/scripts/test_check_docs_parity.py" = ["PLC0415", "PLR0917", "PT018"]
+"tests/scripts/test_check_readme_facts.py" = ["FBT002", "PLC0415", "PLR0917", "PT018"]
+"tests/scripts/test_check_version_lockstep.py" = ["PLC0415", "PT018"]
+"tests/scripts/test_render_diagrams.py" = ["PLC0415", "PT018"]
+"tests/scripts/test_stamp_revision_dates.py" = ["PLC0415", "PT018"]
+"tests/test_mcp_stdio.py" = ["PLR0917"]
+"tests/test_package_boundaries.py" = ["C901"]
+"tests/test_performance.py" = ["N806", "PLC0415", "PLR0917"]
+"tests/test_priority.py" = ["DTZ001", "ICN001"]
+"tests/test_server.py" = ["DTZ001", "DTZ005", "ICN001", "N806", "PIE804", "PLC0415", "PLR0402", "PLR0917", "PT018"]
+"tests/test_server_lifespan.py" = ["PLC0415", "PLR0402", "PLR0913", "PLR0917"]
+"tests/test_startup.py" = ["PT018"]
+"tests/test_tool_logging.py" = ["PLC0415"]
+"tests/test_views.py" = ["DTZ001", "ICN001"]
+"tests/tracking/test_cli.py" = ["PLC0415"]
+"tests/tracking/test_email_monitor.py" = ["DTZ001", "DTZ011", "ICN001", "N806", "PIE804", "PLC0415", "PLR0917"]
+"tests/tracking/test_gmail_client.py" = ["N803", "PLR0917"]
+"tests/tracking/test_register.py" = ["PLC0415", "PT018"]
+# END ratchet
+
+[tool.moonlighter.file-length]
+# A file past `limit` is a module doing more than one thing (scripts/check_file_length.py).
+limit = 200
+ceiling = 250
+
+[tool.moonlighter.file-length.justified]
+
+[tool.complexipy]
+# Cognitive complexity per function: stricter than SonarQube's default (15) and
+# wemake-python-styleguide's (12). Nesting costs more than branching, which is the point.
+max-complexity-allowed = 10
 
 [tool.coverage.run]
 source_pkgs = [
@@ -74,6 +294,21 @@ exclude_also = [
 [tool.mypy]
 python_version = "3.14"
 strict = true
+warn_unreachable = true
+# Beyond --strict: every overriding method says so (@override), every ignore names its
+# code, and the checks that catch dead or always-true conditions are on.
+enable_error_code = [
+    "ignore-without-code",
+    "redundant-expr",
+    "truthy-bool",
+    "possibly-undefined",
+    "unused-awaitable",
+    "explicit-override",
+    "mutable-override",
+    "deprecated",
+    "exhaustive-match",
+    "redundant-self",
+]
 
 [[tool.mypy.overrides]]
 module = [
@@ -90,3 +325,10 @@ module = [
     "google_auth_oauthlib.*",
 ]
 ignore_missing_imports = true
+
+# Ratchet (plan 2026-11-04, Task 7 removes it): both modules guard `found_at`, a NOT NULL
+# column, and staleness re-checks the type a plugin scanner returns. Task 7 types those
+# boundaries honestly instead of silencing the checks here.
+[[tool.mypy.overrides]]
+module = ["moonlighter.discovery.staleness", "moonlighter.discovery.archive"]
+disable_error_code = ["truthy-bool", "unreachable"]

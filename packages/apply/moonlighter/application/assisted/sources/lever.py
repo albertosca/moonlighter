@@ -21,7 +21,7 @@ import json
 import logging
 import re
 from html.parser import HTMLParser
-from typing import Any
+from typing import Any, override
 
 import httpx
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
@@ -66,6 +66,7 @@ class _LeverFormParser(HTMLParser):
         self._label_parts: list[str] = []
         self._label_required = False
 
+    @override
     def handle_starttag(self, tag: str, attribute_pairs: list[tuple[str, str | None]]) -> None:
         attributes = dict(attribute_pairs)
         classes = (attributes.get("class") or "").split()
@@ -84,6 +85,7 @@ class _LeverFormParser(HTMLParser):
         elif tag == "span" and self._in_label and "required" in classes:
             self._label_required = True
 
+    @override
     def handle_endtag(self, tag: str) -> None:
         if tag != "div" or not self._in_label or self._question_classes is None:
             return
@@ -96,6 +98,7 @@ class _LeverFormParser(HTMLParser):
                 )
         self._question_classes = None
 
+    @override
     def handle_data(self, data: str) -> None:
         if self._in_label:
             self._label_parts.append(data)

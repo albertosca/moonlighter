@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from typing import Any, ClassVar
+from typing import Any, ClassVar, override
 from urllib.parse import quote
 
 import httpx
@@ -58,6 +58,7 @@ async def _gather_jobs(
 class GreenhouseScanner(BaseScanner):
     BASE = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
 
+    @override
     async def scan(self, company_slugs: list[str], **keyword_arguments: Any) -> list[RawJob]:
         return await _gather_jobs(
             "greenhouse", company_slugs, self._fetch, keyword_arguments.get("stats")
@@ -96,6 +97,7 @@ class GreenhouseScanner(BaseScanner):
 class LeverScanner(BaseScanner):
     BASE = "https://api.lever.co/v0/postings/{slug}"
 
+    @override
     async def scan(self, company_slugs: list[str], **keyword_arguments: Any) -> list[RawJob]:
         return await _gather_jobs(
             "lever", company_slugs, self._fetch, keyword_arguments.get("stats")
@@ -147,6 +149,7 @@ class AshbyScanner(BaseScanner):
 
     BASE = "https://api.ashbyhq.com/posting-api/job-board/{slug}"
 
+    @override
     async def scan(self, company_slugs: list[str], **keyword_arguments: Any) -> list[RawJob]:
         return await _gather_jobs(
             "ashby", company_slugs, self._fetch, keyword_arguments.get("stats")
@@ -200,6 +203,7 @@ class AshbyScanner(BaseScanner):
 class WorkableScanner(BaseScanner):
     BASE = "https://apply.workable.com/api/v1/widget/accounts/{slug}?details=true"
 
+    @override
     async def scan(self, company_slugs: list[str], **keyword_arguments: Any) -> list[RawJob]:
         return await _gather_jobs(
             "workable", company_slugs, self._fetch, keyword_arguments.get("stats")
@@ -270,6 +274,7 @@ class InHireScanner(BaseScanner):
         "on-site": "onsite",
     }
 
+    @override
     async def scan(self, company_slugs: list[str], **keyword_arguments: Any) -> list[RawJob]:
         return await _gather_jobs(
             "inhire", company_slugs, self._fetch, keyword_arguments.get("stats")
@@ -334,6 +339,7 @@ class RecruiteeScanner(BaseScanner):
             return f"https://{entry}/api/offers/"
         return f"https://{entry}.recruitee.com/api/offers/"
 
+    @override
     async def scan(self, company_slugs: list[str], **keyword_arguments: Any) -> list[RawJob]:
         return await _gather_jobs(
             "recruitee", company_slugs, self._fetch, keyword_arguments.get("stats")
@@ -369,6 +375,7 @@ class SmartRecruitersScanner(BaseScanner):
     DETAIL = "https://api.smartrecruiters.com/v1/companies/{slug}/postings/{pid}"
     APPLY = "https://jobs.smartrecruiters.com/{slug}/{pid}"
 
+    @override
     async def scan(self, company_slugs: list[str], **keyword_arguments: Any) -> list[RawJob]:
         return await _gather_jobs(
             "smartrecruiters", company_slugs, self._fetch, keyword_arguments.get("stats")
@@ -443,6 +450,7 @@ class GupyScanner(BaseScanner):
 
     BASE = "https://employability-portal.gupy.io/api/v1/jobs?jobName={kw}&limit={limit}&offset={offset}"
 
+    @override
     async def scan(
         self,
         company_slugs: list[str] | None = None,
@@ -518,6 +526,7 @@ class RemoteOKScanner(BaseScanner):
 
     BASE = "https://remoteok.com/api"
 
+    @override
     async def scan(
         self, company_slugs: list[str] | None = None, **keyword_arguments: Any
     ) -> list[RawJob]:
@@ -571,6 +580,7 @@ class RemotiveScanner(BaseScanner):
 
     BASE = "https://remotive.com/api/remote-jobs"
 
+    @override
     async def scan(
         self, company_slugs: list[str] | None = None, **keyword_arguments: Any
     ) -> list[RawJob]:
@@ -624,6 +634,7 @@ class WeWorkRemotelyScanner(BaseScanner):
     BASE = "https://weworkremotely.com/remote-jobs.rss"
     CATEGORY_URL = "https://weworkremotely.com/categories/remote-{category}-jobs.rss"
 
+    @override
     async def scan(
         self, company_slugs: list[str] | None = None, **keyword_arguments: Any
     ) -> list[RawJob]:
@@ -733,6 +744,7 @@ class HNWhoIsHiringScanner(BaseScanner):
     _MAX_CONCURRENT_COMMENTS = 20
     _SUBMITTED_LOOKBACK = 10
 
+    @override
     async def scan(
         self, company_slugs: list[str] | None = None, **keyword_arguments: Any
     ) -> list[RawJob]:

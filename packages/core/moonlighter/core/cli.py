@@ -19,7 +19,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime
 from importlib.metadata import entry_points
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any, NoReturn, override
 
 import yaml
 from moonlighter.core.config import (
@@ -73,6 +73,7 @@ class JsonArgumentParser(argparse.ArgumentParser):
     --help is unaffected: it never calls .error(), so it keeps going through
     argparse's own default path (stdout, exit 0)."""
 
+    @override
     def error(self, message: str) -> NoReturn:
         self.print_usage(sys.stderr)
         emit({"kind": "usage_error", "error": message}, EXIT_USAGE)
@@ -109,8 +110,8 @@ def doctor_payload() -> tuple[dict[str, Any], int]:
     try:
         validate_config(load_config())
         valid = True
-    except (ConfigError, OSError, yaml.YAMLError) as e:
-        error = str(e)
+    except (ConfigError, OSError, yaml.YAMLError) as failure:
+        error = str(failure)
     installed = installed_slices()
     live, missing = capabilities(installed)
     payload = {
@@ -129,36 +130,37 @@ def doctor_payload() -> tuple[dict[str, Any], int]:
         "db": {"path": _db_path(), "exists": Path(_db_path()).exists()},
         "slices": installed,
         "commands": sorted(
-            ep.name
-            for ep in entry_points(group="console_scripts")
-            if ep.name.startswith("moonlighter")
+            entry_point.name
+            for entry_point in entry_points(group="console_scripts")
+            if entry_point.name.startswith("moonlighter")
         ),
         "capabilities": {
             "live": [
                 {
-                    "name": c.name,
-                    "needs": sorted(c.needs),
-                    "commands": list(c.commands),
-                    "summary": c.summary,
+                    "name": capability.name,
+                    "needs": sorted(capability.needs),
+                    "commands": list(capability.commands),
+                    "summary": capability.summary,
                 }
-                for c in live
+                for capability in live
             ],
             "missing": [
                 {
-                    "name": c.name,
-                    "needs": sorted(c.needs),
-                    "commands": list(c.commands),
-                    "summary": c.summary,
+                    "name": capability.name,
+                    "needs": sorted(capability.needs),
+                    "commands": list(capability.commands),
+                    "summary": capability.summary,
                     "needs_install": sorted(
-                        c.needs - {s for s in SLICES if installed.get(s, False)}
+                        capability.needs
+                        - {slice_name for slice_name in SLICES if installed.get(slice_name, False)}
                     ),
                 }
-                for c in missing
+                for capability in missing
             ],
         },
     }
-    ok = valid and config_path.exists()
-    return payload, (EXIT_OK if ok else EXIT_NOTHING)
+    is_healthy = valid and config_path.exists()
+    return payload, (EXIT_OK if is_healthy else EXIT_NOTHING)
 
 
 def _iso(value: Any) -> Any:
@@ -192,25 +194,25 @@ def run(
     the JSON is for the machine, the logged traceback is for the human."""
     try:
         payload, code = asyncio.run(entry())
-    except ConfigError as e:
-        payload, code = {"kind": "config_error", "error": str(e)}, EXIT_USAGE
-    except usage as e:
+    except ConfigError as error:
+        payload, code = {"kind": "config_error", "error": str(error)}, EXIT_USAGE
+    except usage as error:
         payload, code = (
-            {"kind": "usage_error", "type": type(e).__name__, "error": str(e)},
+            {"kind": "usage_error", "type": type(error).__name__, "error": str(error)},
             EXIT_USAGE,
         )
-    except expected as e:
+    except expected as error:
         payload, code = (
-            {"kind": "expected_failure", "type": type(e).__name__, "error": str(e)},
+            {"kind": "expected_failure", "type": type(error).__name__, "error": str(error)},
             EXIT_NOTHING,
         )
-    except Exception as e:
+    except Exception as error:
         logging.getLogger(__name__).exception("unhandled error in CLI entry")
         payload, code = (
             {
                 "kind": "error",
-                "type": type(e).__name__,
-                "error": str(e),
+                "type": type(error).__name__,
+                "error": str(error),
             },
             EXIT_CRASH,
         )

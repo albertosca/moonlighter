@@ -1,6 +1,8 @@
 import logging
+from collections.abc import Sequence
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import ClassVar, override
 
 _initialized = False
 _DEFAULT_LOG_PATH = str(Path("~/.moonlighter/app.log").expanduser())
@@ -57,7 +59,7 @@ try:
         core/metrics.py — key=value pairs get their own styles instead of
         blending into ordinary log text."""
 
-        highlights = [  # noqa: RUF012 - mirrors ReprHighlighter's own class attr
+        highlights: ClassVar[Sequence[str]] = [
             *_ReprHighlighter.highlights,
             r"\b(?P<op_name>op=\S+)",
             r"\b(?P<metric_key>calls|total_seconds|input_tokens|output_tokens|spend_limit_hits)="
@@ -76,6 +78,7 @@ try:
         tracking/full) to every rendered message, derived from the logger
         name, so log lines from different subsystems are visually grouped."""
 
+        @override
         def render_message(self, record: logging.LogRecord, message: str) -> _Text:
             text = super().render_message(record, message)
             package = _package_tag(record.name)
@@ -100,23 +103,25 @@ def setup(log_path: str | None = None) -> None:
     root = logging.getLogger("moonlighter")
     root.setLevel(logging.DEBUG)
 
-    fmt = logging.Formatter(
+    formatter = logging.Formatter(
         "%(asctime)s %(levelname)-5s %(name)-45s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     # S-07: app.log ran with no rotation (3.4MB and growing in production) —
     # cap at 10MB x 3 backups.
-    fh = RotatingFileHandler(resolved, maxBytes=10_000_000, backupCount=3, encoding="utf-8")
-    fh.setLevel(logging.DEBUG)
-    fh.setFormatter(fmt)
-    root.addHandler(fh)
+    file_handler = RotatingFileHandler(
+        resolved, maxBytes=10_000_000, backupCount=3, encoding="utf-8"
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    root.addHandler(file_handler)
 
     try:
         from rich.console import Console
         from rich.theme import Theme
 
-        rh = _PackageRichHandler(
+        console_handler = _PackageRichHandler(
             console=Console(stderr=True, theme=Theme(_VIVID_LEVEL_STYLES)),
             level=logging.INFO,
             show_path=True,
@@ -124,7 +129,7 @@ def setup(log_path: str | None = None) -> None:
             rich_tracebacks=False,
             highlighter=MetricsHighlighter(),
         )
-        root.addHandler(rh)
+        root.addHandler(console_handler)
     except ImportError:
         pass  # rich optional
 

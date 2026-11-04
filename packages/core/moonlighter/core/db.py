@@ -2,7 +2,7 @@ import datetime
 import json
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Self, override
 
 from moonlighter.core.config import moonlighter_home
 from peewee import (
@@ -49,7 +49,8 @@ class BaseModel(Model):
         DoesNotExist: ClassVar[type[Exception]]
 
         @classmethod
-        def get_or_create(cls, **kwargs: Any) -> tuple[Self, bool]: ...
+        @override
+        def get_or_create(model_class, **lookups: Any) -> tuple[Self, bool]: ...
 
     class Meta:
         database = db
