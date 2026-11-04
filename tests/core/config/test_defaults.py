@@ -12,3 +12,7 @@ def test_defaults_carry_the_documented_email_paths():
 
 def test_the_default_timeout_is_180_seconds():
     assert DEFAULTS["llm_timeout_seconds"] == 180
+
+
+def test_the_answer_bank_max_age_defaults_to_ninety_days():
+    assert DEFAULTS["answer_bank_max_age_days"] == 90

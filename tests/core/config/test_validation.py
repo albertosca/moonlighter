@@ -121,9 +121,6 @@ class TestAnswerBankMaxAge:
         with pytest.raises(ConfigError, match="answer_bank_max_age_days"):
             validate_config({"answer_bank_max_age_days": "90"})
 
-    def test_default_is_ninety_days(self):
-        assert DEFAULTS["answer_bank_max_age_days"] == 90
-
 
 def test_validate_config_accepts_cursor_model():
     validate_config({"cursor_model": "gpt-5"})
