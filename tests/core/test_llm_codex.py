@@ -6,6 +6,7 @@ and the network but still reads `~/.codex/auth.json` and `~/.ssh`."""
 
 import asyncio
 import os
+import signal
 import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -14,6 +15,7 @@ import pytest
 from moonlighter.core import llm
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.llm import _call_codex, codex_executable, make_caller
+from moonlighter.core.metrics import operation_metrics
 
 LOGGED_IN = b"Logged in using ChatGPT\n"
 
@@ -27,7 +29,9 @@ def _process(stdout: bytes = b"", stderr: bytes = b"", code: int = 0) -> MagicMo
     return process
 
 
-def _fake_codex(answer: str | None, *, login: bytes = LOGGED_IN, login_code: int = 0):
+def _fake_codex(
+    answer: str | None, *, login: bytes = LOGGED_IN, login_code: int = 0, login_stderr: bytes = b""
+):
     """create_subprocess_exec stand-in: `login status` first, then `exec`, which
     writes `answer` to the `--output-last-message` file the way the real CLI does."""
     calls: list[tuple[tuple[str, ...], dict]] = []
@@ -36,7 +40,7 @@ def _fake_codex(answer: str | None, *, login: bytes = LOGGED_IN, login_code: int
     async def create(*argv: str, **launch_options):
         calls.append((argv, launch_options))
         if argv[1:3] == ("login", "status"):
-            process = _process(login, b"", login_code)
+            process = _process(login, login_stderr, login_code)
         else:
             if answer is not None:
                 output = Path(argv[argv.index("--output-last-message") + 1])
@@ -352,3 +356,289 @@ async def test_a_hung_codex_takes_its_children_down_too(tmp_path, monkeypatch):
             return
         time.sleep(0.05)
     pytest.fail("the child of the killed codex survived as an orphan")
+
+
+@pytest.mark.parametrize("model", ["claude-sonnet-4-6", "CLAUDE-X", "", "   "])
+async def test_a_refused_model_quotes_the_setting_and_the_model_it_got(model):
+    create, calls, _ = _fake_codex("ok")
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", create),
+        pytest.raises(RuntimeError) as raised,
+    ):
+        await _call_codex("prompt", model)
+    assert str(raised.value) == (
+        "llm_backend 'codex' needs a non-Claude llm_model and eval_model in config.yaml, "
+        f"got {model!r}. Set both to a model your ChatGPT plan offers."
+    )
+    assert calls == []
+
+
+async def test_a_missing_binary_message_is_pinned_word_for_word(monkeypatch):
+    monkeypatch.setattr(llm.shutil, "which", lambda name: None)
+    with pytest.raises(RuntimeError) as raised:
+        await _call_codex("prompt", "gpt-5")
+    assert str(raised.value) == (
+        "the `codex` CLI was not found on PATH. Install it "
+        "(`brew install --cask codex`) and run `codex login` with your ChatGPT account."
+    )
+
+
+async def test_a_login_refusal_message_is_pinned_word_for_word():
+    create, _, _ = _fake_codex("ok", login=b"Not logged in\n", login_code=1)
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", create),
+        pytest.raises(RuntimeError) as raised,
+    ):
+        await _call_codex("prompt", "gpt-5")
+    assert str(raised.value) == (
+        "llm_backend 'codex' needs a ChatGPT login (an API key is not used). "
+        "Run `codex login` and sign in with your ChatGPT account."
+    )
+
+
+@pytest.mark.parametrize(
+    ("login", "login_stderr"),
+    [
+        (b"\xff Logged in using ChatGPT\n", b""),
+        (b"", b"Logged in using ChatGPT\n"),
+        (b"LOGGED IN USING CHATGPT\n", b""),
+    ],
+    ids=["invalid-utf8-is-replaced", "stderr-counts", "case-is-ignored"],
+)
+async def test_a_chatgpt_login_is_recognised_however_it_is_printed(login, login_stderr):
+    create, calls, _ = _fake_codex("the answer", login=login, login_stderr=login_stderr)
+    with patch("moonlighter.core.llm.asyncio.create_subprocess_exec", create):
+        result = await _call_codex("prompt", "gpt-5")
+    assert result == "the answer"
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize(
+    ("answer", "message"),
+    [
+        (None, "codex CLI wrote no final response"),
+        ("", "codex CLI returned an empty final response"),
+        ("   \n", "codex CLI returned an empty final response"),
+    ],
+)
+async def test_a_missing_answer_message_is_pinned_word_for_word(answer, message):
+    create, _, _ = _fake_codex(answer)
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", create),
+        pytest.raises(RuntimeError) as raised,
+    ):
+        await _call_codex("prompt", "gpt-5")
+    assert str(raised.value) == message
+
+
+async def test_a_hung_login_check_waits_its_own_twenty_seconds_and_kills_the_group():
+    hung = _process()
+    hung.communicate = AsyncMock(side_effect=TimeoutError)
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", AsyncMock(return_value=hung)),
+        patch("moonlighter.core.llm.os.killpg") as killpg,
+        pytest.raises(RuntimeError) as raised,
+    ):
+        await _call_codex("prompt", "gpt-5", timeout_seconds=7)
+    assert str(raised.value) == (
+        "codex CLI did not answer within 20.0 s — killed "
+        "(raise llm_timeout_seconds in config.yaml if your calls are legitimately slow)"
+    )
+    killpg.assert_called_once_with(4242, signal.SIGKILL)
+    hung.wait.assert_awaited_once()
+
+
+async def test_a_hung_exec_message_is_pinned_word_for_word():
+    hung = _process()
+    hung.communicate = AsyncMock(side_effect=TimeoutError)
+    launch = AsyncMock(side_effect=[_process(LOGGED_IN), hung])
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", launch),
+        patch("moonlighter.core.llm.os.killpg") as killpg,
+        pytest.raises(RuntimeError) as raised,
+    ):
+        await _call_codex("prompt", "gpt-5", timeout_seconds=7)
+    assert str(raised.value) == (
+        "codex CLI did not answer within 7 s — killed "
+        "(raise llm_timeout_seconds in config.yaml if your calls are legitimately slow)"
+    )
+    killpg.assert_called_once_with(4242, signal.SIGKILL)
+
+
+@pytest.mark.parametrize(
+    ("stdout", "stderr", "code", "message"),
+    [
+        (b"", b"boom", 2, "codex CLI exited with code 2: boom"),
+        (b"from stdout", b"", 3, "codex CLI exited with code 3: from stdout"),
+        (b"from stdout", b"  \n", 3, "codex CLI exited with code 3: from stdout"),
+        (b"", b"  padded  \n", 2, "codex CLI exited with code 2: padded"),
+        (b"", b"bad \xff byte", 2, "codex CLI exited with code 2: bad � byte"),
+        (
+            b"",
+            b"usage_limit_reached: try later",
+            1,
+            "codex CLI exited with code 1: usage limit: usage_limit_reached: try later",
+        ),
+    ],
+    ids=[
+        "stderr",
+        "stdout-fallback",
+        "whitespace-stderr-falls-back",
+        "stripped",
+        "invalid-utf8-is-replaced",
+        "usage-limit-prefix",
+    ],
+)
+async def test_an_exit_message_is_pinned_word_for_word(*, stdout, stderr, code, message):
+    launch = AsyncMock(side_effect=[_process(LOGGED_IN), _process(stdout, stderr, code)])
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", launch),
+        pytest.raises(RuntimeError) as raised,
+    ):
+        await _call_codex("prompt", "gpt-5")
+    assert str(raised.value) == message
+
+
+async def test_the_login_check_and_the_exec_launch_exactly_these_argvs():
+    create, calls, processes = _fake_codex("ok")
+    with patch("moonlighter.core.llm.asyncio.create_subprocess_exec", create):
+        await _call_codex("prompt", "gpt-5")
+    (login_argv, login_options), (exec_argv, exec_options) = calls
+    workdir = login_options["cwd"]
+    features = (
+        "shell_tool",
+        "unified_exec",
+        "apps",
+        "plugins",
+        "remote_plugin",
+        "multi_agent",
+        "hooks",
+        "browser_use",
+        "browser_use_external",
+        "computer_use",
+        "image_generation",
+        "in_app_browser",
+        "skill_search",
+        "tool_suggest",
+    )
+    assert login_argv == ("/opt/bin/codex", "login", "status")
+    assert processes[0].communicate.call_args.kwargs["input"] == b""
+    assert exec_argv == (
+        "/opt/bin/codex",
+        "--ask-for-approval",
+        "never",
+        "exec",
+        "--ignore-user-config",
+        "--ephemeral",
+        "--skip-git-repo-check",
+        "-c",
+        'model_provider="openai"',
+        "-c",
+        'web_search="disabled"',
+        "-c",
+        'default_permissions="moonlighter-locked"',
+        "-c",
+        (
+            'permissions.moonlighter-locked.filesystem={":minimal"="read",":root"="deny",'
+            '"/opt/bin"="read",":workspace_roots"={"."="read"}}'
+        ),
+        "-c",
+        "permissions.moonlighter-locked.network={enabled=false}",
+        *(part for feature in features for part in ("--disable", feature)),
+        "--model",
+        "gpt-5",
+        "--output-last-message",
+        str(Path(workdir) / "final-message.txt"),
+        "-",
+    )
+    for options in (login_options, exec_options):
+        assert set(options) == {"stdin", "stdout", "stderr", "env", "cwd", "start_new_session"}
+        assert options["stdin"] == asyncio.subprocess.PIPE
+        assert options["stdout"] == asyncio.subprocess.PIPE
+        assert options["stderr"] == asyncio.subprocess.PIPE
+        assert options["start_new_session"] is True
+        assert options["cwd"] == workdir
+
+
+def test_the_permission_args_are_pinned_with_both_binary_directories(monkeypatch):
+    monkeypatch.setattr(llm.os.path, "realpath", lambda path: "/opt/Caskroom/codex/1/bin/codex")
+    assert llm._codex_permission_args("/opt/bin/codex") == [
+        "-c",
+        'default_permissions="moonlighter-locked"',
+        "-c",
+        (
+            'permissions.moonlighter-locked.filesystem={":minimal"="read",":root"="deny",'
+            '"/opt/bin"="read","/opt/Caskroom/codex/1/bin"="read",":workspace_roots"={"."="read"}}'
+        ),
+        "-c",
+        "permissions.moonlighter-locked.network={enabled=false}",
+    ]
+
+
+async def test_the_private_workdir_is_named_for_codex_under_moonlighter_home(tmp_path):
+    create, calls, _ = _fake_codex("ok")
+    with patch("moonlighter.core.llm.asyncio.create_subprocess_exec", create):
+        await _call_codex("prompt", "gpt-5")
+    workdir = Path(calls[0][1]["cwd"])
+    assert workdir.name.startswith("codex-")
+    assert workdir.parent == tmp_path / "home"
+
+
+async def test_a_codex_call_that_answers_records_one_call():
+    create, _, _ = _fake_codex("ok")
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", create),
+        operation_metrics("pin") as metrics,
+    ):
+        await _call_codex("prompt", "gpt-5")
+    assert metrics.calls == 1
+
+
+async def test_a_codex_call_that_exits_nonzero_records_one_call():
+    launch = AsyncMock(side_effect=[_process(LOGGED_IN), _process(b"", b"boom", 2)])
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", launch),
+        operation_metrics("pin") as metrics,
+        pytest.raises(RuntimeError),
+    ):
+        await _call_codex("prompt", "gpt-5")
+    assert metrics.calls == 1
+
+
+def test_a_refused_model_records_no_call_and_creates_no_workdir(tmp_path):
+    with operation_metrics("pin") as metrics, pytest.raises(RuntimeError):
+        asyncio.run(_call_codex("prompt", "claude-sonnet-4-6"))
+    assert metrics.calls == 0
+    assert not (tmp_path / "home").exists()
+
+
+def test_a_missing_codex_binary_records_no_call_and_creates_no_workdir(tmp_path, monkeypatch):
+    monkeypatch.setattr(llm.shutil, "which", lambda name: None)
+    with operation_metrics("pin") as metrics, pytest.raises(RuntimeError):
+        asyncio.run(_call_codex("prompt", "gpt-5"))
+    assert metrics.calls == 0
+    assert not (tmp_path / "home").exists()
+
+
+async def test_a_failed_workdir_cleanup_is_logged_and_the_answer_survives(caplog):
+    create, calls, _ = _fake_codex("the answer")
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", create),
+        patch("moonlighter.core.llm.shutil.rmtree", side_effect=OSError("busy")),
+        caplog.at_level("ERROR"),
+    ):
+        result = await _call_codex("prompt", "gpt-5")
+    assert result == "the answer"
+    assert f"cursor cleanup failed for {calls[0][1]['cwd']}" in caplog.messages
+
+
+async def test_a_cleanup_that_raises_still_records_the_call():
+    create, _, _ = _fake_codex("ok")
+    with (
+        patch("moonlighter.core.llm.asyncio.create_subprocess_exec", create),
+        patch("moonlighter.core.llm._remove_quietly", side_effect=RuntimeError("cleanup")),
+        operation_metrics("pin") as metrics,
+        pytest.raises(RuntimeError, match=r"^cleanup$"),
+    ):
+        await _call_codex("prompt", "gpt-5")
+    assert metrics.calls == 1
