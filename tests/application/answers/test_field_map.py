@@ -4,7 +4,7 @@ from moonlighter.application.answers.field_map import (
     demographic_answer,
     pre_populate_answers,
 )
-from moonlighter.core.config.sentinel import NEEDS_REVIEW_SENTINEL
+from moonlighter.application.answers.needs_review import NEEDS_REVIEW_SENTINEL
 
 PROFILE = {
     "name": "Maria de Souza Pereira",

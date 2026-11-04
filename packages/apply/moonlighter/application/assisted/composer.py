@@ -18,10 +18,10 @@ from moonlighter.application.answers.answer_bank import (
 from moonlighter.application.answers.compliance import is_compliance_question
 from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.application.answers.field_map import demographic_answer, pre_populate_answers
+from moonlighter.application.answers.needs_review import NEEDS_REVIEW_SENTINEL
 from moonlighter.application.answers.option_matcher import match_option_locally
 from moonlighter.application.answers.profile import profile_for_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.core.config.sentinel import NEEDS_REVIEW_SENTINEL
 from moonlighter.core.llm import LLMCaller, is_spend_limit
 from moonlighter.core.parsing import wrap_untrusted
 

@@ -14,7 +14,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from moonlighter.core.config.sentinel import NEEDS_REVIEW_SENTINEL
+from moonlighter.application.answers.needs_review import NEEDS_REVIEW_SENTINEL
 
 _RuleFn = Callable[[dict[str, Any]], str | None]
 
