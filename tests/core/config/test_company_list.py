@@ -99,6 +99,15 @@ def test_company_list_rejects_non_string_entry(tmp_path):
             None,
             "company_list.yaml: source 'greenhouse' has a non-string entry: 42",
         ),
+        # YAML reads an unquoted 2024-01-01 as a date; the repr names its type, str() would not.
+        (
+            "greenhouse:\n  - nubank\n  - 2024-01-01\n",
+            None,
+            (
+                "company_list.yaml: source 'greenhouse' has a non-string entry: "
+                "datetime.date(2024, 1, 1)"
+            ),
+        ),
     ],
 )
 def test_a_rejected_company_list_reads_word_for_word(tmp_path, *, yaml_text, phase, message):
