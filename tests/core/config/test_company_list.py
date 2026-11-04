@@ -84,3 +84,26 @@ def test_company_list_rejects_non_string_entry(tmp_path):
     path.write_text("greenhouse:\n  - nubank\n  - 42\n")
     with pytest.raises(ConfigError, match=r"greenhouse.*42"):
         load_company_list(path)
+
+
+@pytest.mark.parametrize(
+    ("yaml_text", "phase", "message"),
+    [
+        (
+            "greenhouse:\n  phase1: abc\n",
+            "phase1",
+            "company_list.yaml: source 'greenhouse' did not resolve to a list (got str: 'abc')",
+        ),
+        (
+            "greenhouse:\n  - nubank\n  - 42\n",
+            None,
+            "company_list.yaml: source 'greenhouse' has a non-string entry: 42",
+        ),
+    ],
+)
+def test_a_rejected_company_list_reads_word_for_word(tmp_path, *, yaml_text, phase, message):
+    path = tmp_path / "company_list.yaml"
+    path.write_text(yaml_text)
+    with pytest.raises(ConfigError) as raised:
+        load_company_list(path, phase=phase)
+    assert str(raised.value) == message

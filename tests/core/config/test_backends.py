@@ -67,3 +67,42 @@ def test_validate_config_codex_with_the_default_models_names_the_fix():
 
 def test_validate_config_leaves_claude_models_alone_for_other_backends():
     validate_config({"llm_backend": "cli", "llm_model": "claude-sonnet-4-6"})
+
+
+@pytest.mark.parametrize(
+    ("config", "message"),
+    [
+        ({"llm_backend": 5}, "config key 'llm_backend' must be str, got int"),
+        (
+            {"llm_backend": "CLI"},
+            "config key 'llm_backend' must be one of cli, api, cursor, codex, got 'CLI'",
+        ),
+        (
+            {"llm_backend": "codex", "llm_model": "claude-sonnet-4-6"},
+            (
+                "config key 'llm_model' must name a model the Codex CLI can run (for example "
+                "'gpt-6-luna') when llm_backend is 'codex', got 'claude-sonnet-4-6'"
+            ),
+        ),
+    ],
+)
+def test_a_rejected_backend_or_codex_model_reads_word_for_word(config, message):
+    with pytest.raises(ConfigError) as raised:
+        validate_config(config)
+    assert str(raised.value) == message
+
+
+@pytest.mark.parametrize(
+    ("config", "message"),
+    [
+        ({"llm_backend": "codex", "llm_model": "claude-x", "zzz": 1}, "unknown config key 'zzz'"),
+        (
+            {"llm_backend": "codex", "email": {"lookback_days": 0}},
+            "config key 'email.lookback_days' must be positive, got 0",
+        ),
+    ],
+)
+def test_a_bad_key_is_reported_before_the_codex_models_are_checked(config, message):
+    with pytest.raises(ConfigError) as raised:
+        validate_config(config)
+    assert str(raised.value) == message

@@ -174,3 +174,27 @@ def test_a_non_numeric_timeout_is_rejected():
     config["llm_timeout_seconds"] = "three minutes"
     with pytest.raises(ConfigError, match="llm_timeout_seconds"):
         validate_config(config)
+
+
+@pytest.mark.parametrize(
+    ("config", "message"),
+    [
+        ({"zzz": 1, "llm_timeout_seconds": 0}, "unknown config key 'zzz'"),
+        (
+            {"llm_timeout_seconds": 0, "zzz": 1},
+            "config key 'llm_timeout_seconds' must be positive, got 0",
+        ),
+        ({"email": {"zzz": 1, "lookback_days": 0}}, "unknown config key 'email.zzz'"),
+        (
+            {"email": {"lookback_days": 0, "zzz": 1}},
+            "config key 'email.lookback_days' must be positive, got 0",
+        ),
+        ({"cv": {"pool": 5, "zzz": 1}}, "config key 'cv.pool' must be str, got int"),
+        ({"scan_concurrency": True}, "config key 'scan_concurrency' must be int, got bool"),
+        ({"score_threshold": "high"}, "config key 'score_threshold' must be int, float, got str"),
+    ],
+)
+def test_a_rejected_config_names_its_first_bad_key_in_these_exact_words(config, message):
+    with pytest.raises(ConfigError) as raised:
+        validate_config(config)
+    assert str(raised.value) == message
