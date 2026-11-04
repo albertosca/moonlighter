@@ -61,13 +61,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
-    if args.command == "doctor":
+async def _run(arguments: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    if arguments.command == "doctor":
         return doctor_payload()
     config, _profile = bootstrap()
-    if args.command == "register":
-        r = register_application(args.job_id, config)
-        return register_to_dict(r), (EXIT_OK if r.kind is RegisterKind.REGISTERED else EXIT_NOTHING)
+    if arguments.command == "register":
+        result = register_application(arguments.job_id, config)
+        return register_to_dict(result), (
+            EXIT_OK if result.kind is RegisterKind.REGISTERED else EXIT_NOTHING
+        )
     updates = await sync_responses(config, make_caller(config))
     return {"kind": "synced", "updates": updates}, (EXIT_OK if updates else EXIT_NOTHING)
 
@@ -75,5 +77,5 @@ async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
 def main() -> None:  # pragma: no cover - entry point (boundary)
     import sys
 
-    args = parse_args()
-    sys.exit(run(lambda: _run(args), expected=EXPECTED_FAILURES))
+    arguments = parse_args()
+    sys.exit(run(lambda: _run(arguments), expected=EXPECTED_FAILURES))

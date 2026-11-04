@@ -81,20 +81,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
-    if args.command == "doctor":
+async def _run(arguments: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    if arguments.command == "doctor":
         return doctor_payload()
     config, profile = bootstrap()
-    caller = NO_EVAL if args.no_eval else make_caller(config)
+    caller = NO_EVAL if arguments.no_eval else make_caller(config)
     report: ScanReport
-    if args.company:
-        source, slug = args.company
+    if arguments.company:
+        source, slug = arguments.company
         report = await scan_company(source, slug, config, profile, caller)
     else:
-        report = await scan_and_evaluate(args.keywords, args.phase, config, profile, caller)
+        report = await scan_and_evaluate(
+            arguments.keywords, arguments.phase, config, profile, caller
+        )
     return scan_report_to_dict(report), _EXIT_BY_KIND[report.kind]
 
 
 def main() -> None:  # pragma: no cover - entry point (boundary)
-    args = parse_args()
-    sys.exit(run(lambda: _run(args)))
+    arguments = parse_args()
+    sys.exit(run(lambda: _run(arguments)))

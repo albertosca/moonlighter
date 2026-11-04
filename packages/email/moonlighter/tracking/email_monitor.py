@@ -48,14 +48,14 @@ def extract_ref(to_field: str, base_address: str) -> str | None:
     local, _, domain = base_address.partition("@")
     for part in re.split(r",\s*", to_field):  # the To field can have multiple addresses
         match = re.search(r"<([^>]+)>", part)  # "Name <email>" → "email"
-        addr = match.group(1).strip() if match else part.strip()
+        address = match.group(1).strip() if match else part.strip()
 
-        addr_local, _, addr_domain = addr.partition("@")
-        if addr_domain.lower() != domain.lower() or "+" not in addr_local:
+        address_local, _, address_domain = address.partition("@")
+        if address_domain.lower() != domain.lower() or "+" not in address_local:
             continue
-        base_local, _, ref = addr_local.partition("+")
-        if base_local.lower() == local.lower() and ref:
-            return ref
+        base_local, _, reference = address_local.partition("+")
+        if base_local.lower() == local.lower() and reference:
+            return reference
 
     return None
 
@@ -69,18 +69,18 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
     from moonlighter.core.db import ProcessedEmail
 
     service = setup_gmail_service(config)
-    email_cfg = config["email"]
-    base_address = email_cfg["address"]
-    stages = list(email_cfg.get("interview_stages", []))
+    email_config = config["email"]
+    base_address = email_config["address"]
+    stages = list(email_config.get("interview_stages", []))
     model = config.get("llm_model", "claude-sonnet-4-6")
 
     # The sync is 100% READ-ONLY on Gmail by default: dedup lives in a local table
     # (ProcessedEmail). Only writes to Gmail (read + label) if mark_processed=True.
-    mutate_gmail = bool(email_cfg.get("mark_processed", False))
-    archive_all = bool(email_cfg.get("archive_all_classified", False))
+    mutate_gmail = bool(email_config.get("mark_processed", False))
+    archive_all = bool(email_config.get("archive_all_classified", False))
     # Layer two is a superset of layer one by design.
-    archive_ref = archive_all or bool(email_cfg.get("archive_ref_matched", False))
-    label_name = email_cfg.get("processed_label", "moonlighter/processed")
+    archive_reference_matched = archive_all or bool(email_config.get("archive_ref_matched", False))
+    label_name = email_config.get("processed_label", "moonlighter/processed")
     label_id = _get_or_create_label(service, label_name) if mutate_gmail else None
 
     def mark_done(message_id: str) -> None:
@@ -95,53 +95,55 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
             return
         try:
             archive_message(service, message_id)
-        except Exception as e:
-            logger.warning("sync_responses: could not archive %s — %s", message_id, e)
+        except Exception as error:
+            logger.warning("sync_responses: could not archive %s — %s", message_id, error)
 
     updates = []
-    for msg_ref in fetch_recent_messages(service, int(email_cfg.get("lookback_days", 30))):
-        msg_id = msg_ref["id"]
-        if ProcessedEmail.select().where(ProcessedEmail.message_id == msg_id).exists():
+    for message_reference in fetch_recent_messages(
+        service, int(email_config.get("lookback_days", 30))
+    ):
+        message_id = message_reference["id"]
+        if ProcessedEmail.select().where(ProcessedEmail.message_id == message_id).exists():
             continue  # already processed in a previous run — don't re-call the LLM
 
-        message = parse_message(service, msg_id)
+        message = parse_message(service, message_id)
         try:
             classification = await classify_response(message, stages, llm_caller, model)
-        except Exception as e:
-            if is_spend_limit(e):
+        except Exception as error:
+            if is_spend_limit(error):
                 record_spend_limit_hit()
                 logger.warning(
                     "sync_responses: spend limit hit while classifying %s — stopping sync "
                     "early, leaving it and the rest of this batch unprocessed for the next run",
-                    msg_id,
+                    message_id,
                 )
                 break
             logger.warning(
                 "sync_responses: classification failed for %s — leaving it unprocessed "
                 "for the next run: %s",
-                msg_id,
-                e,
+                message_id,
+                error,
             )
             continue  # NOT mark_done: a failed classification must not burn the message
 
         if classification["type"] == "unrelated":
-            mark_done(msg_id)
+            mark_done(message_id)
             continue
 
-        ref = extract_ref(message["to"], base_address)
-        app, match_type = _resolve_application(ref, classification)
+        reference = extract_ref(message["to"], base_address)
+        app, match_type = _resolve_application(reference, classification)
         if app is not None and match_type == "ref":
-            _register_new_stage(classification.get("new_stage"), stages, email_cfg)
+            _register_new_stage(classification.get("new_stage"), stages, email_config)
             advanced = _advance_application(app, classification, match_type, stages)
             updates.append(_make_update(classification, match_type, app, status_advanced=advanced))
-            maybe_archive(msg_id, archive_ref)
+            maybe_archive(message_id, archive_reference_matched)
         elif app is not None:  # match_type == "fuzzy" — suggestion only (S-06)
             updates.append(_make_suggestion(app, classification, match_type))
-            maybe_archive(msg_id, archive_all)
+            maybe_archive(message_id, archive_all)
         else:
             updates.append(_make_update(classification, "uncertain"))
-            maybe_archive(msg_id, archive_all)
-        mark_done(msg_id)
+            maybe_archive(message_id, archive_all)
+        mark_done(message_id)
 
     return updates
 
@@ -172,7 +174,7 @@ def _sanitize_stage(raw: str | None) -> str | None:
 
 
 def _register_new_stage(
-    new_stage: str | None, stages: list[str], email_cfg: dict[str, Any]
+    new_stage: str | None, stages: list[str], email_config: dict[str, Any]
 ) -> None:
     """Learn a novel stage proposed by the LLM, persisting it to the in-memory config.
 
@@ -184,7 +186,7 @@ def _register_new_stage(
     if slug is None or slug in stages or len(stages) >= _MAX_STAGES:
         return
     stages.append(slug)
-    email_cfg["interview_stages"] = stages
+    email_config["interview_stages"] = stages
 
 
 def _advance_application(
@@ -258,11 +260,11 @@ def _status_rank(status: str) -> int:
         return -1
 
 
-def _resolve_application(ref: str | None, classification: dict[str, Any]) -> tuple[Any, str]:
+def _resolve_application(reference: str | None, classification: dict[str, Any]) -> tuple[Any, str]:
     """Finds the matching Application, by ref (exact) or company+title
     (fuzzy). Returns (Application | None, 'ref' | 'fuzzy' | 'uncertain')."""
-    if ref:
-        app = _match_by_ref(ref)
+    if reference:
+        app = _match_by_ref(reference)
         if app is not None:
             return app, "ref"
 
@@ -272,13 +274,13 @@ def _resolve_application(ref: str | None, classification: dict[str, Any]) -> tup
     return None, "uncertain"
 
 
-def _match_by_ref(ref: str) -> Any:
+def _match_by_ref(reference: str) -> Any:
     from moonlighter.core.db import Application
     from peewee import fn
 
     # Refs minted before 2026-08-06 are mixed case, and providers lowercase the local
     # part on the way back, so both sides are folded rather than the column migrated.
-    return Application.get_or_none(fn.LOWER(Application.email_ref) == ref.lower())
+    return Application.get_or_none(fn.LOWER(Application.email_ref) == reference.lower())
 
 
 def _match_by_company_title(company: str | None, job_title: str | None) -> Any:
