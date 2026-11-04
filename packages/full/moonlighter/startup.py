@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from moonlighter.application.answers.cv import configured_cv_path
-from moonlighter.core.config import browser_executable, llm_backend, moonlighter_home
+from moonlighter.core.config.backends import llm_backend
+from moonlighter.core.config.paths import browser_executable, moonlighter_home
 from moonlighter.core.llm import codex_executable, cursor_executable
 from moonlighter.discovery.evaluator import LOCATION_PRECEDENCES
 

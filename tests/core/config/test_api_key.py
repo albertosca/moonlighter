@@ -2,14 +2,15 @@ import os
 from pathlib import Path
 
 import pytest
-from moonlighter.core import config as config_module
-from moonlighter.core.config import anthropic_api_env_file, load_config
+from moonlighter.core.config import api_key
+from moonlighter.core.config.api_key import anthropic_api_env_file
+from moonlighter.core.config.loading import load_config
 
 
 @pytest.fixture
 def provider_file(tmp_path, monkeypatch):
     key_file = tmp_path / "api.env"
-    monkeypatch.setattr(config_module, "anthropic_api_env_file", lambda: key_file)
+    monkeypatch.setattr(api_key, "anthropic_api_env_file", lambda: key_file)
     # setenv first so teardown restores the variable even when load_config sets it.
     monkeypatch.setenv("ANTHROPIC_API_KEY", "placeholder")
     monkeypatch.delenv("ANTHROPIC_API_KEY")
@@ -53,7 +54,7 @@ def test_codex_backend_never_loads_the_anthropic_key(tmp_path, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     key_file = tmp_path / "api.env"
     key_file.write_text("ANTHROPIC_API_KEY=sk-from-file\n")
-    monkeypatch.setattr(config_module, "anthropic_api_env_file", lambda: key_file)
+    monkeypatch.setattr(api_key, "anthropic_api_env_file", lambda: key_file)
     (tmp_path / "config.yaml").write_text("llm_backend: codex\nllm_model: gpt-6-luna\n")
     load_config(tmp_path / "config.yaml")
     assert "ANTHROPIC_API_KEY" not in os.environ

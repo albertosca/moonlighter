@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
-from moonlighter.core import config as config_module
-from moonlighter.core.config import harden_permissions
+from moonlighter.core.config import permissions
+from moonlighter.core.config.permissions import harden_permissions
 
 # --- harden_permissions (S-07) ---
 
@@ -36,8 +36,8 @@ def test_harden_permissions_warns_on_chmod_failure_without_raising(tmp_path, mon
     (tmp_path / "profile.yaml").write_text("x")
     (tmp_path / "browser-session").mkdir()
 
-    with patch.object(config_module.Path, "chmod", side_effect=OSError("read-only fs")):
-        warnings = config_module.harden_permissions()
+    with patch.object(permissions.Path, "chmod", side_effect=OSError("read-only fs")):
+        warnings = permissions.harden_permissions()
 
     assert len(warnings) >= 2
     assert any("profile.yaml" in warning or "permiss" in warning.lower() for warning in warnings)

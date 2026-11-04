@@ -8,7 +8,7 @@ sentinel — never a guess (answering wrong about authorization is lying).
 import re
 from typing import Any
 
-from moonlighter.core.config import NEEDS_REVIEW_SENTINEL
+from moonlighter.core.config.sentinel import NEEDS_REVIEW_SENTINEL
 
 # Countries/cities that allow confident inference. Deliberately short list:
 # we prefer __NEEDS_REVIEW__ over a false positive.

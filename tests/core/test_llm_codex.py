@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from moonlighter.core import llm
-from moonlighter.core.config import ConfigError
+from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.llm import _call_codex, codex_executable, make_caller
 
 LOGGED_IN = b"Logged in using ChatGPT\n"

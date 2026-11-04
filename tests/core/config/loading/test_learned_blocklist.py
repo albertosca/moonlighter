@@ -1,4 +1,4 @@
-from moonlighter.core.config import load_config
+from moonlighter.core.config.loading import load_config
 
 
 def test_load_config_no_learned_blocklist(tmp_path, monkeypatch):

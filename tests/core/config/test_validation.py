@@ -2,7 +2,10 @@ from pathlib import Path
 
 import pytest
 import yaml
-from moonlighter.core.config import DEFAULTS, ConfigError, load_config, validate_config
+from moonlighter.core.config.defaults import DEFAULTS
+from moonlighter.core.config.errors import ConfigError
+from moonlighter.core.config.loading import load_config
+from moonlighter.core.config.validation import validate_config
 
 
 def _valid_config():

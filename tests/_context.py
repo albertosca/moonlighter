@@ -20,7 +20,7 @@ def make_test_context(
     for -- a test that doesn't care about the caller (it patches evaluate_job /
     evaluate_jobs_batch directly) must still exercise the evaluated path, not
     silently fall into --no-eval."""
-    from moonlighter.core.config import load_config
+    from moonlighter.core.config.loading import load_config
 
     app = AppContext(
         config=config if config is not None else load_config(),

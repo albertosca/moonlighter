@@ -10,7 +10,7 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Any, cast
 
-from moonlighter.core.config import load_company_list
+from moonlighter.core.config.company_list import load_company_list
 from moonlighter.core.db import Job, ScanLog
 from moonlighter.core.llm import LLMCaller, is_spend_limit
 from moonlighter.core.log import get_logger

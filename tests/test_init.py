@@ -1,6 +1,7 @@
 import pytest
 import yaml
-from moonlighter.core.config import ConfigError, load_config
+from moonlighter.core.config.errors import ConfigError
+from moonlighter.core.config.loading import load_config
 from moonlighter.init import _ask, detect_browser, run_init
 
 

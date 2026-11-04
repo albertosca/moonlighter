@@ -132,7 +132,7 @@ def _ensure_schema_version_table(db: Any) -> None:
 
 
 def _backup(db: Any) -> Path:
-    from moonlighter.core.config import moonlighter_home
+    from moonlighter.core.config.paths import moonlighter_home
 
     backups = Path(moonlighter_home()) / "backups"
     backups.mkdir(parents=True, exist_ok=True)

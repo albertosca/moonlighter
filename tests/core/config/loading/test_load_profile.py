@@ -1,5 +1,5 @@
 import pytest
-from moonlighter.core.config import load_profile
+from moonlighter.core.config.loading import load_profile
 
 
 def test_load_profile(tmp_path):

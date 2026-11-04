@@ -3,7 +3,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 import pytest
-from moonlighter.core.config import ConfigError
+from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.db import Job, init_db
 
 

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from moonlighter.core.config import browser_executable, moonlighter_home, resolve_under_home
+from moonlighter.core.config.paths import browser_executable, moonlighter_home, resolve_under_home
 
 
 def test_browser_executable_prefers_browser_path():

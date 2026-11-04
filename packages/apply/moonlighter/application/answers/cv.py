@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from moonlighter.application.cvgen.compile import looks_like_a_compiled_pdf
-from moonlighter.core.config import resolve_under_home
+from moonlighter.core.config.paths import resolve_under_home
 
 
 class CVNotFoundError(Exception):

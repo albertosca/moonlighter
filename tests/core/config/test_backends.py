@@ -1,5 +1,7 @@
 import pytest
-from moonlighter.core.config import ConfigError, llm_backend, validate_config
+from moonlighter.core.config.backends import llm_backend
+from moonlighter.core.config.errors import ConfigError
+from moonlighter.core.config.validation import validate_config
 
 CODEX_MODELS = {"llm_model": "gpt-6-luna", "eval_model": "gpt-6-luna"}
 

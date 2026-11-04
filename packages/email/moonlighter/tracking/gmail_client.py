@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from moonlighter.core.config import moonlighter_home, resolve_under_home
+from moonlighter.core.config.paths import moonlighter_home, resolve_under_home
 
 logger = logging.getLogger(__name__)
 

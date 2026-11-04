@@ -21,7 +21,7 @@ from moonlighter.application.assisted.sources.pasted import (
     extract_questions_from_page,
 )
 from moonlighter.application.cvgen.service import ensure_tailored_cv, resolved_pool_path
-from moonlighter.core.config import DEFAULTS
+from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.db import Application, Job, cv_bootstrap_declined
 from moonlighter.core.email_alias import (
     build_email_alias,

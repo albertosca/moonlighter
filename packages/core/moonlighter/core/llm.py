@@ -12,7 +12,9 @@ from typing import Any, Protocol
 
 import anthropic
 from anthropic.types import TextBlock
-from moonlighter.core.config import DEFAULTS, llm_backend, moonlighter_home
+from moonlighter.core.config.backends import llm_backend
+from moonlighter.core.config.defaults import DEFAULTS
+from moonlighter.core.config.paths import moonlighter_home
 from moonlighter.core.log import get_logger
 from moonlighter.core.metrics import record_call
 

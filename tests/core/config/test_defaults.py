@@ -1,4 +1,4 @@
-from moonlighter.core.config import DEFAULTS
+from moonlighter.core.config.defaults import DEFAULTS
 
 
 def test_defaults_carry_the_documented_email_paths():

@@ -22,14 +22,11 @@ from pathlib import Path
 from typing import Any, NoReturn, override
 
 import yaml
-from moonlighter.core.config import (
-    ConfigError,
-    harden_permissions,
-    load_config,
-    load_profile,
-    moonlighter_home,
-    validate_config,
-)
+from moonlighter.core.config.errors import ConfigError
+from moonlighter.core.config.loading import load_config, load_profile
+from moonlighter.core.config.paths import moonlighter_home
+from moonlighter.core.config.permissions import harden_permissions
+from moonlighter.core.config.validation import validate_config
 from moonlighter.core.db import Job, _db_path, init_db
 from moonlighter.core.log import setup as setup_logging
 from moonlighter.core.slices import SLICES, capabilities, installed_slices

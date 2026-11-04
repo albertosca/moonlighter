@@ -5,7 +5,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from moonlighter.core.config import browser_executable
+from moonlighter.core.config.paths import browser_executable
 from moonlighter.core.log import get_logger
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 

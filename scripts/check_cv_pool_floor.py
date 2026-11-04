@@ -21,7 +21,8 @@ from typing import Any
 from moonlighter.application.cvgen.compile import compile_pdf, latex_available, page_count
 from moonlighter.application.cvgen.pool import CVPool, PoolError, load_pool
 from moonlighter.application.cvgen.render import CVSelection, render_cv
-from moonlighter.core.config import load_config, resolve_under_home
+from moonlighter.core.config.loading import load_config
+from moonlighter.core.config.paths import resolve_under_home
 
 
 def check(pool: CVPool, template: str) -> int | None:

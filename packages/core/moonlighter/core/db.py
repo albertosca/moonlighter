@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Self, override
 
-from moonlighter.core.config import moonlighter_home
+from moonlighter.core.config.paths import moonlighter_home
 from peewee import (
     AutoField,
     CharField,

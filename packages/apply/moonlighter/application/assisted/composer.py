@@ -21,7 +21,7 @@ from moonlighter.application.answers.field_map import demographic_answer, pre_po
 from moonlighter.application.answers.option_matcher import match_option_locally
 from moonlighter.application.answers.profile import profile_for_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.core.config import NEEDS_REVIEW_SENTINEL
+from moonlighter.core.config.sentinel import NEEDS_REVIEW_SENTINEL
 from moonlighter.core.llm import LLMCaller, is_spend_limit
 from moonlighter.core.parsing import wrap_untrusted
 

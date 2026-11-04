@@ -1,5 +1,6 @@
 import pytest
-from moonlighter.core.config import ConfigError, load_company_list
+from moonlighter.core.config.company_list import load_company_list
+from moonlighter.core.config.errors import ConfigError
 
 
 def test_load_company_list(tmp_path):

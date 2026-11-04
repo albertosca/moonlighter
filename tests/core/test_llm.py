@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from anthropic.types import TextBlock
-from moonlighter.core.config import ConfigError
+from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.llm import (
     LLMCaller,
     _call_cli,

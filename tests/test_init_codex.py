@@ -1,6 +1,8 @@
 import pytest
 import yaml
-from moonlighter.core.config import ConfigError, load_config, validate_config
+from moonlighter.core.config.errors import ConfigError
+from moonlighter.core.config.loading import load_config
+from moonlighter.core.config.validation import validate_config
 from moonlighter.init import run_init
 
 ANSWERS = {"browser_path": "/x", "citizenship_country": "Brazil", "llm_backend": "codex"}

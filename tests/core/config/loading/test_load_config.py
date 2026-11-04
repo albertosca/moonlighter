@@ -1,4 +1,5 @@
-from moonlighter.core.config import load_config, validate_config
+from moonlighter.core.config.loading import load_config
+from moonlighter.core.config.validation import validate_config
 
 
 def test_load_config_defaults(tmp_path):

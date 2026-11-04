@@ -1,5 +1,5 @@
 import pytest
-from moonlighter.core.config import ConfigError
+from moonlighter.core.config.errors import ConfigError
 from moonlighter.server import AppContext, lifespan, mcp
 
 
@@ -35,12 +35,12 @@ def test_importing_server_has_no_side_effects(monkeypatch):
     import sys
 
     calls: list[str] = []
-    import moonlighter.core.config as cfg
     import moonlighter.core.db as db
-    import moonlighter.core.log as log_mod
+    from moonlighter.core import log
+    from moonlighter.core.config import loading, permissions
 
     monkeypatch.setattr(
-        cfg,
+        loading,
         "load_config",
         lambda *positional_arguments, **keyword_arguments: calls.append("load_config") or {},
     )
@@ -48,12 +48,12 @@ def test_importing_server_has_no_side_effects(monkeypatch):
         db, "init_db", lambda *positional_arguments, **keyword_arguments: calls.append("init_db")
     )
     monkeypatch.setattr(
-        cfg,
+        permissions,
         "harden_permissions",
         lambda *positional_arguments, **keyword_arguments: calls.append("harden") or [],
     )
     monkeypatch.setattr(
-        log_mod,
+        log,
         "setup",
         lambda *positional_arguments, **keyword_arguments: calls.append("setup_logging"),
     )

@@ -30,7 +30,8 @@ sys.path.insert(0, str(_ROOT))
 
 from typing import Any
 
-from moonlighter.core.config import load_config, load_profile, moonlighter_home
+from moonlighter.core.config.loading import load_config, load_profile
+from moonlighter.core.config.paths import moonlighter_home
 from moonlighter.core.db import Job, init_db
 from moonlighter.core.llm import LLMCaller, make_caller
 from moonlighter.core.log import setup as setup_logging

@@ -18,7 +18,7 @@ from moonlighter.application.cvgen.compile import (
 from moonlighter.application.cvgen.generate import USE_BASE, decide_cv
 from moonlighter.application.cvgen.pool import CVPool, PoolError, load_pool
 from moonlighter.application.cvgen.render import CVSelection, render_cv
-from moonlighter.core.config import resolve_under_home
+from moonlighter.core.config.paths import resolve_under_home
 from moonlighter.core.llm import LLMCaller, is_spend_limit
 from moonlighter.core.log import get_logger
 

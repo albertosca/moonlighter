@@ -35,7 +35,8 @@ from moonlighter.core.cli import (
     doctor_payload,
     run,
 )
-from moonlighter.core.config import ConfigError, load_config
+from moonlighter.core.config.errors import ConfigError
+from moonlighter.core.config.loading import load_config
 from moonlighter.core.ingest import job_from_url
 from moonlighter.core.llm import make_caller
 from moonlighter.core.slices import slice_epilog

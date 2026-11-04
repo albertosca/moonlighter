@@ -8,7 +8,8 @@ a scanner is actually given.
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from moonlighter.core.config import ConfigError, validate_config
+from moonlighter.core.config.errors import ConfigError
+from moonlighter.core.config.validation import validate_config
 from moonlighter.discovery import service as scan_service
 from moonlighter.discovery.evaluator import (
     EvalInput,

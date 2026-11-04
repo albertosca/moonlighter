@@ -7,7 +7,8 @@ single largest source of setup friction for a new user.
 from pathlib import Path
 
 import yaml
-from moonlighter.core.config import llm_backend, validate_config
+from moonlighter.core.config.backends import llm_backend
+from moonlighter.core.config.validation import validate_config
 
 # Common install locations, most-preferred first. Chromium-family only -- moonlighter drives a
 # real browser profile so the user's logged-in sessions are reusable.

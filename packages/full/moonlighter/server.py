@@ -21,17 +21,13 @@ from moonlighter.application.assisted.results import render_sheet_result
 from moonlighter.application.cvgen.bootstrap import BootstrapError
 from moonlighter.application.cvgen.bootstrap import bootstrap_cv_pool as bootstrap_cv_pool_service
 from moonlighter.application.cvgen.compile import latex_available
-from moonlighter.core.config import (
-    DEFAULTS,
-    ConfigError,
-    harden_permissions,
-    load_company_list,
-    load_config,
-    load_profile,
-    moonlighter_home,
-    resolve_under_home,
-    validate_config,
-)
+from moonlighter.core.config.company_list import load_company_list
+from moonlighter.core.config.defaults import DEFAULTS
+from moonlighter.core.config.errors import ConfigError
+from moonlighter.core.config.loading import load_config, load_profile
+from moonlighter.core.config.paths import moonlighter_home, resolve_under_home
+from moonlighter.core.config.permissions import harden_permissions
+from moonlighter.core.config.validation import validate_config
 from moonlighter.core.db import Application, Job, init_db, sync_job_status
 from moonlighter.core.llm import LLMCaller, make_caller
 from moonlighter.core.log import get_logger

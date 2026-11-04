@@ -46,7 +46,7 @@ def test_resolve_cv_path_relative_resolved_from_moonlighter_home(monkeypatch, tm
     cv_file.parent.mkdir(parents=True)
     cv_file.write_bytes(b"x")
     config = {"cv": {"default": "cvs/general.pdf"}}
-    from moonlighter.core.config import moonlighter_home
+    from moonlighter.core.config.paths import moonlighter_home
 
     result = resolve_cv_path("stripe", config)
     assert result == str(moonlighter_home() / "cvs" / "general.pdf")
