@@ -126,8 +126,7 @@ def test_forget_cursor_call_is_a_no_op_when_nothing_is_there(tmp_path, monkeypat
     forget_cursor_call(tmp_path / "workdir")
 
 
-def test_cursor_projects_root_is_the_home_projects_dir(monkeypatch):
-    monkeypatch.undo()
+def test_cursor_projects_root_is_the_home_projects_dir():
     assert _cursor_projects_root() == Path.home() / ".cursor" / "projects"
 
 
