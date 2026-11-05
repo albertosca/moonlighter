@@ -1,6 +1,6 @@
-"""Verifies all five package versions and the four ==pins in moonlighter-full
-stay in lockstep — CLAUDE.md's own release note says this is bumped by hand
-and "nothing in CI checks this". This is that check.
+"""Verifies all five package versions and the four ==pins in moonlighter-full stay in lockstep.
+
+CLAUDE.md's own release note says this is bumped by hand and "nothing in CI checks this". This is that check. It uses the standard library only, because CI runs it before installing anything.
 
 Usage:
     python scripts/check_version_lockstep.py
@@ -21,13 +21,13 @@ def _version_of(repo_root: Path, slug: str) -> str:
 
 def _pins_in_full(repo_root: Path) -> dict[str, str]:
     text = (repo_root / "packages" / "full" / "pyproject.toml").read_text()
-    deps = tomllib.loads(text)["project"]["dependencies"]
+    dependencies = tomllib.loads(text)["project"]["dependencies"]
     pins: dict[str, str] = {}
     for slug in _PINNED_SLUGS:
         name = f"moonlighter-{slug}"
-        for dep in deps:
-            if dep.startswith(f"{name}=="):
-                pins[slug] = dep.split("==", 1)[1]
+        for dependency in dependencies:
+            if dependency.startswith(f"{name}=="):
+                pins[slug] = dependency.split("==", 1)[1]
                 break
     return pins
 
@@ -56,8 +56,8 @@ def main(repo_root: Path) -> int:
         print(f"Version lockstep is consistent at {_version_of(repo_root, 'full')}.")
         return 0
     print("Version lockstep broken:")
-    for m in mismatches:
-        print(f"  - {m}")
+    for mismatch in mismatches:
+        print(f"  - {mismatch}")
     return 1
 
 

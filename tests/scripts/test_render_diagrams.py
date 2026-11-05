@@ -59,9 +59,9 @@ def test_main_writes_a_light_and_a_dark_file_per_source_into_the_diagrams_direct
     (source_directory / "b.svg").write_text('<rect fill="{{ground}}"/>')
     (source_directory / "a.svg").write_text('<rect stroke="{{fg}}"/>')
     (source_directory / "notes.txt").write_text("{{ignored}}")
-    monkeypatch.setattr(render_diagrams, "_ROOT", tmp_path)
+    monkeypatch.setattr(render_diagrams, "_DIAGRAMS_DIR", tmp_path)
 
-    assert render_diagrams.main(["x"]) == 0
+    assert render_diagrams.main() == 0
 
     assert capsys.readouterr().out == (
         "wrote a-light.svg\nwrote a-dark.svg\nwrote b-light.svg\nwrote b-dark.svg\n"
@@ -83,10 +83,10 @@ def test_main_stops_with_an_error_on_an_unknown_token_after_writing_earlier_file
     source_directory.mkdir()
     (source_directory / "a.svg").write_text("{{fg}}")
     (source_directory / "b.svg").write_text("{{nope}}")
-    monkeypatch.setattr(render_diagrams, "_ROOT", tmp_path)
+    monkeypatch.setattr(render_diagrams, "_DIAGRAMS_DIR", tmp_path)
 
     with pytest.raises(KeyError, match="nope"):
-        render_diagrams.main(["x"])
+        render_diagrams.main()
 
     assert (tmp_path / "a-dark.svg").exists()
     assert not (tmp_path / "b-light.svg").exists()
@@ -103,9 +103,9 @@ def test_main_renders_the_sources_in_name_order_whatever_order_the_filesystem_li
     monkeypatch.setattr(
         Path, "glob", lambda self, pattern: iter(sorted(real_glob(self, pattern), reverse=True))
     )
-    monkeypatch.setattr(render_diagrams, "_ROOT", tmp_path)
+    monkeypatch.setattr(render_diagrams, "_DIAGRAMS_DIR", tmp_path)
 
-    render_diagrams.main(["x"])
+    render_diagrams.main()
 
     assert capsys.readouterr().out.splitlines() == [
         f"wrote {name}-{theme}.svg" for name in ("a", "b", "c") for theme in ("light", "dark")
