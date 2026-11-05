@@ -1,15 +1,17 @@
-"""archive_stale_jobs: detects jobs whose source posting disappeared and marks
-them archived with closed_at set. Extracted from the old discovery/service.py (pure move, no behavior
-change)."""
+"""Detects jobs whose source posting disappeared and archives them.
 
-import datetime
+archive_stale_jobs marks them archived with closed_at set; format_archive_result words the outcome.
+"""
+
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
+
+from peewee import fn
 
 from moonlighter.core.db import Job
 from moonlighter.discovery.sources.registry import build_http_scanners
 from moonlighter.discovery.staleness import find_stale_jobs
-from peewee import fn
 
 ELIGIBLE_STATUSES = ("new", "reviewed", "applying", "needs_review")
 
@@ -51,11 +53,33 @@ def _group_by_source_company(jobs: list[Job]) -> dict[tuple[str, str], list[Job]
     return groups
 
 
+def _summary(job: Job) -> dict[str, str]:
+    return {"company": job.company, "title": job.title, "url": job.url}
+
+
+def _archive_closed(jobs: list[Job], closed_at: datetime) -> list[dict[str, str]]:
+    for job in jobs:
+        job.status = "archived"
+        job.closed_at = closed_at
+        job.save()
+    return [_summary(job) for job in jobs]
+
+
+def _archive_aged(jobs: list[Job]) -> list[dict[str, str]]:
+    for job in jobs:
+        job.status = "archived"
+        job.save()
+    return [_summary(job) for job in jobs]
+
+
 async def archive_stale_jobs(
     job_id: int | None, company: str | None, config: dict[str, Any]
 ) -> ArchiveResult:
-    """Detects and archives (status='archived', closed_at set) eligible jobs that disappeared from
-    their source. Mutually exclusive filters: job_id, company, or neither (all)."""
+    """Detects and archives eligible jobs that disappeared from their source.
+
+    Archived means status='archived' with closed_at set. Mutually exclusive filters: job_id,
+    company, or neither (all).
+    """
     if job_id is not None and company is not None:
         raise ArchiveStaleJobsError("Provide job_id OR company, not both.")
 
@@ -64,81 +88,87 @@ async def archive_stale_jobs(
     scanners = build_http_scanners()
     staleness = await find_stale_jobs(jobs_by_company, scanners, config)
 
-    now = datetime.datetime.now()
-    archived: list[dict[str, str]] = []
-    for job in staleness.stale:
-        job.status = "archived"
-        job.closed_at = now
-        job.save()
-        archived.append({"company": job.company, "title": job.title, "url": job.url})
-
-    aged: list[dict[str, str]] = []
-    for job in staleness.stale_by_age:
-        job.status = "archived"
-        job.save()
-        aged.append({"company": job.company, "title": job.title, "url": job.url})
-
+    now = datetime.now()  # noqa: DTZ005 - the database stores naive local time
     return ArchiveResult(
-        archived=archived,
-        aged=aged,
+        archived=_archive_closed(staleness.stale, now),
+        aged=_archive_aged(staleness.stale_by_age),
         max_age_days=int(config.get("portal_max_age_days") or 0),
         failed_companies=staleness.failed_companies,
         to_confirm=[_to_confirm_entry(job, now) for job in staleness.unverifiable],
     )
 
 
-def _to_confirm_entry(job: Job, now: datetime.datetime) -> dict[str, Any]:
+def _to_confirm_entry(job: Job, now: datetime) -> dict[str, Any]:
     return {
         "id": job.id,
         "score": job.score,
         "status": job.status,
-        "age_days": (now - job.found_at).days if job.found_at else None,
+        "age_days": (now - job.found_at).days,
         "company": job.company,
         "title": job.title,
         "url": job.url,
     }
 
 
-def format_archive_result(result: ArchiveResult) -> str:
-    if (
-        not result.archived
-        and not result.aged
-        and not result.failed_companies
-        and not result.to_confirm
-    ):
-        return "No closed jobs found."
-    lines: list[str] = []
-    if result.archived:
-        lines.append(f"{len(result.archived)} job(s) archived (closed at source):")
-        lines.extend(
-            f"  - {entry['company']} / {entry['title']} — {entry['url']}"
-            for entry in result.archived
-        )
-    else:
-        lines.append("No closed jobs found.")
-    if result.aged:
-        lines.append(
+def _entry_line(entry: dict[str, str]) -> str:
+    return f"  - {entry['company']} / {entry['title']} — {entry['url']}"
+
+
+def _archived_lines(result: ArchiveResult) -> list[str]:
+    if not result.archived:
+        return ["No closed jobs found."]
+    return [
+        f"{len(result.archived)} job(s) archived (closed at source):",
+        *map(_entry_line, result.archived),
+    ]
+
+
+def _aged_lines(result: ArchiveResult) -> list[str]:
+    if not result.aged:
+        return []
+    return [
+        (
             f"{len(result.aged)} portal job(s) archived by age "
             f"(older than {result.max_age_days} days; a portal feed cannot be re-checked):"
-        )
-        lines.extend(
-            f"  - {entry['company']} / {entry['title']} — {entry['url']}" for entry in result.aged
-        )
-    if result.to_confirm:
-        lines.append("")
-        lines.append(
+        ),
+        *map(_entry_line, result.aged),
+    ]
+
+
+def _to_confirm_lines(result: ArchiveResult) -> list[str]:
+    if not result.to_confirm:
+        return []
+    lines = [
+        "",
+        (
             f"{len(result.to_confirm)} job(s) have no listing to check against — "
             "open each link and say which are closed:"
+        ),
+    ]
+    for entry in result.to_confirm:
+        score = "—" if entry["score"] is None else f"{entry['score']:.1f}"
+        age = "?" if entry["age_days"] is None else entry["age_days"]
+        lines.append(
+            f"  #{entry['id']} | {score} | {entry['status']} | {age}d | "
+            f"{entry['company']} — {entry['title']}"
         )
-        for entry in result.to_confirm:
-            score = "—" if entry["score"] is None else f"{entry['score']:.1f}"
-            age = "?" if entry["age_days"] is None else entry["age_days"]
-            lines.append(
-                f"  #{entry['id']} | {score} | {entry['status']} | {age}d | "
-                f"{entry['company']} — {entry['title']}"
-            )
-            lines.append(f"    {entry['url']}")
-    if result.failed_companies:
-        lines.append("")
-        lines.append(f"⚠️  Could not check: {', '.join(result.failed_companies)}")
+        lines.append(f"    {entry['url']}")
+    return lines
+
+
+def _failed_lines(result: ArchiveResult) -> list[str]:
+    if not result.failed_companies:
+        return []
+    return ["", f"⚠️  Could not check: {', '.join(result.failed_companies)}"]
+
+
+def format_archive_result(result: ArchiveResult) -> str:
+    if not (result.archived or result.aged or result.failed_companies or result.to_confirm):
+        return "No closed jobs found."
+    lines = [
+        *_archived_lines(result),
+        *_aged_lines(result),
+        *_to_confirm_lines(result),
+        *_failed_lines(result),
+    ]
     return "\n".join(lines)
