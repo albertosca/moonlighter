@@ -5,14 +5,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from moonlighter.application.assisted.results import (
-    SheetKind,
-    failed_sheet,
-    sheet_result_to_dict,
-)
 from moonlighter.application.assisted.service import (
     prepare_application,
     prepare_application_from_paste,
+)
+from moonlighter.application.assisted.sheet.results import (
+    SheetKind,
+    failed_sheet,
+    sheet_result_to_dict,
 )
 from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK
 from moonlighter.core.web.ingest import job_from_url

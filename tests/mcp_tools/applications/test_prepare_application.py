@@ -1,7 +1,7 @@
 """prepare_application and prepare_application_from_paste hand off to the assisted service, and their descriptions say what they accept."""
 
 from moonlighter.application.assisted import service as assisted_service
-from moonlighter.application.assisted.results import SheetKind, SheetResult
+from moonlighter.application.assisted.sheet.results import SheetKind, SheetResult
 from moonlighter.application.assisted.sources.registry import SOURCES
 from moonlighter.mcp_tools.applications import prepare_application, prepare_application_from_paste
 

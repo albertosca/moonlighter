@@ -5,16 +5,16 @@ from typing import Any
 import httpx
 
 from moonlighter.application.answers.bank.store import load_answer_bank
-from moonlighter.application.assisted.composer import compose_answers
+from moonlighter.application.assisted.composition.composer import compose_answers
 from moonlighter.application.assisted.questions import FormQuestion
-from moonlighter.application.assisted.required_labels import mark_required
-from moonlighter.application.assisted.results import SheetKind, SheetResult, failed_sheet
-from moonlighter.application.assisted.sheet_notes import (
+from moonlighter.application.assisted.sheet.notes import (
     alias_note,
     cv_note,
     well_shaped_form_data,
     with_tracking_alias,
 )
+from moonlighter.application.assisted.sheet.required_labels import mark_required
+from moonlighter.application.assisted.sheet.results import SheetKind, SheetResult, failed_sheet
 from moonlighter.application.assisted.sources import registry
 from moonlighter.application.assisted.sources.base import (
     questions_or_empty,

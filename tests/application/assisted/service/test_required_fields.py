@@ -4,8 +4,8 @@ import httpx
 import pytest
 from moonlighter.application.assisted import service
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.required_labels import mark_required
-from moonlighter.application.assisted.results import render_sheet_result
+from moonlighter.application.assisted.sheet.required_labels import mark_required
+from moonlighter.application.assisted.sheet.results import render_sheet_result
 from moonlighter.application.assisted.sources import registry
 from moonlighter.application.assisted.sources.base import SourceMatch
 

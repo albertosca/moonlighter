@@ -4,7 +4,7 @@ from typing import Any
 
 from moonlighter.application.assisted import service
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.results import render_sheet_result
+from moonlighter.application.assisted.sheet.results import render_sheet_result
 from moonlighter.application.assisted.sources.pasted import ExtractionError
 
 from tests.application.assisted.service.service_fakes import (

@@ -5,7 +5,7 @@ import json
 from unittest.mock import AsyncMock, patch
 
 from moonlighter.application import cli
-from moonlighter.application.assisted.results import SheetKind, SheetResult
+from moonlighter.application.assisted.sheet.results import SheetKind, SheetResult
 from moonlighter.application.commands import prepare as prepare_command
 from moonlighter.core.db import Job, init_db
 

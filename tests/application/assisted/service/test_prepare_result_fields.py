@@ -3,10 +3,10 @@
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from moonlighter.application.assisted.results import SheetKind
 from moonlighter.application.assisted.service import (
     prepare_application,
 )
+from moonlighter.application.assisted.sheet.results import SheetKind
 from moonlighter.application.cvgen.latex.page_fit import TailoredCV
 from moonlighter.core.db import init_db
 

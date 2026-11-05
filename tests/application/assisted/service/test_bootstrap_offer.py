@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 from moonlighter.application.assisted import service
 from moonlighter.application.assisted.questions import FormQuestion
-from moonlighter.application.assisted.results import SheetKind, render_sheet_result
+from moonlighter.application.assisted.sheet.results import SheetKind, render_sheet_result
 from moonlighter.application.assisted.sources import greenhouse as greenhouse_source
 from moonlighter.core.db import init_db, record_cv_bootstrap_decline
 

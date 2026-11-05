@@ -1,6 +1,6 @@
 import httpx
 import pytest
-from moonlighter.application.assisted.composed_answer import ComposedAnswer
+from moonlighter.application.assisted.composition.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.core.db import Job, init_db
 

@@ -7,7 +7,7 @@ from typing import Any
 from moonlighter.application.answers.bank.store import promote_application
 from moonlighter.application.assisted import service
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.results import render_sheet_result
+from moonlighter.application.assisted.sheet.results import render_sheet_result
 from moonlighter.core.db import AnswerBankEntry, Application
 
 from tests.application.assisted.service.service_fakes import (

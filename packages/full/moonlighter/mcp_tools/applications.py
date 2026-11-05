@@ -9,7 +9,7 @@ from moonlighter._tool_logging import tool_logged
 from moonlighter.app_context import AppContext, refreshed_app_context
 from moonlighter.application.answers.bank.store import promote_application
 from moonlighter.application.assisted import service as assisted_service
-from moonlighter.application.assisted.results import render_sheet_result
+from moonlighter.application.assisted.sheet.results import render_sheet_result
 from moonlighter.core.db import Application, Job, sync_job_status
 from moonlighter.core.metrics import operation_metrics
 from moonlighter.startup import StartupWarning, validate_startup
