@@ -18,6 +18,7 @@ from moonlighter.application.cvgen.latex.render import (
 from moonlighter.application.cvgen.latex.text import is_typesettable
 from moonlighter.application.cvgen.pool.loader import CVPool
 from moonlighter.application.cvgen.pool.selection_prompt import prompt_prefix
+from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.log import get_logger
@@ -135,7 +136,7 @@ async def _model_answer(job: dict[str, Any], prefix: str, caller: LLMCaller) -> 
         cap=8000,
     )
     try:
-        return parse_llm_json(await caller(suffix, "claude-sonnet-4-6", cache_prefix=prefix))
+        return parse_llm_json(await caller(suffix, DEFAULT_LLM_MODEL, cache_prefix=prefix))
     except Exception as error:
         if is_spend_limit(error):
             raise  # quota is the orchestrator's call, not a silent degrade

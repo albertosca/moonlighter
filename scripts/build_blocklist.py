@@ -30,6 +30,7 @@ from blocklist_candidates import fetch_low_scorers
 from blocklist_learned import confirm_write, learned_path, load_learned, save_learned
 from blocklist_proposals import is_quota_error, proposal_prompt, propose_for_company
 
+from moonlighter.core.config.defaults import DEFAULT_EVAL_MODEL
 from moonlighter.core.config.loading import load_config, load_profile
 from moonlighter.core.db import init_db
 from moonlighter.core.llm.caller import LLMCaller
@@ -149,7 +150,7 @@ def main() -> None:
         profile = {}
     init_db()  # resolves the path via moonlighter_home() / MOONLIGHTER_DB_PATH (single source in db.py)
 
-    model = config.get("eval_model", "claude-haiku-4-5-20251001")
+    model = config.get("eval_model", DEFAULT_EVAL_MODEL)
     print(f"Model: {model}  |  blocklist_learned: {learned_path()}")
     print()
 

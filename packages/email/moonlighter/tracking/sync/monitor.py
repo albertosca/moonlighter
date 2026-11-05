@@ -9,6 +9,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
+from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
 from moonlighter.core.db import ProcessedEmail
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
@@ -24,7 +25,7 @@ from moonlighter.tracking.sync.report import make_suggestion, make_update
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MODEL = "claude-sonnet-4-6"
+_DEFAULT_MODEL = DEFAULT_LLM_MODEL
 
 
 @dataclass(frozen=True)

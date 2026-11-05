@@ -3,6 +3,7 @@
 import logging
 from typing import Any
 
+from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.parsing import parse_llm_json, wrap_untrusted
@@ -35,7 +36,7 @@ async def classify_response(
     stages: list[str],
     llm_caller: LLMCaller,
     *,
-    model: str = "claude-sonnet-4-6",
+    model: str = DEFAULT_LLM_MODEL,
 ) -> dict[str, Any]:
     """Classifies an email response via LLM.
 

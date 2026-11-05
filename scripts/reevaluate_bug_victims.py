@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from reevaluation_batch import ReevaluationSettings, reevaluate
 
+from moonlighter.core.config.defaults import DEFAULT_EVAL_MODEL
 from moonlighter.core.config.loading import load_config, load_profile
 from moonlighter.core.db import Job, init_db
 from moonlighter.core.log import setup as setup_logging
@@ -70,9 +71,7 @@ def main() -> None:
     profile = load_profile()
     init_db()  # resolves the path via moonlighter_home() / MOONLIGHTER_DB_PATH (single source in db.py)
 
-    model = arguments.model or config.get(
-        "eval_model", config.get("llm_model", "claude-haiku-4-5-20251001")
-    )
+    model = arguments.model or config.get("eval_model", config.get("llm_model", DEFAULT_EVAL_MODEL))
 
     victims = _fetch_victims(arguments.company, arguments.limit)
     if not victims:

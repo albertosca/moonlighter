@@ -3,6 +3,7 @@
 import json
 from typing import Any
 
+from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
 from moonlighter.core.llm.anthropic_api import make_api_caller
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
@@ -21,7 +22,7 @@ async def evaluate_job(  # noqa: PLR0913, PLR0917 - public keyword API of servic
     title: str,
     description: str,
     profile: dict[str, Any],
-    model: str = "claude-sonnet-4-6",
+    model: str = DEFAULT_LLM_MODEL,
     _caller: LLMCaller | None = None,
     *,
     # Required on purpose, even as None: an optional default let an ad-hoc caller

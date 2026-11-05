@@ -10,12 +10,13 @@ from typing import Any
 
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sources.base import is_question, yes_no_for
+from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.parsing import parse_llm_json, wrap_untrusted
 
 _CHOICE_KINDS = frozenset({QuestionKind.SINGLE_SELECT, QuestionKind.MULTI_SELECT})
 
-DEFAULT_MODEL = "claude-sonnet-4-6"
+DEFAULT_MODEL = DEFAULT_LLM_MODEL
 
 PROMPT = """You are reading the text of a job application page that a candidate copied.
 

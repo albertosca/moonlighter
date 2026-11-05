@@ -5,6 +5,7 @@ from typing import Any
 
 from moonlighter.application.answers.answer_profile import profile_for_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.parsing import wrap_untrusted
 
@@ -88,7 +89,7 @@ async def generate_answer(
         constraint=constraint,
     )
     try:
-        raw = await llm_caller(prompt, "claude-sonnet-4-6")
+        raw = await llm_caller(prompt, DEFAULT_LLM_MODEL)
     except Exception as error:
         logger.warning("could not generate an answer for %r", question.label)
         raise GenerationError(str(error)) from error

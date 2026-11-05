@@ -11,6 +11,7 @@ from moonlighter.application.answers.answer_profile import profile_for_answers
 from moonlighter.application.cvgen.latex.text import escape_latex, is_typesettable
 from moonlighter.application.cvgen.pool.bootstrap_error import BootstrapError
 from moonlighter.application.cvgen.pool.loader import CVPool, PoolBullet, PoolExperience
+from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.log import get_logger
@@ -123,7 +124,7 @@ def _experience_from_raw(
 async def _drafted_data(profile: dict[str, Any], caller: LLMCaller) -> dict[str, Any]:
     """The model's drafted pool as a dict, or a BootstrapError saying why not."""
     try:
-        raw_response = await caller(_prefix(profile), "claude-sonnet-4-6")
+        raw_response = await caller(_prefix(profile), DEFAULT_LLM_MODEL)
     except Exception as error:
         if is_spend_limit(error):
             raise  # the caller decides whether to retry later, same as everywhere else

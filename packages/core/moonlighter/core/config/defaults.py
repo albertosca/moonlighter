@@ -2,6 +2,9 @@
 
 from typing import Any
 
+DEFAULT_LLM_MODEL = "claude-sonnet-4-6"
+DEFAULT_EVAL_MODEL = "claude-haiku-4-5-20251001"
+
 DEFAULTS: dict[str, Any] = {
     # Browser executable path (Chrome/Chromium/Brave). Empty by default:
     # set browser_path in config.yaml. Accepts brave_path (legacy) as a fallback.
@@ -29,8 +32,8 @@ DEFAULTS: dict[str, Any] = {
     # last submitted somewhere) is not replayed. "When can you start?" is the
     # concrete case: true for a while, then quietly wrong. null disables expiry.
     "answer_bank_max_age_days": 90,
-    "llm_model": "claude-sonnet-4-6",
-    "eval_model": "claude-haiku-4-5-20251001",
+    "llm_model": DEFAULT_LLM_MODEL,
+    "eval_model": DEFAULT_EVAL_MODEL,
     "slow_mo_ms": 300,
     "title_blocklist": [],
     # Max parallel LLM evaluations in the scan. Bounds the token burst and the
