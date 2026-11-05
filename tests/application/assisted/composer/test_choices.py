@@ -61,6 +61,7 @@ async def test_multi_select_accepts_several_verbatim_options():
     )
     composed = await compose_answers([question], PROFILE, {}, JOB, caller)
     assert composed[0].answer == "Ruby\nElixir"
+    assert composed[0].gap_reason is None
 
 
 @pytest.mark.asyncio
