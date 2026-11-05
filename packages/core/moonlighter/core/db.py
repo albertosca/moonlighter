@@ -126,9 +126,9 @@ class AnswerBankEntry(BaseModel):
     Populated by moonlighter.application.answers.answer_bank.promote_application
     when an Application is marked "submitted" — see
     moonlighter.application.answers.bank_eligibility for the normalisation and
-    kind-eligibility rules. `kind` is stored for visibility
-    and debugging only; it is not consulted on read (the label was already
-    kind-checked before the row was written).
+    kind-eligibility rules. `kind` is stored for visibility and debugging only;
+    it is not consulted on read (the label was already kind-checked before the
+    row was written).
     """
 
     normalized_question = CharField(unique=True)

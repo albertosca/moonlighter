@@ -6,13 +6,14 @@ from typing import Any
 from moonlighter.application.answers.label_cleaning import clean_label
 
 # EEO/demographic self-identification, from the `demographics:` block the operator
-# configures in profile.yaml. Kept OUT of `_RULES` on purpose: a demographic label
-# is intercepted by composer's is_sensitive_label guard before `known` is consulted,
-# so a rule here would be unreachable — and putting the carve-out in the general
-# ladder is exactly what broke on 2026-09-11, when letting `known` outrank the guard
-# handed the bypass to every other rule too (a "references ... LinkedIn" label came
-# back answered with the LinkedIn URL). `demographic_answer` is called only from
-# inside that guard, for choice questions only.
+# configures in profile.yaml. Kept OUT of static_rules.py's `_RULES` on purpose: a
+# demographic label is intercepted by composer's is_sensitive_label guard before
+# `known` is consulted, so a rule there would be unreachable — and putting the
+# carve-out in the general ladder is exactly what broke on 2026-09-11, when letting
+# `known` outrank the guard handed the bypass to every other rule too (a
+# "references ... LinkedIn" label came back answered with the LinkedIn URL).
+# `demographic_answer` is called only from inside that guard, for choice questions
+# only.
 #
 # Anchored at BOTH ends, and matched against a closed set of real EEO phrasings —
 # not just the leading word. Two measured failures got us here:
