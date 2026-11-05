@@ -114,7 +114,6 @@ strict-checking = true
 # BEGIN ratchet
 # Files not yet migrated to the profile above (plan 2026-11-04, showcase quality).
 # Each task deletes its files' lines; the block is empty and removed at the end.
-"scripts/build_blocklist.py" = ["BLE001", "C901", "D205", "D209", "FBT001", "FBT003", "PLR0912", "PLR0913", "PLR0915", "PLR0917"]
 "scripts/check_built_site.py" = ["C901", "D205", "D209", "FBT001", "PERF401", "PLR0912"]
 "scripts/check_cv_pool_floor.py" = ["C901", "D205", "D209", "PLR0911"]
 "scripts/check_docs_parity.py" = ["D205"]
@@ -125,7 +124,6 @@ strict-checking = true
 "scripts/stamp_revision_dates.py" = ["D205"]
 "tests/_context.py" = ["PLC0415", "PLR0917"]
 "tests/conftest.py" = ["PLC0415", "PLW0603"]
-"tests/scripts/test_build_blocklist.py" = ["FBT003", "PLC0415", "PLR0913", "PLR0917"]
 "tests/test_package_boundaries.py" = ["C901"]
 "tests/test_performance.py" = ["N806", "PLC0415", "PLR0917"]
 # END ratchet
