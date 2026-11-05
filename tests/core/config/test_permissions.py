@@ -3,8 +3,6 @@ from unittest.mock import patch
 from moonlighter.core.config import permissions
 from moonlighter.core.config.permissions import harden_permissions
 
-# --- harden_permissions (S-07) ---
-
 
 def test_harden_permissions_chmods_files_0600(tmp_path, monkeypatch):
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))

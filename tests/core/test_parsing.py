@@ -67,9 +67,6 @@ def test_extract_json_nested_object_extracted():
     assert json.loads(result) == payload
 
 
-# ── parse_llm_json ───────────────────────────────────────────────────────────
-
-
 def test_parse_llm_json_plain():
     assert parse_llm_json('{"a": 1}') == {"a": 1}
 
@@ -82,9 +79,6 @@ def test_parse_llm_json_malformed_raises():
     # json.JSONDecodeError is a ValueError subclass
     with pytest.raises(ValueError):  # noqa: PT011 - the message is the stdlib's JSON error wording
         parse_llm_json("not json")
-
-
-# ── wrap_untrusted ────────────────────────────────────────────────────────────
 
 
 def test_wrap_untrusted_produces_nonce_tagged_block():

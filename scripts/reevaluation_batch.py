@@ -7,8 +7,6 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-from reevaluation_records import record_error, record_result, record_title_skip
-
 from moonlighter.core.db import Job
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.dispatch import make_caller
@@ -17,6 +15,8 @@ from moonlighter.core.metrics import operation_metrics
 from moonlighter.discovery.evaluation.models import EvaluationResult
 from moonlighter.discovery.evaluation.single import evaluate_job
 from moonlighter.discovery.evaluation.title_filter import should_skip_by_title
+
+from reevaluation_records import record_error, record_result, record_title_skip
 
 
 @dataclass(frozen=True)

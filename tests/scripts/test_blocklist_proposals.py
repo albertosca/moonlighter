@@ -1,7 +1,8 @@
 import json
 
-import blocklist_proposals
 import pytest
+
+import blocklist_proposals
 
 
 def _caller(answer, seen=None):

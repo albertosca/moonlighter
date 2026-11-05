@@ -16,7 +16,7 @@ from moonlighter.discovery.sources.base import BaseScanner, ScanStats
 from moonlighter.discovery.sources.registry import build_http_scanners
 
 
-async def scan_and_evaluate(  # noqa: PLR0917 - pinned by tests/discovery/test_cli.py:105
+async def scan_and_evaluate(  # noqa: PLR0917 - test_run_no_eval_passes_no_caller_to_the_service reads the caller as the last positional argument
     keywords: str,
     phase: str,
     config: dict[str, Any],

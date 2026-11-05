@@ -4,7 +4,6 @@ from moonlighter.core.db import Application, Job, init_db
 from moonlighter.core.job_status import sync_job_status
 from tests.core.db.sample_job import make_job
 
-# ── sync_job_status ──────────────────────────────────────────────────────────
 # Provenance: 2026-08-21 manual triage — 5 jobs still 'new' while their
 # Application was already submitted/rejected; a duplicate application was
 # nearly offered twice in one session. Every Application.status writer calls

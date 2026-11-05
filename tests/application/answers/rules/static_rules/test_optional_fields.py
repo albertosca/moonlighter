@@ -15,9 +15,6 @@ def test_english_level():
     assert result["English level"] == "Fluent"
 
 
-# ── Optional profile fields (country_en, country_pt, english_level, office_available) ─────
-
-
 PROFILE_NO_LOCALE = {
     "name": "Test User",
     "phone": "11999999999",

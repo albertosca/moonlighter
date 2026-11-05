@@ -3,8 +3,6 @@
 from moonlighter.tracking.gmail.message_body import _decode_data, extract_body
 from tests.tracking.gmail_payloads import b64
 
-# ── extract_body ───────────────────────────────────────────────────────────
-
 
 def test_extract_body_html_top_level():
     """Top-level text/html payload is decoded."""

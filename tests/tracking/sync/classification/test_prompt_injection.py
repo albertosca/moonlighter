@@ -49,8 +49,6 @@ class TestPromptInjectionHardening:
       - Parsing: simulates an LLM "obeying" the injection and checks the robust fallback.
     """
 
-    # ── structural ───────────────────────────────────────────────────────────
-
     async def test_prompt_wraps_email_content_in_nonce_tag(self):
         prompt, _ = await _capture_prompt(_msg())
         assert re.search(r"<email_[0-9a-f]{8}>", prompt)
@@ -115,8 +113,6 @@ class TestPromptInjectionHardening:
         assert len(opens) == 1
         assert len(closes) == 1
         assert result["type"] == "unrelated"
-
-    # ── parsing robustness ───────────────────────────────────────────────────
 
     async def test_llm_returning_plain_text_injection_raises_classification_error(self):
         """LLM 'obeys' the injection and returns free-form text — that's an

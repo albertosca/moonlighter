@@ -3,8 +3,6 @@
 from moonlighter.application.answers.matching.field_map import pre_populate_answers
 from tests.application.answers.candidate_profiles import PROFILE
 
-# ── PT-BR labels (Portuguese-language forms, e.g. Nubank Investments) ─────────
-
 
 def test_ptbr_nome_first_name():
     result = pre_populate_answers(["Nome"], PROFILE)

@@ -4,7 +4,7 @@ from moonlighter.application.answers.matching.field_map import pre_populate_answ
 from moonlighter.application.answers.needs_review import NEEDS_REVIEW_SENTINEL
 from moonlighter.application.answers.rules.static_rules import static_answer
 
-# ── Salary Coverage E3 — wider lead words and bare PT keywords ──
+# Salary Coverage — wider lead words and bare PT keywords
 
 
 class TestSalaryCoverageE3:
@@ -47,7 +47,7 @@ class TestSalaryCoverageE3:
         assert static_answer("Minimum salary you would accept and why", salary_profile) is None
 
 
-# ─── Question-shaped salary labels (the 2026-08-03 Holepunch gap) ────────────
+# Question-shaped salary labels (the 2026-08-03 Holepunch gap)
 
 
 def test_salary_question_with_foreign_units_refuses():

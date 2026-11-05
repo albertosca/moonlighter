@@ -88,7 +88,7 @@ class TestExtractRef:
         assert extract_ref(to_header, BASE_EMAIL) is None
 
     def test_none_to_field_returns_none(self):
-        assert extract_ref(None, BASE_EMAIL) is None  # type: ignore[arg-type]
+        assert extract_ref(None, BASE_EMAIL) is None  # type: ignore[arg-type]  # the test passes None on purpose, to pin the missing-header case
 
     def test_first_matching_recipient_wins_when_several_match(self):
         """Multiple recipients could, in principle, both match the base

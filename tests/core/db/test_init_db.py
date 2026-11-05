@@ -67,7 +67,7 @@ def test_init_db_migrates_old_application_table(temporary_database):
     assert "current_stage" in columns
 
 
-# --- init_db delegates schema evolution to run_migrations (E7 T2) ─────────────
+# init_db delegates schema evolution to run_migrations
 
 
 def test_init_db_fresh_db_reaches_latest_version_with_all_columns(temporary_database):

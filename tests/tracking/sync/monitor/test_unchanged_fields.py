@@ -96,9 +96,6 @@ async def test_hallucinated_stage_not_in_known_list_is_ignored(temporary_databas
     assert application_refreshed.current_stage is None  # the made-up stage is discarded
 
 
-# ── acknowledgement end-to-end (whole-branch Finding 4) ─────────────────
-
-
 async def test_acknowledgement_end_to_end_leaves_status_and_stage_untouched(temporary_database):
     """End-to-end proof (through the real classify_response, not mocked)
     that an acknowledgement email never advances status or writes a stage —

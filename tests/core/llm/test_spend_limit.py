@@ -33,7 +33,7 @@ IS_SPEND_LIMIT_CASES = [
         True,
         "wrapped-exception-str-propagates-marker",
     ),
-    # ── should NOT be classified as spend-limit ──
+    # should NOT be classified as spend-limit
     (Exception("connection refused"), False, "unrelated-connection-error"),
     (Exception("invalid api key"), False, "unrelated-auth-error"),
     (Exception("file not found: /tmp/x.json"), False, "unrelated-file-error"),

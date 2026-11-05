@@ -69,9 +69,6 @@ def test_application_next_action_stored(temporary_database):
     assert saved.next_action == "Follow up on 2026-06-01"
 
 
-# ── Application: email fields (email_ref + current_stage) ─────────────────────
-
-
 def test_application_email_ref_stored_and_retrieved(temporary_database):
     init_db()
     job = make_job()

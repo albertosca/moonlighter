@@ -8,8 +8,6 @@ from tests.tracking.llm_callers import make_llm_caller
 from tests.tracking.pipeline_rows import make_application, make_job
 from tests.tracking.sync_setup import SYNC_CONFIG
 
-# ── failure signalling end-to-end (whole-branch Finding 1) ─────────────
-
 
 async def test_llm_failure_does_not_burn_the_message_and_retries_on_next_sync(temporary_database):
     """Proves Finding 1 end-to-end, through the real classify_response (not

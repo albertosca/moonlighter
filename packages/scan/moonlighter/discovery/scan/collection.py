@@ -1,7 +1,7 @@
 """Collecting the raw jobs of one scan: HTTP boards, browser plugins and portal feeds."""
 
 from dataclasses import replace
-from typing import Any
+from typing import Any, Protocol
 
 from moonlighter.core.plugins import discover_entry_points
 from moonlighter.core.web.urls import normalize_job_url
@@ -16,8 +16,16 @@ from moonlighter.discovery.sources.base import (
 from moonlighter.discovery.sources.registry import build_http_scanners
 
 
+class BrowserScanner(Protocol):
+    """The shape a browser scanner plugin has: built from a logged-in page, scanned by keywords."""
+
+    def __init__(self, page: Any) -> None: ...
+
+    async def scan(self, *, keywords: str) -> list[RawJob]: ...
+
+
 async def _run_browser_scanner(
-    scanner_class: type[Any], keywords: str, config: dict[str, Any]
+    scanner_class: type[BrowserScanner], keywords: str, config: dict[str, Any]
 ) -> tuple[list[RawJob], str | None]:
     """Run one browser-based scanner plugin (requires prior login, same shape as LinkedInScanner).
 

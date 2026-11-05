@@ -10,7 +10,7 @@ CEFR = [
 ]
 
 
-# ---- match_option_locally (pure, no LLM) ----
+# match_option_locally (pure, no LLM)
 
 
 def test_exact_match():
@@ -56,9 +56,6 @@ def test_starts_with_word_equal_strings_is_boundary_match():
     # Unreachable through match_option_locally (the exact path wins first),
     # but the helper's own contract must hold for any future caller.
     assert _starts_with_word("brazil", "brazil") is True
-
-
-# ---- characterization pins: order, tie-break, threshold boundary and default ----
 
 
 def test_exact_match_returns_the_first_option_that_normalises_alike():

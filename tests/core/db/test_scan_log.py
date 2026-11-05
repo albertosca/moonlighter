@@ -26,9 +26,6 @@ def test_scanlog_same_url_different_source_raises(temporary_database):
         ScanLog.create(job_url="https://example.com/job/dup-src", source="lever")
 
 
-# --- ScanLog: timestamp ---
-
-
 def test_scanlog_scanned_at_is_recent(temporary_database):
     init_db()
     before = datetime.now()  # noqa: DTZ005 - the database stores naive local time

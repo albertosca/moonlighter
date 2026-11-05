@@ -29,9 +29,6 @@ class TestMarkProcessed:
         assert service.users().messages().modify().execute.called
 
 
-# ── get_or_create_label ────────────────────────────────────────────────────
-
-
 def test_get_or_create_label_returns_existing():
     """Label already exists → returns the existing id."""
     service = MagicMock()

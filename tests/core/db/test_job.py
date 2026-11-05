@@ -9,8 +9,6 @@ from peewee import IntegrityError
 from moonlighter.core.db import Job, init_db
 from tests.core.db.sample_job import make_job
 
-# --- Job: salary fields ---
-
 
 def test_job_salary_fields(temporary_database):
     init_db()
@@ -35,9 +33,6 @@ def test_job_salary_notes_field(temporary_database):
     assert "Glassdoor" in saved.salary_notes
 
 
-# --- Job: nullable fields ---
-
-
 def test_job_nullable_fields_default_none(temporary_database):
     init_db()
     job = make_job()
@@ -48,16 +43,10 @@ def test_job_nullable_fields_default_none(temporary_database):
     assert saved.score is None
 
 
-# --- Job: status default ---
-
-
 def test_job_status_default(temporary_database):
     init_db()
     job = make_job()
     assert job.status == "new"
-
-
-# --- Job: unique URL ---
 
 
 def test_job_url_unique_raises(temporary_database):
@@ -65,9 +54,6 @@ def test_job_url_unique_raises(temporary_database):
     make_job(url="https://example.com/job/dup")
     with pytest.raises(IntegrityError):
         make_job(url="https://example.com/job/dup")
-
-
-# --- Job: get_caveats ---
 
 
 def test_job_get_caveats_valid_json(temporary_database):
@@ -93,9 +79,6 @@ def test_job_get_caveats_invalid_json(temporary_database):
     job = make_job(caveats="not json")
     with pytest.raises(json.JSONDecodeError):
         job.get_caveats()
-
-
-# --- Job: timestamps ---
 
 
 def test_job_found_at_is_recent(temporary_database):

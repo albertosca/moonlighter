@@ -31,9 +31,6 @@ async def test_an_llm_failure_becomes_a_gap_and_does_not_abort_the_other_questio
     assert composed[1].answer == "Alberto"
 
 
-# ── IMPORTANT 5: generation failure vs a genuine UNKNOWN ─────────────────────
-
-
 @pytest.mark.asyncio
 async def test_an_llm_error_reports_generation_failure_not_a_knowledge_gap():
     """Before this fix, `except Exception: return None` in generate_answer made a

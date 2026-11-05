@@ -42,7 +42,7 @@ def test_salary_answer_separates_every_thousands_group_with_a_dot():
     assert out["Salary expectation"] == "BRL 1.234.567/month"
 
 
-# ── Compensation: currency and period must match what the label asks for ──────
+# Compensation: currency and period must match what the label asks for
 
 
 _SALARY_PROFILE = {"preferences": {"salary_target_brl_monthly": 35000}}

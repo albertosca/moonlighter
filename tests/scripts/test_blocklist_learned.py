@@ -1,7 +1,8 @@
 from unittest.mock import patch
 
-import blocklist_learned
 import pytest
+
+import blocklist_learned
 
 
 def test_confirm_write_yes_returns_true():

@@ -26,10 +26,6 @@ from typing import Any
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from blocklist_candidates import fetch_low_scorers
-from blocklist_learned import confirm_write, learned_path, load_learned, save_learned
-from blocklist_proposals import is_quota_error, proposal_prompt, propose_for_company
-
 from moonlighter.core.config.defaults import DEFAULT_EVAL_MODEL
 from moonlighter.core.config.loading import load_config, load_profile
 from moonlighter.core.db import init_db
@@ -37,6 +33,10 @@ from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.log import setup as setup_logging
 from moonlighter.core.metrics import operation_metrics
+
+from blocklist_candidates import fetch_low_scorers
+from blocklist_learned import confirm_write, learned_path, load_learned, save_learned
+from blocklist_proposals import is_quota_error, proposal_prompt, propose_for_company
 
 
 def _report(proposals: list[dict[str, Any]], existing: set[str], *, dry_run: bool) -> list[str]:

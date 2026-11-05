@@ -13,9 +13,6 @@ WA_CONFIG = {
 }
 
 
-# ── resolve_work_auth ─────────────────────────────────────────────────────────
-
-
 def test_resolve_authorized_for_brazil():
     answer = resolve_work_auth("Are you authorized to work in this location?", "brazil", WA_CONFIG)
     assert answer == "Yes"
@@ -82,9 +79,6 @@ def test_missing_citizenship_needs_review():
     assert answer == "__NEEDS_REVIEW__"
 
 
-# ── C2: edge cases (regressions) ────────────────────────────────────────────
-
-
 def test_resolve_citizenship_locale_normalized():
     """A non-canonical citizenship_country ('Brasil'/'Brazil'/'BR') must match 'brazil'."""
     for form in ("Brasil", "Brazil", "BR", " brazil "):
@@ -107,7 +101,7 @@ def test_resolve_unrecognized_citizenship_needs_review():
     assert answer == "__NEEDS_REVIEW__"
 
 
-# ── E8 T2: ", CA" is always ambiguous — conservative rule, never a guess ─────
+# ", CA" is always ambiguous — conservative rule, never a guess
 #
 # The rule and its rationale are written out in test_infer_country.py.
 
@@ -121,9 +115,6 @@ def test_resolve_work_auth_for_ambiguous_canada_string_needs_review_not_us():
     assert country is None
     answer = resolve_work_auth("Are you authorized to work in the US?", country, WA_CONFIG)
     assert answer == "__NEEDS_REVIEW__"
-
-
-# ── characterization pins: defaults, every marker, every phrasing, every alias ──
 
 
 def test_resolve_defaults_the_not_authorized_answer_to_no():

@@ -6,12 +6,13 @@ import dataclasses
 from unittest.mock import MagicMock
 
 import pytest
-import reevaluation_batch
-from reevaluation_batch import ReevaluationSettings, Tally, reevaluate
 
 from moonlighter.core.db import Job, init_db
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from tests.scripts.reevaluate_bug_victims.harness import Evaluator, rows, victim
+
+import reevaluation_batch
+from reevaluation_batch import ReevaluationSettings, Tally, reevaluate
 
 
 @pytest.fixture(autouse=True)

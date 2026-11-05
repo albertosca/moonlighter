@@ -101,6 +101,17 @@ strict-checking = true
 # From tests/ and scripts/ Ruff cannot find `moonlighter` on disk (it lives under
 # packages/*/), so it would sort it with the third-party imports instead of a local block.
 known-first-party = ["moonlighter"]
+# The sibling modules the scripts import by bare name (they run from scripts/ on sys.path),
+# so they sort after moonlighter instead of among the third-party imports.
+known-local-folder = [
+    "blocklist_candidates",
+    "blocklist_learned",
+    "blocklist_proposals",
+    "markdown_lines",
+    "readme_links",
+    "reevaluation_batch",
+    "reevaluation_records",
+]
 
 [tool.ruff.lint.per-file-ignores]
 # Scripts are standalone executables run from the repository root: not a package

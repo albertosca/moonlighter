@@ -6,7 +6,7 @@ from moonlighter.application.answers.matching.field_map import pre_populate_answ
 from moonlighter.application.answers.rules.demographics import demographic_answer
 from tests.application.answers.candidate_profiles import PROFILE
 
-# ── EEO/demographics: demographic_answer, NOT the _RULES ladder ──────────────
+# EEO/demographics: demographic_answer, NOT the _RULES ladder
 # These live outside pre_populate_answers on purpose: composer's is_sensitive_label
 # guard intercepts a demographic label before `known` is consulted, so a rule in
 # _RULES would be unreachable — and putting the carve-out in the general ladder is

@@ -105,7 +105,7 @@ async def _score_and_store(
     return format_add_result(job, result, threshold=threshold, status=fields["status"])
 
 
-async def add_job(  # noqa: PLR0913, PLR0917 - the MCP tool's seven fields; see the backlog item
+async def add_job(  # noqa: PLR0913, PLR0917 - the MCP tool takes these seven fields as its public arguments
     url: str,
     company: str,
     title: str,

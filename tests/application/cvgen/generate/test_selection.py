@@ -15,8 +15,8 @@ from tests.application.cvgen.selection_samples import (
     recording_caller,
 )
 
-# --- any shape the model emits degrades; nothing reaches the operator as an
-# --- error line instead of the sheet (the module's own contract).
+# any shape the model emits degrades; nothing reaches the operator as an
+# error line instead of the sheet (the module's own contract).
 SHAPES = {
     "bullets_translated as a list": ({"bullets_translated": ["\\input{/x}"]}, "translations", {}),
     "bullets_translated as a string": (

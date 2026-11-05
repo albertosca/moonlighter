@@ -32,9 +32,6 @@ def test_ptbr_strips_asterisk():
     assert result["Sobrenome*"] == "de Souza Pereira"
 
 
-# ── label normalisation ───────────────────────────────────────────────────────
-
-
 def test_required_marker_on_its_own_line_does_not_break_matching():
     r"""Workable renders the required marker as a line BEFORE the label, so the
     scraped string is '*\nFirst name'. Every rule here is ^-anchored, so nothing

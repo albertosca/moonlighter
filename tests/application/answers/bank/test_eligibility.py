@@ -9,8 +9,6 @@ from moonlighter.application.answers.bank.eligibility import (
 )
 from moonlighter.application.assisted.questions import QuestionKind
 
-# ── normalize_question ───────────────────────────────────────────────────────
-
 
 def test_normalize_question_lowercases_collapses_whitespace_and_strips_trailing_punctuation():
     assert normalize_question("  Are You   Legally Authorized ?  ") == "are you legally authorized"
@@ -18,9 +16,6 @@ def test_normalize_question_lowercases_collapses_whitespace_and_strips_trailing_
 
 def test_normalize_question_strips_trailing_colon_and_asterisk():
     assert normalize_question("Full name:*") == "full name"
-
-
-# ── is_bank_eligible ──────────────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(
@@ -39,9 +34,6 @@ def test_is_bank_eligible_true_for_eligible_kinds(kind):
 @pytest.mark.parametrize("kind", [QuestionKind.LONG_TEXT, QuestionKind.FILE])
 def test_is_bank_eligible_false_for_ineligible_kinds(kind):
     assert is_bank_eligible(kind) is False
-
-
-# ── is_sensitive_label ────────────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(

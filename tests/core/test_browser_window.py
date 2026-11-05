@@ -5,8 +5,6 @@ from unittest.mock import AsyncMock, MagicMock
 from moonlighter.core import browser_window
 from tests.core.browser_config import CONFIG
 
-# ── save_screenshot ───────────────────────────────────────────────────────────
-
 
 async def test_save_screenshot_captures_the_whole_page(tmp_path):
     """The viewport is ~750 CSS px; a real application form is ~4500. A
@@ -92,9 +90,6 @@ async def test_save_screenshot_still_captures_when_window_state_is_unavailable(t
     )
 
     mock_page.screenshot.assert_awaited_once_with(path=path, full_page=True)
-
-
-# ── hide_window / show_window ──────────────────────────────────────────────
 
 
 async def test_hide_window_minimizes_via_cdp():

@@ -26,27 +26,34 @@ def make_caller(config: dict[str, Any]) -> LLMCaller:
     selecting a backend the user did not ask for.
     """
     backend = llm_backend(config)
+    if backend == "api":
+        return make_api_caller()
+    timeout_seconds = config.get("llm_timeout_seconds", DEFAULTS["llm_timeout_seconds"])
     if backend == "cli":
-        timeout_seconds = config.get("llm_timeout_seconds", DEFAULTS["llm_timeout_seconds"])
-
-        async def _call(prompt: str, model: str, cache_prefix: str | None = None) -> str:
-            return await call_cli(prompt, model, cache_prefix, timeout_seconds=timeout_seconds)
-
-        return _call
+        return _cli_caller(timeout_seconds)
     if backend == "cursor":
-        chosen = str(config.get("cursor_model") or "").strip()
-        timeout_seconds = config.get("llm_timeout_seconds", DEFAULTS["llm_timeout_seconds"])
-        return _cursor_caller(chosen or None, timeout_seconds)
-    if backend == "codex":
-        codex_timeout_seconds = config.get("llm_timeout_seconds", DEFAULTS["llm_timeout_seconds"])
+        return _cursor_caller(
+            str(config.get("cursor_model") or "").strip() or None, timeout_seconds
+        )
+    return _codex_caller(timeout_seconds)
 
-        async def _call_with_codex(prompt: str, model: str, cache_prefix: str | None = None) -> str:
-            return await call_codex(
-                prompt, model, cache_prefix, timeout_seconds=codex_timeout_seconds
-            )
 
-        return _call_with_codex
-    return make_api_caller()
+def _cli_caller(timeout_seconds: float) -> LLMCaller:
+    """Bind the shared call timeout to the `claude -p` CLI."""
+
+    async def _call(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        return await call_cli(prompt, model, cache_prefix, timeout_seconds=timeout_seconds)
+
+    return _call
+
+
+def _codex_caller(timeout_seconds: float) -> LLMCaller:
+    """Bind the shared call timeout to `codex exec`."""
+
+    async def _call(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        return await call_codex(prompt, model, cache_prefix, timeout_seconds=timeout_seconds)
+
+    return _call
 
 
 def _cursor_caller(cursor_model: str | None, timeout_seconds: float) -> LLMCaller:

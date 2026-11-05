@@ -43,9 +43,6 @@ def test_load_config_default_path_uses_moonlighter_home(monkeypatch, tmp_path):
     assert config["score_threshold"] == 6.5
 
 
-# --- path expansion ---
-
-
 def test_load_config_path_keys_expanded(tmp_path):
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
     assert "~" not in config["browser_session_dir"]
@@ -56,9 +53,6 @@ def test_load_config_all_path_keys_no_tilde(tmp_path):
     config = load_config(config_path=str(tmp_path / "nonexistent.yaml"))
     for key in ("browser_session_dir", "screenshots_dir"):
         assert "~" not in config[key], f"{key} still contains '~'"
-
-
-# --- scan_concurrency ---
 
 
 def test_scan_concurrency_default(tmp_path, monkeypatch):
@@ -75,9 +69,6 @@ def test_scan_concurrency_override(tmp_path, monkeypatch):
 def test_scan_batch_size_default(tmp_path, monkeypatch):
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     assert load_config()["scan_batch_size"] == 5
-
-
-# --- llm backend keys ---
 
 
 def test_load_config_keeps_cursor_model_and_does_not_invent_it(tmp_path, monkeypatch):
@@ -120,9 +111,6 @@ def test_load_config_leaves_the_eval_model_default_for_other_backends(tmp_path, 
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text("llm_backend: cli\nllm_model: claude-opus-4-1\n")
     assert load_config(tmp_path / "config.yaml")["eval_model"].startswith("claude")
-
-
-# --- dict-valued defaults (email:) ---
 
 
 def test_load_config_partial_email_block_keeps_sibling_defaults(tmp_path):

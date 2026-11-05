@@ -2,7 +2,7 @@
 
 from moonlighter.application.answers.matching.field_map import pre_populate_answers
 
-# ── Compensation (E2) — filled statically so the salary figure never reaches the LLM ──
+# Compensation — filled statically so the salary figure never reaches the LLM
 
 
 def test_compensation_field_matches_too():

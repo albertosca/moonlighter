@@ -109,9 +109,9 @@ async def test_verify_job_updates_the_same_row_and_scores_above_threshold(tempor
 
 async def test_verify_job_scores_a_row_that_scan_actually_produced(temporary_database):
     """Crosses the scan -> verify_job seam: builds the needs_review row through the
-    real _run_scan pipeline (Task 1), then scores it through verify_job (Task 3) --
-    proving the two sides agree on the row's shape (e.g. caveats='[]'), not just
-    that each works against a hand-built Job in isolation.
+    real scan pipeline, then scores it through verify_job -- proving the two sides
+    agree on the row's shape (e.g. caveats='[]'), not just that each works against
+    a hand-built Job in isolation.
     """
     init_db()
     raw = RawJob(

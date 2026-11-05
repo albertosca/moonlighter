@@ -12,7 +12,7 @@ from moonlighter.discovery.archive import ArchiveResult
 from moonlighter.mcp_tools import scanning
 from moonlighter.server import lifespan, mcp
 
-# ── config/profile edits reach a running server (2026-09-25) ──────────────────
+# config/profile edits reach a running server (2026-09-25)
 # The server read config.yaml and profile.yaml once, at connect time. A config
 # flag set mid-session (email.archive_all_classified) was silently ignored:
 # sync_email_responses reported success, archived nothing, and marked the

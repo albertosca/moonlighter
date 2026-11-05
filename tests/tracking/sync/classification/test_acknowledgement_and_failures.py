@@ -45,7 +45,6 @@ async def test_an_acknowledgement_carries_no_stage():
     assert result["new_stage"] is None
 
 
-# ── failure signalling (whole-branch Finding 1) ─────────────────────────────
 #
 # A classification that FAILED (the LLM raised, or its response could not be
 # parsed) must be distinguishable from a successful classification of

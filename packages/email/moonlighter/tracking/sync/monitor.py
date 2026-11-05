@@ -1,7 +1,7 @@
 """Email monitor for job applications.
 
-Monitors the configured Gmail account, classifies replies with the LLM,
-and automatically updates the applications pipeline.
+Monitor the configured Gmail account, classify replies with the LLM,
+and automatically update the applications pipeline.
 """
 
 import logging
@@ -53,11 +53,8 @@ class _SpendLimitReachedError(Exception):
     """Stops the sync: the quota is spent, so the rest of the batch waits for the next run."""
 
 
-# ── Sync: reads, classifies, and updates the pipeline ───────────────────────
-
-
 async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[dict[str, Any]]:
-    """Orchestrates the full flow: reads recent emails, classifies them, and updates the database.
+    """Run the full flow: read recent emails, classify them, and update the database.
 
     Returns the list of updates made.
     """

@@ -3,11 +3,12 @@
 import json
 
 import pytest
-import reevaluation_records
 
 from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.evaluation.models import EvaluationResult
 from tests.scripts.reevaluate_bug_victims.harness import UNTOUCHED_NOTES, victim
+
+import reevaluation_records
 
 
 @pytest.fixture(autouse=True)

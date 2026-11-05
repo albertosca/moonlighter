@@ -4,7 +4,7 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _fake_claude_on_path():
+def _startup_finds_claude():
     """`claude` is installed on the dev machine and never in CI. Without a fixed
     resolution the cli-backend check would make this module pass locally and
     fail in CI. Tests that need it absent patch `which` themselves.

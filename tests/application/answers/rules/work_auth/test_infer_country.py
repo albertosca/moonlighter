@@ -4,8 +4,6 @@ import pytest
 
 from moonlighter.application.answers.rules.work_auth import infer_country
 
-# ── infer_country (conservador) ───────────────────────────────────────────────
-
 
 def test_infer_country_brazil_from_location():
     assert infer_country("São Paulo, Brazil", None) == "brazil"
@@ -24,9 +22,6 @@ def test_infer_country_unknown_returns_none():
     assert infer_country("", None) is None
 
 
-# ── C2: edge cases (regressions) ────────────────────────────────────────────
-
-
 def test_infer_country_canada_not_misread_as_us():
     """', ca' must NOT match 'Canada' (from 'ca-nada') — otherwise a Canadian job becomes US."""
     assert infer_country("Toronto, Canada", None) is None
@@ -40,7 +35,7 @@ def test_infer_country_us_state_codes_still_match():
     assert infer_country("Dallas, TX", None) == "united states"
 
 
-# ── E8 T2: ", CA" is always ambiguous — conservative rule, never a guess ─────
+# ", CA" is always ambiguous — conservative rule, never a guess
 #
 # "CA" is ambiguous: US-state code (California) OR country code (Canada, ISO
 # 3166 alpha-2). Rather than disambiguate by enumerating Canadian cities (the
@@ -88,9 +83,6 @@ def test_infer_country_other_canadian_markers_not_misread_as_us():
 def test_infer_country_remote_with_no_location_signal_is_none():
     assert infer_country(None, None) is None
     assert infer_country("Remote", "remote") is None
-
-
-# ── characterization pins: defaults, every marker, every phrasing, every alias ──
 
 
 @pytest.mark.parametrize(

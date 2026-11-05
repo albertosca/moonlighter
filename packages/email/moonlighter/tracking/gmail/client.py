@@ -9,14 +9,14 @@ from moonlighter.core.config.paths import moonlighter_home, resolve_under_home
 
 logger = logging.getLogger(__name__)
 
-# ── Optional Google imports (only needed at real runtime) ───────────────────
+# The Google libraries are only needed at real runtime.
 try:
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
 except ImportError:  # pragma: no cover - optional import fallback (google libs)
-    Credentials = None  # type: ignore[assignment, misc]
-    Request = None  # type: ignore[assignment, misc]
+    Credentials = None  # type: ignore[assignment, misc]  # None stands in for the missing optional import
+    Request = None  # type: ignore[assignment, misc]  # None stands in for the missing optional import
     build = None
 
 try:
@@ -30,9 +30,6 @@ SCOPE_MODIFY = "https://www.googleapis.com/auth/gmail.modify"
 
 class GmailAuthError(Exception):
     pass
-
-
-# ── Gmail API: authentication ───────────────────────────────────────────────
 
 
 _MUTATING_FLAGS = ("mark_processed", "archive_ref_matched", "archive_all_classified")
@@ -137,7 +134,7 @@ def setup_gmail_service(config: dict[str, Any]) -> Any:
     # flags a token broader than we need. Narrowing here is not a privilege
     # reduction — it just makes the refresh fail.
     scopes = _token_scopes(token_path) or [required_scope]
-    credentials = Credentials.from_authorized_user_file(str(token_path), scopes)  # type: ignore[no-untyped-call]
+    credentials = Credentials.from_authorized_user_file(str(token_path), scopes)  # type: ignore[no-untyped-call]  # google-auth leaves from_authorized_user_file untyped
     if not credentials.valid and credentials.expired and credentials.refresh_token:
         credentials.refresh(Request())
         # Persist only a token file we own. `token_path` may point at another
