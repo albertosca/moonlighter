@@ -41,13 +41,13 @@ def test_render_answer_bank_marks_entries_past_max_age(temporary_database):
     init_db()
     aged_entry("notice period", "30 days", days_old=5)
     aged_entry("when can you start", "in two weeks", days_old=120)
-    rendered = render_answer_bank(list_entries(), maximum_age_days=90)
-    assert "notice period" in rendered
-    assert "30 days" in rendered
-    assert "when can you start" in rendered
-    assert "in two weeks" in rendered
-    stale_line = next(line for line in rendered.splitlines() if "when can you start" in line)
-    fresh_line = next(line for line in rendered.splitlines() if "notice period" in line)
+    out = render_answer_bank(list_entries(), maximum_age_days=90)
+    assert "notice period" in out
+    assert "30 days" in out
+    assert "when can you start" in out
+    assert "in two weeks" in out
+    stale_line = next(line for line in out.splitlines() if "when can you start" in line)
+    fresh_line = next(line for line in out.splitlines() if "notice period" in line)
     assert "expired" in stale_line
     assert "expired" not in fresh_line
 
