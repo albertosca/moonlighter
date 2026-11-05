@@ -5,7 +5,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 def make_hn_client(url_map):
     """Branches on exact URL match (HN's API is one-resource-per-URL, no
-    query params to substring-match on)."""
+    query params to substring-match on).
+    """
 
     async def fake_get(url, headers=None):
         mock_response = MagicMock()

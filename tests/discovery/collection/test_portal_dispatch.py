@@ -8,7 +8,8 @@ from moonlighter.discovery.sources.base import RawJob
 
 async def _collect(config):
     """Runs collect_raw_jobs with no HTTP-registry scanners and no LinkedIn jobs,
-    isolating the Gupy dispatch branch."""
+    isolating the Gupy dispatch branch.
+    """
     with (
         patch("moonlighter.discovery.collection.build_http_scanners", return_value={}),
         patch("moonlighter.discovery.collection.discover_entry_points", return_value=[]),

@@ -1,6 +1,7 @@
 """call_cli records one call, a non-negative total_seconds and zero tokens in the active
 operation_metrics scope, still counts the call when it fails, and counts none when `claude`
-is missing."""
+is missing.
+"""
 
 import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch

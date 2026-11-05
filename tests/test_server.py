@@ -75,7 +75,8 @@ def test_dispatch_unknown_word_returns_none_and_falls_through_to_the_server():
 
 async def test_tools_list_surface_is_pinned(snapshot_text):
     """Names, order, descriptions, input schemas and annotations of every tool, as a
-    client sees them in tools/list."""
+    client sees them in tools/list.
+    """
     tools = await mcp.list_tools()
     dump = [tool.model_dump(mode="json", by_alias=True) for tool in tools]
     snapshot_text(json.dumps(dump, indent=2, sort_keys=True, ensure_ascii=False), "tools_list")

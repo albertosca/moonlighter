@@ -53,7 +53,8 @@ def test_parse_batch_item_with_missing_keys_uses_defaults():
 def test_parse_batch_item_wrong_type_string_tolerated_as_default():
     """A non-dict item (LLM returned a bare string/number instead of an
     object) is coerced to {} by parse_batch and gets default field values —
-    the malformed item is tolerated, never crashes the batch."""
+    the malformed item is tolerated, never crashes the batch.
+    """
     results = parse_batch('["oops", 5, null]', 3)
     assert results is not None
     assert all(result.score == 0.0 and result.caveats == [] for result in results)
@@ -67,7 +68,8 @@ def test_parse_batch_item_is_nested_list_tolerated_as_default():
 
 def test_parse_batch_extracts_json_from_markdown_fence_with_prose():
     """Fallback path: raw isn't valid JSON on its own (has surrounding
-    prose + fence) — parse_llm_json must extract it before json.loads."""
+    prose + fence) — parse_llm_json must extract it before json.loads.
+    """
     raw = 'Here are the results:\n```json\n[{"score": 6.5, "score_notes": "ok"}]\n```'
     results = parse_batch(raw, 1)
     assert results is not None
@@ -76,7 +78,8 @@ def test_parse_batch_extracts_json_from_markdown_fence_with_prose():
 
 def test_parse_batch_item_with_malformed_salary_fields_sanitized():
     """A dict item with hostile/wrong-typed salary sub-fields still parses —
-    _result_from's per-field coercion sanitizes them instead of raising."""
+    _result_from's per-field coercion sanitizes them instead of raising.
+    """
     raw = json.dumps(
         [
             {

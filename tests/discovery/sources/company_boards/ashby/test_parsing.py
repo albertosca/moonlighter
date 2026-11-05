@@ -26,7 +26,8 @@ async def test_ashby_scan_success():
 
 async def test_ashby_uses_the_rest_board_endpoint():
     """Guards the regression directly: a POST to the retired GraphQL endpoint is
-    what made every company look empty."""
+    what made every company look empty.
+    """
     mock_client = make_mock_client(ashby_response(ASHBY_JOB))
     with patch(
         "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
@@ -61,7 +62,8 @@ async def test_ashby_is_remote_flag_false_uses_location():
 
 async def test_ashby_unlisted_job_is_skipped():
     """isListed=False means the posting is not public — surfacing it would send the
-    candidate to a page that is not accepting applications."""
+    candidate to a page that is not accepting applications.
+    """
     job = {**ASHBY_JOB, "isListed": False}
     mock_client = make_mock_client(ashby_response(job))
     with patch(

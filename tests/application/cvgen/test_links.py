@@ -39,7 +39,8 @@ def test_template_links_skips_a_link_commented_out_mid_line():
 
 def test_template_links_reads_a_line_break_before_a_comment_as_a_comment():
     """A LaTeX line break (two backslashes) makes the % after it a comment;
-    only an odd number of backslashes escapes it (2026-09-29 re-review)."""
+    only an odd number of backslashes escapes it (2026-09-29 re-review).
+    """
     assert template_links(r"\\ % \social[github]{dead}") == []
     assert template_links(r"\homepage{a.dev/50\%off}") == ["https://a.dev/50\\%off"]
 
@@ -66,7 +67,8 @@ async def test_check_links_flags_a_404_and_passes_a_200():
 @pytest.mark.asyncio
 async def test_check_links_does_not_call_linkedins_bot_wall_broken():
     """LinkedIn answers automated requests with 999: that says nothing about the
-    profile, so it is reported as unverified rather than as a broken link."""
+    profile, so it is reported as unverified rather than as a broken link.
+    """
     async with _client({"https://www.linkedin.com/in/albertosca": 999}) as client:
         report = await check_links(["https://www.linkedin.com/in/albertosca"], client)
     assert report[0]["ok"] is None
@@ -110,8 +112,8 @@ async def test_link_report_is_empty_without_templates(tmp_path):
 @pytest.mark.asyncio
 async def test_link_report_opens_a_client_that_follows_redirects(tmp_path, monkeypatch):
     """A profile URL commonly redirects (http→https, trailing slash): without
-    following redirects every such link would read as a 3xx, not as working."""
-
+    following redirects every such link would read as a 3xx, not as working.
+    """
     (tmp_path / "cv-template.en.tex").write_text(r"\social[github]{albertosca}")
     opened: dict = {}
     real_client = httpx.AsyncClient

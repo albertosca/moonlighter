@@ -27,9 +27,10 @@ async def test_the_prompt_carries_the_posting_so_the_answer_can_match_its_langua
 
 @pytest.mark.asyncio
 async def test_llm_prompt_carries_only_the_curated_profile():
-    """references (a third party's contacts), preferences (the salary figure — E2)
+    """The references (a third party's contacts), preferences (the salary figure — E2)
     and demographics must never reach the prompt; the old applier path curated
-    them out and the composer must too."""
+    them out and the composer must too.
+    """
     profile = {
         "name": "Alba Test",
         "summary": "Senior engineer.",
@@ -57,7 +58,8 @@ async def test_a_choice_prompt_tells_the_model_not_to_underclaim():
     """The model picked "minor limitations" for a profile that says English
     (fluent/native) — live on the Nubank shadow-run (2026-08-13), with the fact
     present in the curated prompt. The choice constraint must instruct it to
-    pick the strongest option the profile supports."""
+    pick the strongest option the profile supports.
+    """
     captured: dict[str, str] = {}
 
     async def caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:

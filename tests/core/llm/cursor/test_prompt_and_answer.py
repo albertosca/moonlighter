@@ -76,7 +76,8 @@ async def test_cursor_no_cache_prefix_keeps_prompt_unchanged():
 )
 async def test_call_cursor_decodes_its_output_strictly(stdout, stderr, code):
     """Same pin as the claude CLI's: a byte that is not UTF-8 raises
-    UnicodeDecodeError, not the RuntimeError a caller expects."""
+    UnicodeDecodeError, not the RuntimeError a caller expects.
+    """
     with (
         patch(
             "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec",

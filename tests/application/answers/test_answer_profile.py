@@ -49,7 +49,8 @@ def test_career_start_reaches_the_answer_prompt():
     counted from there and wrote "close to 14 years" for someone with 16 — an
     understatement repeated in every application, including a screening question
     that asks about years of experience. The whitelist is what decides whether a
-    profile field can influence an answer at all."""
+    profile field can influence an answer at all.
+    """
     profile = {
         "career_started": 2010,
         "experience": [{"company": "X", "period": "2012-09 – 2014-07"}],
@@ -61,7 +62,8 @@ def test_career_start_reaches_the_answer_prompt():
 def test_profile_for_answers_still_excludes_contact_details():
     """The whitelist exists because this output lands on an untrusted page:
     contact data is placed by the deterministic field map, never written by the
-    model into free text."""
+    model into free text.
+    """
     profile = {"name": "X", "email": "a@b.c", "phone": "1", "linkedin": "u", "summary": "s"}
     sent = profile_for_answers(profile)
     assert set(sent) == {"summary"}
@@ -72,7 +74,8 @@ def test_open_source_reaches_the_answer_prompt():
     "open source contributions" answers cited only ParallelME (2016) from the
     experience list and ignored the projects in profile.yaml's open_source: —
     the whitelist never let them through. Public by nature; prose content, not
-    contact data (links stay on the deterministic field-map track)."""
+    contact data (links stay on the deterministic field-map track).
+    """
     profile = {"open_source": [{"name": "moonlighter"}], "summary": "s"}
     assert profile_for_answers(profile)["open_source"] == [{"name": "moonlighter"}]
 

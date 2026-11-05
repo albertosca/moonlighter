@@ -10,8 +10,8 @@ from tests.mcp_tools._records import create_job
 
 async def test_reopen_job_brings_an_archived_job_back_to_reviewed(temporary_database):
     """Before this tool the only way to try an archived job anyway was editing the
-    DB by hand (Encora #8314/#8315, 2026-09-24)."""
-
+    DB by hand (Encora #8314/#8315, 2026-09-24).
+    """
     init_db()
     job = create_job(
         temporary_database,

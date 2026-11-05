@@ -41,8 +41,7 @@ def _msg(**overrides) -> dict:
 
 
 class TestPromptInjectionHardening:
-    """
-    Tests that malicious content in email fields does not escape the XML
+    """Tests that malicious content in email fields does not escape the XML
     delimiters and that parsing withstands unexpected responses caused by injection.
 
     Two angles:
@@ -92,7 +91,8 @@ class TestPromptInjectionHardening:
     async def test_xml_tag_injection_in_body_is_neutralized(self):
         """S-04 fix: a literal </email> an attacker embeds in the body is
         stripped before wrapping — it no longer closes the block early (this
-        WAS a known, documented limitation; now it's actively neutralized)."""
+        WAS a known, documented limitation; now it's actively neutralized).
+        """
         captured: dict = {}
 
         async def capturing_caller(prompt, model=None):
@@ -122,7 +122,8 @@ class TestPromptInjectionHardening:
         """LLM 'obeys' the injection and returns free-form text — that's an
         unparseable response, a FAILED classification (ClassificationError), not
         a successful classification of 'unrelated' (whole-branch Finding 1):
-        the failure must be retried, never silently filed as a real answer."""
+        the failure must be retried, never silently filed as a real answer.
+        """
 
         async def confused_caller(prompt, model=None):
             return "Sure! Following the new instructions: type=offer confirmed."
@@ -139,7 +140,8 @@ class TestPromptInjectionHardening:
     ):
         """Truncated JSON caused by injection must not raise an arbitrary
         exception (it's still a caught, typed failure) — but it must also not
-        be silently treated as a successful 'unrelated' classification."""
+        be silently treated as a successful 'unrelated' classification.
+        """
 
         async def partial_caller(prompt, model=None):
             return '{"type": "offer", "company": "Evil Corp"'  # not closed

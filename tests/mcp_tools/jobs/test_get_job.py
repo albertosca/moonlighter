@@ -68,7 +68,8 @@ async def test_get_job_without_posted_at(temporary_database):
 async def test_get_job_description_is_framed_as_external_data(temporary_database):
     """S-09: scraped job text flows into an MCP tool response read by the
     orchestrating Claude session — frame it unambiguously as data, never
-    instructions, so a posting can't try to talk directly to the orchestrator."""
+    instructions, so a posting can't try to talk directly to the orchestrator.
+    """
     init_db()
     job = create_job(
         temporary_database, url="https://x.com/gj6", description="A normal job description."

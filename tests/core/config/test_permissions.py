@@ -31,7 +31,8 @@ def test_harden_permissions_skips_missing_files(tmp_path, monkeypatch):
 
 def test_harden_permissions_warns_on_chmod_failure_without_raising(tmp_path, monkeypatch):
     """A permission error must never crash the server's startup — it becomes
-    a warning, not an exception."""
+    a warning, not an exception.
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     (tmp_path / "profile.yaml").write_text("x")
     (tmp_path / "browser-session").mkdir()

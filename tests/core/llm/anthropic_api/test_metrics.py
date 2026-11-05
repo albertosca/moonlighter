@@ -1,6 +1,7 @@
 """A make_api_caller caller records one call plus the input and output tokens of message.usage
 in the active operation_metrics scope, and still counts the call when it fails, with zero
-tokens."""
+tokens.
+"""
 
 import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -33,7 +34,8 @@ async def test_api_caller_records_usage():
 
 async def test_api_caller_records_even_on_failure():
     """Time in `finally`: a failed call still counts calls, with 0 tokens
-    (usage was never assigned before the exception)."""
+    (usage was never assigned before the exception).
+    """
     mock_client = MagicMock()
     mock_client.messages.create = AsyncMock(side_effect=RuntimeError("boom"))
 

@@ -2,7 +2,8 @@
 
 2026-09-29 review: the timeout killed the direct process only; a child it had
 spawned survived as an orphan (PPID 1). Real processes here, no mocks: a fake
-`claude` script that starts `sleep` and hangs."""
+`claude` script that starts `sleep` and hangs.
+"""
 
 import asyncio
 import os

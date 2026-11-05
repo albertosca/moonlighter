@@ -21,7 +21,8 @@ def test_stats_warnings_flags_errors_and_empty_sources():
 
 def test_stats_warnings_singularizes_one_company_and_one_error():
     """MINOR regression: 'from 1 companies' / '1 fetch errors' read as broken
-    grammar -- singular counts must use the singular noun."""
+    grammar -- singular counts must use the singular noun.
+    """
     stats: ScanStats = {
         "greenhouse": SourceStats(companies=1, jobs=0, errors=1),
     }

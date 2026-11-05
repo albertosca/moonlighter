@@ -127,7 +127,8 @@ async def test_recruitee_missing_offers_key_returns_empty():
 async def test_recruitee_custom_domain_entry():
     """An entry containing a dot is a custom career domain. Live-verified
     2026-08-12: careers.tellent.com and jobs.channable.com serve the same
-    /api/offers/ payload as {slug}.recruitee.com."""
+    /api/offers/ payload as {slug}.recruitee.com.
+    """
     ok_response = MagicMock(status_code=200)
     ok_response.json.return_value = RECRUITEE_RESPONSE
     mock_client = AsyncMock()

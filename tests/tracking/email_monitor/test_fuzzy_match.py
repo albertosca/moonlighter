@@ -15,7 +15,8 @@ async def test_email_without_ref_fuzzy_match_is_suggestion_only(temporary_databa
     """S-06: fuzzy match (no +ref) never mutates the pipeline — it's a
     suggestion the human must confirm via update_status. Anyone who knows a
     real company name can otherwise forge a rejection/interview email that
-    silently mutates a real application."""
+    silently mutates a real application.
+    """
     init_db()
     job = make_job(temporary_database, company="Stripe", title="Backend Engineer")
     application = make_application(job, status="submitted", email_ref=None)
@@ -62,7 +63,8 @@ async def test_email_without_ref_fuzzy_match_is_suggestion_only(temporary_databa
 async def test_fuzzy_rejection_never_auto_rejects(temporary_database):
     """The exact S-06 attack: a forged rejection naming a real company,
     without the +ref alias, must never flip a real application to the
-    terminal 'rejected' status."""
+    terminal 'rejected' status.
+    """
     init_db()
     job = make_job(temporary_database, company="Anthropic", title="Senior Engineer")
     application = make_application(job, status="submitted", email_ref=None)

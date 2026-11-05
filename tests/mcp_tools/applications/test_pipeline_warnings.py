@@ -11,7 +11,8 @@ from tests._context import make_test_context
 
 async def test_get_pipeline_shows_warnings_when_setup_incomplete(temporary_database):
     """An empty profile (the make_test_context default) surfaces a Setup Warnings
-    section with a distinguishable marker, prepended before the pipeline itself."""
+    section with a distinguishable marker, prepended before the pipeline itself.
+    """
     init_db()
 
     result = await get_pipeline(context=make_test_context(profile={}))
@@ -23,7 +24,8 @@ async def test_get_pipeline_shows_warnings_when_setup_incomplete(temporary_datab
 async def test_get_pipeline_no_warnings_section_when_setup_is_clean(temporary_database, tmp_path):
     """A fully-configured setup (real profile, real cv.pdf, cli backend, existing
     browser) produces zero warnings -> no Setup Warnings section at all, and the
-    pipeline output is unchanged from the pre-existing behavior."""
+    pipeline output is unchanged from the pre-existing behavior.
+    """
     init_db()
 
     cv_path = tmp_path / "cv.pdf"
@@ -49,7 +51,8 @@ async def test_get_pipeline_warnings_distinguish_error_and_warn_levels(
     temporary_database, tmp_path
 ):
     """No ANTHROPIC_API_KEY + api backend -> an 'error'-level warning; missing cv.pdf
-    -> a 'warn'-level warning. Both render with their own marker in the same call."""
+    -> a 'warn'-level warning. Both render with their own marker in the same call.
+    """
     init_db()
 
     with (

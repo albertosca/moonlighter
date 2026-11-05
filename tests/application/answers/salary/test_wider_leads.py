@@ -53,7 +53,8 @@ class TestSalaryCoverageE3:
 def test_salary_question_with_foreign_units_refuses():
     """The REAL live label that fell through to the LLM. With the interrogative
     lead it now matches — and the currency/period guard refuses (annual USD
-    against a BRL-monthly figure)."""
+    against a BRL-monthly figure).
+    """
     profile = {"preferences": {"salary_target_brl_monthly": 35000}}
     answers = pre_populate_answers(
         ["What is your expected salary? (annual USD)"],
@@ -107,7 +108,8 @@ def test_salary_question_ptbr_lead():
 
 def test_salary_essay_with_interrogative_lead_still_falls_through():
     """The lead must not re-open the essay over-match: 'view on salary
-    transparency' continues into non-whitelisted words and must reach the LLM."""
+    transparency' continues into non-whitelisted words and must reach the LLM.
+    """
     profile = {"preferences": {"salary_target_brl_monthly": 35000}}
     answers = pre_populate_answers(
         ["What is your view on salary transparency?"],

@@ -9,7 +9,8 @@ from tests.discovery.sources.job_feeds.gupy.fake_portal import GUPY_P1
 
 def _make_gupy_client(url_map):
     """Like make_url_branching_client: branches the mock client's .get(url) on a
-    substring match, raising loudly on an unexpected URL."""
+    substring match, raising loudly on an unexpected URL.
+    """
 
     async def fake_get(url, headers=None):
         for substring, payload in url_map.items():

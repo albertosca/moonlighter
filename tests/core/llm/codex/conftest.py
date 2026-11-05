@@ -2,7 +2,8 @@
 
 Idea and first implementation: JR2PROJETOS (issue 121). The permission profile is
 what the 2026-10-25 canary showed is needed: `--sandbox read-only` blocks writes
-and the network but still reads `~/.codex/auth.json` and `~/.ssh`."""
+and the network but still reads `~/.codex/auth.json` and `~/.ssh`.
+"""
 
 import pytest
 from moonlighter.core.llm import codex, codex_profile

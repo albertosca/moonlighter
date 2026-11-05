@@ -73,7 +73,8 @@ async def test_spend_limit_error_propagates_unwrapped_not_as_classification_erro
     """A spend-limit failure must be recognizable by the caller (via
     moonlighter.core.llm.spend_limit.is_spend_limit) so it can stop the sync loop instead of
     retrying every remaining message against a dead quota — wrapping it in
-    ClassificationError like an ordinary failure would hide that distinction."""
+    ClassificationError like an ordinary failure would hide that distinction.
+    """
 
     async def quota_exhausted_caller(prompt, model, cache_prefix=None):
         raise RuntimeError("rate limit exceeded, please retry later")

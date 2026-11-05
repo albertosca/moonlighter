@@ -10,7 +10,8 @@ from tests.discovery.sources.fake_http_clients import mock_client_class
 async def test_dead_api_reaches_the_scan_report():
     """CANARY: the exact dead-Ashby shape (HTTP 200, error payload, no jobs key)
     must surface in the user-visible report — this is the detector biting on the
-    failure that actually happened, silently, for weeks."""
+    failure that actually happened, silently, for weeks.
+    """
     dead = MagicMock(status_code=200)
     dead.json.return_value = {"errors": [{"message": "Cannot query field"}]}
     mock_client = AsyncMock()

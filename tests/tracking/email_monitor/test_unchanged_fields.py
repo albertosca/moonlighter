@@ -53,7 +53,8 @@ async def test_info_request_keeps_current_status(temporary_database):
 async def test_hallucinated_stage_not_in_known_list_is_ignored(temporary_database):
     """S-05: a 'stage' outside the known list (and that isn't a declared
     new_stage) is never written to current_stage — mitigates hallucination
-    via prompt injection (S-04) even if it escapes the delimiter."""
+    via prompt injection (S-04) even if it escapes the delimiter.
+    """
     init_db()
     job = make_job(temporary_database)
     application = make_application(job, status="submitted", email_ref="hal001", current_stage=None)
@@ -110,7 +111,8 @@ async def test_acknowledgement_end_to_end_leaves_status_and_stage_untouched(temp
     regressed, register_new_stage would register the volunteered stage as
     legitimately new, and advance_application would then find it 'known'
     and write it to current_stage. That coupling was previously untested —
-    this is the test that would catch a regression in it."""
+    this is the test that would catch a regression in it.
+    """
     init_db()
     job = make_job(temporary_database)
     application = make_application(job, status="submitted", email_ref="ack001", current_stage=None)

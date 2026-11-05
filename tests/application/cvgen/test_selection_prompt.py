@@ -55,7 +55,8 @@ async def _prefix_sent(pool):
 async def test_prompt_forbids_claims_the_profile_skills_deny():
     """2026-09-24: the tailored summary claimed "production web applications with
     Python" while the profile's skills said no Python in production. The skills
-    notes must reach the prompt, and the prompt must treat them as limits."""
+    notes must reach the prompt, and the prompt must treat them as limits.
+    """
     profile = {**PROFILE, "skills": [{"name": "Python", "notes": "studied, never in production"}]}
     call, calls = recording_caller(json.dumps({"decision": "USE_BASE"}))
     await decide_cv(

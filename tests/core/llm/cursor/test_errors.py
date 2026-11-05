@@ -62,7 +62,8 @@ async def test_call_cursor_errors_clearly_when_no_binary_is_on_path():
 @pytest.mark.parametrize("group_already_gone", [False, True])
 async def test_call_cursor_kills_a_subprocess_that_does_not_answer_in_time(group_already_gone):
     """Same rule as the claude CLI: a hung agent is killed with its process
-    group, and a group that already exited is not an error."""
+    group, and a group that already exited is not an error.
+    """
 
     async def never_answers(input=None):  # noqa: A002 - mirrors Process.communicate(input=...)
         await asyncio.sleep(3600)

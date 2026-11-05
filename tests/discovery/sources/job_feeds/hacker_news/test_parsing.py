@@ -33,7 +33,8 @@ async def test_hn_parse_title_truncates_long_rest_after_separator():
     which the tag-strip turns into a space, not a newline -- so 'first line'
     is really 'the whole flattened comment' and an unbounded `rest` after
     the first separator became the entire ~1200-char posting. Cap it like
-    the no-separator fallback already caps full_text."""
+    the no-separator fallback already caps full_text.
+    """
     long_rest = "Senior Engineer, Genomics Infrastructure | Memphis, TN | ONSITE or REMOTE | " + (
         "x" * 200
     )
@@ -68,7 +69,8 @@ async def test_hn_parse_title_falls_through_when_separator_leads_with_empty_comp
     """A first line starting with the '|' separator strips to an empty
     company on that attempt -- must fall through (not return an empty
     company) to try '-' next and, since this fixture has no '-' either,
-    all the way to the final prose fallback."""
+    all the way to the final prose fallback.
+    """
     text = "| Remote position available now for engineers"
     url_map = hn_url_map(kids=(201,))
     url_map[f"{HN_BASE}/item/201.json"] = {"id": 201, "text": text}
@@ -123,7 +125,8 @@ async def test_hn_header_segments_fill_remote_type_and_location(header, remote_t
 
 async def test_hn_remote_word_in_the_body_does_not_set_remote_type():
     """Only the pipe-separated header counts: 'remote' in the prose of the JD is
-    not a statement about this posting's workplace."""
+    not a statement about this posting's workplace.
+    """
     body = "Acme | Backend Engineer | Austin " + ("blah " * 80) + "| we are not remote-friendly"
     job = await _hn_job(body)
     assert job.remote_type is None

@@ -11,7 +11,8 @@ async def test_call_cli_kills_a_subprocess_that_does_not_answer_in_time(group_al
     """One `claude -p` call hung for the whole 300 s on a 1,351-character page
     (llm-tests-forge run, 2026-09-25): nothing ended it but the harness. The
     whole process group is killed (see tests/core/llm/test_isolation.py for the real
-    processes), and a group that exited in the meantime is not an error."""
+    processes), and a group that exited in the meantime is not an error.
+    """
 
     async def never_answers(input=None):  # noqa: A002 - mirrors Process.communicate(input=...)
         await asyncio.sleep(3600)

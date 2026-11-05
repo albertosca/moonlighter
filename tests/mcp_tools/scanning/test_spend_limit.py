@@ -19,7 +19,8 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(temporary_datab
     and chunk 1 sees the stop event and touches nothing else.
 
     This test FAILS if the _release loop is removed from the spend-limit except
-    clause: without release, chunk 0's 4 jobs end up with a ScanLog but no Job."""
+    clause: without release, chunk 0's 4 jobs end up with a ScanLog but no Job.
+    """
     init_db()
 
     raws = [
@@ -77,7 +78,8 @@ async def test_scan_spend_limit_stops_further_batches(temporary_database):
     With scan_concurrency=1 the chunks are serialized: chunk 0 calls
     evaluate_jobs_batch (which raises spend-limit), sets the stop event, and
     releases the semaphore; chunks 1 and 2 see the stop before calling
-    evaluate_jobs_batch. Concrete proof of early stop: call_count == 1, not 3."""
+    evaluate_jobs_batch. Concrete proof of early stop: call_count == 1, not 3.
+    """
     init_db()
 
     raws = [

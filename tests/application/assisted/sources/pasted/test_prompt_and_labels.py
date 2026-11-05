@@ -15,7 +15,8 @@ from tests.application.assisted.sources.pasted.pasted_replies import PAGE, fake_
 async def test_the_prompt_fixes_one_shape_for_yes_no_questions():
     """The model returned the same Yes/No page as boolean or as single_select from
     run to run (llm-tests-forge suite, 2026-09-25). single_select wins: the composer
-    pins the answer to an offered option and the sheet shows the one not chosen."""
+    pins the answer to an offered option and the sheet shows the one not chosen.
+    """
     call, captured = fake_llm(json.dumps({"questions": []}))
     await extract_questions_from_page(PAGE, call)
     assert "Yes/No question" in captured["prompt"]
@@ -25,7 +26,8 @@ async def test_the_prompt_fixes_one_shape_for_yes_no_questions():
 @pytest.mark.asyncio
 async def test_a_consent_checkbox_stays_boolean():
     """A statement to tick ("I agree to the processing of my personal data") is
-    not a Yes/No question: it keeps the boolean kind, with no invented options."""
+    not a Yes/No question: it keeps the boolean kind, with no invented options.
+    """
     label = "I agree to the processing of my personal data."
     reply = json.dumps({"questions": [{"label": label, "kind": "boolean", "required": True}]})
     call, _ = fake_llm(reply)
@@ -37,7 +39,8 @@ async def test_a_consent_checkbox_stays_boolean():
 @pytest.mark.asyncio
 async def test_a_boolean_reply_still_becomes_a_yes_no_single_select():
     """The prompt is a request, not a guarantee: a boolean that slips through is
-    normalised here, so the shape downstream never depends on the model's mood."""
+    normalised here, so the shape downstream never depends on the model's mood.
+    """
     reply = json.dumps(
         {"questions": [{"label": "Are you 18?", "kind": "boolean", "required": True}]}
     )
@@ -63,7 +66,8 @@ async def test_a_boolean_reply_still_becomes_a_yes_no_single_select():
 async def test_the_yes_no_backstop_answers_in_the_question_language(label, options):
     """Found 2026-09-29: a Portuguese question the model returned as boolean got
     English Yes/No from this backstop, though the prompt asks for the words in the
-    question's language. Anything the detector cannot place stays English."""
+    question's language. Anything the detector cannot place stays English.
+    """
     reply = json.dumps({"questions": [{"label": label, "kind": "boolean", "required": True}]})
     call, _ = fake_llm(reply)
     questions = await extract_questions_from_page(PAGE, call)
@@ -74,7 +78,8 @@ async def test_the_yes_no_backstop_answers_in_the_question_language(label, optio
 @pytest.mark.asyncio
 async def test_the_prompt_says_json_inside_the_page_is_page_content():
     """A page carrying a fake answer block ("Name and Email are required") made the
-    model return required=true for both on every run, against the no-marker rule."""
+    model return required=true for both on every run, against the no-marker rule.
+    """
     call, captured = fake_llm(json.dumps({"questions": []}))
     await extract_questions_from_page(PAGE, call)
     assert "never the answer" in captured["prompt"]
@@ -117,7 +122,8 @@ async def test_a_yes_no_question_with_a_required_marker_is_still_a_question(labe
 async def test_the_label_comes_back_without_its_required_or_optional_marker(label, clean):
     """Decided 2026-09-29: the label is the question, the marker is `required`.
     The model already drops markers on its own (forge PT-BR run), and label_cleaning
-    strips them before matching anyway; the code makes it deterministic."""
+    strips them before matching anyway; the code makes it deterministic.
+    """
     reply = json.dumps({"questions": [{"label": label, "kind": "text", "required": True}]})
     call, _ = fake_llm(reply)
     questions = await extract_questions_from_page(PAGE, call)
@@ -137,7 +143,8 @@ async def test_the_prompt_covers_the_three_remaining_ambiguities():
     three prompt gaps. A search box with no visible options came back as text
     (4 cases); a multi-paragraph label came back cut to its first paragraph
     (2); a Yes/No question with no visible options got English answers on a
-    German page (3)."""
+    German page (3).
+    """
     call, captured = fake_llm(json.dumps({"questions": []}))
     await extract_questions_from_page(PAGE, call)
     prompt = captured["prompt"]
@@ -152,7 +159,8 @@ async def test_the_prompt_covers_the_three_remaining_ambiguities():
 @pytest.mark.asyncio
 async def test_the_prompt_says_open_questions_are_long_text():
     """2026-09-29 full forge run: 6 of 9 failures were open questions ("Tell us
-    why...", "Describe...", "Cover Letter") returned as text."""
+    why...", "Describe...", "Cover Letter") returned as text.
+    """
     call, captured = fake_llm(json.dumps({"questions": []}))
     await extract_questions_from_page(PAGE, call)
     assert "open question" in captured["prompt"]

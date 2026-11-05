@@ -13,7 +13,8 @@ pytestmark = pytest.mark.usefixtures("_no_real_cursor_projects")
 
 def test_cursor_project_slug_matches_the_directory_cursor_creates():
     """Dots and underscores are dashes, and a doubled dash collapses. A path
-    under ~/.moonlighter misses the real directory if either rule is dropped."""
+    under ~/.moonlighter misses the real directory if either rule is dropped.
+    """
     assert (
         _cursor_project_slug(Path("/Users/ada/.moonlighter/cli-workdir"))
         == "Users-ada-moonlighter-cli-workdir"
@@ -25,9 +26,10 @@ def test_cursor_project_slug_matches_the_directory_cursor_creates():
 
 
 def test_forget_cursor_call_removes_the_project_named_after_the_workspace(tmp_path, monkeypatch):
-    """The jsonl stores a newline as the two characters \\n, so matching the
+    r"""The jsonl stores a newline as the two characters \n, so matching the
     prompt text misses every real prompt. The trust file names the workspace,
-    and that is what selects the project. A stranger project stays."""
+    and that is what selects the project. A stranger project stays.
+    """
     root = tmp_path / "projects"
     root.mkdir()
     monkeypatch.setattr("moonlighter.core.llm.cursor_projects._cursor_projects_root", lambda: root)

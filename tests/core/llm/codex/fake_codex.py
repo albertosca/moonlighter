@@ -22,7 +22,8 @@ def fake_codex(
     answer: str | None, *, login: bytes = LOGGED_IN, login_code: int = 0, login_stderr: bytes = b""
 ):
     """create_subprocess_exec stand-in: `login status` first, then `exec`, which
-    writes `answer` to the `--output-last-message` file the way the real CLI does."""
+    writes `answer` to the `--output-last-message` file the way the real CLI does.
+    """
     calls: list[tuple[tuple[str, ...], dict]] = []
     processes: list[MagicMock] = []
 

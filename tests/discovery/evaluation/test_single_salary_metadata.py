@@ -35,7 +35,8 @@ async def test_evaluate_job_invalid_salary_source_becomes_none():
 
 async def test_evaluate_job_non_hashable_salary_source_becomes_none():
     """S-05: a non-string (unhashable) salary_source from the LLM must not crash
-    the validator — it becomes None like any other invalid value, never raises."""
+    the validator — it becomes None like any other invalid value, never raises.
+    """
     caller = make_caller(
         json.dumps(
             {

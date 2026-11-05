@@ -58,7 +58,8 @@ async def test_unrelated_email_skipped_and_marked_processed(temporary_database):
 
 async def test_every_email_recorded_locally_without_gmail_writes(temporary_database):
     """Read-only by default: no email is touched on Gmail; each one is recorded
-    locally in ProcessedEmail."""
+    locally in ProcessedEmail.
+    """
     init_db()
     classify_result = {
         "type": "unrelated",

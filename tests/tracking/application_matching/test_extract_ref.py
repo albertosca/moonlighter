@@ -43,7 +43,8 @@ class TestExtractRef:
     def test_multiple_plus_signs_ref_includes_everything_after_first_plus(self):
         """Documents the actual partition behavior: only the FIRST '+' splits
         local-part from ref, so a second '+' becomes part of the ref value
-        itself rather than being treated as a delimiter."""
+        itself rather than being treated as a delimiter.
+        """
         to_header = "candidaturas+ref+extra@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) == "ref+extra"
 
@@ -64,7 +65,8 @@ class TestExtractRef:
         the '+' (short of '@' or ',') comes back verbatim. This is safe because
         callers only ever use it for an EXACT equality lookup against
         Application.email_ref (see _match_by_ref) — never interpolated into a
-        query or command, so there is no injection surface here."""
+        query or command, so there is no injection surface here.
+        """
         to_header = "candidaturas+'; DROP TABLE apps;--@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) == "'; DROP TABLE apps;--"
 
@@ -72,14 +74,16 @@ class TestExtractRef:
         """'gmail.com.evil.com' must never be treated as 'gmail.com' — the
         security property extract_ref exists for (S-06: unspoofable +ref
         signal) requires the domain comparison to_header be an exact match, not a
-        suffix/substring check."""
+        suffix/substring check.
+        """
         to_header = "candidaturas+ref@gmail.com.evil.com"
         assert extract_ref(to_header, BASE_EMAIL) is None
 
     def test_base_domain_as_suffix_of_attacker_local_part_does_not_match(self):
         """An attacker-chosen local part that merely CONTAINS the real local
         part is not a match — comparison is on the full local part before '+',
-        not a substring/suffix check."""
+        not a substring/suffix check.
+        """
         to_header = "evilcandidaturas+ref@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) is None
 
@@ -89,7 +93,8 @@ class TestExtractRef:
     def test_first_matching_recipient_wins_when_several_match(self):
         """Multiple recipients could, in principle, both match the base
         address with different refs (e.g. forwarded/CC'd copies) — the first
-        one found in iteration order is returned, deterministically."""
+        one found in iteration order is returned, deterministically.
+        """
         to_header = "candidaturas+first@gmail.com, candidaturas+second@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) == "first"
 
@@ -108,14 +113,16 @@ class TestExtractRef:
     def test_no_false_extraction_for_non_matching_input(self, to_header):
         """Property: for any To-field that does not contain a genuine alias of
         base_address, extract_ref must return None — never fabricate a ref
-        from an unrelated address. This is the core anti-spoofing guarantee."""
+        from an unrelated address. This is the core anti-spoofing guarantee.
+        """
         assert extract_ref(to_header, BASE_EMAIL) is None
 
     @pytest.mark.parametrize("reference", ["a", "x7k2mp", "AB-cd_12", "123456", "r" * 64])
     def test_round_trips_ref_for_well_formed_alias(self, reference):
         """Property: for a well-formed alias of base_address, extract_ref
         recovers exactly the ref that was embedded — no truncation, no
-        mangling, for a range of ref shapes."""
+        mangling, for a range of ref shapes.
+        """
         to_header = f"candidaturas+{reference}@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) == reference
 

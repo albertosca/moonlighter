@@ -21,7 +21,8 @@ async def test_llm_failure_does_not_burn_the_message_and_retries_on_next_sync(te
     exception, and drop the try/except around it in _classify) and
     this test fails — the first sync marks msg0 processed via the
     'unrelated' fallback, so the second sync's healthy caller never even
-    gets invoked for it."""
+    gets invoked for it.
+    """
     init_db()
     job = make_job(temporary_database)
     application = make_application(job, status="submitted", email_ref="fail001")
@@ -83,7 +84,8 @@ async def test_spend_limit_stops_the_loop_instead_of_burning_remaining_messages(
     the failing message: retrying every remaining message against a dead
     quota wastes the whole batch. Proven by call count — parse_message must
     only be invoked once, for the message that hit the limit; the second
-    message is never even looked at."""
+    message is never even looked at.
+    """
     init_db()
     job1 = make_job(temporary_database)
     application1 = make_application(job1, status="submitted", email_ref="sl001")

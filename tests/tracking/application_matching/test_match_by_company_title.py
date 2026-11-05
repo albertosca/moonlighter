@@ -10,7 +10,8 @@ class TestMatchByCompanyTitle:
     """Direct unit tests for the fuzzy company+title matcher. It only ever
     feeds a 'fuzzy' suggestion (never an auto-mutation — see S-06 tests in
     TestSyncResponses), so the safety property under test here is: ambiguity
-    must yield None, never a silently-picked wrong Application."""
+    must yield None, never a silently-picked wrong Application.
+    """
 
     def test_exact_single_match_returns_application(self, temporary_database):
         init_db()
@@ -32,7 +33,8 @@ class TestMatchByCompanyTitle:
         """Two active applications with the same company+title: the matcher
         must refuse to guess — returning None is the safe behavior, since
         picking either one at random would risk mutating the WRONG
-        application's status/notes."""
+        application's status/notes.
+        """
         init_db()
         job1 = make_job(
             temporary_database, company="Stripe", title="Engineer", url="https://x.com/a"
@@ -92,7 +94,8 @@ class TestMatchByCompanyTitle:
     def test_inactive_status_applications_are_excluded(self, temporary_database):
         """A 'rejected' or 'draft' Application must never surface as a fuzzy
         match target — only _ACTIVE_STATUSES are eligible, so a stale/closed
-        application can't get reopened by a coincidental company+title hit."""
+        application can't get reopened by a coincidental company+title hit.
+        """
         init_db()
         job = make_job(temporary_database, company="Anthropic", title="Senior Engineer")
         make_application(job, status="rejected")
@@ -102,7 +105,8 @@ class TestMatchByCompanyTitle:
 
     def test_active_match_found_even_with_an_inactive_duplicate(self, temporary_database):
         """A rejected duplicate for the same company+title must not make an
-        otherwise-unique active match look ambiguous."""
+        otherwise-unique active match look ambiguous.
+        """
         init_db()
         job = make_job(temporary_database, company="Anthropic", title="Senior Engineer")
         make_application(job, status="rejected")
@@ -114,7 +118,8 @@ class TestMatchByCompanyTitle:
 
     def test_company_filter_alone_is_ambiguous_across_two_titles(self, temporary_database):
         """Same company, two different active roles, no job_title given to
-        disambiguate → None, not an arbitrary pick."""
+        disambiguate → None, not an arbitrary pick.
+        """
         init_db()
         job1 = make_job(
             temporary_database, company="Anthropic", title="Backend Engineer", url="https://x/1"

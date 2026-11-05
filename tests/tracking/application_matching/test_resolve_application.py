@@ -7,7 +7,7 @@ from tests.tracking.pipeline_rows import make_application, make_job
 
 
 def test_resolve_application_ref_no_match_falls_through(temporary_database):
-    """ref given but no Application → DoesNotExist swallowed, falls through to fuzzy (422-423)."""
+    """A ref given but no Application → DoesNotExist swallowed, falls through to fuzzy (422-423)."""
     init_db()
     application, match = resolve_application(
         "nonexistent_ref", {"company": None, "job_title": None}
@@ -45,7 +45,7 @@ def test_resolve_application_no_company_no_title_is_uncertain(temporary_database
 
 
 def test_resolve_application_fuzzy_zero_matches_is_uncertain(temporary_database):
-    """company with no matching Application → 0 results → uncertain (444->448)."""
+    """A company with no matching Application → 0 results → uncertain (444->448)."""
     init_db()
     application, match = resolve_application(
         None, {"company": "NonexistentCompany", "job_title": None}

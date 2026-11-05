@@ -37,7 +37,8 @@ async def test_detach_disconnects_playwright_but_leaves_the_browser_running():
     """A captcha token minted in a CDP-controlled tab does not validate
     server-side, so handing the page back means genuinely letting go: stop the
     Playwright driver, keep the window and its filled form alive for the human.
-    Killing the process would throw away the work."""
+    Killing the process would throw away the work.
+    """
     mock_browser = MagicMock()
     mock_browser.close = AsyncMock()
     mock_pw = MagicMock()
@@ -67,7 +68,8 @@ async def test_detach_is_safe_when_nothing_is_connected():
 
 async def test_detach_forgets_the_connection_even_if_closing_fails():
     """A driver that errors on the way out must not leave a stale handle behind —
-    the next operation would reuse a dead connection."""
+    the next operation would reuse a dead connection.
+    """
     mock_browser = MagicMock()
     mock_browser.close = AsyncMock(side_effect=RuntimeError("already gone"))
     mock_pw = MagicMock()

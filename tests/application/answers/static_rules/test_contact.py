@@ -24,7 +24,8 @@ def test_full_name():
     """A single "Full name" field is the norm outside the Greenhouse/Lever
     first+last convention. Without a rule it fell through to the LLM, which
     answered "full legal name is not present in the profile" -- leaving a
-    required field blank on a real application (live Recruitee, 2026-08-03)."""
+    required field blank on a real application (live Recruitee, 2026-08-03).
+    """
     result = pre_populate_answers(["Full name"], PROFILE)
     assert result["Full name"] == "Maria de Souza Pereira"
 
@@ -39,7 +40,8 @@ def test_a_bare_name_label_is_the_full_name():
     """Ashby's application page asks for a single "Name" field. With no rule it
     went to the LLM, which answered "I DON'T KNOW — no basis in your profile"
     (ElevenLabs #6675, 2026-09-25). Reproduced 2026-09-29: the extractor returns
-    the field every time; the miss was here."""
+    the field every time; the miss was here.
+    """
     for label in ["Name", "Name *", "*\nName", "Your name"]:
         answers = pre_populate_answers([label], PROFILE)
         assert answers.get(label) == "Maria de Souza Pereira", f"{label!r} was not filled"

@@ -39,7 +39,8 @@ def test_returns_service_when_token_exists(tmp_path):
 def test_resolves_a_relative_token_path_under_moonlighter_home(tmp_path, monkeypatch):
     """IMPORTANT 6: token_path defaults to a relative filename now
     ("gmail-token.json"), and setup_gmail_service must resolve it under
-    MOONLIGHTER_HOME rather than treating it as relative to the cwd."""
+    MOONLIGHTER_HOME rather than treating it as relative to the cwd.
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     (tmp_path / "gmail-token.json").write_text("{}")
 
@@ -83,7 +84,8 @@ def test_refreshed_token_is_not_written_back_to_a_foreign_file(tmp_path, monkeyp
     """The token may be shared with another project that owns and refreshes
     it. Writing google-auth's serialisation over it rewrites its shape (a
     `scopes` list where the owner keeps a `scope` string, plus expiry and
-    universe_domain) and can break the owner. Refresh in memory instead."""
+    universe_domain) and can break the owner. Refresh in memory instead.
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     foreign = tmp_path / "outro-projeto" / "token.json"
     foreign.parent.mkdir(parents=True)

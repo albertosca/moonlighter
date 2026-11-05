@@ -12,7 +12,8 @@ from tests.discovery.scan_fakes import CONFIG, FakeBrowserScanner, make_raw_job,
 async def test_run_browser_scanner_browser_launch_failure_is_silent():
     """If browser.new_page() itself raises (no browser configured, launch error),
     the browser-scanner plugin is skipped silently -- same as any other failure,
-    it must not block the HTTP results."""
+    it must not block the HTTP results.
+    """
     with patch("moonlighter.core.browser", create=True) as mock_browser:
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
         jobs, warning = await _run_browser_scanner(FakeBrowserScanner, "engineer", CONFIG)

@@ -59,7 +59,8 @@ async def test_fuzzy_match_never_registers_a_new_stage(temporary_database):
     """S-06 hardening: a spoofed email (no ref) that proposes a new_stage
     must not get it registered into the shared interview_stages config —
     only a ref-confirmed match may influence anything, including stage
-    registration."""
+    registration.
+    """
     init_db()
     job = make_job(temporary_database, company="Stripe", title="Backend Engineer")
     make_application(job, status="submitted", email_ref=None)
@@ -106,7 +107,8 @@ async def test_fuzzy_match_never_registers_a_new_stage(temporary_database):
 async def test_legitimately_registered_new_stage_is_accepted(temporary_database):
     """A declared new_stage (registered via register_new_stage BEFORE
     advance_application runs) must be accepted — it's not hallucination,
-    it's a deliberate feature."""
+    it's a deliberate feature.
+    """
     init_db()
     job = make_job(temporary_database)
     application = make_application(job, status="submitted", email_ref="ns001", current_stage=None)

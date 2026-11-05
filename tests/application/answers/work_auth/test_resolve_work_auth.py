@@ -114,7 +114,8 @@ def test_resolve_unrecognized_citizenship_needs_review():
 def test_resolve_work_auth_for_ambiguous_canada_string_needs_review_not_us():
     """End to end: an authorization field with location 'Toronto, CA' (the
     inferred country must be None, not 'united states') cannot answer as if
-    the job were in the US — it must fall through to review."""
+    the job were in the US — it must fall through to review.
+    """
     country = infer_country("Toronto, CA", None)
     assert country is None
     answer = resolve_work_auth("Are you authorized to work in the US?", country, WA_CONFIG)

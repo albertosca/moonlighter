@@ -60,7 +60,7 @@ async def test_evaluate_job_non_integer_salary_becomes_none():
 
 
 async def test_evaluate_job_bool_salary_becomes_none():
-    """bool is an int subclass in Python — must be explicitly rejected."""
+    """A bool is an int subclass in Python — must be explicitly rejected."""
     caller = make_caller(
         json.dumps(
             {

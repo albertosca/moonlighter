@@ -32,7 +32,8 @@ async def test_greenhouse_url_routes_to_board_api():
 @pytest.mark.asyncio
 async def test_greenhouse_posting_carries_its_location():
     """add_job hands the location to the evaluator's regional filter; without it the
-    LLM judges eligibility from the description alone (the 2026-08-21 gitlab class)."""
+    LLM judges eligibility from the description alone (the 2026-08-21 gitlab class).
+    """
     job = {**GREENHOUSE_JOB, "location": {"name": "Bangalore, India"}}
     client_class, _client_mock = fake_client(job)
     with patch("httpx.AsyncClient", client_class):
@@ -45,7 +46,8 @@ async def test_greenhouse_posting_carries_its_location():
 @pytest.mark.asyncio
 async def test_greenhouse_fetch_error_returns_none():
     """A non-200 from the board API (e.g. a stale/deleted job_id) is a FetchError,
-    swallowed so the caller falls back to the generic HTML fetch."""
+    swallowed so the caller falls back to the generic HTML fetch.
+    """
     response = MagicMock(status_code=404)
     client = AsyncMock()
     client.get = AsyncMock(return_value=response)

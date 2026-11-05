@@ -52,7 +52,8 @@ def test_infer_country_us_state_codes_still_match():
 
 def test_infer_country_canadian_city_with_ambiguous_ca_country_code_is_not_us():
     """'Toronto, CA' and 'Vancouver, CA' use CA as the country code (Canada),
-    not the US state code — must never resolve to 'united states'."""
+    not the US state code — must never resolve to 'united states'.
+    """
     assert infer_country("Toronto, CA", None) is None
     assert infer_country("Vancouver, CA", None) is None
 
@@ -60,7 +61,8 @@ def test_infer_country_canadian_city_with_ambiguous_ca_country_code_is_not_us():
 def test_infer_country_ca_is_always_ambiguous_never_resolves_to_a_country():
     """Conservative rule holds for ANY ', CA' location: a made-up US-California
     city and a made-up Canadian city both resolve to None (needs review) —
-    the rule does not special-case real Canadian markers or real CA cities."""
+    the rule does not special-case real Canadian markers or real CA cities.
+    """
     assert infer_country("Anytown, CA", None) is None
     assert infer_country("Notrealburg, CA", None) is None
     # Real US cities with ', CA' are no longer resolved either: conservative
@@ -71,7 +73,8 @@ def test_infer_country_ca_is_always_ambiguous_never_resolves_to_a_country():
 
 def test_infer_country_us_state_ny_still_resolves_to_us():
     """Control: a non-ambiguous US state code (NY) is unaffected by the CA
-    conservative rule and still resolves to 'united states'."""
+    conservative rule and still resolves to 'united states'.
+    """
     assert infer_country("Buffalo, NY", None) == "united states"
 
 

@@ -39,7 +39,8 @@ def test_build_email_alias_different_refs():
 
 def test_is_email_label_matches_ptbr_hyphenated_required_label():
     """'E-mail*' (PT, hyphen, required asterisk) is the live shape that once
-    needed a normalization fix — it must keep matching."""
+    needed a normalization fix — it must keep matching.
+    """
     assert is_email_label("E-mail*")
 
 

@@ -10,7 +10,8 @@ from tests.core.migrations.unmigrated_db import fresh_db
 
 def _real_shaped_db(path, open_dbs):
     """Simulates Alberto's real DB: email_ref/current_stage/closed_at already
-    exist (from the old ad-hoc ALTERs) but there is NO schema_version table."""
+    exist (from the old ad-hoc ALTERs) but there is NO schema_version table.
+    """
     db = fresh_db(path, open_dbs)
     db.execute_sql("ALTER TABLE application ADD COLUMN email_ref VARCHAR(8) NULL")
     db.execute_sql("ALTER TABLE application ADD COLUMN current_stage VARCHAR(255) NULL")
@@ -28,7 +29,8 @@ def test_run_migrations_resumes_from_existing_schema_version_row(tmp_path, monke
     got partway through, or completed). `_ensure_schema_version_table` must
     leave that row alone rather than re-seeding it back to 0 — only the
     still-pending migrations run, and the version continues climbing from
-    where it left off."""
+    where it left off.
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     db = fresh_db(tmp_path / "t.db", open_dbs)
     db.execute_sql("CREATE TABLE schema_version (version INTEGER NOT NULL)")
@@ -62,7 +64,8 @@ def test_idempotence_on_real_shaped_db_never_raises(tmp_path, monkeypatch, open_
     """THE critical invariant: Alberto's real DB already has the three columns
     from the old ad-hoc ALTERs but no schema_version table (detected version 0).
     Running the migrations against it must be a safe no-op per column and
-    converge to the latest version — never raise "column already exists"."""
+    converge to the latest version — never raise "column already exists".
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     db = _real_shaped_db(tmp_path / "t.db", open_dbs)
 

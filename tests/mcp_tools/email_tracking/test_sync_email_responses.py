@@ -75,7 +75,8 @@ async def test_sync_email_responses_empty_inbox(temporary_database):
 
 async def test_sync_email_responses_flags_fuzzy_match_as_suggestion(temporary_database):
     """S-06: the sync_email_responses report must tell the human a fuzzy match
-    was NOT applied and needs manual update_status confirmation."""
+    was NOT applied and needs manual update_status confirmation.
+    """
     init_db()
 
     with patch(

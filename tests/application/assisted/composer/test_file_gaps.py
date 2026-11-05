@@ -53,7 +53,8 @@ async def test_a_cv_file_gap_names_the_tailored_pdf_with_review_instruction(tmp_
 async def test_a_non_cv_file_gap_does_not_name_the_cv(tmp_path):
     """A "Cover letter" file field whose gap says "upload this file yourself:
     <the CV>" instructs the operator to attach the wrong document — found on
-    the GitLab gate sheet (2026-08-13). Only CV-shaped labels get the path."""
+    the GitLab gate sheet (2026-08-13). Only CV-shaped labels get the path.
+    """
     cv_path = tmp_path / "cv.pdf"
     cv_path.write_bytes(b"%PDF-1.4")
     question = FormQuestion(label="Cover Letter", kind=QuestionKind.FILE, required=False)

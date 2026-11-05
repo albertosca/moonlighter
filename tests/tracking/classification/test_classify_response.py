@@ -38,7 +38,8 @@ class TestClassifyResponse:
 
     async def test_passes_model_to_caller(self, message):
         """Regression BUG-02: the real caller (call_cli, or make_api_caller's) requires (prompt, model)
-        with no default. classify_response must pass the model positionally."""
+        with no default. classify_response must pass the model positionally.
+        """
         received = {}
 
         async def strict_caller(prompt, model):  # no default → catches a 1-arg call
@@ -155,7 +156,8 @@ class TestClassifyResponse:
         successful classification of 'unrelated' — see ClassificationError's
         docstring (whole-branch Finding 1): treating parse failure as
         'unrelated' let sync_responses mark the message permanently processed,
-        losing a real reply the model simply failed to answer for."""
+        losing a real reply the model simply failed to answer for.
+        """
 
         async def bad_caller(prompt, model=None):
             return "not JSON"

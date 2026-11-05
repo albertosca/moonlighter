@@ -56,7 +56,8 @@ async def test_the_pasted_text_is_wrapped_as_untrusted():
 async def test_an_unparseable_reply_is_an_error_not_an_empty_page():
     """It used to return [], which the paste flow reported as "no questions -
     was the whole page copied?": the person re-copied a page that was fine.
-    Seen in the forge run of 2026-09-29 (salary case, 1 of 2 runs)."""
+    Seen in the forge run of 2026-09-29 (salary case, 1 of 2 runs).
+    """
     call, _ = fake_llm("sorry, I cannot help with that")
     with pytest.raises(ExtractionError, match="sorry, I cannot help"):
         await extract_questions_from_page(PAGE, call)

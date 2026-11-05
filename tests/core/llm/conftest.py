@@ -19,6 +19,7 @@ def _fake_claude_on_path():
     machine running them (it never is in CI). Fix `shutil.which` to a stable
     fake path for every test that requests this fixture; tests that need a different
     resolution (found elsewhere, or absent) patch it explicitly, which
-    overrides this outer patch for their duration."""
+    overrides this outer patch for their duration.
+    """
     with patch("shutil.which", return_value="/usr/local/bin/claude"):
         yield

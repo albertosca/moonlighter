@@ -10,7 +10,6 @@ from tests._context import make_test_context
 
 async def test_setup_email_calls_gmail_flow():
     """setup_email should start the OAuth flow and confirm success."""
-
     test_config = {
         "email": {
             "address": "candidaturas@gmail.com",
@@ -32,7 +31,6 @@ async def test_setup_email_calls_gmail_flow():
 
 async def test_setup_email_raises_friendly_error_when_client_json_missing():
     """setup_email should return a clear message if gmail-client.json does not exist."""
-
     test_config = {
         "email": {
             "address": "candidaturas@gmail.com",
@@ -50,8 +48,8 @@ async def test_setup_email_resolves_a_relative_credentials_path_under_moonlighte
 ):
     """IMPORTANT 6: DEFAULTS ships relative filenames ("gmail-client.json"), and
     setup_email must resolve them under MOONLIGHTER_HOME -- not hardcode
-    ~/.moonlighter, which ignores a MOONLIGHTER_HOME override."""
-
+    ~/.moonlighter, which ignores a MOONLIGHTER_HOME override.
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     (tmp_path / "gmail-client.json").write_text("{}")
     test_config = {
@@ -73,8 +71,8 @@ async def test_setup_email_resolves_a_relative_credentials_path_under_moonlighte
 
 async def test_setup_email_leaves_an_absolute_credentials_path_untouched(tmp_path, monkeypatch):
     """A user who already points credentials_path at their own absolute location
-    must not have it silently rewritten to somewhere under MOONLIGHTER_HOME."""
-
+    must not have it silently rewritten to somewhere under MOONLIGHTER_HOME.
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "not-this-one"))
     creds = tmp_path / "somewhere-else" / "client.json"
     creds.parent.mkdir()
@@ -98,8 +96,8 @@ async def test_setup_email_leaves_an_absolute_credentials_path_untouched(tmp_pat
 async def test_setup_email_missing_credentials_path_gives_a_clear_message():
     """MINOR 8: Path("").expanduser() is ".", a directory that always exists --
     without this guard the tool falls through to a confusing 'Is a directory'
-    failure deep in the OAuth flow instead of naming the actual problem."""
-
+    failure deep in the OAuth flow instead of naming the actual problem.
+    """
     test_config = {"email": {"token_path": "gmail-token.json"}}
     result = await setup_email(context=make_test_context(config=test_config))
     assert "credentials_path" in result
@@ -108,7 +106,6 @@ async def test_setup_email_missing_credentials_path_gives_a_clear_message():
 
 async def test_setup_email_handles_auth_error(tmp_path):
     """GmailAuthError during OAuth → friendly message (mcp_tools.email_tracking.setup_email)."""
-
     creds = tmp_path / "gmail-client.json"
     creds.write_text("{}")
     test_config = {
@@ -125,7 +122,6 @@ async def test_setup_email_handles_auth_error(tmp_path):
 
 async def test_setup_email_handles_unexpected_error(tmp_path):
     """Unexpected exception during OAuth → unexpected-error message (mcp_tools.email_tracking.setup_email)."""
-
     creds = tmp_path / "gmail-client.json"
     creds.write_text("{}")
     test_config = {

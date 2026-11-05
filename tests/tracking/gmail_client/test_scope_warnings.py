@@ -26,7 +26,8 @@ def test_required_scope_is_modify_when_opted_in():
 def test_setup_gmail_service_warns_on_broader_scope_than_needed(tmp_path, caplog):
     """S-08: a token with gmail.modify when only gmail.readonly is required (the
     default, mark_processed=false) triggers a one-time warning — never
-    auto-revoke, just say so plainly."""
+    auto-revoke, just say so plainly.
+    """
     token_path = str(tmp_path / "gmail-token.json")
     config = {
         "email": {
@@ -84,7 +85,8 @@ def test_setup_gmail_service_no_warning_when_scope_already_matches(tmp_path, cap
 
 def test_setup_gmail_service_no_warning_when_scopes_attr_is_a_mock(tmp_path, caplog):
     """Defensive: a mocked/unconfigured .scopes attribute (not a real list) must
-    never be iterated — the mismatch check is a no-op in that case."""
+    never be iterated — the mismatch check is a no-op in that case.
+    """
     token_path = str(tmp_path / "gmail-token.json")
     config = {
         "email": {

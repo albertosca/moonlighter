@@ -25,7 +25,8 @@ async def test_hn_scan_skips_deleted_comments():
 async def test_hn_fetch_kids_non_200_returns_empty():
     """The first call to /item/100.json (inside _find_latest_thread, checking
     the title) must succeed; the SECOND call to that same URL (inside
-    _fetch_kids) is what returns non-200."""
+    _fetch_kids) is what returns non-200.
+    """
 
     async def fake_get(url, headers=None):
         mock_response = MagicMock()

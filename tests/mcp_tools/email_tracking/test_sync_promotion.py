@@ -15,7 +15,8 @@ async def test_sync_email_responses_promotes_the_answers_of_an_application_an_em
     """The bank's only promotion trigger used to be update_status(..., 'submitted').
     An application whose status only ever advances because a reply arrived by
     email never passed through it, so its answers were never promoted — the
-    shared bank filled far more slowly than the design assumed."""
+    shared bank filled far more slowly than the design assumed.
+    """
     init_db()
 
     job = create_job(temporary_database, url="https://boards.greenhouse.io/acme/jobs/931")
@@ -55,7 +56,8 @@ async def test_sync_email_responses_does_not_promote_when_the_status_did_not_adv
 ):
     """An acknowledgement matches a real ref but moves nothing. A fuzzy match
     (S-06) never mutates the application at all. Neither is evidence to promote
-    on — promotion follows the advance, not the arrival of an email."""
+    on — promotion follows the advance, not the arrival of an email.
+    """
     init_db()
 
     job = create_job(temporary_database, url="https://boards.greenhouse.io/acme/jobs/932")

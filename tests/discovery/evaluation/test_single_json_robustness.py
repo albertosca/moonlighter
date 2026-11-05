@@ -83,7 +83,7 @@ async def test_evaluate_job_strips_leading_prose():
 
 
 async def test_evaluate_job_null_score_becomes_zero_keeps_notes():
-    """score null → 0.0 while preserving the notes (doesn't fall into 'evaluation error')."""
+    """A null score → 0.0 while preserving the notes (doesn't fall into 'evaluation error')."""
     caller = make_caller(json.dumps({"score": None, "score_notes": "no score", "caveats": ["x"]}))
     result = await evaluate_job(
         company="C",

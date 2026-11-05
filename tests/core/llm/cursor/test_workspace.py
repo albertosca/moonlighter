@@ -12,7 +12,8 @@ from tests.core.llm.fake_processes import cursor_process
 async def test_call_cursor_workspace_is_a_private_directory_per_call(tmp_path, monkeypatch):
     """Two calls in one home never share a workdir, and each directory is gone
     after the call. Mode is recorded while the process is starting: cleanup
-    removes the directory before this function resumes."""
+    removes the directory before this function resumes.
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     seen: list[tuple[Path, str]] = []
 

@@ -47,7 +47,8 @@ class FakeBrowserScanner:
     """Stands in for a registered moonlighter.scanners plugin (LinkedIn is the
     real-world example, provided by the private moonlighter-linkedin package --
     see docs/superpowers/specs/2026-07-22-linkedin-plugin-split-design.md).
-    run_scan configures its scan() return/raise per test via closure."""
+    run_scan configures its scan() return/raise per test via closure.
+    """
 
     _raised_error: Exception | None = None
     _jobs: ClassVar[list] = []

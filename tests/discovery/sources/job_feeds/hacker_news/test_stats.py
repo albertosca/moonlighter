@@ -52,7 +52,8 @@ async def test_hn_records_stats_counts_comment_gather_exceptions():
     (a 404'd or dead comment is indistinguishable and not an error, per the
     brief) -- but asyncio.gather(return_exceptions=True) can still surface a
     genuine Exception object if something above that try/except blows up.
-    That's what the error-counting formula is for; force one here directly."""
+    That's what the error-counting formula is for; force one here directly.
+    """
     url_map = hn_url_map(kids=(201, 202))
     mock_client = make_hn_client(url_map)
     with (

@@ -16,7 +16,8 @@ from tests.application.answers.candidate_profiles import PROFILE
 def test_a_demographic_label_is_not_answered_by_the_general_ladder():
     """The rules are deliberately NOT in _RULES: composer calls demographic_answer
     directly from inside its guard. If they were here, every other rule would get
-    the same bypass."""
+    the same bypass.
+    """
     for label in ["Gender", "Race", "Veteran status", "Disability status"]:
         assert label not in pre_populate_answers([label], PROFILE), label
 
@@ -124,7 +125,8 @@ def test_a_bare_ethnicity_label_is_not_served_the_race_value():
     `race`. Bare `Ethnicity` is not: on a US EEO form it usually means the
     Hispanic/Latino question, so serving `race` there is a guess. This rule was
     unreachable until `Ethnicity` became a sensitive label (2026-09-14); rather
-    than let the widening switch on a guess, the bare form stays a gap."""
+    than let the widening switch on a guess, the bare form stays a gap.
+    """
     assert demographic_answer("Race/Ethnicity", PROFILE) == "White"
     assert demographic_answer("Ethnicity", PROFILE) is None
 
@@ -147,7 +149,8 @@ def test_demographic_answer_coerces_a_yaml_boolean(raw, expected):
     """`profile.yaml` is read with yaml.safe_load (YAML 1.1), where an unquoted
     No/Yes parses as a bool. Left raw, False read as unconfigured (silently losing
     a configured answer) and True reached `known` as a non-str, crashing the whole
-    sheet with AttributeError: 'bool' object has no attribute 'strip'."""
+    sheet with AttributeError: 'bool' object has no attribute 'strip'.
+    """
     profile = {**PROFILE, "demographics": {"veteran_status": raw}}
     assert demographic_answer("Veteran status", profile) == expected
 

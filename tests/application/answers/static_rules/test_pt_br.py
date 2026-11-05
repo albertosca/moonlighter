@@ -50,7 +50,8 @@ def test_currently_based_question_fills_city():
 
 def test_currently_based_midsentence_confirmation_not_prepopulated():
     """A confirmation field that CONTAINS 'currently based' mid-sentence is NOT treated
-    as the city (leaves it for the LLM to answer 'Yes, I am aware')."""
+    as the city (leaves it for the LLM to answer 'Yes, I am aware').
+    """
     label = (
         "You are aware that this is a hybrid position and we require you to be "
         'currently based in one of the job post locations. Type "Yes, I am aware" if you confirm.'

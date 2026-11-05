@@ -13,7 +13,8 @@ async def test_save_screenshot_captures_the_whole_page(tmp_path):
     """The viewport is ~750 CSS px; a real application form is ~4500. A
     viewport-only capture showed 17% of the form, so the human-review gate was
     asking someone to approve what they could not see. full_page is what makes
-    03-filled a review artifact rather than a thumbnail."""
+    03-filled a review artifact rather than a thumbnail.
+    """
     config = {**CONFIG, "screenshots_dir": str(tmp_path)}
     mock_page = MagicMock()
     mock_page.screenshot = AsyncMock()
@@ -36,7 +37,8 @@ async def test_save_screenshot_restores_a_minimized_window_and_re_minimizes_it(t
     blocks until it times out -- reproduced on both Greenhouse and Recruitee.
     The browser-driven filler this predates minimized the window before
     filling, which made the 03-filled review artifact impossible to produce.
-    Restore around the capture, then put the window back exactly as it was."""
+    Restore around the capture, then put the window back exactly as it was.
+    """
     config = {**CONFIG, "screenshots_dir": str(tmp_path)}
     mock_page = MagicMock()
     mock_page.screenshot = AsyncMock()
@@ -60,7 +62,8 @@ async def test_save_screenshot_restores_a_minimized_window_and_re_minimizes_it(t
 async def test_save_screenshot_leaves_an_already_visible_window_alone(tmp_path):
     """01-job-page and 02-form are taken with the window visible. Blindly
     re-minimizing after every capture would hide a window the flow means to
-    keep on screen."""
+    keep on screen.
+    """
     config = {**CONFIG, "screenshots_dir": str(tmp_path)}
     mock_page = MagicMock()
     mock_page.screenshot = AsyncMock()
@@ -78,7 +81,8 @@ async def test_save_screenshot_leaves_an_already_visible_window_alone(tmp_path):
 
 async def test_save_screenshot_still_captures_when_window_state_is_unavailable(tmp_path):
     """CDP window-state calls are best-effort, as the browser-driven filler's
-    were made in 96decbc; a failure here must not cost us the screenshot itself."""
+    were made in 96decbc; a failure here must not cost us the screenshot itself.
+    """
     config = {**CONFIG, "screenshots_dir": str(tmp_path)}
     mock_page = MagicMock()
     mock_page.screenshot = AsyncMock()

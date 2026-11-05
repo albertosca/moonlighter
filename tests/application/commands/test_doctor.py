@@ -58,7 +58,8 @@ async def test_apply_doctor_online_reports_a_broken_config_instead_of_crashing(
     temporary_database,
 ):
     """--online exists to diagnose; a config that does not load must come back in
-    the payload the way plain doctor reports it, not as a crash (exit 3)."""
+    the payload the way plain doctor reports it, not as a crash (exit 3).
+    """
     report = AsyncMock()
     with (
         patch.object(doctor_command, "doctor_payload", return_value=({"kind": "doctor"}, 1)),

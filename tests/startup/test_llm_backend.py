@@ -8,7 +8,8 @@ from moonlighter.startup import validate_startup
 def test_validate_startup_cli_backend_without_the_claude_binary_produces_error(monkeypatch):
     """The symmetric hole to the API-key check: the api path was guarded and the
     cli path was not, so a user who picked 'cli' without Claude Code installed
-    learned about it mid-scan, once per job, instead of at startup."""
+    learned about it mid-scan, once per job, instead of at startup.
+    """
     monkeypatch.setattr("moonlighter.startup.shutil.which", lambda _: None)
     warnings = validate_startup(config={"llm_backend": "cli"}, profile={"skills": []})
     assert any(
@@ -24,7 +25,8 @@ def test_validate_startup_cli_backend_with_the_claude_binary_is_quiet(monkeypatc
 
 def test_validate_startup_omitted_backend_does_not_demand_an_api_key(monkeypatch):
     """An omitted llm_backend now means 'cli', so the API-key error must not
-    fire -- otherwise the default and the check disagree about the same key."""
+    fire -- otherwise the default and the check disagree about the same key.
+    """
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr("moonlighter.startup.shutil.which", lambda _: "/usr/local/bin/claude")
     warnings = validate_startup(config={}, profile={"skills": []})
@@ -47,7 +49,8 @@ def test_validate_startup_api_key_present_no_api_error(monkeypatch):
 
 def test_validate_startup_cli_backend_skips_api_key_error(monkeypatch):
     """BUG-05: with llm_backend='cli' no API key is used, so its absence
-    must not raise an error."""
+    must not raise an error.
+    """
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     warnings = validate_startup(config={"llm_backend": "cli"}, profile={"skills": []})
     assert not any("ANTHROPIC_API_KEY" in warning.message for warning in warnings)

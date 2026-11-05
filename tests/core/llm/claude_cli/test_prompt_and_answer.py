@@ -82,7 +82,8 @@ async def test_cli_no_cache_prefix_keeps_prompt_unchanged():
 )
 async def test_call_cli_decodes_its_output_strictly(stdout, stderr, code):
     """Today's behaviour, pinned so the split cannot change it: a byte that is not
-    UTF-8 raises UnicodeDecodeError, not the RuntimeError a caller expects."""
+    UTF-8 raises UnicodeDecodeError, not the RuntimeError a caller expects.
+    """
     mock_process = MagicMock()
     mock_process.returncode = code
     mock_process.communicate = AsyncMock(return_value=(stdout, stderr))

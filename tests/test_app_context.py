@@ -86,7 +86,8 @@ async def test_an_invalid_config_edit_keeps_the_last_good_one_and_warns(
 
 async def test_a_deleted_profile_becomes_empty(temporary_database, monkeypatch, tmp_path):
     """Unlike a deleted config, a deleted profile is a legitimate state: the server
-    boots with {} when profile.yaml is absent, so a deletion mid-session means the same."""
+    boots with {} when profile.yaml is absent, so a deletion mid-session means the same.
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     profile_path = tmp_path / "profile.yaml"
     _write(profile_path, "headline: Before\n")
@@ -125,7 +126,8 @@ async def test_an_edit_that_is_not_a_mapping_keeps_the_last_good_file(
 ):
     """A list, a scalar, or an empty file (an editor that truncates, then writes)
     must not replace the settings: one tool call on defaults mid-write is the
-    2026-09-25 class of bug."""
+    2026-09-25 class of bug.
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     _write(tmp_path / "config.yaml", "score_threshold: 8.0\n")
     _write(tmp_path / "profile.yaml", "headline: Before\n")

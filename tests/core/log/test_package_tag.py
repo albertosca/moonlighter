@@ -16,7 +16,8 @@ def test_package_tag_maps_known_packages():
 
 def test_package_tag_returns_none_for_unknown_or_bare_name():
     """Defensive fallback: an unmapped package or a name with no
-    'moonlighter.' prefix must not crash — just skip the prefix."""
+    'moonlighter.' prefix must not crash — just skip the prefix.
+    """
     assert _package_tag("moonlighter.unknownpkg.mod") is None
     assert _package_tag("moonlighter") is None
     assert _package_tag("some_other_root.mod") is None
@@ -54,7 +55,8 @@ def test_package_rich_handler_prefixes_message_with_package_color(tmp_path):
 
 def test_package_rich_handler_no_prefix_for_unmapped_package(tmp_path):
     """A logger name outside the 5 known packages (shouldn't happen in
-    practice, but must degrade safely) renders with no prefix at all."""
+    practice, but must degrade safely) renders with no prefix at all.
+    """
     log_mod._initialized = False
     root = logging.getLogger("moonlighter")
     for handler in root.handlers[:]:

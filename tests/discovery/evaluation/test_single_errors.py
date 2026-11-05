@@ -95,7 +95,8 @@ async def test_evaluate_job_rate_limit_propagates():
 async def test_evaluate_job_session_limit_propagates():
     """Claude CLI's real 'session limit' message must also propagate — it's a
     spend-limit variant, not a per-job error. Regression: is_spend_limit() didn't
-    recognize this phrase, so callers never stopped early on it."""
+    recognize this phrase, so callers never stopped early on it.
+    """
 
     async def session_limit_caller(prompt, model, cache_prefix=None):
         raise Exception("You've hit your session limit · resets 12:40am (America/Sao_Paulo)")  # noqa: TRY002 - a plain Exception is what an SDK failure looks like
@@ -115,7 +116,8 @@ async def test_evaluate_job_session_limit_propagates():
 
 async def test_evaluate_job_requires_location_and_remote_type_by_name():
     """Optional defaults let an ad-hoc caller drop them silently (2026-09-25 re-eval:
-    4 of 6 promoted jobs were false positives). A caller must now say None on purpose."""
+    4 of 6 promoted jobs were false positives). A caller must now say None on purpose.
+    """
 
     async def caller(prompt, model, cache_prefix=None):
         return '{"score": 5.0, "score_notes": "x", "caveats": []}'

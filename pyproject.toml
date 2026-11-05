@@ -108,8 +108,10 @@ strict-checking = true
 # the point of an assertion. ARG: fakes must match the signature they replace, and
 # fixtures requested for their side effect arrive as unused arguments.
 # SLF001: unit tests pin the private helpers where a quirk lives.
-# D: a test's name is its documentation.
-"tests/*" = ["S101", "S105", "S106", "S108", "PLR2004", "ARG001", "ARG002", "ARG005", "SLF001", "D"]
+# D100/D104: a test's name is its documentation, so a test module or package needs no docstring.
+# D205: a test docstring is a free-form note on why the case exists, not rendered API
+# documentation, so the summary-line rule does not apply.
+"tests/*" = ["S101", "S105", "S106", "S108", "PLR2004", "ARG001", "ARG002", "ARG005", "SLF001", "D100", "D104", "D205"]
 
 # BEGIN ratchet
 # Files not yet migrated to the profile above (plan 2026-11-04, showcase quality).

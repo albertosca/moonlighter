@@ -11,7 +11,8 @@ from tests.core.llm.fake_processes import cursor_process
 
 async def test_call_cursor_uses_sandbox_argv_and_stdin():
     """Prompt stays off argv (same reason as the Claude CLI: it must not show up
-    in `ps`). Sandbox flags are fixed; the account model is not overridden."""
+    in `ps`). Sandbox flags are fixed; the account model is not overridden.
+    """
     mock_process = cursor_process(b"hello from cursor\n")
 
     with (

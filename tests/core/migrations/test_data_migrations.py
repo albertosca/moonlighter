@@ -8,7 +8,8 @@ from tests.core.migrations.unmigrated_db import fresh_db
 def test_m004_unifies_closed_into_archived(tmp_path, monkeypatch, open_dbs):
     """'closed' (good job gone from source) and 'archived' (triaged out) are one
     status from the operator's point of view — closed_at alone keeps recording
-    WHY a job left the queue. m004 folds the existing 'closed' rows in."""
+    WHY a job left the queue. m004 folds the existing 'closed' rows in.
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     db = fresh_db(tmp_path / "t.db", open_dbs)
     db.execute_sql("ALTER TABLE job ADD COLUMN status VARCHAR(32)")
@@ -28,7 +29,8 @@ def test_m004_unifies_closed_into_archived(tmp_path, monkeypatch, open_dbs):
 def test_m005_backfills_job_status_from_applications(tmp_path, monkeypatch, open_dbs):
     """One-shot repair for the drift found 2026-08-21: jobs still 'new' whose
     Application was already submitted/rejected. Forward writers now sync via
-    sync_job_status; this folds the pre-existing rows in."""
+    sync_job_status; this folds the pre-existing rows in.
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     db = fresh_db(tmp_path / "t.db", open_dbs)
     db.execute_sql("ALTER TABLE job ADD COLUMN status VARCHAR(32)")
@@ -54,7 +56,8 @@ def test_m006_fixes_invented_onsite_remote_types(tmp_path, monkeypatch, open_dbs
     #2811: location 'Remoto', remote_type 'onsite' — and since 2026-08-24 an
     invented onsite outside Belo Horizonte is an invented deterministic
     archive. m006 re-derives the stored 'onsite' rows: PT/EN explicit terms
-    win, a bare place name becomes NULL (unknown, the evaluator decides)."""
+    win, a bare place name becomes NULL (unknown, the evaluator decides).
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     db = fresh_db(tmp_path / "t.db", open_dbs)
     db.execute_sql("ALTER TABLE job ADD COLUMN location VARCHAR(255)")

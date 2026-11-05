@@ -44,7 +44,8 @@ def _require_cursor() -> None:
 
 def _plant_files(tmp_path: Path) -> tuple[Path, str, Path, Path, Path]:
     """The directory the agent must not reach, and what it holds: a secret file,
-    a file the prompt never names, and where a shell command would leave a marker."""
+    a file the prompt never names, and where a shell command would leave a marker.
+    """
     outside = tmp_path / "outside"
     outside.mkdir()
     secret = secrets.token_hex(16)
@@ -59,7 +60,8 @@ def _plant_files(tmp_path: Path) -> tuple[Path, str, Path, Path, Path]:
 async def test_cursor_sandbox_blocks_reads_shell_and_fetches(tmp_path, monkeypatch):
     """Two calls share one MOONLIGHTER_HOME. Each prompt is multi-line, with a
     token on the second line, because that is the call a scan actually makes.
-    A fresh home used to hide that only the first transcript was removed."""
+    A fresh home used to hide that only the first transcript was removed.
+    """
     _require_cursor()
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     outside, secret, secret_file, unlisted, marker = _plant_files(tmp_path)

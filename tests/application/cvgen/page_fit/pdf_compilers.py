@@ -3,7 +3,8 @@
 
 def compiler_that_reports(pages_by_attempt):
     """A compile_pdf stand-in that writes a pdflatex-shaped log and a pdf,
-    reporting the page count for each successive attempt."""
+    reporting the page count for each successive attempt.
+    """
     attempts = {"n": 0}
 
     def compile_(tex):

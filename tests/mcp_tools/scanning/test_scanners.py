@@ -67,7 +67,8 @@ async def test_scan_linkedin_failure_doesnt_block(temporary_database):
 
 async def test_scan_registered_scanner_session_expired_shows_warning(temporary_database):
     """A registered browser-scanner plugin raising ScannerSessionExpiredError ->
-    explicit warning in the result (no silence)."""
+    explicit warning in the result (no silence).
+    """
     init_db()
 
     with (
@@ -96,7 +97,8 @@ async def test_scan_registered_scanner_session_expired_does_not_block_http_resul
     temporary_database,
 ):
     """A registered browser-scanner plugin's ScannerSessionExpiredError does not
-    prevent HTTP jobs from being returned."""
+    prevent HTTP jobs from being returned.
+    """
     init_db()
 
     raw = RawJob(

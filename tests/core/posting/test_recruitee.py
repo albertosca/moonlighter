@@ -68,7 +68,8 @@ async def test_recruitee_non_dict_response_returns_none():
 async def test_recruitee_offer_prefix_collision_does_not_match_longer_slug():
     """IMPORTANT regression: requesting /o/backend-engineer must not match a
     feed entry at /o/backend-engineer-senior — the old unanchored substring
-    check (`needle in apply_url`) would wrongly return the senior posting."""
+    check (`needle in apply_url`) would wrongly return the senior posting.
+    """
     collision = {
         "offers": [
             {
@@ -97,7 +98,8 @@ async def test_recruitee_offer_prefix_collision_does_not_match_longer_slug():
 async def test_recruitee_longer_offer_slug_still_matches_itself():
     """Sanity twin of the collision test above: requesting the longer slug
     directly must still resolve to its own entry, not be blocked by the
-    anchoring fix."""
+    anchoring fix.
+    """
     collision = {
         "offers": [
             {

@@ -18,7 +18,8 @@ async def test_operator_directed_prose_becomes_a_gap(note):
     The label is deliberately neutral: what this canary pins is the ANSWER TEXT
     reaching the operator-directed guard, and the original "References" label is
     now intercepted upstream by is_sensitive_label — which would leave this
-    passing without the operator guard ever running."""
+    passing without the operator guard ever running.
+    """
 
     async def caller(prompt: str, model: str) -> str:
         return note
@@ -51,7 +52,8 @@ async def test_a_verbatim_option_naming_the_candidate_stays_selectable():
     the LLM narrating ABOUT the candidate in prose ("the candidate should..."),
     not to reject a legitimate, verbatim-correct dropdown option that happens to
     contain the phrase "the candidate". Gating the guard on `is_choice` keeps a
-    real option like this pickable."""
+    real option like this pickable.
+    """
     question = FormQuestion(
         label="Are you the candidate applying?",
         kind=QuestionKind.SINGLE_SELECT,

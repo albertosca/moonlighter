@@ -37,7 +37,8 @@ async def test_every_question_produces_exactly_one_entry_in_order():
 @pytest.mark.asyncio
 async def test_salary_label_is_still_prepopulated_from_full_profile():
     """Curation is prompt-only: the deterministic salary rule still sees
-    preferences and answers without any LLM call."""
+    preferences and answers without any LLM call.
+    """
     profile = {"preferences": {"salary_target_brl_monthly": 35000}}
     caller = AsyncMock(side_effect=AssertionError("LLM must not be called"))
     questions = [FormQuestion(label="Salary expectation", kind=QuestionKind.TEXT, required=True)]
@@ -53,7 +54,8 @@ async def test_salary_label_with_no_target_configured_becomes_a_gap_without_the_
     """CRITICAL: `known.get(label) or await generate_answer(...)` treated the deliberate
     "" that salary_expectation returns when no salary_target_brl_monthly is
     configured as absence, and fell through to the LLM to invent a figure — a
-    direct violation of E2 (the salary figure must never reach the model)."""
+    direct violation of E2 (the salary figure must never reach the model).
+    """
     question = FormQuestion(label="Salary expectation", kind=QuestionKind.TEXT, required=True)
     composed = await compose_answers([question], PROFILE, {}, JOB, never_called)
     assert composed[0].answer is None
@@ -64,7 +66,8 @@ async def test_salary_label_with_no_target_configured_becomes_a_gap_without_the_
 async def test_salary_gap_is_counted_in_the_sheet_footer():
     """The gap from the fix above must actually surface to the human, not just
     exist as a ComposedAnswer -- the sheet footer is where the human decides
-    whether an application is ready to paste and submit."""
+    whether an application is ready to paste and submit.
+    """
     question = FormQuestion(label="Salary expectation", kind=QuestionKind.TEXT, required=True)
     composed = await compose_answers([question], PROFILE, {}, JOB, never_called)
     sheet = render_sheet(
@@ -77,7 +80,8 @@ async def test_salary_gap_is_counted_in_the_sheet_footer():
 @pytest.mark.asyncio
 async def test_a_label_absent_from_known_answers_still_calls_the_llm():
     """The other side of the presence/truthiness fix: a label pre_populate_answers
-    never touched must still reach the LLM exactly as before."""
+    never touched must still reach the LLM exactly as before.
+    """
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
     composed = await compose_answers([question], PROFILE, {}, JOB, answers_anything)
     assert composed[0].answer == "a generated answer"

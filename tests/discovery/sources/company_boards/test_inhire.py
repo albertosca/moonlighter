@@ -48,7 +48,8 @@ INHIRE_DETAIL = {
 
 def _make_inhire_client(page=INHIRE_PAGE, details=INHIRE_DETAIL, detail_status=200):
     """Mock client that serves the listing at BASE and per-job details at
-    BASE/{jobId} — the two-endpoint shape the real API has."""
+    BASE/{jobId} — the two-endpoint shape the real API has.
+    """
     mock_client = MagicMock()
 
     async def get(url, headers=None):

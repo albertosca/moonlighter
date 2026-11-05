@@ -72,7 +72,8 @@ def test_company_list_rejects_non_list_phase_value(tmp_path):
     """MINOR regression: a phase filter selecting a scalar phase value (not a
     list) must raise, not silently iterate the string character-by-character
     -- every single character is a str, so entry-level validation alone would
-    pass and single-char slugs would get scanned."""
+    pass and single-char slugs would get scanned.
+    """
     path = tmp_path / "company_list.yaml"
     path.write_text("greenhouse:\n  phase1: notalist\n")
     with pytest.raises(ConfigError, match=r"greenhouse.*did not resolve to a list"):

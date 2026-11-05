@@ -8,7 +8,8 @@ CODEX_MODELS = {"llm_model": "gpt-6-luna", "eval_model": "gpt-6-luna"}
 
 def test_llm_backend_defaults_to_cli_when_omitted():
     """The subscription path is the default: `uvx moonlighter` users generally
-    have Claude Code and no API key."""
+    have Claude Code and no API key.
+    """
     assert llm_backend({}) == "cli"
 
 
@@ -21,7 +22,8 @@ def test_llm_backend_returns_the_configured_value():
 @pytest.mark.parametrize("bad", ["CLI", "Api", "clii", "subscription", ""])
 def test_llm_backend_rejects_anything_else_naming_the_valid_values(bad):
     """These all used to select the api backend in silence -- 'CLI' being the
-    most plausible typo, and the most expensive, since it demands an API key."""
+    most plausible typo, and the most expensive, since it demands an API key.
+    """
     with pytest.raises(ConfigError, match="cli, api, cursor"):
         llm_backend({"llm_backend": bad})
 
@@ -54,7 +56,8 @@ def test_validate_config_accepts_codex_with_non_claude_models():
 @pytest.mark.parametrize("bad", ["claude-sonnet-4-6", "Claude-Haiku", ""])
 def test_validate_config_rejects_a_claude_or_empty_model_for_codex(key, bad):
     """The Codex CLI cannot run Anthropic ids, and the shipped defaults are Claude
-    ids: without this the failure surfaces mid-scan, one call at a time."""
+    ids: without this the failure surfaces mid-scan, one call at a time.
+    """
     config = {"llm_backend": "codex", **CODEX_MODELS, key: bad}
     with pytest.raises(ConfigError, match=key):
         validate_config(config)

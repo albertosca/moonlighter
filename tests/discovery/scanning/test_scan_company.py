@@ -72,7 +72,8 @@ async def test_scan_company_zero_raw_jobs_does_not_claim_all_already_known(tempo
     """MINOR regression: an empty raw_jobs list can mean either 'company has no
     open postings' or 'the fetch failed' -- the old '(0 found, all already
     known)' message asserted the fetch succeeded and simply found nothing,
-    which is false when it errored."""
+    which is false when it errored.
+    """
     init_db()
     with (
         patch(

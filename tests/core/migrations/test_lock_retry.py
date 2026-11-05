@@ -17,7 +17,8 @@ def test_locked_db_retries_then_succeeds(*, tmp_path, monkeypatch, open_dbs, raw
     the schema_version/migration writes) — sqlite's online backup step
     itself busy-loops against an externally-held exclusive lock indefinitely
     regardless of `timeout=0` (verified empirically), which would make the
-    stub's own setup hang if the lock were taken any earlier."""
+    stub's own setup hang if the lock were taken any earlier.
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(migrations, "_LOCK_BACKOFF_S", 0)
     db = fresh_db(tmp_path / "t.db", open_dbs, timeout=0)

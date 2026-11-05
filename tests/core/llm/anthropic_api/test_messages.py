@@ -96,7 +96,7 @@ def test_make_api_caller_reuses_client_across_calls():
 
 
 async def test_api_caller_satisfies_llm_caller_contract():
-    """api caller satisfies (prompt: str, model: str) -> str contract."""
+    """The api caller satisfies (prompt: str, model: str) -> str contract."""
     mock_message = MagicMock()
     mock_message.content = [MagicMock(spec=TextBlock, text="text result")]
     mock_client = MagicMock()

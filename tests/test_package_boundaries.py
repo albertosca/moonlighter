@@ -1,4 +1,4 @@
-"""Every package may only import from packages it actually declares.
+r"""Every package may only import from packages it actually declares.
 
 This is not style. `moonlighter-scan` is published to PyPI on its own, and a
 `pip install moonlighter-scan` gets exactly the dependencies its pyproject.toml
@@ -8,7 +8,7 @@ raises ModuleNotFoundError at import time for the user who installed one slice.
 
 Measured 2026-09-14 against the real published artifact:
 
-    $ uv run --isolated --no-project --python 3.14 --with moonlighter-scan \\
+    $ uv run --isolated --no-project --python 3.14 --with moonlighter-scan \
         python -c "import moonlighter.discovery.service"
     ModuleNotFoundError: No module named 'moonlighter.views'
 

@@ -23,7 +23,8 @@ def by_label(questions, label):
 
 def card_page(card, custom_questions=None):
     """A page carrying one card template and, like the real page, one custom-question
-    `li` per card field with text (or `custom_questions` of them when given)."""
+    `li` per card field with text (or `custom_questions` of them when given).
+    """
     if custom_questions is None:
         custom_questions = sum(
             1 for field in card.get("fields") or [] if isinstance(field, dict) and field.get("text")

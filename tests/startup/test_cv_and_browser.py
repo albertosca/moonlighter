@@ -14,7 +14,8 @@ def test_validate_startup_missing_cv_produces_warn(tmp_path):
 
 def test_validate_startup_default_cv_path_resolves_under_moonlighter_home(monkeypatch, tmp_path):
     """When cv_path is omitted, the default is <MOONLIGHTER_HOME>/cv.pdf, not a path
-    relative to the installed package (which is an ephemeral cache dir under uvx)."""
+    relative to the installed package (which is an ephemeral cache dir under uvx).
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     warnings = validate_startup(config={}, profile={"skills": []})
     cv_warning = next(warning for warning in warnings if "cv" in warning.message.lower())
@@ -23,7 +24,8 @@ def test_validate_startup_default_cv_path_resolves_under_moonlighter_home(monkey
 
 def test_validate_startup_honours_a_configured_cv_default(tmp_path):
     """A user who points cv.default somewhere else must not be told their CV is
-    missing -- the composer resolves the CV through config, so the warning must too."""
+    missing -- the composer resolves the CV through config, so the warning must too.
+    """
     resume = tmp_path / "resumes" / "senior.pdf"
     resume.parent.mkdir()
     resume.touch()
@@ -36,7 +38,8 @@ def test_validate_startup_honours_a_configured_cv_default(tmp_path):
 
 def test_validate_startup_names_the_configured_cv_when_it_is_missing(tmp_path):
     """And when it really is missing, the warning names the configured path --
-    not MOONLIGHTER_HOME/cv.pdf, which the applier would never have looked at."""
+    not MOONLIGHTER_HOME/cv.pdf, which the applier would never have looked at.
+    """
     configured = tmp_path / "resumes" / "senior.pdf"
     warnings = validate_startup(
         config={"cv": {"default": str(configured)}},

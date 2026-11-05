@@ -105,7 +105,8 @@ async def test_eval_injection_in_description_stays_inside_xml():
 
 async def test_eval_fake_closing_tag_in_description_is_neutralized():
     """S-04: a literal </job_posting...> embedded in the description cannot
-    close the block early — it's stripped before wrapping."""
+    close the block early — it's stripped before wrapping.
+    """
     captured = {}
 
     async def cap(prompt, model, cache_prefix=None):
@@ -147,7 +148,8 @@ async def test_batch_wraps_each_posting_in_its_own_nonce_tag():
 
 async def test_batch_injection_cannot_escape_its_own_block():
     """A malicious posting cannot close its block early nor leak into the
-    neighboring block in the same batch."""
+    neighboring block in the same batch.
+    """
     captured = {}
 
     async def caller(prompt, model, cache_prefix=None):

@@ -28,7 +28,8 @@ async def test_launch_browser_uses_random_port_flag(tmp_path):
 async def test_launch_browser_deletes_stale_port_file_before_launch(tmp_path):
     """A leftover DevToolsActivePort from a dead session must never be trusted —
     it's deleted before the new process starts, so a crashed launch can't
-    silently reconnect to a stale/foreign port (S-03)."""
+    silently reconnect to a stale/foreign port (S-03).
+    """
     stale = tmp_path / "DevToolsActivePort"
     stale.write_text("11111\n/devtools/browser/stale\n")
     mock_process = MagicMock()

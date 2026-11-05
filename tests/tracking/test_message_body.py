@@ -15,7 +15,8 @@ def test_extract_body_html_top_level():
 
 def test_extract_body_multipart_skips_empty_parts_then_finds_html():
     """text/plain and text/html parts with empty data are skipped;
-    the html with data is accepted."""
+    the html with data is accepted.
+    """
     payload = {
         "mimeType": "multipart/alternative",
         "parts": [

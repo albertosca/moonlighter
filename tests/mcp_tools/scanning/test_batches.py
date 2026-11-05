@@ -53,7 +53,8 @@ async def test_scan_concurrent_batch_all_processed(temporary_database):
 async def test_scan_non_spend_error_keeps_title_filtered_in_report(temporary_database):
     """A generic (non-spend-limit) error in evaluate_jobs_batch must not drop the
     title-filtered jobs already persisted earlier in the same chunk from the report
-    count — they're already saved in the DB, the report must reflect that too."""
+    count — they're already saved in the DB, the report must reflect that too.
+    """
     init_db()
 
     raws = [
@@ -116,7 +117,8 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tem
     """A bug that crashes evaluate_chunk itself (outside its own try/except, e.g. a
     _persist failure) must not blow up the whole scan_and_evaluate call — gather's
     return_exceptions=True catches it, this chunk contributes nothing, other chunks
-    are unaffected."""
+    are unaffected.
+    """
     init_db()
 
     raws = [

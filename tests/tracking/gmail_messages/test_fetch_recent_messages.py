@@ -11,7 +11,8 @@ class TestFetchRecentMessages:
         """ATS confirmations sent to a plus-alias land in spam regularly — one did,
         for the holepunch application on 2026-08-04, and the monitor could not see
         it: SPAM is a separate label from INBOX, so labelIds=[INBOX] hid it entirely.
-        "We received your application" is the reply least worth missing."""
+        "We received your application" is the reply least worth missing.
+        """
         service = MagicMock()
         listing = service.users.return_value.messages.return_value.list
         listing.return_value.execute.return_value = {"messages": []}
@@ -25,7 +26,8 @@ class TestFetchRecentMessages:
     def test_does_not_gate_on_read_state(self):
         """A person reads their mail; a reply already read is exactly the reply
         worth recording. Re-processing is prevented by ProcessedEmail, not by
-        the unread flag."""
+        the unread flag.
+        """
         service = MagicMock()
         listing = service.users.return_value.messages.return_value.list
         listing.return_value.execute.return_value = {"messages": []}
@@ -77,7 +79,8 @@ class TestFetchRecentMessages:
         never be silent — a full page has to log a clear warning, since a
         mailbox with more than maximum_results messages inside the lookback window
         would otherwise lose the older ones with no signal at all (unlike the
-        old is:unread design, this time-window design has no drain)."""
+        old is:unread design, this time-window design has no drain).
+        """
         service = MagicMock()
         full_page = {
             "messages": [{"id": f"m{index}", "threadId": f"t{index}"} for index in range(3)]
@@ -104,7 +107,8 @@ class TestFetchRecentMessages:
     def test_paginates_via_next_page_token_across_multiple_pages(self):
         """A mailbox with more messages than maximum_results must not silently
         truncate — fetch_recent_messages follows nextPageToken to collect them
-        all, up to the hard page bound."""
+        all, up to the hard page bound.
+        """
         service = MagicMock()
         responses = [
             {
@@ -135,7 +139,8 @@ class TestFetchRecentMessages:
     def test_stops_at_the_hard_page_bound_and_warns(self, caplog):
         """Even if Gmail keeps returning nextPageToken forever, pagination must
         stop at a bounded number of pages so a huge mailbox can't spin forever —
-        and hitting that bound is logged, same as hitting maximum_results."""
+        and hitting that bound is logged, same as hitting maximum_results.
+        """
         service = MagicMock()
         # Every page is below maximum_results (so the per-page warning doesn't fire)
         # but always carries a nextPageToken, forcing the hard page-count bound.

@@ -63,7 +63,8 @@ async def test_add_job_routes_through_ats_when_fields_missing(temporary_database
 
 async def test_add_job_hands_the_ats_location_to_the_evaluator(temporary_database):
     """Without the structured location the LLM judges eligibility from the text alone —
-    the 2026-08-21 gitlab false-positive class, reintroduced by any caller that omits it."""
+    the 2026-08-21 gitlab false-positive class, reintroduced by any caller that omits it.
+    """
     init_db()
     posting = FetchedPosting(
         company="GitLab",
@@ -91,7 +92,8 @@ async def test_add_job_takes_the_ats_location_even_when_every_field_was_given(
     temporary_database,
 ):
     """With company, title and description all pasted, the ATS lookup used to be
-    skipped, and the evaluator ran with no location — the gap this branch closes."""
+    skipped, and the evaluator ran with no location — the gap this branch closes.
+    """
     init_db()
     posting = FetchedPosting(
         company="GitLab", title="Engineer", description="API text.", location="Bangalore, India"

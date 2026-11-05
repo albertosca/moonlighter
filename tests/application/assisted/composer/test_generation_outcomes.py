@@ -39,7 +39,8 @@ async def test_an_llm_error_reports_generation_failure_not_a_knowledge_gap():
     """Before this fix, `except Exception: return None` in generate_answer made a
     spend-limit or network error read exactly like a genuine UNKNOWN -- "no basis
     in your profile to answer" is a fact about the candidate, and an LLM outage
-    is a fact about the tool run. They must not share a gap reason."""
+    is a fact about the tool run. They must not share a gap reason.
+    """
 
     async def explodes(prompt: str, model: str, cache_prefix: str | None = None) -> str:
         # A non-spend failure: the spend-limit string now routes to its own

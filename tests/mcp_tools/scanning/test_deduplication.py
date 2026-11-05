@@ -14,7 +14,6 @@ from tests.mcp_tools._records import make_eval_result
 
 def _scan_patches(raw_jobs, eval_mock):
     """Context manager stack shared by race condition tests."""
-
     stack = ExitStack()
     stack.enter_context(
         patch(
@@ -65,7 +64,6 @@ async def test_scan_concurrent_calls_evaluate_same_url_only_once(temporary_datab
     Reproduces the race condition where 11 parallel MCP tool invocations each saw
     the same empty ScanLog snapshot and fired 11 LLM calls per job.
     """
-
     init_db()
 
     url = "https://x.com/race-1"
@@ -92,7 +90,8 @@ async def test_scan_concurrent_calls_evaluate_same_url_only_once(temporary_datab
 async def test_scan_spend_limit_releases_scan_log_claim(temporary_database):
     """When evaluate_job hits the spend limit, the scan STOPS CLEANLY (does not crash):
     it releases the claim in ScanLog (URL retryable on the next scan), does not create
-    a Job, and warns in the return. Conservative contract — no exception propagates to the tool."""
+    a Job, and warns in the return. Conservative contract — no exception propagates to the tool.
+    """
     init_db()
 
     url = "https://x.com/spend-limit-1"

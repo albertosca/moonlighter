@@ -19,7 +19,8 @@ def test_advance_application_syncs_job_status(temporary_database, application_fa
     """An email-classified advance (e.g. screening) must pull Job.status to
     'applied' — the 2026-08-21 triage found jobs still 'new' with live
     applications, and sync_email_responses was one of the writers that never
-    told the Job."""
+    told the Job.
+    """
     application = application_factory(status="submitted")
     job = application.job
     job.status = "new"  # simulate the drift seen live

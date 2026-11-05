@@ -1,6 +1,7 @@
 """call_cursor records one call, a non-negative total_seconds and zero tokens in the active
 operation_metrics scope, still counts the call when it fails or when forget_cursor_call
-raises, and counts none when `agent` is missing."""
+raises, and counts none when `agent` is missing.
+"""
 
 import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch

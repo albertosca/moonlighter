@@ -92,7 +92,8 @@ def test_load_config_keeps_cursor_model_and_does_not_invent_it(tmp_path, monkeyp
 def test_load_config_fills_llm_backend_from_defaults(tmp_path, monkeypatch):
     """The default has to arrive through DEFAULTS, not through a `.get()`
     fallback at each call site -- that divergence is what made the wizard, the
-    README, and the factory disagree about which backend an omitted key means."""
+    README, and the factory disagree about which backend an omitted key means.
+    """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text("score_threshold: 7.0\n")
 

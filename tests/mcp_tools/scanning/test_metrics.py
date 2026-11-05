@@ -17,7 +17,8 @@ async def test_scan_and_evaluate_logs_one_metrics_summary(temporary_database, ca
     real evaluator/caller would), scan_and_evaluate must emit exactly one
     `op=scan_and_evaluate` summary line naming the right call count — proof the
     tool wraps its whole body in a single operation_metrics scope, not one
-    scope per job/batch (which would split the counts across many lines)."""
+    scope per job/batch (which would split the counts across many lines).
+    """
     init_db()
 
     raws = [
@@ -70,7 +71,8 @@ async def test_scan_and_evaluate_logs_one_metrics_summary(temporary_database, ca
 async def test_scan_and_evaluate_spend_limit_abort_increments_hits(temporary_database, caplog):
     """A spend-limit abort mid-scan increments spend_limit_hits in the single
     scan_and_evaluate summary (evaluator/service call record_spend_limit_hit()
-    before propagating, inside the tool's one operation_metrics scope)."""
+    before propagating, inside the tool's one operation_metrics scope).
+    """
     init_db()
 
     raws = [

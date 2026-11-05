@@ -100,7 +100,8 @@ async def test_remotive_non_dict_json_returns_empty():
 
 async def test_remotive_non_json_body_returns_empty():
     """A 200 response with a non-JSON body must degrade to [] like every
-    other failure mode, not raise json.JSONDecodeError out of scan()."""
+    other failure mode, not raise json.JSONDecodeError out of scan().
+    """
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.side_effect = json.JSONDecodeError("Expecting value", "<html>", 0)

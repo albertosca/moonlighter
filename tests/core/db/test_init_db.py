@@ -54,7 +54,8 @@ def test_init_db_idempotent_preserves_email_ref(temporary_database):
 def test_init_db_migrates_old_application_table(temporary_database):
     """Old 'application' table (with no email_ref/current_stage) → init_db adds
     the columns via ALTER TABLE (migrations.py: _m001_application_email_ref,
-    _m002_application_current_stage)."""
+    _m002_application_current_stage).
+    """
     db.init(temporary_database)
     db.connect(reuse_if_open=True)
     db.execute_sql("DROP TABLE IF EXISTS application")
@@ -74,7 +75,8 @@ def test_init_db_migrates_old_application_table(temporary_database):
 
 def test_init_db_fresh_db_reaches_latest_version_with_all_columns(temporary_database):
     """A fresh temp DB, after init_db(), is at the latest schema_version and has every
-    column the migrations add (behavior-preserving vs. the old inline ALTERs)."""
+    column the migrations add (behavior-preserving vs. the old inline ALTERs).
+    """
     init_db()
 
     assert current_version(db) == len(MIGRATIONS)
@@ -98,7 +100,8 @@ def test_init_db_called_twice_stays_at_latest_version(temporary_database):
 def test_init_db_converges_real_db_shape_without_schema_version(temporary_database):
     """A DB that already has the migrated columns (the real ~/.moonlighter shape,
     pre-existing before this schema_version table existed) converges to the latest
-    version with no error — run_migrations must not choke on already-applied columns."""
+    version with no error — run_migrations must not choke on already-applied columns.
+    """
     db.init(temporary_database)
     db.connect(reuse_if_open=True)
     db.execute_sql(

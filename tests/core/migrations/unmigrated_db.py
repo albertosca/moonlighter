@@ -9,7 +9,8 @@ def fresh_db(path, open_dbs, timeout=None):
 
     `timeout` is forwarded to `sqlite3.connect` via peewee (default lets
     sqlite busy-wait up to 5s before raising, which the genuine-lock tests
-    override to 0 so a lock raises immediately and the test stays fast)."""
+    override to 0 so a lock raises immediately and the test stays fast).
+    """
     db = (
         SqliteDatabase(str(path), timeout=timeout)
         if timeout is not None

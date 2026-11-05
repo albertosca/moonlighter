@@ -9,11 +9,12 @@ from rich.logging import RichHandler
 
 
 def test_setup_without_rich_falls_back_silently(tmp_path, monkeypatch):
-    """rich absent → ImportError swallowed, only the FileHandler remains.
+    """Without rich → ImportError swallowed, only the FileHandler remains.
 
     setup()'s own try block imports rich.console/rich.theme (not rich.logging
     — _PackageRichHandler is already bound at module import time), so that's
-    the import that must fail here to actually exercise the except branch."""
+    the import that must fail here to actually exercise the except branch.
+    """
     root = logging.getLogger("moonlighter")
     saved = root.handlers[:]
     for handler in root.handlers[:]:
@@ -31,7 +32,8 @@ def test_setup_without_rich_falls_back_silently(tmp_path, monkeypatch):
 def test_rich_handler_uses_vivid_level_styles(tmp_path):
     """The default rich theme (plain 'blue'/'yellow'/'green', no bold) reads as
     faint on a dark terminal — the operator's actual complaint. Levels must be
-    bold/bright, distinct from rich's own DEFAULT_STYLES."""
+    bold/bright, distinct from rich's own DEFAULT_STYLES.
+    """
     log_mod._initialized = False
     root = logging.getLogger("moonlighter")
     for handler in root.handlers[:]:
@@ -49,7 +51,8 @@ def test_rich_handler_uses_vivid_level_styles(tmp_path):
 def test_rich_handler_writes_to_stderr_not_stdout(tmp_path, capsys):
     """S-13: on a stdio MCP server, stdout IS the JSON-RPC channel — a log line
     at the wrong moment corrupts protocol framing. Nothing but the protocol may
-    write to stdout."""
+    write to stdout.
+    """
     log_mod._initialized = False
     root = logging.getLogger("moonlighter")
     for handler in root.handlers[:]:

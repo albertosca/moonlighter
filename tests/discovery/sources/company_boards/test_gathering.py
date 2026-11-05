@@ -92,7 +92,8 @@ async def test_scan_skips_fetch_exceptions(scanner_class):
 @pytest.mark.asyncio
 async def test_gather_jobs_counts_failures_per_source():
     """One slug succeeds, one errors: the error is COUNTED in stats, not silently
-    dropped — [] from a broken API must stay distinguishable from no openings."""
+    dropped — [] from a broken API must stay distinguishable from no openings.
+    """
     ok_response = MagicMock(status_code=200)
     ok_response.json.return_value = GREENHOUSE_RESPONSE
     boom = MagicMock(status_code=500)

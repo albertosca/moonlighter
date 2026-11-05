@@ -10,7 +10,8 @@ from moonlighter.tracking.gmail_client import _token_scopes, setup_gmail_service
 class TestTokenScopes:
     def test_reads_the_scope_string_format(self, tmp_path):
         """The token may be maintained by another project that writes google's
-        wire format: a single space-separated `scope` string, not a `scopes` list."""
+        wire format: a single space-separated `scope` string, not a `scopes` list.
+        """
         token_file = tmp_path / "t.json"
         token_file.write_text('{"scope": "https://a/gmail.modify https://a/calendar"}')
         assert _token_scopes(token_file) == ["https://a/gmail.modify", "https://a/calendar"]
@@ -33,7 +34,8 @@ class TestTokenScopes:
     def test_setup_requests_the_granted_scopes_not_the_narrower_one(self, tmp_path, monkeypatch):
         """Refreshing with a scope the grant does not literally contain fails with
         invalid_scope: gmail.modify does not include the string gmail.readonly.
-        The token's own scopes are what must be sent; breadth is only warned about."""
+        The token's own scopes are what must be sent; breadth is only warned about.
+        """
         monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
         token = tmp_path / "gmail-token.json"
         token.write_text('{"scope": "https://www.googleapis.com/auth/gmail.modify"}')
@@ -55,7 +57,8 @@ class TestTokenScopes:
 class TestIsOurs:
     def test_unresolvable_path_is_not_ours(self, monkeypatch):
         """A path that cannot be resolved must never be treated as ours — the
-        consequence of guessing wrong is overwriting another project's token."""
+        consequence of guessing wrong is overwriting another project's token.
+        """
         monkeypatch.setattr(
             gmail_client, "moonlighter_home", MagicMock(side_effect=OSError("no home"))
         )

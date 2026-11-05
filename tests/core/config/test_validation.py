@@ -68,7 +68,8 @@ class TestValidateConfig:
     def test_zero_lookback_days_rejected(self):
         """Gmail's newer_than:0d matches zero messages (verified live), so a
         lookback_days of 0 silently disables the sync forever — reading exactly
-        like an empty mailbox instead of the config mistake it is."""
+        like an empty mailbox instead of the config mistake it is.
+        """
         config = _valid_config()
         config["email"] = {"lookback_days": 0}
         with pytest.raises(ConfigError, match="lookback_days"):
@@ -96,7 +97,8 @@ class TestValidateConfig:
         _CONFIG_SCHEMA, so setting it in config.yaml raised
         ConfigError: unknown config key 'scan_gupy'. Never triggered in
         practice because it was never set — caught while adding the 4 new
-        remote-board flags to the same schema section."""
+        remote-board flags to the same schema section.
+        """
         validate_config({"scan_gupy": True})
 
     def test_validate_config_accepts_remote_board_flags(self):
@@ -159,7 +161,8 @@ def test_a_positive_timeout_is_accepted():
 @pytest.mark.parametrize("value", [0, -5])
 def test_a_non_positive_timeout_is_rejected(value):
     """Zero would kill every call before it answered — a config mistake that reads
-    like the CLI being broken."""
+    like the CLI being broken.
+    """
     config = load_config()
     config["llm_timeout_seconds"] = value
     with pytest.raises(ConfigError, match="llm_timeout_seconds"):

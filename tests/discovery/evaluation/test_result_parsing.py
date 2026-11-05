@@ -59,8 +59,9 @@ def test_as_float_valid_numeric_string_is_coerced():
 
 
 def test_as_float_bool_true_is_coerced_like_int():
-    """bool is an int subclass; _as_float doesn't special-case it (unlike
-    _as_salary, which explicitly rejects bools) — documents actual behavior."""
+    """A bool is an int subclass; _as_float doesn't special-case it (unlike
+    _as_salary, which explicitly rejects bools) — documents actual behavior.
+    """
     assert _as_float(True) == 1.0  # noqa: FBT003 - the bool is the value under test
 
 
@@ -69,7 +70,7 @@ def test_as_salary_none_becomes_none():
 
 
 def test_as_salary_bool_true_becomes_none():
-    """bool is a subclass of int in Python — must be rejected explicitly."""
+    """A bool is a subclass of int in Python — must be rejected explicitly."""
     assert _as_salary(True) is None  # noqa: FBT003 - the bool is the value under test
 
 
