@@ -10,6 +10,8 @@ Usage:
     python scripts/check_file_length.py [PATH ...]
 
 With no PATH, every .py file under packages/, tests/ and scripts/ is checked.
+A PATH that selects no .py file (missing, not Python, a directory without Python
+files, or outside the repository) fails the run.
 """
 
 import sys
@@ -106,15 +108,36 @@ def check(repo_root: Path, roots: Sequence[Path] = _DEFAULT_ROOTS) -> list[str]:
     ]
 
 
+def _selected_root(repo_root: Path, argument: str) -> Path | None:
+    """The argument as a repo-relative root, or None when it selects no measured .py file.
+
+    Both sides are resolved first: a macOS temporary directory sits behind /var -> /private/var, and a path outside the repository must be refused rather than raise in relative_to.
+    """
+    resolved = (repo_root / argument).resolve()
+    repository = repo_root.resolve()
+    if not resolved.is_relative_to(repository):
+        return None
+    if resolved.is_file() and resolved.suffix != ".py":
+        return None
+    relative = resolved.relative_to(repository)
+    return relative if _python_files(repo_root, [relative]) else None
+
+
 def main(repo_root: Path, arguments: Sequence[str]) -> int:
-    """Print the verdict; exit status 1 when any violation was found."""
-    violations = check(repo_root, [Path(argument) for argument in arguments] or _DEFAULT_ROOTS)
-    if not violations:
+    """Print the verdict; exit status 1 when any violation was found.
+
+    With explicit arguments, one that selects no .py file is a failure of its own and never falls back to the default roots.
+    """
+    selected = [(argument, _selected_root(repo_root, argument)) for argument in arguments]
+    rejected = [f"{argument}: selects no .py file" for argument, root in selected if root is None]
+    roots = [root for _, root in selected if root is not None]
+    violations = check(repo_root, roots if arguments else _DEFAULT_ROOTS)
+    if not rejected and not violations:
         print(f"Every Python file is within {load_policy(repo_root).limit} lines.")
         return 0
     print("File length gate failed:")
-    for violation in violations:
-        print(f"  - {violation}")
+    for line in (*rejected, *violations):
+        print(f"  - {line}")
     return 1
 
 
