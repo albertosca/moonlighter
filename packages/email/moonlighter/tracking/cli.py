@@ -35,9 +35,9 @@ from moonlighter.core.cli import (
 from moonlighter.core.doctor import doctor_payload
 from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.slices import slice_epilog
-from moonlighter.tracking.email_monitor import sync_responses
-from moonlighter.tracking.gmail_client import GmailAuthError
+from moonlighter.tracking.gmail.client import GmailAuthError
 from moonlighter.tracking.register import RegisterKind, register_application, register_to_dict
+from moonlighter.tracking.sync.monitor import sync_responses
 
 # No Gmail token/credentials yet is a routine, anticipated failure -- not a
 # bug -- so run() maps it to exit 1 (expected_failure) instead of exit 3

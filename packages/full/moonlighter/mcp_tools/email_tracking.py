@@ -12,8 +12,8 @@ from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.config.paths import resolve_under_home
 from moonlighter.core.db import Application
 from moonlighter.core.metrics import operation_metrics
-from moonlighter.tracking.email_monitor import sync_responses
-from moonlighter.tracking.gmail_client import GmailAuthError, run_gmail_oauth, setup_gmail_service
+from moonlighter.tracking.gmail.client import GmailAuthError, run_gmail_oauth, setup_gmail_service
+from moonlighter.tracking.sync.monitor import sync_responses
 
 
 @tool_logged

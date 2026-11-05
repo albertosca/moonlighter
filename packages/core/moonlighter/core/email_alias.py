@@ -1,7 +1,7 @@
 """+ref tracking alias for the email field on the ATS form.
 
 The company replies to <account>+<ref>@gmail.com (the configured tracking account),
-which lets email_monitor match the reply to the application by the ref.
+which lets tracking/sync/monitor.py match the reply to the application by the ref.
 """
 
 import re

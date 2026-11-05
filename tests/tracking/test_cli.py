@@ -7,7 +7,7 @@ import pytest
 from moonlighter.core.cli import run
 from moonlighter.tracking import cli
 from moonlighter.tracking.cli import parse_args
-from moonlighter.tracking.gmail_client import GmailAuthError
+from moonlighter.tracking.gmail.client import GmailAuthError
 from moonlighter.tracking.register import RegisterKind, RegisterResult
 
 

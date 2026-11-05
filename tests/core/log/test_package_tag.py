@@ -10,7 +10,7 @@ def test_package_tag_maps_known_packages():
     assert _package_tag("moonlighter.discovery.evaluator") == "discovery"
     assert _package_tag("moonlighter.application.appliers.recruitee") == "application"
     assert _package_tag("moonlighter.core.browser") == "core"
-    assert _package_tag("moonlighter.tracking.gmail_client") == "tracking"
+    assert _package_tag("moonlighter.tracking.gmail.client") == "tracking"
     assert _package_tag("moonlighter.full.server") == "full"
 
 
