@@ -14,7 +14,7 @@ import pytest
 from moonlighter.core.db import Job, ScanLog, init_db
 from moonlighter.core.posting import FetchedPosting
 from moonlighter.discovery import service as scan_service
-from moonlighter.discovery.evaluator import EvaluationResult
+from moonlighter.discovery.evaluation.models import EvaluationResult
 from moonlighter.discovery.results import ScanKind, ScanReport, _render_counts, render_scan_report
 
 CONFIG = {

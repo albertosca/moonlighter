@@ -25,12 +25,10 @@ from moonlighter.discovery.eligibility import (
     classify_location,
     eligible_regions_from,
 )
-from moonlighter.discovery.evaluator import (
-    EvalInput,
-    evaluate_job,
-    evaluate_jobs_batch,
-    should_skip_by_title,
-)
+from moonlighter.discovery.evaluation.batch import evaluate_jobs_batch
+from moonlighter.discovery.evaluation.models import EvalInput
+from moonlighter.discovery.evaluation.single import evaluate_job
+from moonlighter.discovery.evaluation.title_filter import should_skip_by_title
 from moonlighter.discovery.results import ScanKind, ScanReport
 from moonlighter.discovery.sources.base import RawJob, ScanStats, normalize_remote_type
 from moonlighter.discovery.sources.registry import build_http_scanners
@@ -386,7 +384,7 @@ async def _evaluate_and_store(
                     model,
                     # mypy doesn't narrow a variable captured by this nested
                     # closure across the `caller is NO_EVAL` check above.
-                    cast(LLMCaller, caller),
+                    caller=cast(LLMCaller, caller),
                 )
             except Exception as error:
                 for raw in to_eval:

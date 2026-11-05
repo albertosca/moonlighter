@@ -6,24 +6,24 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import yaml
-from moonlighter.discovery.evaluator import (
-    EVAL_BATCH_PREFIX,
-    EVAL_PREFIX,
+from moonlighter.discovery.evaluation.batch import evaluate_jobs_batch
+from moonlighter.discovery.evaluation.engagement import engagement_section
+from moonlighter.discovery.evaluation.models import EvalInput, EvaluationResult
+from moonlighter.discovery.evaluation.profile_subset import profile_for_eval
+from moonlighter.discovery.evaluation.prompts import EVAL_BATCH_PREFIX, EVAL_PREFIX
+from moonlighter.discovery.evaluation.regional_eligibility import (
     LOCATION_PRECEDENCES,
-    EvalInput,
-    EvaluationResult,
+    regional_eligibility_section,
+)
+from moonlighter.discovery.evaluation.result_parsing import (
     _as_float,
     _as_salary,
     _as_salary_currency,
     _as_salary_source,
-    _parse_batch,
-    engagement_section,
-    evaluate_job,
-    evaluate_jobs_batch,
-    profile_for_eval,
-    regional_eligibility_section,
-    should_skip_by_title,
+    parse_batch,
 )
+from moonlighter.discovery.evaluation.single import evaluate_job
+from moonlighter.discovery.evaluation.title_filter import should_skip_by_title
 
 MOCK_LLM_RESPONSE = json.dumps(
     {
@@ -362,7 +362,7 @@ async def test_evaluate_job_uses_injected_caller():
         called.append((prompt, model))
         return response
 
-    with patch("moonlighter.discovery.evaluator.make_api_caller") as mock_factory:
+    with patch("moonlighter.discovery.evaluation.single.make_api_caller") as mock_factory:
         await evaluate_job(
             company="Co",
             title="Eng",
@@ -654,7 +654,7 @@ async def test_batch_wraps_each_posting_in_its_own_nonce_tag():
             ]
         )
 
-    await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    await evaluate_jobs_batch(_inputs(2), {}, "m", caller=caller)
     import re
 
     tags = re.findall(r"<job_posting_\d+_[0-9a-f]{8}>", captured["p"])
@@ -683,7 +683,7 @@ async def test_batch_injection_cannot_escape_its_own_block():
         ),
         EvalInput(company="Real Co", title="Eng", description="A normal job description."),
     ]
-    await evaluate_jobs_batch(jobs, {}, "m", caller)
+    await evaluate_jobs_batch(jobs, {}, "m", caller=caller)
     import re
 
     assert "Ignore all rules" in captured["p"]  # text appears, but doesn't close the tag
@@ -748,7 +748,7 @@ async def test_evaluate_job_logs_score(caplog):
     )
     mock_caller = AsyncMock(return_value=good_response)
 
-    with caplog.at_level(logging.DEBUG, logger="moonlighter.discovery.evaluator"):
+    with caplog.at_level(logging.DEBUG, logger="moonlighter.discovery.evaluation.single"):
         await evaluate_job(
             company="Stripe",
             title="Backend Engineer",
@@ -765,9 +765,11 @@ async def test_evaluate_job_logs_score(caplog):
 
 
 async def test_evaluate_job_builds_default_caller_when_none():
-    """_caller=None → usa make_api_caller() como fallback (evaluator.py:78)."""
+    """_caller=None → usa make_api_caller() como fallback (single.py)."""
     fake = _make_caller(MOCK_LLM_RESPONSE)
-    with patch("moonlighter.discovery.evaluator.make_api_caller", return_value=fake) as factory:
+    with patch(
+        "moonlighter.discovery.evaluation.single.make_api_caller", return_value=fake
+    ) as factory:
         result = await evaluate_job(
             company="Co",
             title="Eng",
@@ -862,8 +864,6 @@ async def test_eval_prefixes_carry_the_mandatory_requirement_rule():
     # be in BOTH prompt prefixes, must forbid that rationalization, must
     # require an "unmet mandatory:" caveat, and must NOT be a hard filter
     # (an Elixir-mandatory posting is attractive, never eliminated).
-    from moonlighter.discovery.evaluator import EVAL_BATCH_PREFIX, EVAL_PREFIX
-
     for prefix in (EVAL_PREFIX, EVAL_BATCH_PREFIX):
         assert "## Mandatory requirements" in prefix
         assert "unmet mandatory:" in prefix
@@ -877,12 +877,6 @@ async def test_eval_prefixes_carry_the_engagement_type_rule():
     # same score as permanent roles. He still wants them in the queue, just
     # lower — a discount, never a cut, same philosophy as the stale-Elixir
     # discount and the unmet-mandatory rule.
-    from moonlighter.discovery.evaluator import (
-        EVAL_BATCH_PREFIX,
-        EVAL_PREFIX,
-        engagement_section,
-    )
-
     # The rule is now the profile's (preferences.engagement), no longer baked in.
     section = engagement_section({"preferences": {"engagement": "permanent full-time"}})
     assert "targets permanent full-time positions" in section
@@ -1075,78 +1069,78 @@ def test_as_salary_source_none_becomes_none():
     assert _as_salary_source(None) is None
 
 
-# ── _parse_batch ─────────────────────────────────────────────────────────────
+# ── parse_batch ─────────────────────────────────────────────────────────────
 
 
-def test_parse_batch_valid_array_maps_by_order():
+def testparse_batch_valid_array_maps_by_order():
     raw = '[{"score": 8.0, "score_notes": "a", "caveats": []}, {"score": 3.0, "score_notes": "b", "caveats": ["x"]}]'
-    results = _parse_batch(raw, 2)
+    results = parse_batch(raw, 2)
     assert results is not None
     assert [result.score for result in results] == [8.0, 3.0]
     assert results[1].caveats == ["x"]
 
 
-def test_parse_batch_wrong_length_returns_none():
-    assert _parse_batch('[{"score": 8.0}]', 2) is None
+def testparse_batch_wrong_length_returns_none():
+    assert parse_batch('[{"score": 8.0}]', 2) is None
 
 
-def test_parse_batch_more_items_than_requested_returns_none():
+def testparse_batch_more_items_than_requested_returns_none():
     """LLM returns MORE items than n (e.g. hallucinated extras) — also structurally invalid."""
     raw = '[{"score": 1.0}, {"score": 2.0}, {"score": 3.0}]'
-    assert _parse_batch(raw, 2) is None
+    assert parse_batch(raw, 2) is None
 
 
-def test_parse_batch_non_array_returns_none():
-    assert _parse_batch('{"score": 8.0}', 1) is None
+def testparse_batch_non_array_returns_none():
+    assert parse_batch('{"score": 8.0}', 1) is None
 
 
-def test_parse_batch_bare_scalar_top_level_returns_none():
-    assert _parse_batch("42", 1) is None
+def testparse_batch_bare_scalar_top_level_returns_none():
+    assert parse_batch("42", 1) is None
 
 
-def test_parse_batch_invalid_json_returns_none():
-    assert _parse_batch("not json", 2) is None
+def testparse_batch_invalid_json_returns_none():
+    assert parse_batch("not json", 2) is None
 
 
-def test_parse_batch_empty_string_returns_none():
-    assert _parse_batch("", 1) is None
+def testparse_batch_empty_string_returns_none():
+    assert parse_batch("", 1) is None
 
 
-def test_parse_batch_empty_array_matches_zero_n():
-    assert _parse_batch("[]", 0) == []
+def testparse_batch_empty_array_matches_zero_n():
+    assert parse_batch("[]", 0) == []
 
 
-def test_parse_batch_item_with_missing_keys_uses_defaults():
-    results = _parse_batch('[{"foo": 1}]', 1)
+def testparse_batch_item_with_missing_keys_uses_defaults():
+    results = parse_batch('[{"foo": 1}]', 1)
     assert results is not None
     assert results[0].score == 0.0 and results[0].caveats == []
 
 
-def test_parse_batch_item_wrong_type_string_tolerated_as_default():
+def testparse_batch_item_wrong_type_string_tolerated_as_default():
     """A non-dict item (LLM returned a bare string/number instead of an
-    object) is coerced to {} by _parse_batch and gets default field values —
+    object) is coerced to {} by parse_batch and gets default field values —
     the malformed item is tolerated, never crashes the batch."""
-    results = _parse_batch('["oops", 5, null]', 3)
+    results = parse_batch('["oops", 5, null]', 3)
     assert results is not None
     assert all(result.score == 0.0 and result.caveats == [] for result in results)
 
 
-def test_parse_batch_item_is_nested_list_tolerated_as_default():
-    results = _parse_batch("[[1, 2, 3]]", 1)
+def testparse_batch_item_is_nested_list_tolerated_as_default():
+    results = parse_batch("[[1, 2, 3]]", 1)
     assert results is not None
     assert results[0].score == 0.0
 
 
-def test_parse_batch_extracts_json_from_markdown_fence_with_prose():
+def testparse_batch_extracts_json_from_markdown_fence_with_prose():
     """Fallback path: raw isn't valid JSON on its own (has surrounding
     prose + fence) — parse_llm_json must extract it before json.loads."""
     raw = 'Here are the results:\n```json\n[{"score": 6.5, "score_notes": "ok"}]\n```'
-    results = _parse_batch(raw, 1)
+    results = parse_batch(raw, 1)
     assert results is not None
     assert results[0].score == 6.5
 
 
-def test_parse_batch_item_with_malformed_salary_fields_sanitized():
+def testparse_batch_item_with_malformed_salary_fields_sanitized():
     """A dict item with hostile/wrong-typed salary sub-fields still parses —
     _result_from's per-field coercion sanitizes them instead of raising."""
     raw = json.dumps(
@@ -1160,7 +1154,7 @@ def test_parse_batch_item_with_malformed_salary_fields_sanitized():
             }
         ]
     )
-    results = _parse_batch(raw, 1)
+    results = parse_batch(raw, 1)
     assert results is not None
     result = results[0]
     assert result.score == 0.0
@@ -1187,7 +1181,7 @@ async def test_batch_happy_path_single_call():
         calls["n"] += 1
         return '[{"score": 8.0, "score_notes": "a", "caveats": []}, {"score": 2.0, "score_notes": "b", "caveats": []}]'
 
-    results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller=caller)
     assert [result.score for result in results] == [8.0, 2.0]
     assert calls["n"] == 1  # a single call for the batch
 
@@ -1201,7 +1195,7 @@ async def test_batch_falls_back_per_job_on_bad_json():
             return "garbage not json"  # batch fails to parse
         return '{"score": 5.0, "score_notes": "x", "caveats": []}'  # per-job
 
-    results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller=caller)
     assert [result.score for result in results] == [5.0, 5.0]
     assert calls["n"] == 3  # 1 batch (failed) + 2 per-job
 
@@ -1211,7 +1205,7 @@ async def test_batch_spend_limit_propagates():
         raise RuntimeError("spend limit reached")
 
     with pytest.raises(RuntimeError, match="spend limit"):
-        await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+        await evaluate_jobs_batch(_inputs(2), {}, "m", caller=caller)
 
 
 async def test_batch_single_job_uses_single_path():
@@ -1221,7 +1215,7 @@ async def test_batch_single_job_uses_single_path():
         calls["n"] += 1
         return '{"score": 7.0, "score_notes": "x", "caveats": []}'
 
-    results = await evaluate_jobs_batch(_inputs(1), {}, "m", caller)
+    results = await evaluate_jobs_batch(_inputs(1), {}, "m", caller=caller)
     assert results[0].score == 7.0
     assert calls["n"] == 1
 
@@ -1236,7 +1230,7 @@ async def test_batch_falls_back_per_job_on_non_spend_error():
             raise ConnectionError("timeout")  # non-spend error: fallback
         return '{"score": 3.0, "score_notes": "y", "caveats": []}'
 
-    results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    results = await evaluate_jobs_batch(_inputs(2), {}, "m", caller=caller)
     assert calls["n"] == 3  # 1 batch (error) + 2 per-job
     assert len(results) == 2
     assert [result.score for result in results] == [3.0, 3.0]
@@ -1250,8 +1244,6 @@ async def test_evaluate_job_passes_cache_prefix():
         captured["prefix"] = cache_prefix
         captured["dynamic"] = prompt
         return '{"score": 8.0, "score_notes": "x", "caveats": []}'
-
-    from moonlighter.discovery.evaluator import evaluate_job
 
     await evaluate_job(
         "Co", "Eng", "JD here", {"skills": ["python"]}, "m", caller, location=None, remote_type=None
@@ -1602,7 +1594,7 @@ async def _prefixes_for(profile):
 
     await evaluate_job("Co", "Eng", "desc", profile, "m", caller, location=None, remote_type=None)
     await evaluate_jobs_batch(
-        [EvalInput("Co", "A", "d"), EvalInput("Co", "B", "d")], profile, "m", batch_caller
+        [EvalInput("Co", "A", "d"), EvalInput("Co", "B", "d")], profile, "m", caller=batch_caller
     )
     return captured["single"], captured["batch"]
 
@@ -1705,7 +1697,7 @@ async def test_a_spend_limit_in_evaluate_job_is_recorded_before_it_propagates():
         raise RuntimeError(SPEND_LIMIT_MESSAGE)
 
     with (
-        patch("moonlighter.discovery.evaluator.record_spend_limit_hit") as record,
+        patch("moonlighter.discovery.evaluation.single.record_spend_limit_hit") as record,
         pytest.raises(RuntimeError, match="spend limit"),
     ):
         await _evaluate(caller)
@@ -1716,7 +1708,7 @@ async def test_an_ordinary_error_in_evaluate_job_records_no_spend_limit_hit():
     async def caller(prompt, model, cache_prefix=None):
         raise RuntimeError("boom")
 
-    with patch("moonlighter.discovery.evaluator.record_spend_limit_hit") as record:
+    with patch("moonlighter.discovery.evaluation.single.record_spend_limit_hit") as record:
         await _evaluate(caller)
     record.assert_not_called()
 
@@ -1726,10 +1718,10 @@ async def test_a_spend_limit_in_the_batch_call_is_recorded_before_it_propagates(
         raise RuntimeError(SPEND_LIMIT_MESSAGE)
 
     with (
-        patch("moonlighter.discovery.evaluator.record_spend_limit_hit") as record,
+        patch("moonlighter.discovery.evaluation.batch.record_spend_limit_hit") as record,
         pytest.raises(RuntimeError, match="spend limit"),
     ):
-        await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+        await evaluate_jobs_batch(_inputs(2), {}, "m", caller=caller)
     record.assert_called_once_with()
 
 
@@ -1737,8 +1729,8 @@ async def test_an_ordinary_error_in_the_batch_call_records_no_spend_limit_hit():
     async def caller(prompt, model, cache_prefix=None):
         raise RuntimeError("boom")
 
-    with patch("moonlighter.discovery.evaluator.record_spend_limit_hit") as record:
-        await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    with patch("moonlighter.discovery.evaluation.batch.record_spend_limit_hit") as record:
+        await evaluate_jobs_batch(_inputs(2), {}, "m", caller=caller)
     record.assert_not_called()
 
 
@@ -1774,7 +1766,7 @@ async def test_a_failed_batch_call_is_logged_with_the_traceback_before_the_fallb
         raise RuntimeError("boom")
 
     with caplog.at_level(logging.DEBUG):
-        await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+        await evaluate_jobs_batch(_inputs(2), {}, "m", caller=caller)
     record = _warnings(caplog)[0]
     assert record.getMessage() == "batch eval: call error — fallback per-job: boom"
     assert record.exc_info is not None
@@ -1783,7 +1775,7 @@ async def test_a_failed_batch_call_is_logged_with_the_traceback_before_the_fallb
 async def test_an_invalid_batch_reply_is_logged_without_a_traceback_before_the_fallback(caplog):
     caller, _ = _recording_caller("garbage", MOCK_LLM_RESPONSE)
     with caplog.at_level(logging.DEBUG):
-        await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+        await evaluate_jobs_batch(_inputs(2), {}, "m", caller=caller)
     (record,) = _warnings(caplog)
     assert record.getMessage() == "batch eval: invalid parse — fallback per-job (2 jobs)"
     assert record.exc_info is None
@@ -1791,7 +1783,7 @@ async def test_an_invalid_batch_reply_is_logged_without_a_traceback_before_the_f
 
 async def test_a_batch_of_no_jobs_still_asks_the_model_once():
     caller, calls = _recording_caller("[]")
-    assert await evaluate_jobs_batch([], {}, "m", caller) == []
+    assert await evaluate_jobs_batch([], {}, "m", caller=caller) == []
     assert len(calls) == 1
     assert "exactly 0 objects" in calls[0][2]
 
@@ -1801,7 +1793,7 @@ async def test_a_batch_reply_that_is_not_text_propagates_instead_of_falling_back
         return None
 
     with pytest.raises(TypeError):
-        await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+        await evaluate_jobs_batch(_inputs(2), {}, "m", caller=caller)
 
 
 async def test_the_batch_prompt_carries_each_jobs_location_and_remote_type():
@@ -1811,7 +1803,7 @@ async def test_the_batch_prompt_carries_each_jobs_location_and_remote_type():
         EvalInput("Beta", "Dev", "d1"),
     ]
     caller, calls = _recording_caller('[{"score": 1.0}, {"score": 2.0}]')
-    await evaluate_jobs_batch(jobs, {}, "m", caller)
+    await evaluate_jobs_batch(jobs, {}, "m", caller=caller)
     prompt = calls[0][0]
     assert (
         "Company: Acme\nTitle: Eng\nLocation: Bangalore, India\nRemote type: remote\nDescription:\nd0"
@@ -1824,7 +1816,9 @@ async def test_the_batch_prompt_carries_each_jobs_location_and_remote_type():
 
 async def test_a_batch_of_one_job_forwards_its_location_to_the_single_prompt():
     caller, calls = _recording_caller('{"score": 1.0}')
-    await evaluate_jobs_batch([EvalInput("Acme", "Eng", "d0", "Italy", "hybrid")], {}, "m", caller)
+    await evaluate_jobs_batch(
+        [EvalInput("Acme", "Eng", "d0", "Italy", "hybrid")], {}, "m", caller=caller
+    )
     assert "Location: Italy\nRemote type: hybrid\nDescription:\nd0" in calls[0][0]
 
 
@@ -1834,7 +1828,7 @@ async def test_the_per_job_fallback_forwards_the_model_and_each_jobs_location():
         EvalInput("Beta", "Dev", "d1"),
     ]
     caller, calls = _recording_caller("garbage", '{"score": 5.0}')
-    await evaluate_jobs_batch(jobs, {}, "model-x", caller)
+    await evaluate_jobs_batch(jobs, {}, "model-x", caller=caller)
     assert [model for _, model, _ in calls] == ["model-x", "model-x", "model-x"]
     assert "Company: Acme" in calls[1][0]
     assert "Location: Bangalore, India\nRemote type: remote" in calls[1][0]
@@ -1856,14 +1850,14 @@ async def test_the_per_job_fallback_runs_one_job_at_a_time_in_order():
         log.append(f"end {label}")
         return '{"score": 5.0}'
 
-    await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    await evaluate_jobs_batch(_inputs(2), {}, "m", caller=caller)
     assert log == ["start Co0", "end Co0", "start Co1", "end Co1"]
 
 
 async def test_each_batch_posting_is_capped_at_8000_characters():
     job = EvalInput("Co", "Eng", "x" * 10000)
     caller, calls = _recording_caller('[{"score": 1.0}, {"score": 2.0}]')
-    await evaluate_jobs_batch([job, EvalInput("Co", "Dev", "d")], {}, "m", caller)
+    await evaluate_jobs_batch([job, EvalInput("Co", "Dev", "d")], {}, "m", caller=caller)
     assert "x" * 8001 not in calls[0][0]
     assert "x" * 7964 in calls[0][0]
 
@@ -1906,7 +1900,7 @@ async def test_the_single_prefix_is_the_template_filled_with_the_three_profile_s
 
 async def test_the_batch_prefix_is_the_template_filled_with_the_sections_and_the_job_count():
     caller, calls = _recording_caller("[" + ", ".join(['{"score": 1.0}'] * 3) + "]")
-    await evaluate_jobs_batch(_inputs(3), PROFILE_WITH_EVERY_SECTION, "m", caller)
+    await evaluate_jobs_batch(_inputs(3), PROFILE_WITH_EVERY_SECTION, "m", caller=caller)
     prefix = calls[0][2]
     assert prefix == EVAL_BATCH_PREFIX.format(
         profile_yaml=yaml.dump(profile_for_eval(PROFILE_WITH_EVERY_SECTION), allow_unicode=True),

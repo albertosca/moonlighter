@@ -33,7 +33,8 @@ from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.log import setup as setup_logging
 from moonlighter.core.metrics import operation_metrics
-from moonlighter.discovery.evaluator import evaluate_job, should_skip_by_title
+from moonlighter.discovery.evaluation.single import evaluate_job
+from moonlighter.discovery.evaluation.title_filter import should_skip_by_title
 
 BUG_MARKER = "evaluation error: claude CLI exited with code 1"
 

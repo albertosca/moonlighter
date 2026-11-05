@@ -8,7 +8,7 @@ from moonlighter.application.assisted.results import SheetKind, SheetResult
 from moonlighter.application.cvgen.bootstrap import BootstrapError, BootstrapOutcome
 from moonlighter.core.db import Application, Job, ScanLog, init_db
 from moonlighter.core.metrics import record_call
-from moonlighter.discovery.evaluator import EvaluationResult
+from moonlighter.discovery.evaluation.models import EvaluationResult
 from moonlighter.discovery.results import ScanKind, ScanReport
 
 from tests._context import make_test_context

@@ -11,12 +11,10 @@ import pytest
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.validation import validate_config
 from moonlighter.discovery import service as scan_service
-from moonlighter.discovery.evaluator import (
-    EvalInput,
-    engagement_section,
-    evaluate_job,
-    evaluate_jobs_batch,
-)
+from moonlighter.discovery.evaluation.batch import evaluate_jobs_batch
+from moonlighter.discovery.evaluation.engagement import engagement_section
+from moonlighter.discovery.evaluation.models import EvalInput
+from moonlighter.discovery.evaluation.single import evaluate_job
 from moonlighter.discovery.sources.job_feeds.remotive import RemotiveScanner
 from moonlighter.discovery.sources.job_feeds.weworkremotely import WeWorkRemotelyScanner
 
@@ -73,7 +71,7 @@ async def test_single_evaluation_prompt_has_no_software_identity():
 async def test_batch_evaluation_prompt_has_no_software_identity():
     caller, seen = _spy(BATCH_RESPONSE)
     jobs = [EvalInput("Hospital", "ICU Nurse", "Care."), EvalInput("Clinic", "Nurse", "Care.")]
-    await evaluate_jobs_batch(jobs, NURSE_PROFILE, "m", caller)
+    await evaluate_jobs_batch(jobs, NURSE_PROFILE, "m", caller=caller)
     _assert_no_hardcoded_identity(seen["prefix"])
     assert "## Engagement type" not in seen["prefix"]
 
@@ -87,7 +85,7 @@ async def test_the_engagement_the_profile_names_reaches_both_prompts():
     assert "targets part-time hospital positions" in seen["prefix"]
     caller, seen = _spy(BATCH_RESPONSE)
     await evaluate_jobs_batch(
-        [EvalInput("A", "B", "C"), EvalInput("D", "E", "F")], profile, "m", caller
+        [EvalInput("A", "B", "C"), EvalInput("D", "E", "F")], profile, "m", caller=caller
     )
     assert "targets part-time hospital positions" in seen["prefix"]
 

@@ -93,7 +93,7 @@ async def test_evaluate_10_jobs_concurrent_faster_than_sequential():
     """
     import json
 
-    from moonlighter.discovery.evaluator import evaluate_job
+    from moonlighter.discovery.evaluation.single import evaluate_job
 
     call_count = [0]
     _response = json.dumps(
@@ -161,7 +161,7 @@ async def test_evaluate_batch_size_10_processes_all():
     """
     import json
 
-    from moonlighter.discovery.evaluator import evaluate_job
+    from moonlighter.discovery.evaluation.single import evaluate_job
 
     _response = json.dumps(
         {

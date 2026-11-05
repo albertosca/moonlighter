@@ -9,7 +9,7 @@ from moonlighter.core.config.backends import llm_backend
 from moonlighter.core.config.paths import browser_executable, moonlighter_home
 from moonlighter.core.llm.codex import codex_executable
 from moonlighter.core.llm.cursor import cursor_executable
-from moonlighter.discovery.evaluator import LOCATION_PRECEDENCES
+from moonlighter.discovery.evaluation.regional_eligibility import LOCATION_PRECEDENCES
 
 
 @dataclass
