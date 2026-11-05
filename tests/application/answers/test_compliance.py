@@ -14,11 +14,15 @@ from moonlighter.application.answers.compliance import is_compliance_question
 
 # The real option list from the gympass/Wellhub conflict-of-interest question.
 GYMPASS_OPTIONS = (
-    "I currently hold or have previously held a position, role, or affiliation "
-    "with a public body, government entity, state-owned enterprise, political "
-    "party, or international organization.",
-    "I have a family member or close relationship with someone who holds or has "
-    "held a position in a public body or government entity.",
+    (
+        "I currently hold or have previously held a position, role, or affiliation "
+        "with a public body, government entity, state-owned enterprise, political "
+        "party, or international organization."
+    ),
+    (
+        "I have a family member or close relationship with someone who holds or has "
+        "held a position in a public body or government entity."
+    ),
     "I engage in external professional activity.",
     "I have nothing to declare.",
 )

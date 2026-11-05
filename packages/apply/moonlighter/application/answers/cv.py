@@ -12,8 +12,8 @@ class CVNotFoundError(Exception):
 
 
 def configured_cv_path(config: dict[str, Any], company: str = "") -> Path | None:
-    """
-    The CV path config points at, without checking whether it exists.
+    """The CV path config points at, without checking whether it exists.
+
     Company matching is case-insensitive; falls back to 'default'. Relative
     paths are resolved from MOONLIGHTER_HOME; `~` expands. Returns None when nothing is
     mapped at all.
@@ -33,15 +33,18 @@ def configured_cv_path(config: dict[str, Any], company: str = "") -> Path | None
 
 
 def resolve_cv_path(company: str, config: dict[str, Any], job_id: int | None = None) -> str:
-    """
-    Resolves the CV path to upload: the job's own tailored PDF when one exists,
+    """Resolves the CV path to upload.
+
+    The job's own tailored PDF when one exists,
     else the company mapping, else 'default'. Company matching is case-insensitive.
     Relative paths are resolved from MOONLIGHTER_HOME; `~` expands. Raises
     CVNotFoundError if the chosen file does not exist (never silently uploads
     the wrong CV).
     """
     if job_id is not None:
-        from moonlighter.application.cvgen.service import generated_dir_for
+        from moonlighter.application.cvgen.service import (  # noqa: PLC0415 - keeps cvgen.service, and core.llm behind it, out of every import of answers.cv
+            generated_dir_for,
+        )
 
         tailored = generated_dir_for(config, job_id) / "cv.pdf"
         # exists() alone would upload a stranded partial-write (round-6

@@ -37,8 +37,10 @@ _OPTION = re.compile(
 
 
 def is_compliance_question(label: str, options: Sequence[str]) -> bool:
-    """True when a form question is a declaration/compliance/conflict-of-interest
-    question — recognized by its label or by the content of its options."""
+    """True when a form question is a declaration/compliance/conflict-of-interest question.
+
+    Recognized by its label or by the content of its options.
+    """
     if _LABEL.search(label):
         return True
     return any(_OPTION.search(option) for option in options)

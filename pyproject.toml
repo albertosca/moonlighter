@@ -111,9 +111,6 @@ strict-checking = true
 # Files not yet migrated to the profile above (plan 2026-11-04, showcase quality).
 # Each task deletes its files' lines; the block is empty and removed at the end.
 "packages/apply/moonlighter/application/__init__.py" = ["D104"]
-"packages/apply/moonlighter/application/answers/__init__.py" = ["D104"]
-"packages/apply/moonlighter/application/answers/compliance.py" = ["D205", "D209"]
-"packages/apply/moonlighter/application/answers/cv.py" = ["D205", "D212", "PLC0415"]
 "packages/apply/moonlighter/application/cli.py" = ["C901", "I001", "PLC0415", "PLR0912", "PLR0915"]
 "packages/apply/moonlighter/application/cvgen/__init__.py" = ["D104"]
 "packages/apply/moonlighter/application/cvgen/bootstrap.py" = ["C901", "D205", "D209", "PLR2004"]
@@ -145,8 +142,6 @@ strict-checking = true
 "scripts/render_diagrams.py" = ["ARG001", "D205"]
 "scripts/stamp_revision_dates.py" = ["D205"]
 "tests/_context.py" = ["PLC0415", "PLR0917"]
-"tests/application/answers/test_compliance.py" = ["ISC004"]
-"tests/application/answers/test_cv.py" = ["PLC0415"]
 "tests/application/cvgen/test_bootstrap.py" = ["PLC0415", "PLE2515"]
 "tests/application/cvgen/test_compile.py" = ["PLC0415", "PT018"]
 "tests/application/cvgen/test_cvgen_service.py" = ["ASYNC240", "FBT003", "PLC0415", "PT018"]
