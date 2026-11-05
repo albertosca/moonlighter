@@ -7,6 +7,7 @@ from collections.abc import Callable
 from unittest.mock import patch
 
 import reevaluate_bug_victims
+import reevaluation_batch
 from moonlighter.core.db import Job
 from moonlighter.discovery.evaluation.models import EvaluationResult
 
@@ -69,7 +70,7 @@ def run_main(monkeypatch, *flags, outcomes=None, config=CONFIG, suspend=True) ->
     evaluator = Evaluator(outcomes or {}, suspend=suspend)
     monkeypatch.setattr(sys, "argv", ["reevaluate_bug_victims.py", *flags])
     monkeypatch.setattr(reevaluate_bug_victims, "load_config", lambda: config)
-    with patch.object(reevaluate_bug_victims, "evaluate_job", evaluator):
+    with patch.object(reevaluation_batch, "evaluate_job", evaluator):
         reevaluate_bug_victims.main()
     return evaluator
 

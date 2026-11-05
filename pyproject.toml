@@ -119,7 +119,6 @@ strict-checking = true
 "scripts/check_docs_parity.py" = ["D205"]
 "scripts/check_readme_facts.py" = ["C901", "D205", "PLR0912"]
 "scripts/check_version_lockstep.py" = ["D205"]
-"scripts/reevaluate_bug_victims.py" = ["BLE001", "C901", "D205", "FBT001", "FBT002", "PLR0912", "PLR0913", "PLR0915", "PLR0917"]
 "scripts/render_diagrams.py" = ["ARG001", "D205"]
 "scripts/stamp_revision_dates.py" = ["D205"]
 "tests/_context.py" = ["PLC0415", "PLR0917"]

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import reevaluate_bug_victims
+import reevaluation_batch
 from moonlighter.core.db import init_db
 
 
@@ -15,5 +16,5 @@ def caller_factory(monkeypatch, temporary_database):
     # setup_logging() adds a process-wide file handler on ~/.moonlighter/app.log, once per process.
     monkeypatch.setattr(reevaluate_bug_victims, "setup_logging", lambda: None)
     factory = MagicMock(return_value="CALLER")
-    monkeypatch.setattr(reevaluate_bug_victims, "make_caller", factory)
+    monkeypatch.setattr(reevaluation_batch, "make_caller", factory)
     return factory
