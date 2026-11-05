@@ -26,8 +26,8 @@ async def _add_links(payload: dict[str, Any]) -> None:
     try:
         config = load_config()
     except (ConfigError, OSError, yaml.YAMLError) as error:
-        # The payload above already reports the broken config; --online
-        # adds why the links were not checked, never a crash (exit 3).
+        # The payload from doctor_payload() already reports the broken config;
+        # --online adds why the links were not checked, never a crash (exit 3).
         payload["links"] = None
         payload["links_error"] = f"config does not load: {error}"
         return
@@ -40,4 +40,5 @@ async def _add_links(payload: dict[str, Any]) -> None:
 
 
 def _has_broken_link(payload: dict[str, Any]) -> bool:
+    # links is None when the config did not load.
     return any(link["ok"] is False for link in payload["links"] or ())

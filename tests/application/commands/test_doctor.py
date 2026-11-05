@@ -80,7 +80,9 @@ async def test_apply_doctor_online_says_when_there_was_nothing_to_check(temporar
     ):
         payload, code = await cli._run(cli.parse_args(["doctor", "--online"]))
     assert payload["links"] == []
-    assert "no CV template" in payload["links_note"]
+    assert payload["links_note"] == (
+        "no CV template with header links found in cv.template_dir; nothing checked"
+    )
     assert code == 0
 
 
@@ -99,16 +101,3 @@ async def test_apply_doctor_online_reports_every_load_failure_with_the_same_pref
     assert payload["links_error"] == f"config does not load: {failure}"
     assert "links_note" not in payload
     assert code == 1
-
-
-async def test_apply_doctor_online_nothing_to_check_note_is_this_exact_sentence(
-    temporary_database,
-):
-    with (
-        patch.object(doctor_command, "doctor_payload", return_value=({"kind": "doctor"}, 0)),
-        patch.object(doctor_command, "link_report", AsyncMock(return_value=[])),
-    ):
-        payload, _ = await cli._run(cli.parse_args(["doctor", "--online"]))
-    assert payload["links_note"] == (
-        "no CV template with header links found in cv.template_dir; nothing checked"
-    )
