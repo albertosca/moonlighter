@@ -32,7 +32,7 @@ def test_fill_template_handles_a_missing_optional_field():
 
 
 def test_fill_template_escapes_tex_specials_in_contact_and_education_fields():
-    # pool.py's own module docstring records this exact bug class already
+    # pool/loader.py's own module docstring records this exact bug class already
     # happening once: an unescaped '&' in a hand-curated "R&D Engineer" title
     # broke every pdflatex compile silently. NAME_FIRST/NAME_LAST/HEADLINE/
     # PHONE/EMAIL and the education fields all substitute into ordinary
@@ -81,7 +81,7 @@ def test_fill_template_drops_a_linkedin_value_that_is_not_a_real_slug():
 
 def test_fill_template_skips_a_malformed_education_entry_that_is_not_a_mapping():
     # profile.yaml is hand-edited: a stray '-' under "education" (the same
-    # mistake pool.py's own _bullet/_experience guard against) makes an entry
+    # mistake pool/loader.py's own _bullet/_experience guard against) makes an entry
     # a bare string instead of a mapping -- fill_template must skip it rather
     # than crash the whole bootstrap on one malformed line.
     profile = {

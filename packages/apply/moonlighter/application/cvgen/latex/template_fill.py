@@ -47,7 +47,7 @@ def _linkedin_username(url: str) -> str:
 
 
 def _education_block(entries: list[Any]) -> str:
-    # year/degree/school are pasted into \cventry{...} the same way pool.py's
+    # year/degree/school are pasted into \cventry{...} the same way pool/loader.py's
     # curated company/title/location are (see that module's own docstring for
     # the "R&D Engineer" incident this class of bug already caused once) --
     # profile.yaml is operator-authored free text, not pre-escaped LaTeX, so
@@ -78,7 +78,7 @@ def fill_template(profile: dict[str, Any]) -> str:
     # \title{}, \phone[mobile]{}, \email{}), never verbatim -- an unescaped
     # '&'/'%'/'_' from a profile field either breaks the compile or, worse, a
     # bare '%' silently truncates the rest of the line (LaTeX's comment
-    # character) with no compile error at all. escape_latex is what pool.py's
+    # character) with no compile error at all. escape_latex is what pool/loader.py's
     # own curated fields and every model-authored string in render.py already
     # go through before reaching a .tex file; profile.yaml is exactly as
     # untrusted as either. LINKEDIN_USERNAME is the one exception: it is a

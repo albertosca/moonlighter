@@ -9,7 +9,7 @@ from tests.application.cvgen.bootstrap_samples import CANDIDATE_PROFILE, scripte
 
 
 async def test_bootstrap_cv_pool_place_holds_a_missing_title_and_period(monkeypatch, tmp_path):
-    # pool.py's _experience rejects an EMPTY title/period with PoolError just
+    # pool/loader.py's _experience rejects an EMPTY title/period with PoolError just
     # as hard as an empty location, and a model that omits either is ordinary
     # -- location already had a placeholder guard, these two fell through to
     # "". The proof is the round trip, not the field: a pool that load_pool

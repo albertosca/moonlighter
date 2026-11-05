@@ -18,7 +18,7 @@ from moonlighter.core.parsing import parse_llm_json
 
 logger = get_logger(__name__)
 
-# pool.py's load_pool requires every experience to carry a non-empty
+# pool/loader.py's load_pool requires every experience to carry a non-empty
 # company, title, period AND location (one `not raw.get(field)` check over
 # all four) -- but a profile.yaml missing any of them is a realistic
 # bootstrap input, not a malformed one, and so is a model that omits one

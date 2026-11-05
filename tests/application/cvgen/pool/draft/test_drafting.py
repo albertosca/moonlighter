@@ -141,7 +141,7 @@ async def test_draft_pool_drops_a_bullet_that_escapes_to_nothing():
 
 
 async def test_draft_pool_escapes_a_tex_special_in_the_experience_header_fields():
-    # pool.py's own module docstring records this exact bug already happening once:
+    # pool/loader.py's own module docstring records this exact bug already happening once:
     # an unescaped '&' in a hand-curated "R&D Engineer" title broke every pdflatex
     # compile silently until someone compiled it. render.py's _entry pastes company/
     # title/period/location into \cventry{...} unescaped, trusting they are already
