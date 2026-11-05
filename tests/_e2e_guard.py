@@ -2,7 +2,7 @@
 
 An e2e test only runs when someone selected it (``addopts`` deselects the
 marker), so a skip there means "you asked for the real thing and got nothing".
-Loaded for the whole suite through ``addopts`` (``-p tests._e2e_guard``).
+Registered for the whole suite by ``pytest_configure`` in ``tests/conftest.py``.
 """
 
 from collections.abc import Generator
