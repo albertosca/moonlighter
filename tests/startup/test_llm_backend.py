@@ -1,7 +1,8 @@
 """Whichever LLM backend is configured needs its own credential, reported once at startup."""
 
+import pytest
 from moonlighter.core.config.backends import LLM_BACKENDS
-from moonlighter.startup import _BACKEND_CREDENTIALS, validate_startup
+from moonlighter.startup import validate_startup
 
 
 def test_validate_startup_cli_backend_without_the_claude_binary_produces_error(monkeypatch):
@@ -99,6 +100,8 @@ def test_codex_backend_with_the_cli_is_quiet_and_asks_for_no_api_key(monkeypatch
     assert not any("ANTHROPIC_API_KEY" in warning.message for warning in warnings)
 
 
-def test_every_llm_backend_has_a_credential_check():
-    """A backend added to LLM_BACKENDS without an entry would raise KeyError at startup."""
-    assert set(_BACKEND_CREDENTIALS) == set(LLM_BACKENDS)
+@pytest.mark.parametrize("backend", LLM_BACKENDS)
+def test_every_llm_backend_has_a_credential_check(backend):
+    """A backend added to LLM_BACKENDS without a credential check would raise KeyError at startup."""
+    warnings = validate_startup(config={"llm_backend": backend}, profile={"skills": []})
+    assert isinstance(warnings, list)

@@ -16,7 +16,7 @@ from tests._fresh_import import import_server_afresh
 from tests.mcp_tools._records import create_application, create_job
 
 
-def test_validate_startup_called_at_import_with_real_config(monkeypatch):
+def test_importing_the_server_builds_it_without_an_api_key(monkeypatch):
     """A fresh import of the server builds it with no ANTHROPIC_API_KEY set.
 
     The startup checks run in the lifespan, not at import, so a missing key must

@@ -93,6 +93,7 @@ _TOOLS = (
 )
 for _tool in _TOOLS:
     mcp.add_tool(_tool)
+del _tool
 
 
 _USAGE = """usage: moonlighter [init | doctor | -h]

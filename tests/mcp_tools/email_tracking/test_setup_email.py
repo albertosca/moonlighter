@@ -107,7 +107,7 @@ async def test_setup_email_missing_credentials_path_gives_a_clear_message():
 
 
 async def test_setup_email_handles_auth_error(tmp_path):
-    """GmailAuthError during OAuth → friendly message (server.py setup_email)."""
+    """GmailAuthError during OAuth → friendly message (mcp_tools.email_tracking.setup_email)."""
 
     creds = tmp_path / "gmail-client.json"
     creds.write_text("{}")
@@ -124,7 +124,7 @@ async def test_setup_email_handles_auth_error(tmp_path):
 
 
 async def test_setup_email_handles_unexpected_error(tmp_path):
-    """Unexpected exception during OAuth → unexpected-error message (server.py setup_email)."""
+    """Unexpected exception during OAuth → unexpected-error message (mcp_tools.email_tracking.setup_email)."""
 
     creds = tmp_path / "gmail-client.json"
     creds.write_text("{}")

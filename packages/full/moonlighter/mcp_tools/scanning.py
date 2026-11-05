@@ -7,7 +7,8 @@ from mcp.server.mcpserver import Context
 from moonlighter._tool_logging import tool_logged
 from moonlighter.app_context import AppContext, refreshed_app_context
 from moonlighter.core.metrics import operation_metrics
-from moonlighter.discovery import archive, manual_jobs, scanning
+from moonlighter.discovery import archive, manual_jobs
+from moonlighter.discovery import scanning as discovery_scanning
 from moonlighter.discovery.archive import ArchiveStaleJobsError, format_archive_result
 from moonlighter.discovery.results import render_scan_report
 
@@ -29,7 +30,7 @@ async def scan_and_evaluate(  # noqa: D417 - context is injected by FastMCP; the
     app_context = refreshed_app_context(context)
     with operation_metrics("scan_and_evaluate"):
         return render_scan_report(
-            await scanning.scan_and_evaluate(
+            await discovery_scanning.scan_and_evaluate(
                 keywords,
                 phase,
                 app_context.config,
@@ -56,7 +57,7 @@ async def scan_company(  # noqa: D417 - context is injected by FastMCP; the docs
     app_context = refreshed_app_context(context)
     with operation_metrics("scan_company"):
         return render_scan_report(
-            await scanning.scan_company(
+            await discovery_scanning.scan_company(
                 source,
                 company,
                 app_context.config,
