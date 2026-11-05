@@ -6,6 +6,7 @@ load_config() reads blocklist_learned.yaml from the moonlighter home on every ru
 from pathlib import Path
 
 import yaml
+
 from moonlighter.core.config.paths import moonlighter_home
 
 

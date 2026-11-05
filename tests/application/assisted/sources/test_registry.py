@@ -1,4 +1,5 @@
 import pytest
+
 from moonlighter.application.assisted.sources import registry
 from moonlighter.core.db import Job
 

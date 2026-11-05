@@ -3,7 +3,6 @@
 from moonlighter.application.assisted.composition.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sheet.builder import render_sheet
-
 from tests.application.assisted.sheet.builder.sheet_answers import (
     HEADER,
     choice,

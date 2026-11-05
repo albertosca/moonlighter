@@ -1,7 +1,6 @@
 """The per-question markers of a rendered sheet: numbering, required, gap and pick-one or pick-any."""
 
 from moonlighter.application.assisted.sheet.builder import render_sheet
-
 from tests.application.assisted.sheet.builder.sheet_answers import (
     HEADER,
     answered,

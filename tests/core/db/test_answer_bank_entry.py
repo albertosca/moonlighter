@@ -1,8 +1,9 @@
 """AnswerBankEntry stores an approved answer under its normalized question, and that question is unique."""
 
 import pytest
-from moonlighter.core.db import AnswerBankEntry, init_db
 from peewee import IntegrityError
+
+from moonlighter.core.db import AnswerBankEntry, init_db
 
 
 def test_answer_bank_entry_created_and_normalized_question_is_unique(temporary_database):

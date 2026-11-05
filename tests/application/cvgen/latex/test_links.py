@@ -1,5 +1,6 @@
 import httpx
 import pytest
+
 from moonlighter.application.cvgen.latex import links
 from moonlighter.application.cvgen.latex.links import check_links, link_report, template_links
 

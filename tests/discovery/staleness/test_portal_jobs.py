@@ -3,7 +3,6 @@
 from datetime import datetime, timedelta
 
 from moonlighter.discovery.staleness import find_stale_jobs
-
 from tests.discovery.staleness.fake_jobs import make_job
 
 PORTAL_LINE = "{count} remoteok job(s) (portal feed, no per-company listing)"

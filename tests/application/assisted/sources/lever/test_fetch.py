@@ -1,13 +1,13 @@
 """Fetching a Lever apply page and recognising a Lever posting URL."""
 
 import httpx
+
 from moonlighter.application.assisted.sources.base import SourceMatch, questions_or_empty
 from moonlighter.application.assisted.sources.lever import (
     LeverSource,
     fetch_lever_questions,
     posting_from_url,
 )
-
 from tests.application.assisted.sources.lever.lever_pages import PAGE
 
 

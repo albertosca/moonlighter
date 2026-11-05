@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.discovery.scan.collection import collect_raw_jobs
-
 from tests.discovery.sources.fake_http_clients import mock_client_class
 
 

@@ -1,7 +1,6 @@
 """Extracting the readable body of a Gmail payload."""
 
 from moonlighter.tracking.gmail.message_body import _decode_data, extract_body
-
 from tests.tracking.gmail_payloads import b64
 
 # ── extract_body ───────────────────────────────────────────────────────────

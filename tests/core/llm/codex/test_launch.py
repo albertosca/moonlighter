@@ -3,7 +3,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from moonlighter.core.llm.codex import call_codex
-
 from tests.core.llm.codex.fake_codex import fake_codex
 
 

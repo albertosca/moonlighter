@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.discovery.sources.company_boards.inhire import InHireScanner, _inhire_slug
-
 from tests.discovery.sources.fake_http_clients import make_mock_client
 
 INHIRE_PAGE = {

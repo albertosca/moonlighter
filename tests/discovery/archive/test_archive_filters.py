@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.archive import archive_stale_jobs, format_archive_result
 from moonlighter.discovery.staleness import StalenessResult
-
 from tests.discovery.archive.stale_jobs import make_stale_job
 from tests.discovery.scan_fakes import CONFIG
 

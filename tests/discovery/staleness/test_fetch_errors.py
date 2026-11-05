@@ -11,7 +11,6 @@ from unittest.mock import patch
 from moonlighter.discovery.sources.base import SourceStats
 from moonlighter.discovery.sources.company_boards.greenhouse import GreenhouseScanner
 from moonlighter.discovery.staleness import find_stale_jobs
-
 from tests.discovery.sources.fake_http_clients import make_simple_client
 from tests.discovery.staleness.fake_jobs import CONFIG, make_job
 

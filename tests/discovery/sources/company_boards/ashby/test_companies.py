@@ -3,8 +3,8 @@
 from unittest.mock import patch
 
 import httpx
-from moonlighter.discovery.sources.company_boards.ashby import AshbyScanner
 
+from moonlighter.discovery.sources.company_boards.ashby import AshbyScanner
 from tests.discovery.sources.company_boards.ashby.fake_board import ashby_response
 from tests.discovery.sources.fake_http_clients import make_mock_client
 

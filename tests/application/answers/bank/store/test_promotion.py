@@ -1,9 +1,9 @@
 """Promoting an application's answers into the bank: what is banked, skipped or overwritten."""
 
 import pytest
+
 from moonlighter.application.answers.bank.store import promote_application
 from moonlighter.core.db import AnswerBankEntry, init_db
-
 from tests.application.answers.bank.store.bank_rows import FROZEN_NOW, JANUARY_SECOND, dated_entry
 
 

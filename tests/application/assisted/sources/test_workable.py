@@ -1,6 +1,7 @@
 import json
 
 import httpx
+
 from moonlighter.application.assisted.questions import QuestionKind
 from moonlighter.application.assisted.sources.base import SourceMatch, questions_or_empty
 from moonlighter.application.assisted.sources.workable import (
@@ -9,7 +10,6 @@ from moonlighter.application.assisted.sources.workable import (
     parse_workable_form,
     shortcode_from_url,
 )
-
 from tests.application.assisted.sources.fixture_files import FIXTURES_DIRECTORY
 
 SEEQ = json.loads((FIXTURES_DIRECTORY / "workable_form_seeq.json").read_text())

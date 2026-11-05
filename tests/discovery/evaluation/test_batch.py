@@ -3,9 +3,9 @@
 from unittest.mock import patch
 
 import pytest
+
 from moonlighter.discovery.evaluation.batch import evaluate_jobs_batch
 from moonlighter.discovery.evaluation.models import EvalInput
-
 from tests.discovery.evaluation.evaluation_fakes import (
     SPEND_LIMIT_MESSAGE,
     inputs,

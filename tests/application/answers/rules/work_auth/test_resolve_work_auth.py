@@ -1,6 +1,7 @@
 """resolve_work_auth: the answer per field kind, country and configured citizenship."""
 
 import pytest
+
 from moonlighter.application.answers.rules.work_auth import infer_country, resolve_work_auth
 
 WA_CONFIG = {

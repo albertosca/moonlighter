@@ -6,7 +6,6 @@ from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.archive import ArchiveResult, ArchiveStaleJobsError
 from moonlighter.discovery.scan.results import ScanKind, ScanReport
 from moonlighter.mcp_tools.scanning import add_job, archive_stale_jobs, scan_company, verify_job
-
 from tests._context import make_test_context
 from tests.mcp_tools._records import make_eval_result
 

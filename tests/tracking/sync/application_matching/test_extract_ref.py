@@ -1,8 +1,8 @@
 """Reading the application reference out of a reply's recipient addresses."""
 
 import pytest
-from moonlighter.tracking.sync.application_matching import extract_ref
 
+from moonlighter.tracking.sync.application_matching import extract_ref
 from tests.tracking.tracking_settings import BASE_EMAIL
 
 

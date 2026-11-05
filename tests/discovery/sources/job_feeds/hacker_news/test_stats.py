@@ -3,9 +3,9 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from moonlighter.discovery.sources.base import ScanStats, SourceStats
 from moonlighter.discovery.sources.job_feeds.hacker_news import HNWhoIsHiringScanner
-
 from tests.discovery.sources.fake_http_clients import mock_client_class
 from tests.discovery.sources.job_feeds.hacker_news.fake_api import hn_url_map, make_hn_client
 

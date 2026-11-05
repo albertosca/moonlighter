@@ -3,8 +3,8 @@ import signal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from moonlighter.core.llm.cursor import call_cursor
 
+from moonlighter.core.llm.cursor import call_cursor
 from tests.core.llm.fake_processes import cursor_process
 
 

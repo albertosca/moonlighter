@@ -1,8 +1,8 @@
 """Pins which jobs reevaluate_bug_victims picks and what it passes to the evaluator for each flag and config value."""
 
 import pytest
-from moonlighter.discovery.evaluation.models import EvaluationResult
 
+from moonlighter.discovery.evaluation.models import EvaluationResult
 from tests.scripts.reevaluate_bug_victims.harness import CONFIG, rows, run_main, victim
 
 

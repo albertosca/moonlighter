@@ -1,5 +1,6 @@
 import pytest
 import yaml
+
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.loading import load_config
 from moonlighter.core.config.validation import validate_config

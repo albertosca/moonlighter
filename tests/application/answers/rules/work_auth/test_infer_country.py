@@ -1,6 +1,7 @@
 """infer_country: which job locations name a country confidently, and which never do."""
 
 import pytest
+
 from moonlighter.application.answers.rules.work_auth import infer_country
 
 # ── infer_country (conservador) ───────────────────────────────────────────────

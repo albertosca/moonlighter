@@ -3,8 +3,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-from moonlighter.discovery.sources.company_boards.smartrecruiters import SmartRecruitersScanner
 
+from moonlighter.discovery.sources.company_boards.smartrecruiters import SmartRecruitersScanner
 from tests.discovery.sources.company_boards.smartrecruiters.fake_board import (
     SR_LIST_P1,
     make_url_branching_client,

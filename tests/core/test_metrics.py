@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+
 from moonlighter.core.metrics import (
     LLMMetrics,
     operation_metrics,

@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.core.db import init_db
 from moonlighter.discovery.scan.pipeline import evaluate_and_store
-
 from tests.discovery.scan_fakes import BatchRecorder, evaluation_result, make_raw_job, store_config
 
 

@@ -1,7 +1,6 @@
 """The entry point: work authorization before the static rules, and what lands in the result."""
 
 from moonlighter.application.answers.matching.field_map import pre_populate_answers
-
 from tests.application.answers.candidate_profiles import PROFILE
 
 WA_CONFIG_BRAZIL = {

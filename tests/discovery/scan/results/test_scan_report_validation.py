@@ -1,6 +1,7 @@
 """The messages ScanReport raises, and which one wins when several checks fail."""
 
 import pytest
+
 from moonlighter.discovery.scan.results import ScanKind, ScanReport
 
 

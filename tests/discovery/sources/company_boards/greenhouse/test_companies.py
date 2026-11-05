@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from moonlighter.discovery.sources.company_boards.greenhouse import GreenhouseScanner
 
+from moonlighter.discovery.sources.company_boards.greenhouse import GreenhouseScanner
 from tests.discovery.sources.fake_http_clients import make_mock_client
 
 

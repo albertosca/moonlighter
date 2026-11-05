@@ -3,8 +3,8 @@
 import json
 
 import pytest
-from moonlighter.tracking.sync.classification import ClassificationError, classify_response
 
+from moonlighter.tracking.sync.classification import ClassificationError, classify_response
 from tests.tracking.llm_callers import make_llm_caller
 from tests.tracking.tracking_settings import BASE_EMAIL, BASE_STAGES
 

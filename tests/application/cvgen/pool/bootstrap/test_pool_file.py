@@ -1,10 +1,10 @@
 import json
 
 import pytest
+
 from moonlighter.application.cvgen.pool.bootstrap import BootstrapOutcome, bootstrap_cv_pool
 from moonlighter.application.cvgen.pool.bootstrap_error import BootstrapError
 from moonlighter.application.cvgen.pool.loader import load_pool
-
 from tests.application.cvgen.bootstrap_samples import CANDIDATE_PROFILE, scripted_caller
 
 

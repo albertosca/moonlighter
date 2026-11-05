@@ -1,5 +1,4 @@
 from moonlighter.application.cvgen.latex.template_fill import fill_template
-
 from tests.application.cvgen.log_records import logged_warnings
 
 

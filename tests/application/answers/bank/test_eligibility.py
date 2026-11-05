@@ -1,6 +1,7 @@
 """The bank's pure gatekeeping: question normalisation, eligible kinds and sensitive labels."""
 
 import pytest
+
 from moonlighter.application.answers.bank.eligibility import (
     is_bank_eligible,
     is_sensitive_label,

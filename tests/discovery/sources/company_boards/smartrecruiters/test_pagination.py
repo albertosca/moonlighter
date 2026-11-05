@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, patch
 
 from moonlighter.discovery.sources.company_boards.smartrecruiters import SmartRecruitersScanner
-
 from tests.discovery.sources.company_boards.smartrecruiters.fake_board import (
     SR_DETAIL,
     SR_LIST_P1,

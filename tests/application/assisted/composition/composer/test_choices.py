@@ -1,9 +1,9 @@
 """Pins how select answers are matched to the offered options, and the option-count limit."""
 
 import pytest
+
 from moonlighter.application.assisted.composition.composer import compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE
 
 

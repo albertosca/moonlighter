@@ -3,6 +3,7 @@
 import json
 
 import pytest
+
 from moonlighter.core.cli import JsonArgumentParser
 
 

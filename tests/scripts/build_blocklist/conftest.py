@@ -2,6 +2,7 @@
 
 import build_blocklist
 import pytest
+
 from moonlighter.core.db import init_db
 
 

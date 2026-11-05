@@ -4,9 +4,9 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from moonlighter.discovery.sources.base import RawJob
 from moonlighter.discovery.staleness import find_stale_jobs
-
 from tests.discovery.staleness.fake_jobs import CHECKERS, CONFIG, make_job, make_scanner
 
 

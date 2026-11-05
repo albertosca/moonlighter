@@ -3,8 +3,8 @@
 from unittest.mock import patch
 
 import pytest
-from moonlighter.discovery.sources.job_feeds.hacker_news import HNWhoIsHiringScanner
 
+from moonlighter.discovery.sources.job_feeds.hacker_news import HNWhoIsHiringScanner
 from tests.discovery.sources.job_feeds.hacker_news.fake_api import (
     HN_BASE,
     hn_url_map,

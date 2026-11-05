@@ -9,8 +9,8 @@ import secrets
 from pathlib import Path
 
 import pytest
-from moonlighter.core.llm.cursor import call_cursor, cursor_executable
 
+from moonlighter.core.llm.cursor import call_cursor, cursor_executable
 from tests.core.llm.canary_server import start_canary_server
 
 pytestmark = pytest.mark.e2e

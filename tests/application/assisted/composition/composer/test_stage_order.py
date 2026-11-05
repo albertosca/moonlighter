@@ -1,10 +1,10 @@
 """Pins the order of the composer's stages and the state it carries from one question to the next."""
 
 import pytest
+
 from moonlighter.application.assisted.composition import composer
 from moonlighter.application.assisted.composition.composer import compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE, never_called
 
 COMPLIANCE_OPTIONS = (

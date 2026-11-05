@@ -3,6 +3,7 @@
 import json
 
 import pytest
+
 from moonlighter.application.assisted.sheet.results import (
     SheetKind,
     SheetResult,

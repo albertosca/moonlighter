@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from moonlighter.tracking.gmail.client import GmailAuthError, setup_gmail_service
 
 

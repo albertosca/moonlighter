@@ -2,8 +2,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from moonlighter.core.llm.codex import call_codex
 
+from moonlighter.core.llm.codex import call_codex
 from tests.core.llm.codex.fake_codex import LOGGED_IN, fake_codex, fake_process, write_final_message
 
 

@@ -3,8 +3,8 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
-from moonlighter.application.cvgen.latex.compile import compile_pdf, latex_available
 
+from moonlighter.application.cvgen.latex.compile import compile_pdf, latex_available
 from tests.application.cvgen.log_records import logged_warnings
 
 COMPILE = "moonlighter.application.cvgen.latex.compile"

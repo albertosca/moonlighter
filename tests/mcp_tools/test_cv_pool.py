@@ -4,7 +4,6 @@ from moonlighter.application.cvgen.pool.bootstrap import BootstrapOutcome
 from moonlighter.application.cvgen.pool.bootstrap_error import BootstrapError
 from moonlighter.core.db import cv_bootstrap_declined, init_db
 from moonlighter.mcp_tools import cv_pool
-
 from tests._context import make_test_context
 
 

@@ -1,4 +1,5 @@
 import pytest
+
 from moonlighter.core.db import Application, Job, init_db
 
 

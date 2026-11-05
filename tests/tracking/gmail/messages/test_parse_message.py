@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock
 
 from moonlighter.tracking.gmail.messages import parse_message
-
 from tests.tracking.gmail_payloads import b64
 from tests.tracking.tracking_settings import BASE_EMAIL
 

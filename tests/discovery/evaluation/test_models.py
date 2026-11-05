@@ -3,6 +3,7 @@
 from dataclasses import FrozenInstanceError
 
 import pytest
+
 from moonlighter.discovery.evaluation.models import EvalInput
 
 

@@ -6,7 +6,6 @@ import re
 from moonlighter.discovery.evaluation.batch import evaluate_jobs_batch
 from moonlighter.discovery.evaluation.models import EvalInput
 from moonlighter.discovery.evaluation.single import evaluate_job
-
 from tests.discovery.evaluation.evaluation_fakes import MOCK_LLM_RESPONSE, PROFILE, inputs
 
 

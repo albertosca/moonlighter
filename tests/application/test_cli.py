@@ -3,6 +3,7 @@ import sys
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from moonlighter.application import cli
 from moonlighter.application.commands import bootstrap_cv as bootstrap_cv_command
 from moonlighter.application.commands import doctor as doctor_command

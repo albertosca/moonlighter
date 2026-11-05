@@ -3,9 +3,10 @@
 import logging
 import sys
 
-from moonlighter.core import log as log_mod
 from rich.default_styles import DEFAULT_STYLES
 from rich.logging import RichHandler
+
+from moonlighter.core import log as log_mod
 
 
 def test_setup_without_rich_falls_back_silently(tmp_path, monkeypatch):

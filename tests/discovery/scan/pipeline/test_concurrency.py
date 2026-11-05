@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 
 from moonlighter.core.db import init_db
 from moonlighter.discovery.scan.pipeline import evaluate_and_store
-
 from tests.discovery.scan_fakes import BatchRecorder, make_raw_job, store_config
 
 

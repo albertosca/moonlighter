@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 
 import pytest
+
 from moonlighter.application.answers.rules.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.core.config.paths import moonlighter_home
 

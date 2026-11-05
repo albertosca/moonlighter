@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from moonlighter.core.db import init_db
 from moonlighter.discovery.sources.base import RawJob, ScannerSessionExpiredError
 from moonlighter.mcp_tools.scanning import scan_and_evaluate
-
 from tests._context import make_test_context
 from tests.mcp_tools._records import batch_of, make_eval_result
 

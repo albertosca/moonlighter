@@ -4,7 +4,6 @@ from moonlighter.application.assisted.questions import QuestionKind
 from moonlighter.application.assisted.sources.recruitee import (
     parse_recruitee_questions,
 )
-
 from tests.application.assisted.sources.recruitee.recruitee_offers import PAYLOAD
 
 

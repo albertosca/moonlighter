@@ -3,6 +3,7 @@ import signal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from moonlighter.core.llm.claude_cli import call_cli
 
 

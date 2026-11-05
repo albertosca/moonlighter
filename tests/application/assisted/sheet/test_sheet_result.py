@@ -15,7 +15,6 @@ from moonlighter.application.assisted.sheet.results import (
 )
 from moonlighter.application.cvgen.latex.page_fit import TailoredCV
 from moonlighter.core.db import init_db
-
 from tests.application.assisted.sheet_inputs import CONFIG, PAGE, PROFILE, QUESTIONS, create_job
 
 

@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 import reevaluate_bug_victims
 import reevaluation_batch
+
 from moonlighter.core.db import init_db
 
 

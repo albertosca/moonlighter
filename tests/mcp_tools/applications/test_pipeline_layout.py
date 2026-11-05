@@ -4,7 +4,6 @@ from datetime import timedelta
 
 from moonlighter.core.db import Application, init_db
 from moonlighter.mcp_tools.applications import get_pipeline
-
 from tests._context import make_test_context
 from tests.mcp_tools._records import create_application, create_job
 

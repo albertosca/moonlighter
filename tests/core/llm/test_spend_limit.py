@@ -1,4 +1,5 @@
 import pytest
+
 from moonlighter.core.llm.spend_limit import is_spend_limit
 
 

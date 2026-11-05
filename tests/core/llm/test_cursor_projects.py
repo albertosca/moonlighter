@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+
 from moonlighter.core.llm.cursor_projects import (
     _cursor_project_slug,
     _cursor_projects_for,

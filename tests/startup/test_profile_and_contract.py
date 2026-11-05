@@ -1,6 +1,7 @@
 """An empty profile, an unknown location precedence, and the all-clear and return-type contracts."""
 
 import pytest
+
 from moonlighter.startup import StartupWarning, validate_startup
 
 

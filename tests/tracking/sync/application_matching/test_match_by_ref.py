@@ -1,6 +1,7 @@
 """Matching a reply to its application by the reference in its plus-alias."""
 
 import pytest
+
 from moonlighter.tracking.sync.application_matching import _match_by_ref
 
 

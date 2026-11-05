@@ -1,9 +1,9 @@
 """Pins that the work-authorization review sentinel becomes a gap on free-text questions."""
 
 import pytest
+
 from moonlighter.application.assisted.composition.composer import compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE, never_called
 
 

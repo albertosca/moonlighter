@@ -3,7 +3,6 @@ import json
 from moonlighter.application.cvgen.generate import decide_cv
 from moonlighter.application.cvgen.latex.cv_template import BaseFields
 from moonlighter.application.cvgen.pool.loader import CVPool, PoolBullet, PoolExperience
-
 from tests.application.cvgen.log_records import logged_warnings
 from tests.application.cvgen.tailored_cv_samples import JOB, fixed_caller
 

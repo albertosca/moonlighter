@@ -7,6 +7,7 @@ import sys
 from unittest.mock import patch
 
 import build_blocklist
+
 from moonlighter.core.db import Job
 
 _URLS = itertools.count(1)

@@ -5,8 +5,8 @@ import logging
 from unittest.mock import AsyncMock
 
 import pytest
-from moonlighter.discovery.evaluation.single import evaluate_job
 
+from moonlighter.discovery.evaluation.single import evaluate_job
 from tests.discovery.evaluation.evaluation_fakes import (
     MOCK_LLM_RESPONSE,
     evaluate_once,

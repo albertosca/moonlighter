@@ -1,4 +1,5 @@
 import pytest
+
 from moonlighter.core.config.loading import load_profile
 
 

@@ -1,9 +1,9 @@
 """The Application model defaults status to "draft", stores its form data, notes and email fields, and keeps email_ref unique only when set."""
 
 import pytest
-from moonlighter.core.db import Application, init_db
 from peewee import IntegrityError
 
+from moonlighter.core.db import Application, init_db
 from tests.core.db.sample_job import make_job
 
 

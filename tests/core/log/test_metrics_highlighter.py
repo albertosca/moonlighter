@@ -1,7 +1,8 @@
 """MetricsHighlighter gives the op= summary line's keys and values, outcome words and job ids their own styles, and styles a status word only when it stands alone."""
 
-from moonlighter.core.log import MetricsHighlighter
 from rich.text import Text
+
+from moonlighter.core.log import MetricsHighlighter
 
 
 def test_metrics_highlighter_colors_op_summary_line():

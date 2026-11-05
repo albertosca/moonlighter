@@ -7,9 +7,9 @@ Two layers: archive_ref_matched (certainty only) and archive_all_classified (sup
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from moonlighter.core.db import init_db
 from moonlighter.tracking.sync.monitor import sync_responses
-
 from tests.tracking.archive_settings import archive_config
 from tests.tracking.llm_callers import make_llm_caller
 from tests.tracking.pipeline_rows import make_application, make_job

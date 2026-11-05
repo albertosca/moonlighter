@@ -1,6 +1,7 @@
 import json
 
 import httpx
+
 from moonlighter.application.assisted.sources.base import SourceMatch
 from moonlighter.application.assisted.sources.inhire import (
     InHireSource,
@@ -8,7 +9,6 @@ from moonlighter.application.assisted.sources.inhire import (
     parse_required_fields,
     tenant_and_job_from_url,
 )
-
 from tests.application.assisted.sources.fixture_files import FIXTURES_DIRECTORY
 
 DETAIL = json.loads((FIXTURES_DIRECTORY / "inhire_job_infleet.json").read_text())

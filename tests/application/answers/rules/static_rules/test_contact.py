@@ -1,7 +1,6 @@
 """Contact rules: names, phone, email and profile links, from English labels."""
 
 from moonlighter.application.answers.matching.field_map import pre_populate_answers
-
 from tests.application.answers.candidate_profiles import PROFILE
 
 

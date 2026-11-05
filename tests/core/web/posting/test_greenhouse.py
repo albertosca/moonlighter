@@ -3,8 +3,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from moonlighter.core.web.posting import FetchedPosting, fetch_posting_via_ats
 
+from moonlighter.core.web.posting import FetchedPosting, fetch_posting_via_ats
 from tests.core.web.posting.fake_client import fake_client
 
 GREENHOUSE_JOB = {

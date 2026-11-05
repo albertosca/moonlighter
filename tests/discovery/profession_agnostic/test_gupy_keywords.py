@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from moonlighter.discovery.scan.collection import collect_raw_jobs
 
 

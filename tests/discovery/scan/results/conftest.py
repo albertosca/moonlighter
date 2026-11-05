@@ -1,6 +1,7 @@
 """Fixtures for the scan-report tests."""
 
 import pytest
+
 from moonlighter.core.db import Job, init_db
 
 

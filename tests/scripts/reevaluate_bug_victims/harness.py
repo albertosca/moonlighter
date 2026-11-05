@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import reevaluate_bug_victims
 import reevaluation_batch
+
 from moonlighter.core.db import Job
 from moonlighter.discovery.evaluation.models import EvaluationResult
 

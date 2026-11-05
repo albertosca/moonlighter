@@ -2,9 +2,9 @@
 
 import peewee
 import pytest
+
 from moonlighter.core import migrations
 from moonlighter.core.migrations import MIGRATIONS, current_version, run_migrations
-
 from tests.core.migrations.unmigrated_db import fresh_db
 
 

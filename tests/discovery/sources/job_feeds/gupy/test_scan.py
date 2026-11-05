@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.discovery.sources.job_feeds.gupy import GupyScanner
-
 from tests.discovery.sources.job_feeds.gupy.fake_portal import GUPY_P1
 
 

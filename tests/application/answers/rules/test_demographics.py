@@ -1,9 +1,9 @@
 """EEO answers: only an exact self-identification label is served the configured value."""
 
 import pytest
+
 from moonlighter.application.answers.matching.field_map import pre_populate_answers
 from moonlighter.application.answers.rules.demographics import demographic_answer
-
 from tests.application.answers.candidate_profiles import PROFILE
 
 # ── EEO/demographics: demographic_answer, NOT the _RULES ladder ──────────────

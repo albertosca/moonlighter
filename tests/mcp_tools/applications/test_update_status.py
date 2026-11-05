@@ -3,9 +3,9 @@
 import re
 
 import pytest
+
 from moonlighter.core.db import Application, Job, init_db
 from moonlighter.mcp_tools.applications import update_status
-
 from tests.mcp_tools._records import create_application, create_job
 
 

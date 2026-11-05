@@ -5,7 +5,6 @@ from unittest.mock import patch
 
 from moonlighter.core.db import init_db
 from moonlighter.mcp_tools.applications import get_pipeline
-
 from tests._context import make_test_context
 
 

@@ -2,7 +2,6 @@
 
 from moonlighter.core.db import init_db
 from moonlighter.discovery.scan.results import ScanKind, ScanReport, _render_counts
-
 from tests.discovery.scan.results.saved_jobs import saved_job
 
 

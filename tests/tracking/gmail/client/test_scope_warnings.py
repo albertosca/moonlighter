@@ -10,7 +10,6 @@ from moonlighter.tracking.gmail.client import (
     _warn_if_scope_mismatch,
     setup_gmail_service,
 )
-
 from tests.tracking.archive_settings import archive_config
 
 

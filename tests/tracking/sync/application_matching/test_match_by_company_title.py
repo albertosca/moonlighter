@@ -2,7 +2,6 @@
 
 from moonlighter.core.db import init_db
 from moonlighter.tracking.sync.application_matching import _match_by_company_title
-
 from tests.tracking.pipeline_rows import make_application, make_job
 
 

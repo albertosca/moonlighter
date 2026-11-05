@@ -8,7 +8,6 @@ from moonlighter.application.answers.bank.store import (
     render_answer_bank,
 )
 from moonlighter.core.db import AnswerBankEntry, init_db
-
 from tests.application.answers.bank.store.bank_rows import FROZEN_NOW, aged_entry, dated_entry
 
 

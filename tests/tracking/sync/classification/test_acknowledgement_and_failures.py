@@ -3,6 +3,7 @@
 import json
 
 import pytest
+
 from moonlighter.tracking.sync.classification import ClassificationError, classify_response
 
 STAGES = ["phone_screening", "technical_interview"]

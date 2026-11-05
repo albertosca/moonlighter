@@ -3,9 +3,9 @@
 from unittest.mock import patch
 
 import pytest
+
 from moonlighter.discovery.evaluation.models import EvaluationResult
 from moonlighter.discovery.evaluation.single import evaluate_job
-
 from tests.discovery.evaluation.evaluation_fakes import (
     MOCK_LLM_RESPONSE,
     PROFILE,

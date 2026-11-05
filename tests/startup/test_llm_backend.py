@@ -1,6 +1,7 @@
 """Whichever LLM backend is configured needs its own credential, reported once at startup."""
 
 import pytest
+
 from moonlighter.core.config.backends import LLM_BACKENDS
 from moonlighter.startup import validate_startup
 

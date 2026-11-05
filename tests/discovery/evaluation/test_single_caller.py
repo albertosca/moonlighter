@@ -4,7 +4,6 @@ import json
 from unittest.mock import patch
 
 from moonlighter.discovery.evaluation.single import evaluate_job
-
 from tests.discovery.evaluation.evaluation_fakes import (
     JOB_DESCRIPTION,
     MOCK_LLM_RESPONSE,

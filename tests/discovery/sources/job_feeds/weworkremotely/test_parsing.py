@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 from moonlighter.core.web.http_fetch import HEADERS
 from moonlighter.discovery.sources.job_feeds.weworkremotely import WeWorkRemotelyScanner
-
 from tests.discovery.sources.job_feeds.weworkremotely.fake_feed import WWR_RSS, make_rss_client
 
 

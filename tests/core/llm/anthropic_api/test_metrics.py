@@ -7,6 +7,7 @@ import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from anthropic.types import TextBlock
+
 from moonlighter.core.llm.anthropic_api import make_api_caller
 from moonlighter.core.metrics import operation_metrics
 

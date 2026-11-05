@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+
 from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.loading import load_config

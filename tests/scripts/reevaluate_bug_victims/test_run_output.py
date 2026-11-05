@@ -1,7 +1,6 @@
 """Pins what a reevaluate_bug_victims run prints and writes: a mixed run, a dry run and a spend-limit stop."""
 
 from moonlighter.discovery.evaluation.models import EvaluationResult
-
 from tests.scripts.reevaluate_bug_victims.harness import (
     BUG,
     UNTOUCHED_NOTES,

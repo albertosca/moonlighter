@@ -4,8 +4,9 @@ import os
 from datetime import datetime, timedelta
 
 import pytest
-from moonlighter.core.db import ScanLog, init_db
 from peewee import IntegrityError
+
+from moonlighter.core.db import ScanLog, init_db
 
 
 def test_scan_log_dedup(temporary_database):

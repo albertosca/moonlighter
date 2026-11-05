@@ -4,8 +4,8 @@ import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from moonlighter.core import browser
 
+from moonlighter.core import browser
 from tests.core.browser_config import CONFIG
 
 

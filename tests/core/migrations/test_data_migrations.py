@@ -1,7 +1,6 @@
 """The data migrations rewrite only the rows they target: m004 folds closed into archived, m005 moves job status to its application's, and m006 re-derives invented onsite values."""
 
 from moonlighter.core.migrations import run_migrations
-
 from tests.core.migrations.unmigrated_db import fresh_db
 
 

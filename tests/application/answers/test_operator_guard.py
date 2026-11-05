@@ -1,8 +1,8 @@
 """Pins which answers the operator guard flags, and which marker it names."""
 
 import pytest
-from moonlighter.application.answers.operator_guard import find_operator_marker
 
+from moonlighter.application.answers.operator_guard import find_operator_marker
 from tests.application.operator_incidents import OPERATOR_NOTE_ADDRESS, OPERATOR_NOTE_REFERENCES
 
 

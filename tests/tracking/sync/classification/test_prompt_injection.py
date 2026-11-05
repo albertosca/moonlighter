@@ -4,8 +4,8 @@ import json
 import re
 
 import pytest
-from moonlighter.tracking.sync.classification import ClassificationError, classify_response
 
+from moonlighter.tracking.sync.classification import ClassificationError, classify_response
 from tests.tracking.tracking_settings import BASE_EMAIL, BASE_STAGES
 
 

@@ -4,9 +4,9 @@ import logging
 import re
 
 import pytest
+
 from moonlighter.application.assisted.composition.composer import compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE
 
 EXPECTED_CHOICE_PROMPT = """Answer one question on a job application, as the candidate.

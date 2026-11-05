@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, patch
 
 from moonlighter.core.db import init_db
 from moonlighter.mcp_tools.email_tracking import sync_email_responses
-
 from tests._context import make_test_context
 
 

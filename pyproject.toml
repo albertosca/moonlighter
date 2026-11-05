@@ -97,6 +97,11 @@ max-branches = 8
 # inside a package: compare the last component, the gate behind the ban on stdlib names.
 strict-checking = true
 
+[tool.ruff.lint.isort]
+# From tests/ and scripts/ Ruff cannot find `moonlighter` on disk (it lives under
+# packages/*/), so it would sort it with the third-party imports instead of a local block.
+known-first-party = ["moonlighter"]
+
 [tool.ruff.lint.per-file-ignores]
 # Scripts are standalone executables run from the repository root: not a package
 # (INP001), stdout is their interface (T201), and some fix sys.path first (E402).

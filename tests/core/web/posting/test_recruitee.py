@@ -3,8 +3,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from moonlighter.core.web.posting import fetch_posting_via_ats
 
+from moonlighter.core.web.posting import fetch_posting_via_ats
 from tests.core.web.posting.fake_client import fake_client
 
 RECRUITEE_OFFERS = {

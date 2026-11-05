@@ -29,6 +29,7 @@ sys.path.insert(0, str(_ROOT))
 from blocklist_candidates import fetch_low_scorers
 from blocklist_learned import confirm_write, learned_path, load_learned, save_learned
 from blocklist_proposals import is_quota_error, proposal_prompt, propose_for_company
+
 from moonlighter.core.config.loading import load_config, load_profile
 from moonlighter.core.db import init_db
 from moonlighter.core.llm.caller import LLMCaller

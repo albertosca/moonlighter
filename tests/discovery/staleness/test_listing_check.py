@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 from moonlighter.discovery.sources.base import RawJob
 from moonlighter.discovery.staleness import StalenessResult, find_stale_jobs
-
 from tests.discovery.staleness.fake_jobs import CONFIG, make_job, make_scanner
 
 

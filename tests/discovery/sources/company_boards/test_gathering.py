@@ -4,13 +4,13 @@ import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from moonlighter.discovery.sources.base import ScanStats, SourceStats
 from moonlighter.discovery.sources.company_boards.ashby import AshbyScanner
 from moonlighter.discovery.sources.company_boards.greenhouse import GreenhouseScanner
 from moonlighter.discovery.sources.company_boards.lever import LeverScanner
 from moonlighter.discovery.sources.company_boards.recruitee import RecruiteeScanner
 from moonlighter.discovery.sources.company_boards.workable import WorkableScanner
-
 from tests.discovery.sources.company_boards.greenhouse_board import GREENHOUSE_RESPONSE
 from tests.discovery.sources.fake_http_clients import make_mock_client, mock_client_class
 

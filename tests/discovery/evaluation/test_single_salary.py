@@ -3,7 +3,6 @@
 import json
 
 from moonlighter.discovery.evaluation.single import evaluate_job
-
 from tests.discovery.evaluation.evaluation_fakes import JOB_DESCRIPTION, PROFILE, make_caller
 
 

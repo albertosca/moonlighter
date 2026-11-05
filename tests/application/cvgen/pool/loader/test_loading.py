@@ -1,8 +1,8 @@
 import textwrap
 
 import pytest
-from moonlighter.application.cvgen.pool.loader import CVPool, PoolError, load_pool
 
+from moonlighter.application.cvgen.pool.loader import CVPool, PoolError, load_pool
 from tests.application.cvgen.pool.loader.pool_files import VALID_POOL_YAML, write_pool_file
 
 

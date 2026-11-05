@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+
 from moonlighter.app_context import refreshed_app_context
 from moonlighter.discovery import archive
 from moonlighter.discovery.archive import ArchiveResult

@@ -3,8 +3,8 @@
 from datetime import datetime, timedelta
 
 import pytest
-from moonlighter.discovery.staleness import find_stale_jobs
 
+from moonlighter.discovery.staleness import find_stale_jobs
 from tests.discovery.staleness.fake_jobs import make_job
 
 

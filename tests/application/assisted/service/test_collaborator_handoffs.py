@@ -4,12 +4,12 @@ from typing import Any
 
 import httpx
 import pytest
+
 from moonlighter.application.assisted import service
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sources import greenhouse as greenhouse_source
 from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.db import record_cv_bootstrap_decline
-
 from tests.application.assisted.service.service_fakes import stub_caller
 
 GREENHOUSE_URL = "https://job-boards.greenhouse.io/acme/jobs/1"

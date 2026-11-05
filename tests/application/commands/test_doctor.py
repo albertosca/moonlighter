@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import yaml
+
 from moonlighter.application import cli
 from moonlighter.application.commands import doctor as doctor_command
 from moonlighter.core.config.errors import ConfigError

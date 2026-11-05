@@ -13,9 +13,9 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
 from moonlighter.core.llm.codex import call_codex, codex_executable
 from moonlighter.core.llm.codex_profile import _codex_permission_args
-
 from tests.core.llm.canary_server import start_canary_server
 
 pytestmark = pytest.mark.e2e

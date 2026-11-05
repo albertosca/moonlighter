@@ -7,9 +7,9 @@ import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from moonlighter.core.llm.cursor import call_cursor
 from moonlighter.core.metrics import operation_metrics
-
 from tests.core.llm.fake_processes import cursor_process
 
 

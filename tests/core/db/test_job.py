@@ -5,9 +5,9 @@ import os
 from datetime import datetime, timedelta
 
 import pytest
-from moonlighter.core.db import Job, init_db
 from peewee import IntegrityError
 
+from moonlighter.core.db import Job, init_db
 from tests.core.db.sample_job import make_job
 
 # --- Job: salary fields ---

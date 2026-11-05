@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from moonlighter.core.db import init_db
 from moonlighter.tracking.sync.monitor import sync_responses
 

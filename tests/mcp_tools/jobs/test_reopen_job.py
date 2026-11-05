@@ -4,7 +4,6 @@ from datetime import datetime
 
 from moonlighter.core.db import Job, init_db
 from moonlighter.mcp_tools.jobs import reopen_job
-
 from tests.mcp_tools._records import create_job
 
 

@@ -6,6 +6,7 @@ and the network but still reads `~/.codex/auth.json` and `~/.ssh`.
 """
 
 import pytest
+
 from moonlighter.core.llm import codex, codex_profile
 
 

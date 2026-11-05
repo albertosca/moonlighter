@@ -4,7 +4,6 @@ from datetime import datetime
 from unittest.mock import patch
 
 from moonlighter.discovery.sources.company_boards.ashby import AshbyScanner
-
 from tests.discovery.sources.company_boards.ashby.fake_board import ASHBY_JOB, ashby_response
 from tests.discovery.sources.fake_http_clients import make_mock_client
 

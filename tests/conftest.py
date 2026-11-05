@@ -6,8 +6,8 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from moonlighter.core.config import api_key
 
+from moonlighter.core.config import api_key
 from tests import _e2e_guard
 
 _SNAPSHOTS = Path(__file__).parent / "snapshots"

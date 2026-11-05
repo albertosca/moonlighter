@@ -1,11 +1,11 @@
 import json
 
 import pytest
+
 from moonlighter.application.cvgen.generate import decide_cv
 from moonlighter.application.cvgen.latex.cv_template import BaseFields
 from moonlighter.application.cvgen.latex.render import MAXIMUM_BULLETS
 from moonlighter.application.cvgen.pool.loader import CVPool, PoolBullet, PoolExperience
-
 from tests.application.cvgen.selection_samples import (
     AI_ENGINEER_JOB,
     POOL,

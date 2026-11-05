@@ -2,7 +2,6 @@
 
 from moonlighter.application.answers.bank.store import forget, list_entries, render_answer_bank
 from moonlighter.core.db import AnswerBankEntry, init_db
-
 from tests.application.answers.bank.store.bank_rows import (
     JANUARY_SECOND,
     SEPTEMBER_FIRST,

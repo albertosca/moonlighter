@@ -1,7 +1,6 @@
 """Label cleaning: the decoration a form hangs on a label never hides the rule behind it."""
 
 from moonlighter.application.answers.matching.field_map import pre_populate_answers
-
 from tests.application.answers.candidate_profiles import PROFILE
 
 

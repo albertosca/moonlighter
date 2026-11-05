@@ -9,6 +9,7 @@ import asyncio
 import os
 
 import pytest
+
 from moonlighter.core.llm import claude_cli, cursor, cursor_projects
 
 

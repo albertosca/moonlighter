@@ -24,10 +24,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from reevaluation_batch import ReevaluationSettings, reevaluate
+
 from moonlighter.core.config.loading import load_config, load_profile
 from moonlighter.core.db import Job, init_db
 from moonlighter.core.log import setup as setup_logging
-from reevaluation_batch import ReevaluationSettings, reevaluate
 
 BUG_MARKER = "evaluation error: claude CLI exited with code 1"
 

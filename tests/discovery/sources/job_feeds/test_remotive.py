@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+
 from moonlighter.discovery.sources.base import ScanStats, SourceStats
 from moonlighter.discovery.sources.job_feeds.remotive import RemotiveScanner
-
 from tests.discovery.sources.fake_http_clients import (
     make_mock_client,
     make_simple_client,

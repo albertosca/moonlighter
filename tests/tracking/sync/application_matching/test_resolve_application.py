@@ -2,7 +2,6 @@
 
 from moonlighter.core.db import init_db
 from moonlighter.tracking.sync.application_matching import resolve_application
-
 from tests.tracking.pipeline_rows import make_application, make_job
 
 

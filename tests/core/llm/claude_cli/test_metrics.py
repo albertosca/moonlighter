@@ -7,6 +7,7 @@ import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from moonlighter.core.llm.claude_cli import call_cli
 from moonlighter.core.metrics import operation_metrics
 

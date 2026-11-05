@@ -2,7 +2,6 @@ import json
 
 from moonlighter.application.cvgen.pool.draft import draft_pool
 from moonlighter.application.cvgen.pool.loader import CVPool
-
 from tests.application.cvgen.bootstrap_samples import CANDIDATE_PROFILE, scripted_caller
 from tests.application.cvgen.log_records import logged_warnings
 from tests.application.cvgen.tailored_cv_samples import fixed_caller

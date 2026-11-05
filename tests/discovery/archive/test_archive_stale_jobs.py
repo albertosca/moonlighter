@@ -3,10 +3,10 @@
 from datetime import datetime, timedelta
 
 import pytest
+
 from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.archive import ArchiveStaleJobsError, archive_stale_jobs
 from moonlighter.discovery.staleness import StalenessResult
-
 from tests.discovery.archive.stale_jobs import make_stale_job
 from tests.discovery.scan_fakes import CONFIG
 

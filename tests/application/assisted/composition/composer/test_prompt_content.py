@@ -1,9 +1,9 @@
 """Pins what reaches the prompt: the posting, the curated profile and the choice instructions."""
 
 import pytest
+
 from moonlighter.application.assisted.composition.composer import compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE
 
 

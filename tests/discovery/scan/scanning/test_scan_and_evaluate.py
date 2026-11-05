@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.core.db import init_db
 from moonlighter.discovery.scan.scanning import scan_and_evaluate
-
 from tests.discovery.scan_fakes import make_raw_job
 
 

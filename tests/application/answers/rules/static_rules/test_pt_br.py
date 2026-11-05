@@ -1,7 +1,6 @@
 """PT-BR labels: the Portuguese spellings of the contact and location rules."""
 
 from moonlighter.application.answers.matching.field_map import pre_populate_answers
-
 from tests.application.answers.candidate_profiles import PROFILE
 
 # ── PT-BR labels (Portuguese-language forms, e.g. Nubank Investments) ─────────

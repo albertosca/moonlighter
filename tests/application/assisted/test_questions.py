@@ -1,4 +1,5 @@
 import pytest
+
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 
 

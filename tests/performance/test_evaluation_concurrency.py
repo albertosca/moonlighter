@@ -5,7 +5,6 @@ import json
 import time
 
 from moonlighter.discovery.evaluation.single import evaluate_job
-
 from tests.performance.timing import CONCURRENCY_RATIO
 
 _MODEL_ANSWER = json.dumps(

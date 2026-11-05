@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 from moonlighter.core import browser_window
-
 from tests.core.browser_config import CONFIG
 
 # ── save_screenshot ───────────────────────────────────────────────────────────

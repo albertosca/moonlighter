@@ -1,6 +1,7 @@
 """Every session test starts and ends with the browser module's three singletons cleared."""
 
 import pytest
+
 from moonlighter.core import browser
 
 

@@ -3,7 +3,6 @@
 import os
 
 from moonlighter.core.db import Application, Job, init_db, sync_job_status
-
 from tests.core.db.sample_job import make_job
 
 # ── sync_job_status ──────────────────────────────────────────────────────────

@@ -3,8 +3,8 @@
 from unittest.mock import patch
 
 import httpx
-from moonlighter.discovery.sources.company_boards.workable import WorkableScanner
 
+from moonlighter.discovery.sources.company_boards.workable import WorkableScanner
 from tests.discovery.sources.fake_http_clients import make_mock_client
 
 WORKABLE_RESPONSE = {

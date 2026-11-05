@@ -8,7 +8,6 @@ from moonlighter.discovery.sources.base import SourceStats
 from moonlighter.discovery.sources.company_boards.ashby import AshbyScanner
 from moonlighter.discovery.sources.company_boards.greenhouse import GreenhouseScanner
 from moonlighter.discovery.sources.company_boards.lever import LeverScanner
-
 from tests.performance.timing import CONCURRENCY_RATIO
 
 DELAY_SECONDS = 0.02

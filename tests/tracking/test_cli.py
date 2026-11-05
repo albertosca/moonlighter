@@ -4,6 +4,7 @@ import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from moonlighter.core.cli import run
 from moonlighter.tracking import cli
 from moonlighter.tracking.cli import parse_args

@@ -3,8 +3,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-from moonlighter.discovery.sources.company_boards.recruitee import RecruiteeScanner
 
+from moonlighter.discovery.sources.company_boards.recruitee import RecruiteeScanner
 from tests.discovery.sources.fake_http_clients import make_mock_client, mock_client_class
 
 RECRUITEE_RESPONSE = {

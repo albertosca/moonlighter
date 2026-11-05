@@ -1,7 +1,7 @@
 import blocklist_candidates
 import pytest
-from moonlighter.core.db import init_db
 
+from moonlighter.core.db import init_db
 from tests.scripts.build_blocklist.harness import scored
 
 

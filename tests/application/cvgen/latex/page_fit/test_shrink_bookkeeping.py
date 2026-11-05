@@ -6,7 +6,6 @@ from moonlighter.application.cvgen.latex.render import CVSelection
 from moonlighter.application.cvgen.paths import generated_dir_for
 from moonlighter.application.cvgen.pool.loader import CVPool, PoolBullet, PoolExperience
 from moonlighter.application.cvgen.service import ensure_tailored_cv
-
 from tests.application.cvgen.latex.page_fit.pdf_compilers import compiler_that_reports
 from tests.application.cvgen.tailored_cv_samples import JOB, counting_caller, write_pool
 

@@ -3,11 +3,11 @@ import inspect
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.llm.cursor import call_cursor
 from moonlighter.core.llm.dispatch import make_caller
-
 from tests.core.llm.fake_processes import cursor_process
 
 pytestmark = pytest.mark.usefixtures("_no_real_cursor_projects", "_fake_claude_on_path")

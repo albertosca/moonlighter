@@ -2,7 +2,6 @@
 
 from moonlighter.core.db import AnswerBankEntry, init_db
 from moonlighter.mcp_tools.answer_bank import forget_answer, list_answer_bank
-
 from tests._context import make_test_context
 
 

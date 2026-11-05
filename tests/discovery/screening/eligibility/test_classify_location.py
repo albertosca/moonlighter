@@ -11,7 +11,6 @@ Alberto's rule: eligible = remote with an explicit eligible region
 """
 
 from moonlighter.discovery.screening.eligibility import Eligibility, classify_location
-
 from tests.discovery.screening.eligibility.regions import REGIONS
 
 

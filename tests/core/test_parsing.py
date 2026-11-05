@@ -2,6 +2,7 @@ import json
 import re
 
 import pytest
+
 from moonlighter.core.parsing import extract_json, parse_llm_json, wrap_untrusted
 
 

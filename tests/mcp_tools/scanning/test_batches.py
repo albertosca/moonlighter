@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, patch
 from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.sources.base import RawJob
 from moonlighter.mcp_tools.scanning import scan_and_evaluate
-
 from tests._context import make_test_context
 from tests.mcp_tools._records import batch_of, make_eval_result
 

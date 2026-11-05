@@ -1,11 +1,11 @@
 """Reading a Lever apply page: card templates, standard fields and the unreadable cases."""
 
 import pytest
+
 from moonlighter.application.assisted.questions import QuestionKind
 from moonlighter.application.assisted.sources.lever import (
     parse_lever_form,
 )
-
 from tests.application.assisted.sources.lever.lever_pages import (
     PAGE,
     by_label,

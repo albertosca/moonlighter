@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 from moonlighter.mcp_tools.email_tracking import setup_email
 from moonlighter.tracking.gmail.client import GmailAuthError
-
 from tests._context import make_test_context
 
 

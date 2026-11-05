@@ -7,7 +7,6 @@ from moonlighter.core.db import init_db
 from moonlighter.core.metrics import record_call
 from moonlighter.discovery.sources.base import RawJob
 from moonlighter.mcp_tools.scanning import scan_and_evaluate
-
 from tests._context import make_test_context
 from tests.mcp_tools._records import make_eval_result
 

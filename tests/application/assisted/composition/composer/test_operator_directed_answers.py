@@ -1,9 +1,9 @@
 """Pins that prose addressed to the operator becomes a gap, and what the guard lets through."""
 
 import pytest
+
 from moonlighter.application.assisted.composition.composer import compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE
 from tests.application.operator_incidents import OPERATOR_NOTE_ADDRESS, OPERATOR_NOTE_REFERENCES
 

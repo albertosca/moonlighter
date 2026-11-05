@@ -4,7 +4,6 @@ from moonlighter.application.assisted import service as assisted_service
 from moonlighter.application.assisted.sheet.results import SheetKind, SheetResult
 from moonlighter.application.assisted.sources.registry import SOURCES
 from moonlighter.mcp_tools.applications import prepare_application, prepare_application_from_paste
-
 from tests._context import make_test_context
 
 

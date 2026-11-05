@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.core.db import Application, init_db
 from moonlighter.tracking.sync.monitor import sync_responses
-
 from tests.tracking.llm_callers import make_llm_caller
 from tests.tracking.pipeline_rows import make_application, make_job
 from tests.tracking.sync_setup import SYNC_CONFIG

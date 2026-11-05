@@ -3,7 +3,6 @@
 import sqlite3
 
 from moonlighter.core.migrations import run_migrations
-
 from tests.core.migrations.unmigrated_db import fresh_db
 
 

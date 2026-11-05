@@ -1,6 +1,7 @@
 """The portal category config keys must be strings."""
 
 import pytest
+
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.validation import validate_config
 

@@ -3,8 +3,8 @@
 from types import SimpleNamespace
 
 import pytest
-from moonlighter.application.answers.bank import store
 
+from moonlighter.application.answers.bank import store
 from tests.application.answers.bank.store.bank_rows import FROZEN_NOW
 
 

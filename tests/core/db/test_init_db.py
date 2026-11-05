@@ -4,7 +4,6 @@ import os
 
 from moonlighter.core.db import Application, Job, db, init_db
 from moonlighter.core.migrations import MIGRATIONS, current_version
-
 from tests.core.db.sample_job import make_job
 
 

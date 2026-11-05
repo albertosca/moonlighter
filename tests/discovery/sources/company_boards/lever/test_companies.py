@@ -3,8 +3,8 @@
 from unittest.mock import patch
 
 import httpx
-from moonlighter.discovery.sources.company_boards.lever import LeverScanner
 
+from moonlighter.discovery.sources.company_boards.lever import LeverScanner
 from tests.discovery.sources.fake_http_clients import make_mock_client
 
 

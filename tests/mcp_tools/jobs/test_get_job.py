@@ -4,7 +4,6 @@ import re
 
 from moonlighter.core.db import init_db
 from moonlighter.mcp_tools.jobs import get_job
-
 from tests.mcp_tools._records import create_job
 
 

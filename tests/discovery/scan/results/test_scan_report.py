@@ -11,7 +11,6 @@ from moonlighter.discovery.scan.results import (
 )
 from moonlighter.discovery.scan.scanning import scan_company
 from moonlighter.discovery.sources.base import SourceStats
-
 from tests.discovery.scan_fakes import make_raw_job, run_scan
 
 CONFIG = {"score_threshold": 7.0, "scan_concurrency": 2}

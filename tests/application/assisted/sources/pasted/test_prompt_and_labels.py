@@ -3,11 +3,11 @@
 import json
 
 import pytest
+
 from moonlighter.application.assisted.questions import QuestionKind
 from moonlighter.application.assisted.sources.pasted import (
     extract_questions_from_page,
 )
-
 from tests.application.assisted.sources.pasted.pasted_replies import PAGE, fake_llm
 
 

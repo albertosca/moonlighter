@@ -1,7 +1,6 @@
 """Location rules: city, address and country, and where the candidate is based."""
 
 from moonlighter.application.answers.matching.field_map import pre_populate_answers
-
 from tests.application.answers.candidate_profiles import PROFILE
 
 

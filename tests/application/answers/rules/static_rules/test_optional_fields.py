@@ -1,7 +1,6 @@
 """Optional profile fields: answered when the profile holds them, left to the LLM when not."""
 
 from moonlighter.application.answers.matching.field_map import pre_populate_answers
-
 from tests.application.answers.candidate_profiles import PROFILE
 
 

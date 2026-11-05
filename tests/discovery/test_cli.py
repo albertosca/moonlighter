@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from moonlighter.discovery import cli
 from moonlighter.discovery.cli import _run, parse_args
 from moonlighter.discovery.scan.results import ScanKind, ScanReport

@@ -5,7 +5,6 @@ from unittest.mock import patch
 
 from moonlighter.core.llm.cursor import _CURSOR_SANDBOX_ARGS, call_cursor
 from moonlighter.core.llm.dispatch import make_caller
-
 from tests.core.llm.fake_processes import cursor_process
 
 

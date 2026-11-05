@@ -5,7 +5,6 @@ from moonlighter.discovery.screening.eligibility import (
     classify_location,
     eligible_regions_from,
 )
-
 from tests.discovery.screening.eligibility.regions import REGIONS
 
 

@@ -4,8 +4,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from moonlighter.core.llm.cursor import call_cursor
 
+from moonlighter.core.llm.cursor import call_cursor
 from tests.core.llm.fake_processes import cursor_process
 
 

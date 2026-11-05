@@ -10,7 +10,6 @@ from moonlighter.core.db import init_db
 from moonlighter.mcp_tools.applications import get_pipeline
 from moonlighter.server import _dispatch, mcp
 from moonlighter.startup import StartupWarning
-
 from tests._context import make_test_context
 from tests._fresh_import import import_server_afresh
 from tests.mcp_tools._records import create_application, create_job

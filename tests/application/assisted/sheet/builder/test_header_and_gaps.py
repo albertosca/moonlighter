@@ -1,7 +1,6 @@
 """The sheet's header, its gap summary and what an empty or mixed sheet says."""
 
 from moonlighter.application.assisted.sheet.builder import render_sheet
-
 from tests.application.assisted.sheet.builder.sheet_answers import (
     HEADER,
     answered,

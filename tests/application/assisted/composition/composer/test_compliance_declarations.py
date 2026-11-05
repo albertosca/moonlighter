@@ -1,9 +1,9 @@
 """Pins that declaration and compliance questions never reach the LLM."""
 
 import pytest
+
 from moonlighter.application.assisted.composition.composer import compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE, never_called
 
 GYMPASS_CONFLICT_OPTIONS = (

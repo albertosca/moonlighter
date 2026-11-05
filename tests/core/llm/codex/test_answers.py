@@ -1,8 +1,8 @@
 from unittest.mock import patch
 
 import pytest
-from moonlighter.core.llm.codex import call_codex
 
+from moonlighter.core.llm.codex import call_codex
 from tests.core.llm.codex.fake_codex import fake_codex
 
 

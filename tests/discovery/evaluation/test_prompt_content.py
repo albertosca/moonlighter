@@ -3,7 +3,6 @@
 from moonlighter.discovery.evaluation.engagement import engagement_section
 from moonlighter.discovery.evaluation.prompts import EVAL_BATCH_PREFIX, EVAL_PREFIX
 from moonlighter.discovery.evaluation.single import evaluate_job
-
 from tests.discovery.evaluation.evaluation_fakes import (
     JOB_DESCRIPTION,
     MOCK_LLM_RESPONSE,

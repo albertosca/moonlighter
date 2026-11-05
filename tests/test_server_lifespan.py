@@ -1,13 +1,13 @@
 """The server's lifespan: what it yields, when it refuses to boot, and that importing the server does nothing."""
 
 import pytest
+
 from moonlighter.app_context import AppContext
 from moonlighter.core import db as database
 from moonlighter.core import log
 from moonlighter.core.config import loading, permissions
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.server import lifespan, mcp
-
 from tests._fresh_import import import_server_afresh
 
 
