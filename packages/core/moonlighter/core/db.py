@@ -1,10 +1,11 @@
-import datetime
+"""The local SQLite store: its path, its peewee models and their small invariants, and init_db."""
+
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Self, override
 
-from moonlighter.core.config.paths import moonlighter_home
 from peewee import (
     AutoField,
     CharField,
@@ -17,6 +18,8 @@ from peewee import (
     TextField,
 )
 
+from moonlighter.core.config.paths import moonlighter_home
+
 
 def db_path() -> str:
     # Single source of truth for the DB path: explicit override via MOONLIGHTER_DB_PATH,
@@ -28,21 +31,22 @@ db = SqliteDatabase(None)  # initialized in init_db()
 
 
 class BaseModel(Model):
-    # peewee's ModelBase metaclass (peewee.py) synthesizes three things on every
-    # Model subclass at class-creation time, none of which peewee's own bundled
-    # stubs (site-packages/peewee-stubs, vendored since peewee 4.1.1) know about:
+    # peewee's ModelBase metaclass (peewee.py) synthesizes two things on every
+    # Model subclass at class-creation time that peewee's own bundled stubs
+    # (site-packages/peewee-stubs, vendored since peewee 4.1.1) don't declare:
     # an implicit `id` AutoField primary key when no field declares
-    # primary_key=True, a per-subclass `DoesNotExist` exception class, and an
-    # untyped `get_or_create` classmethod. Before the stubs existed, `peewee.Model`
-    # resolved to `Any` (via this project's `ignore_missing_imports` fallback for
-    # `peewee.*`), so every one of these was silently Any-typed too.
+    # primary_key=True, and a per-subclass `DoesNotExist` exception class. The
+    # stubs do declare Model's own `get_or_create` classmethod, but untyped.
+    # Before the stubs existed, `peewee.Model` resolved to `Any` (via this
+    # project's `ignore_missing_imports` fallback for `peewee.*`), so every one
+    # of these was silently Any-typed too.
     #
     # `id` is declared for real: this is exactly what peewee already synthesizes
     # for a model with no explicit primary key (see ModelBase.__new__), so it's
     # behaviorally a no-op -- it only spells out, for the type checker, what was
     # already happening at runtime. `DoesNotExist` and `get_or_create` are
-    # declared under TYPE_CHECKING only, since real assignments here would fight
-    # the ones peewee's metaclass makes on every subclass.
+    # declared under TYPE_CHECKING only: real assignments would fight the
+    # metaclass's `DoesNotExist` and replace peewee's own `get_or_create`.
     id = AutoField()
 
     if TYPE_CHECKING:
@@ -73,10 +77,10 @@ class Job(BaseModel):
     salary_currency = CharField(null=True)
     salary_source = CharField(null=True)  # 'stated' | 'llm_estimate' | 'third_party'
     salary_notes = TextField(null=True)
-    status = CharField(
-        default="new"
-    )  # 'new'|'reviewed'|'applying'|'needs_review'|'applied'|'rejected'|'archived' (closed_at set = was live, gone from source)
-    found_at = DateTimeField(default=datetime.datetime.now)
+    # 'new'|'reviewed'|'applying'|'needs_review'|'applied'|'rejected'|'archived'
+    # (closed_at set = was live, gone from source)
+    status = CharField(default="new")
+    found_at = DateTimeField(default=datetime.now)
     closed_at = DateTimeField(null=True)
 
     def get_caveats(self) -> list[str]:
@@ -88,11 +92,10 @@ class Application(BaseModel):
     applied_at = DateTimeField(null=True)
     form_data = TextField(null=True)  # JSON dict: field_name -> answer
     notes = TextField(null=True)
-    status = CharField(
-        default="draft"
-    )  # 'draft'|'filled'|'submitted'|'needs_review'|'screening'|'interviews'|'offer'|'rejected'
+    # 'draft'|'filled'|'submitted'|'needs_review'|'screening'|'interviews'|'offer'|'rejected'
+    status = CharField(default="draft")
     next_action = TextField(null=True)
-    updated_at = DateTimeField(default=datetime.datetime.now)
+    updated_at = DateTimeField(default=datetime.now)
     email_ref = CharField(max_length=8, null=True, unique=True)
     current_stage = CharField(null=True)
 
@@ -102,16 +105,19 @@ class Application(BaseModel):
 
 class ScanLog(BaseModel):
     job_url = CharField(unique=True)
-    scanned_at = DateTimeField(default=datetime.datetime.now)
+    scanned_at = DateTimeField(default=datetime.now)
     source = CharField()
 
 
 class ProcessedEmail(BaseModel):
-    """Local dedup of emails already processed by the sync, so the monitor doesn't
-    need to mark the email in Gmail (keeps the autonomous sync 100% read-only)."""
+    """Local dedup of emails already processed by the sync.
+
+    With it, the monitor doesn't need to mark the email in Gmail (keeps the
+    autonomous sync 100% read-only).
+    """
 
     message_id = CharField(unique=True)
-    processed_at = DateTimeField(default=datetime.datetime.now)
+    processed_at = DateTimeField(default=datetime.now)
 
 
 class AnswerBankEntry(BaseModel):
@@ -128,17 +134,19 @@ class AnswerBankEntry(BaseModel):
     kind = CharField()
     answer = TextField()
     source_job_id = IntegerField()
-    updated_at = DateTimeField(default=datetime.datetime.now)
+    updated_at = DateTimeField(default=datetime.now)
 
 
 class CVBootstrapDecline(BaseModel):
-    """A single row means the CV-pool bootstrap offer was declined once and
-    must never be offered again -- existence-as-flag, the same idiom
-    ensure_tailored_cv already uses for "is the feature on" (a file exists
-    or it doesn't). One installation needs at most one row; a second
-    record_cv_bootstrap_decline() call is a harmless no-op, not an error."""
+    """One row means the CV-pool bootstrap offer was declined once and must never be offered again.
 
-    declined_at = DateTimeField(default=datetime.datetime.now)
+    Existence-as-flag, the same idiom ensure_tailored_cv already uses for "is
+    the feature on" (a file exists or it doesn't). One installation needs at
+    most one row; a second record_cv_bootstrap_decline() call is a harmless
+    no-op, not an error.
+    """
+
+    declined_at = DateTimeField(default=datetime.now)
 
 
 def cv_bootstrap_declined() -> bool:
@@ -166,7 +174,8 @@ def sync_job_status(application: Application) -> None:
     Application was already submitted/rejected, nearly offering a duplicate
     application twice in one session. Every Application.status writer calls
     this after saving; 'draft' maps to nothing (a draft is not yet an
-    application the queue should hide)."""
+    application the queue should hide).
+    """
     target = _APP_TO_JOB_STATUS.get(str(application.status))
     if target is None:
         return
@@ -185,6 +194,6 @@ def init_db() -> None:
         [Job, Application, ScanLog, ProcessedEmail, AnswerBankEntry, CVBootstrapDecline],
         safe=True,
     )
-    from moonlighter.core.migrations import run_migrations
+    from moonlighter.core.migrations import run_migrations  # noqa: PLC0415 - migrations calls get_logger() at import, which configures logging; keep that out of import moonlighter.core.db
 
     run_migrations(db)
