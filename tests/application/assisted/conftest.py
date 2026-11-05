@@ -1,5 +1,7 @@
 import httpx
 import pytest
+from moonlighter.application.assisted.composed_answer import ComposedAnswer
+from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.core.db import Job, init_db
 
 
@@ -7,9 +9,9 @@ from moonlighter.core.db import Job, init_db
 def job_factory(temporary_database):
     """Create a Job row in the in-memory test database.
 
-    Follows the pattern used in tests/application/test_service.py: the shared
-    temporary_database fixture points MOONLIGHTER_DB_PATH at a fresh temp file, init_db()
-    creates the schema in it, and Job.create() persists the row callers ask for.
+    The shared temporary_database fixture points MOONLIGHTER_DB_PATH at a fresh temp
+    file, init_db() creates the schema in it, and Job.create() persists the row callers
+    ask for.
     """
     init_db()
 
@@ -41,3 +43,20 @@ def _no_real_network(request, monkeypatch):
         raise AssertionError(f"real network call in a unit test: {http_request.url}")
 
     monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", refuse)
+
+
+@pytest.fixture
+def composed_fixture():
+    """Two answered, required text questions: the sheet the result tests render."""
+    return [
+        ComposedAnswer(
+            FormQuestion(label="Full name", kind=QuestionKind.TEXT, options=[], required=True),
+            "Jane Doe",
+            None,
+        ),
+        ComposedAnswer(
+            FormQuestion(label="Email", kind=QuestionKind.TEXT, options=[], required=True),
+            "jane@example.com",
+            None,
+        ),
+    ]

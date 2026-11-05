@@ -1,8 +1,8 @@
+"""The rendered sheet text for every outcome, pinned byte-for-byte by snapshots."""
+
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-import pytest
-from moonlighter.application.assisted.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.results import SheetKind, SheetResult, render_sheet_result
 from moonlighter.application.assisted.service import (
@@ -10,40 +10,13 @@ from moonlighter.application.assisted.service import (
     prepare_application_from_paste,
 )
 from moonlighter.application.cvgen.service import TailoredCV
-from moonlighter.core.db import Job, init_db, record_cv_bootstrap_decline
+from moonlighter.core.db import init_db
 
-CONFIG = {"llm_model": "claude-sonnet-4-6"}
-PROFILE = {"name": "Jane Doe", "email": "jane@example.com"}
-QUESTIONS = [
-    FormQuestion(label="Full name", kind=QuestionKind.TEXT, options=[], required=True),
-    FormQuestion(label="Email", kind=QuestionKind.TEXT, options=[], required=True),
-]
-PAGE = "Full name\nEmail\nWhy do you want to work here?"
-
-
-def _job(**overrides):
-    init_db()
-    # This module doesn't exercise the CV-pool bootstrap offer (Task 7's own
-    # tests for that live in test_assisted_service.py) -- every prepare_*
-    # call below predates it and asserts on sheet/paste-hint/error content.
-    # Recording a decline here keeps _cv_bootstrap_offer a no-op without
-    # touching resolved_pool_path, so ensure_tailored_cv's mocked/None
-    # behavior below is unaffected.
-    record_cv_bootstrap_decline()
-    defaults = {
-        "source": "greenhouse",
-        "company": "Acme",
-        "title": "Staff Engineer",
-        "url": "https://boards.greenhouse.io/acme/jobs/1",
-        "score": 9.0,
-        "status": "new",
-    }
-    defaults.update(overrides)
-    return Job.create(**defaults)
+from tests.application.assisted.sheet_inputs import CONFIG, PAGE, PROFILE, QUESTIONS, create_job
 
 
 async def test_prepare_application_plain_sheet_is_unchanged(temporary_database, snapshot_text):
-    job = _job()
+    job = create_job()
     with (
         patch(
             "moonlighter.application.assisted.service._api_form",
@@ -62,7 +35,7 @@ async def test_prepare_application_plain_sheet_is_unchanged(temporary_database, 
 async def test_prepare_application_appends_the_alias_note(temporary_database, snapshot_text):
     # The alias note fires only when NO question on the sheet takes the alias,
     # so this passes a question list with no email field.
-    job = _job(url="https://boards.greenhouse.io/acme/jobs/2")
+    job = create_job(url="https://boards.greenhouse.io/acme/jobs/2")
     no_email = [FormQuestion(label="Full name", kind=QuestionKind.TEXT, options=[], required=True)]
     with (
         patch(
@@ -89,8 +62,8 @@ async def test_prepare_application_appends_the_alias_note(temporary_database, sn
 async def test_prepare_application_appends_the_uncompiled_cv_note(
     temporary_database, snapshot_text
 ):
-    job = _job(url="https://boards.greenhouse.io/acme/jobs/3")
-    uncompiled = TailoredCV(Path("/tmp/moonlighter-test-cv/cv.tex"), False)
+    job = create_job(url="https://boards.greenhouse.io/acme/jobs/3")
+    uncompiled = TailoredCV(Path("/tmp/moonlighter-test-cv/cv.tex"), compiled=False)
     with (
         patch(
             "moonlighter.application.assisted.service._api_form",
@@ -109,8 +82,8 @@ async def test_prepare_application_appends_the_uncompiled_cv_note(
 async def test_prepare_application_appends_the_compiled_cv_note(temporary_database, snapshot_text):
     # Compiled CV, no CV/FILE question on the sheet to name it -- _names_path is
     # False since none of QUESTIONS carries a gap_reason mentioning this path.
-    job = _job(url="https://boards.greenhouse.io/acme/jobs/4")
-    compiled = TailoredCV(Path("/tmp/moonlighter-test-cv/cv.pdf"), True)
+    job = create_job(url="https://boards.greenhouse.io/acme/jobs/4")
+    compiled = TailoredCV(Path("/tmp/moonlighter-test-cv/cv.pdf"), compiled=True)
     with (
         patch(
             "moonlighter.application.assisted.service._api_form",
@@ -136,29 +109,13 @@ async def test_prepare_application_job_not_found_is_unchanged(temporary_database
 async def test_prepare_application_with_no_questions_returns_the_paste_hint(
     temporary_database, snapshot_text
 ):
-    job = _job(url="https://boards.greenhouse.io/acme/jobs/5")
+    job = create_job(url="https://boards.greenhouse.io/acme/jobs/5")
     with patch(
         "moonlighter.application.assisted.service._api_form",
         new=AsyncMock(return_value=([], ())),
     ):
         out = render_sheet_result(await prepare_application(job.id, CONFIG, PROFILE))
     snapshot_text(out, "paste_hint")
-
-
-@pytest.fixture
-def composed_fixture():
-    return [
-        ComposedAnswer(
-            FormQuestion(label="Full name", kind=QuestionKind.TEXT, options=[], required=True),
-            "Jane Doe",
-            None,
-        ),
-        ComposedAnswer(
-            FormQuestion(label="Email", kind=QuestionKind.TEXT, options=[], required=True),
-            "jane@example.com",
-            None,
-        ),
-    ]
 
 
 def test_render_sheet_result_reproduces_the_plain_sheet(composed_fixture, snapshot_text):
@@ -176,29 +133,8 @@ def test_render_sheet_result_reproduces_the_plain_sheet(composed_fixture, snapsh
     snapshot_text(render_sheet_result(result), "plain_sheet")
 
 
-def test_render_sheet_result_orders_alias_note_before_cv_note(composed_fixture):
-    # The relative order of the two footers is part of the byte-identical MCP
-    # contract -- swapping (alias_note, cv_note) to (cv_note, alias_note) in
-    # render_sheet_result's loop leaves every other test green.
-    result = SheetResult(
-        kind=SheetKind.SHEET,
-        composed=composed_fixture,
-        job_title="Staff Engineer",
-        company="Acme",
-        apply_url="https://boards.greenhouse.io/acme/jobs/1",
-        alias="jane+ab12cd@example.com",
-        alias_note="Where the form asks for an email address, use: jane+ab12cd@example.com",
-        cv_note="Upload this CV for this job: /tmp/cv.pdf (tailored for this job — review it before uploading)",
-        error=None,
-    )
-    rendered = render_sheet_result(result)
-    alias_at = rendered.index("Where the form asks for an email address")
-    cv_at = rendered.index("Upload this CV for this job")
-    assert alias_at < cv_at
-
-
 async def test_prepare_from_paste_sheet_is_unchanged(temporary_database, snapshot_text):
-    job = _job(url="https://boards.greenhouse.io/acme/jobs/4")
+    job = create_job(url="https://boards.greenhouse.io/acme/jobs/4")
     with (
         patch(
             "moonlighter.application.assisted.service._api_form",
@@ -221,7 +157,7 @@ async def test_prepare_from_paste_sheet_is_unchanged(temporary_database, snapsho
 
 
 async def test_prepare_from_paste_no_questions_is_unchanged(temporary_database, snapshot_text):
-    job = _job(url="https://boards.greenhouse.io/acme/jobs/5")
+    job = create_job(url="https://boards.greenhouse.io/acme/jobs/5")
     with (
         patch(
             "moonlighter.application.assisted.service._api_form",
@@ -244,178 +180,3 @@ async def test_prepare_from_paste_job_not_found_is_unchanged(temporary_database,
         await prepare_application_from_paste(4242, PAGE, CONFIG, profile=PROFILE)
     )
     snapshot_text(out, "paste_job_not_found")
-
-
-def test_sheet_result_kind_and_error_agree():
-    from moonlighter.application.assisted.results import SheetKind, SheetResult
-
-    with pytest.raises(ValueError, match="sheet"):
-        SheetResult(
-            kind=SheetKind.SHEET, composed=[], job_title="", company="", apply_url="", error="x"
-        )
-    with pytest.raises(ValueError, match="job_not_found"):
-        SheetResult(
-            kind=SheetKind.JOB_NOT_FOUND, composed=[], job_title="", company="", apply_url=""
-        )
-
-
-async def test_prepare_application_reports_the_cv_path_and_compiled_flag(temporary_database):
-    # cv_note carried the path inside an English sentence; a script needs the
-    # path and the flag as fields. The note is unchanged (snapshot).
-    job = _job(url="https://boards.greenhouse.io/acme/jobs/9")
-    compiled = TailoredCV(path=Path("/tmp/cv-generated/9/cv.pdf"), compiled=True)
-    with (
-        patch(
-            "moonlighter.application.assisted.service._api_form",
-            new=AsyncMock(return_value=(QUESTIONS, ())),
-        ),
-        patch(
-            "moonlighter.application.assisted.service.ensure_tailored_cv",
-            new=AsyncMock(return_value=compiled),
-        ),
-        patch("moonlighter.application.assisted.service._tracking_alias", return_value=None),
-    ):
-        result = await prepare_application(job.id, CONFIG, PROFILE)
-    assert result.kind is SheetKind.SHEET
-    assert result.cv_path == "/tmp/cv-generated/9/cv.pdf"
-    assert result.cv_compiled is True
-
-
-async def test_prepare_application_needs_paste_carries_the_job_url(temporary_database):
-    # failed_sheet() built apply_url="" for every early-check failure, but the
-    # NEEDS_PASTE call site has job.url in hand (it's already in PASTE_HINT's
-    # message) -- a script reading apply_url off a needs_paste result got
-    # nothing instead of the URL it needs to open and paste from.
-    job = _job(url="https://boards.greenhouse.io/acme/jobs/6")
-    with patch(
-        "moonlighter.application.assisted.service._api_form",
-        new=AsyncMock(return_value=([], ())),
-    ):
-        result = await prepare_application(job.id, CONFIG, PROFILE)
-    assert result.kind == SheetKind.NEEDS_PASTE
-    assert result.apply_url == job.url
-
-
-async def test_prepare_application_not_found_has_the_kind_a_script_can_switch_on(
-    temporary_database,
-):
-    init_db()
-    result = await prepare_application(4242, CONFIG, PROFILE)
-    assert result.kind is SheetKind.JOB_NOT_FOUND
-    assert result.error == "Job 4242 not found."
-
-
-def test_sheet_result_to_dict_is_json_serialisable(composed_fixture):
-    import json
-
-    from moonlighter.application.assisted.results import (
-        SheetKind,
-        SheetResult,
-        sheet_result_to_dict,
-    )
-
-    result = SheetResult(
-        kind=SheetKind.SHEET,
-        composed=composed_fixture,
-        job_title="Staff Engineer",
-        company="Acme",
-        apply_url="https://x",
-        alias="jane+ab12@x.com",
-        alias_note="Where the form asks...",
-        cv_path="/p/cv.pdf",
-        cv_compiled=True,
-    )
-    result_payload = sheet_result_to_dict(result)
-    json.dumps(result_payload)
-    assert result_payload["kind"] == "sheet"
-    assert result_payload["alias"] == "jane+ab12@x.com"
-    assert result_payload["cv"] == {"path": "/p/cv.pdf", "compiled": True}
-    first = result_payload["answers"][0]
-    assert set(first) == {"label", "kind", "required", "options", "answer", "gap_reason"}
-    assert result_payload["notes"] == {
-        "alias": "Where the form asks...",
-        "cv": None,
-        "source": None,
-    }
-
-
-def test_the_source_note_is_rendered_and_serialised():
-    from moonlighter.application.assisted.results import (
-        SheetKind,
-        SheetResult,
-        sheet_result_to_dict,
-    )
-
-    result = SheetResult(
-        kind=SheetKind.SHEET,
-        composed=[],
-        job_title="Engineer",
-        company="Acme",
-        apply_url="https://x",
-        source_note=(
-            "The pasted text was not used: this job's ATS publishes its form,"
-            " which is more reliable."
-        ),
-    )
-    assert "The pasted text was not used" in render_sheet_result(result)
-    assert sheet_result_to_dict(result)["notes"]["source"].startswith(
-        "The pasted text was not used"
-    )
-
-
-def test_sheet_result_to_dict_pins_the_needs_paste_and_no_questions_wire_values():
-    # A CLI consumer switches on the exact string over the wire -- pin both
-    # non-SHEET kinds a script can see, not just SHEET (see sheet_result_to_dict
-    # above). Renaming either StrEnum member's value left the suite green
-    # before this test existed (mutation checked, reverted).
-    from moonlighter.application.assisted.results import (
-        SheetKind,
-        SheetResult,
-        sheet_result_to_dict,
-    )
-
-    needs_paste = sheet_result_to_dict(
-        SheetResult(
-            kind=SheetKind.NEEDS_PASTE,
-            composed=[],
-            job_title="",
-            company="",
-            apply_url="",
-            error="paste it",
-        )
-    )
-    assert needs_paste["kind"] == "needs_paste"
-
-    no_questions = sheet_result_to_dict(
-        SheetResult(
-            kind=SheetKind.NO_QUESTIONS,
-            composed=[],
-            job_title="",
-            company="",
-            apply_url="",
-            error="no questions",
-        )
-    )
-    assert no_questions["kind"] == "no_questions"
-
-
-def test_sheet_kind_posting_unreadable_is_pinned():
-    from moonlighter.application.assisted.results import (
-        SheetKind,
-        SheetResult,
-        sheet_result_to_dict,
-    )
-
-    result = SheetResult(
-        kind=SheetKind.POSTING_UNREADABLE,
-        composed=[],
-        job_title="",
-        company="",
-        apply_url="https://x",
-        error="The posting at https://x could not be read.",
-    )
-    assert sheet_result_to_dict(result)["kind"] == "posting_unreadable"
-
-
-def test_cv_bootstrap_offer_is_a_valid_sheet_kind():
-    assert SheetKind.CV_BOOTSTRAP_OFFER.value == "cv_bootstrap_offer"

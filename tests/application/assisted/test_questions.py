@@ -3,19 +3,19 @@ from moonlighter.application.assisted.questions import FormQuestion, QuestionKin
 
 
 def test_a_plain_question_has_no_options():
-    q = FormQuestion(label="First Name", kind=QuestionKind.TEXT, required=True)
-    assert q.options == ()
-    assert q.is_choice is False
+    question = FormQuestion(label="First Name", kind=QuestionKind.TEXT, required=True)
+    assert question.options == ()
+    assert question.is_choice is False
 
 
 def test_a_select_question_reports_itself_as_a_choice():
-    q = FormQuestion(
+    question = FormQuestion(
         label="Will you require sponsorship?",
         kind=QuestionKind.SINGLE_SELECT,
         required=True,
         options=("No", "Yes, now"),
     )
-    assert q.is_choice is True
+    assert question.is_choice is True
 
 
 def test_a_choice_question_without_options_is_rejected():
