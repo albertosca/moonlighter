@@ -166,7 +166,6 @@ strict-checking = true
 "tests/application/answers/test_cv.py" = ["PLC0415"]
 "tests/application/answers/test_profile.py" = ["PT018"]
 "tests/application/assisted/test_assisted_service.py" = ["DTZ005", "PLC0415", "PLR0913", "PLR0917", "PT018"]
-"tests/application/assisted/test_composer.py" = ["ISC004", "PLC0415", "PT018"]
 "tests/application/assisted/test_lever_source.py" = ["PT011"]
 "tests/application/assisted/test_pasted_source.py" = ["PT018"]
 "tests/application/assisted/test_sheet.py" = ["FBT001", "FBT002", "PLR0917"]
