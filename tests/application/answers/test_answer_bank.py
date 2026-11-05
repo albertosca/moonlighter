@@ -1,4 +1,8 @@
+from datetime import datetime, timedelta
+from types import SimpleNamespace
+
 import pytest
+from moonlighter.application.answers import answer_bank
 from moonlighter.application.answers.answer_bank import (
     forget,
     is_bank_eligible,
@@ -279,3 +283,81 @@ def test_render_answer_bank_marks_entries_past_max_age(temporary_database):
 def test_render_answer_bank_empty(temporary_database):
     init_db()
     assert render_answer_bank([], max_age_days=90) == "The answer bank is empty."
+
+
+# ── characterization pins: exact rendering, overwrite and the expiry boundary ──
+
+FROZEN_NOW = datetime(2026, 11, 5, 12, 0, 0)  # noqa: DTZ001 - the database stores naive local time
+SEPTEMBER_FIRST = FROZEN_NOW - timedelta(days=65)
+JANUARY_SECOND = FROZEN_NOW - timedelta(days=307)
+
+
+@pytest.fixture
+def frozen_clock(monkeypatch):
+    """Answer-bank time stands still at FROZEN_NOW, so a boundary can be exact."""
+    monkeypatch.setattr(answer_bank, "datetime", SimpleNamespace(now=lambda: FROZEN_NOW))
+
+
+def _dated_entry(question: str, answer: str, updated_at: datetime, *, kind: str = "text") -> None:
+    AnswerBankEntry.create(
+        normalized_question=question,
+        kind=kind,
+        answer=answer,
+        source_job_id=1,
+        updated_at=updated_at,
+    )
+
+
+def test_render_answer_bank_exact_text_for_one_entry(temporary_database, frozen_clock):
+    init_db()
+    _dated_entry("notice period", "30 days", SEPTEMBER_FIRST)
+    assert render_answer_bank(list_entries(), max_age_days=90) == (
+        "# Answer bank — 1 entry\n\n- **notice period** → 30 days  [text, job #1, last used 2026-09-01]"
+    )
+
+
+def test_render_answer_bank_exact_text_for_entries_with_an_expired_one(
+    temporary_database, frozen_clock
+):
+    init_db()
+    _dated_entry("notice period", "30 days", SEPTEMBER_FIRST)
+    _dated_entry("when can you start", "in two weeks", JANUARY_SECOND, kind="single_select")
+    assert render_answer_bank(list_entries(), max_age_days=90) == (
+        "# Answer bank — 2 entries\n\n"
+        "- **notice period** → 30 days  [text, job #1, last used 2026-09-01]\n"
+        "- **when can you start** → in two weeks  [single_select, job #1, last used 2026-01-02]"
+        "  (expired — not replayed)"
+    )
+
+
+def test_an_entry_exactly_at_the_age_limit_is_still_replayed(temporary_database, frozen_clock):
+    init_db()
+    _dated_entry("notice period", "30 days", FROZEN_NOW - timedelta(days=90))
+    _dated_entry("when can you start", "in two weeks", FROZEN_NOW - timedelta(days=90, seconds=1))
+    assert load_answer_bank(max_age_days=90) == {"notice period": "30 days"}
+    lines = render_answer_bank(list_entries(), max_age_days=90).splitlines()
+    assert lines[2].endswith("last used 2026-08-07]")
+    assert lines[3].endswith("  (expired — not replayed)")
+
+
+def test_promote_application_overwrite_refreshes_kind_and_last_use(
+    temporary_database, frozen_clock
+):
+    init_db()
+    _dated_entry("notice period", "30 days", JANUARY_SECOND)
+    job_cache = {"Notice period": {"answer": "60 days", "kind": "single_select"}}
+    promote_application(job_cache, source_job_id=3)
+    row = AnswerBankEntry.get(AnswerBankEntry.normalized_question == "notice period")
+    assert row.kind == "single_select"
+    assert row.updated_at == FROZEN_NOW
+
+
+def test_two_labels_that_normalise_alike_bank_one_row_with_the_last_answer(temporary_database):
+    init_db()
+    job_cache = {
+        "Notice period?": {"answer": "30 days", "kind": "text"},
+        "  notice   PERIOD:": {"answer": "60 days", "kind": "text"},
+    }
+    promote_application(job_cache, source_job_id=4)
+    rows = list(AnswerBankEntry.select())
+    assert [(row.normalized_question, row.answer) for row in rows] == [("notice period", "60 days")]

@@ -99,3 +99,26 @@ class TestNonComplianceQuestionsPass:
 
     def test_salary_expectation(self):
         assert not is_compliance_question("Salary expectation (BRL/month)", ())
+
+
+class TestCharacterizationPins:
+    def test_portuguese_public_body_option(self):
+        assert is_compliance_question("Selecione", ("Já trabalhei em órgão público", "Nenhuma"))
+
+    def test_unaccented_public_body_option(self):
+        assert is_compliance_question("Selecione", ("Ja trabalhei em orgao publico", "Nenhuma"))
+
+    def test_portuguese_political_party_option(self):
+        assert is_compliance_question("Selecione", ("Sou filiado a partido político", "Nenhuma"))
+
+    def test_declaro_label(self):
+        assert is_compliance_question("Declaro que as informações são verdadeiras", ())
+
+    def test_declaro_needs_a_word_boundary(self):
+        assert not is_compliance_question("Ele declarou o imposto?", ())
+
+    def test_certifico_option_under_a_neutral_label(self):
+        assert is_compliance_question("Confirme", ("Certifico que li a política", "Não"))
+
+    def test_certifico_option_needs_a_word_boundary(self):
+        assert not is_compliance_question("Confirme", ("Certificou-se?", "Não"))

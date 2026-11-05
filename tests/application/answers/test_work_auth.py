@@ -1,3 +1,4 @@
+import pytest
 from moonlighter.application.answers.work_auth import infer_country, resolve_work_auth
 
 WA_CONFIG = {
@@ -33,32 +34,32 @@ def test_infer_country_unknown_returns_none():
 
 
 def test_resolve_authorized_for_brazil():
-    r = resolve_work_auth("Are you authorized to work in this location?", "brazil", WA_CONFIG)
-    assert r == "Yes"
+    answer = resolve_work_auth("Are you authorized to work in this location?", "brazil", WA_CONFIG)
+    assert answer == "Yes"
 
 
 def test_resolve_sponsorship_for_brazil():
-    r = resolve_work_auth("Will you require visa sponsorship?", "brazil", WA_CONFIG)
-    assert r == "No"
+    answer = resolve_work_auth("Will you require visa sponsorship?", "brazil", WA_CONFIG)
+    assert answer == "No"
 
 
 def test_resolve_authorized_for_us_is_no():
-    r = resolve_work_auth(
+    answer = resolve_work_auth(
         "Are you legally authorized to work in the US?", "united states", WA_CONFIG
     )
-    assert r == "No"
+    assert answer == "No"
 
 
 def test_resolve_sponsorship_for_us_is_yes():
-    r = resolve_work_auth(
+    answer = resolve_work_auth(
         "Do you require sponsorship now or in the future?", "united states", WA_CONFIG
     )
-    assert r == "Yes"
+    assert answer == "Yes"
 
 
 def test_resolve_unknown_country_needs_review():
-    r = resolve_work_auth("Are you authorized to work here?", None, WA_CONFIG)
-    assert r == "__NEEDS_REVIEW__"
+    answer = resolve_work_auth("Are you authorized to work here?", None, WA_CONFIG)
+    assert answer == "__NEEDS_REVIEW__"
 
 
 def test_resolve_non_work_auth_field_returns_none():
@@ -83,18 +84,18 @@ WA_CONFIG_NO_CITIZENSHIP = {
 
 def test_empty_citizenship_needs_review_even_with_known_country():
     """citizenship_country empty → never guesses the country, always __NEEDS_REVIEW__."""
-    r = resolve_work_auth(
+    answer = resolve_work_auth(
         "Are you authorized to work in this location?", "brazil", WA_CONFIG_EMPTY_CITIZENSHIP
     )
-    assert r == "__NEEDS_REVIEW__"
+    assert answer == "__NEEDS_REVIEW__"
 
 
 def test_missing_citizenship_needs_review():
     """citizenship_country missing from config → same behavior as empty."""
-    r = resolve_work_auth(
+    answer = resolve_work_auth(
         "Are you authorized to work in this location?", "brazil", WA_CONFIG_NO_CITIZENSHIP
     )
-    assert r == "__NEEDS_REVIEW__"
+    assert answer == "__NEEDS_REVIEW__"
 
 
 # ── C2: edge cases (regressions) ────────────────────────────────────────────
@@ -116,23 +117,23 @@ def test_infer_country_us_state_codes_still_match():
 def test_resolve_citizenship_locale_normalized():
     """A non-canonical citizenship_country ('Brasil'/'Brazil'/'BR') must match 'brazil'."""
     for form in ("Brasil", "Brazil", "BR", " brazil "):
-        cfg = {"work_authorization": {"citizenship_country": form}}
-        r = resolve_work_auth("Are you authorized to work here?", "brazil", cfg)
-        assert r == "Yes", f"failed for {form!r}"
+        config = {"work_authorization": {"citizenship_country": form}}
+        answer = resolve_work_auth("Are you authorized to work here?", "brazil", config)
+        assert answer == "Yes", f"failed for {form!r}"
 
 
 def test_resolve_us_citizenship_normalized():
     """citizenship_country in US form ('USA') normalizes and matches country 'united states'."""
-    cfg = {"work_authorization": {"citizenship_country": "USA"}}
-    r = resolve_work_auth("Are you authorized to work here?", "united states", cfg)
-    assert r == "Yes"
+    config = {"work_authorization": {"citizenship_country": "USA"}}
+    answer = resolve_work_auth("Are you authorized to work here?", "united states", config)
+    assert answer == "Yes"
 
 
 def test_resolve_unrecognized_citizenship_needs_review():
     """Unrecognized citizenship country (neither BR nor US) → review (conservative)."""
-    cfg = {"work_authorization": {"citizenship_country": "Portugal"}}
-    r = resolve_work_auth("Are you authorized to work here?", "united states", cfg)
-    assert r == "__NEEDS_REVIEW__"
+    config = {"work_authorization": {"citizenship_country": "Portugal"}}
+    answer = resolve_work_auth("Are you authorized to work here?", "united states", config)
+    assert answer == "__NEEDS_REVIEW__"
 
 
 # ── E8 T2: ", CA" is always ambiguous — conservative rule, never a guess ─────
@@ -177,8 +178,8 @@ def test_resolve_work_auth_for_ambiguous_canada_string_needs_review_not_us():
     the job were in the US — it must fall through to review."""
     country = infer_country("Toronto, CA", None)
     assert country is None
-    r = resolve_work_auth("Are you authorized to work in the US?", country, WA_CONFIG)
-    assert r == "__NEEDS_REVIEW__"
+    answer = resolve_work_auth("Are you authorized to work in the US?", country, WA_CONFIG)
+    assert answer == "__NEEDS_REVIEW__"
 
 
 def test_infer_country_other_canadian_markers_not_misread_as_us():
@@ -190,3 +191,59 @@ def test_infer_country_other_canadian_markers_not_misread_as_us():
 def test_infer_country_remote_with_no_location_signal_is_none():
     assert infer_country(None, None) is None
     assert infer_country("Remote", "remote") is None
+
+
+# ── characterization pins: defaults, every marker, every phrasing, every alias ──
+
+
+def test_resolve_defaults_the_not_authorized_answer_to_no():
+    config = {"work_authorization": {"citizenship_country": "brazil"}}
+    assert resolve_work_auth("Are you authorized to work here?", "united states", config) == "No"
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        "Sao Paulo",
+        "Rio de Janeiro",
+        "Porto Alegre",
+        "Curitiba",
+        "Recife",
+        "Florianópolis",
+        "Florianopolis",
+        "Campinas",
+    ],
+)
+def test_infer_country_brazil_from_each_city_marker(location):
+    assert infer_country(location, None) == "brazil"
+
+
+@pytest.mark.parametrize("location", ["U.S.", "U.S.A", "Seattle", "Austin", "Boston"])
+def test_infer_country_us_from_each_marker(location):
+    assert infer_country(location, None) == "united states"
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "Do you have work authorization?",
+        "Can you legally work in this country?",
+        "Do you hold a work permit?",
+        "Are you eligible to work here?",
+    ],
+)
+def test_resolve_recognises_each_authorization_phrasing(label):
+    assert resolve_work_auth(label, "brazil", WA_CONFIG) == "Yes"
+
+
+@pytest.mark.parametrize("label", ["Do you require a visa?", "Will you need visa-related support?"])
+def test_resolve_recognises_each_sponsorship_phrasing(label):
+    assert resolve_work_auth(label, "brazil", WA_CONFIG) == "No"
+
+
+@pytest.mark.parametrize(
+    "citizenship", ["united states", "US", "u.s.", "U.S.A", "United States of America"]
+)
+def test_resolve_accepts_each_us_citizenship_alias(citizenship):
+    config = {"work_authorization": {"citizenship_country": citizenship}}
+    assert resolve_work_auth("Are you authorized to work here?", "united states", config) == "Yes"

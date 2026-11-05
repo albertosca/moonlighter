@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -117,3 +118,16 @@ def test_tilde_in_cv_default_expands_like_the_tailored_cv_keys(monkeypatch, tmp_
     default_cv.parent.mkdir()
     default_cv.write_bytes(b"%PDF")
     assert resolve_cv_path("acme", {"cv": {"default": "~/cvs/x.pdf"}}) == str(default_cv)
+
+
+def test_no_mapping_message_is_exact():
+    message = "No CV mapped for 'stripe' and no 'cv.default' in config. Check config.yaml."
+    with pytest.raises(CVNotFoundError, match="^" + re.escape(message) + "$"):
+        resolve_cv_path("stripe", {"cv": {"by_company": {}}})
+
+
+def test_missing_file_message_is_exact(tmp_path):
+    missing = tmp_path / "missing.pdf"
+    message = f"CV for 'stripe' not found at {missing}. Check the 'cv' mapping in config."
+    with pytest.raises(CVNotFoundError, match="^" + re.escape(message) + "$"):
+        resolve_cv_path("stripe", {"cv": {"default": str(missing)}})

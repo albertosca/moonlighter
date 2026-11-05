@@ -71,3 +71,31 @@ def test_open_source_reaches_the_answer_prompt():
     contact data (links stay on the deterministic field-map track)."""
     profile = {"open_source": [{"name": "moonlighter"}], "summary": "s"}
     assert profile_for_answers(profile)["open_source"] == [{"name": "moonlighter"}]
+
+
+def test_profile_for_answers_keeps_the_whitelist_order_whatever_the_profile_order():
+    """The reduced profile is serialised into the answer prompt in this order."""
+    keys = [
+        "open_source",
+        "publications",
+        "languages",
+        "education",
+        "experience",
+        "skills",
+        "summary",
+        "headline",
+        "career_started",
+        "name",
+    ]
+    reduced = profile_for_answers({key: key for key in keys})
+    assert list(reduced) == [
+        "career_started",
+        "headline",
+        "summary",
+        "skills",
+        "experience",
+        "education",
+        "languages",
+        "publications",
+        "open_source",
+    ]
