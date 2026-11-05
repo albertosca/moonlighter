@@ -1,6 +1,6 @@
-"""Task 4: the LLM callers record into whatever operation_metrics scope is
-active — CLI records time only (no token usage exposed), API records real
-message.usage tokens."""
+"""A make_api_caller caller records one call plus the input and output tokens of message.usage
+in the active operation_metrics scope, and still counts the call when it fails, with zero
+tokens."""
 
 import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch

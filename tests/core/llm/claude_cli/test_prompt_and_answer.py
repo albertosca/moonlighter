@@ -35,12 +35,12 @@ async def test_cli_caller_satisfies_llm_caller_contract():
 
 async def test_cli_concatenates_cache_prefix():
     """cache_prefix is concatenated to the prompt in the cli backend."""
-    captured: dict[str, bytes] = {}
+    captured: dict[str, object] = {}
 
     async def fake_communicate(
         *positional_arguments: object, **keyword_arguments: object
     ) -> tuple[bytes, bytes]:
-        captured["input"] = keyword_arguments["input"]  # type: ignore[assignment]
+        captured["input"] = keyword_arguments["input"]
         return (b"ok", b"")
 
     mock_process = MagicMock()
@@ -56,12 +56,12 @@ async def test_cli_concatenates_cache_prefix():
 
 async def test_cli_no_cache_prefix_keeps_prompt_unchanged():
     """cache_prefix=None (default) keeps the original behavior in the cli."""
-    captured: dict[str, bytes] = {}
+    captured: dict[str, object] = {}
 
     async def fake_communicate(
         *positional_arguments: object, **keyword_arguments: object
     ) -> tuple[bytes, bytes]:
-        captured["input"] = keyword_arguments["input"]  # type: ignore[assignment]
+        captured["input"] = keyword_arguments["input"]
         return (b"ok", b"")
 
     mock_process = MagicMock()
