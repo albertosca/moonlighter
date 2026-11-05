@@ -1,4 +1,6 @@
-from moonlighter.application.answers.profile import profile_for_answers
+"""The answer-path profile whitelist: which fields reach the model, and in what order."""
+
+from moonlighter.application.answers.answer_profile import profile_for_answers
 
 
 def test_profile_for_answers_keeps_only_prose_keys():
@@ -31,8 +33,10 @@ def test_profile_for_answers_keeps_only_prose_keys():
         "open_source",
     }
     # The secrets are gone.
-    assert "phone" not in reduced and "email" not in reduced
-    assert "preferences" not in reduced and "criteria" not in reduced
+    assert "phone" not in reduced
+    assert "email" not in reduced
+    assert "preferences" not in reduced
+    assert "criteria" not in reduced
 
 
 def test_profile_for_answers_omits_absent_keys():

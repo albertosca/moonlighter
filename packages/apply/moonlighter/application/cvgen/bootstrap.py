@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from moonlighter.application.answers.profile import profile_for_answers
+from moonlighter.application.answers.answer_profile import profile_for_answers
 from moonlighter.application.cvgen.compile import compile_pdf
 from moonlighter.application.cvgen.generate import MAXIMUM_BULLETS, MAXIMUM_OPEN_SOURCE
 from moonlighter.application.cvgen.pool import (

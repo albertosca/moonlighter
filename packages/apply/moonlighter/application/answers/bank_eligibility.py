@@ -45,7 +45,7 @@ def is_sensitive_label(label: str) -> bool:
     Never eligible for the cross-job bank regardless of question kind, because
     nothing deterministic stops the LLM from guessing an answer to a label
     like this even though the underlying data is deliberately excluded from
-    its prompt (profile.py's profile_for_answers). A hallucinated answer here
+    its prompt (answer_profile.py's profile_for_answers). A hallucinated answer here
     must not persist into a table shared across every future company.
     """
     return bool(_SENSITIVE_LABEL.search(label))

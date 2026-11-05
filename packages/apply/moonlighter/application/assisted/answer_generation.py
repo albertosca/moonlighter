@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-from moonlighter.application.answers.profile import profile_for_answers
+from moonlighter.application.answers.answer_profile import profile_for_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.parsing import wrap_untrusted

@@ -7,7 +7,7 @@ never rendered (specs/2026-08-25-tailored-cv-design.md)."""
 
 from typing import Any, Final, Literal
 
-from moonlighter.application.answers.profile import profile_for_answers
+from moonlighter.application.answers.answer_profile import profile_for_answers
 from moonlighter.application.cvgen.pool import CVPool
 from moonlighter.application.cvgen.render import CVSelection, is_typesettable
 from moonlighter.core.llm.caller import LLMCaller
