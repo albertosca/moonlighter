@@ -1,3 +1,5 @@
+"""Parse JSON out of LLM replies, and wrap untrusted text so it cannot escape its delimiter."""
+
 import json
 import re
 import secrets
@@ -5,30 +7,34 @@ from typing import Any
 
 
 def extract_json(raw: str) -> str:
-    """
-    Extracts raw JSON from an LLM response that may contain markdown fences
-    or introductory text before/after the JSON.
+    """Extracts raw JSON from an LLM response.
+
+    The response may contain markdown fences or introductory text before/after the JSON.
     Attempts in order: labeled fence, unlabeled fence, bare JSON object.
     """
     raw = raw.strip()
-    m = re.search(r"```(?:json)?\s*\n?([\s\S]*?)\n?```", raw)
-    if m:
-        return m.group(1).strip()
-    m = re.search(r"(\{[\s\S]*\})", raw)
-    if m:
-        return m.group(1)
+    match = re.search(r"```(?:json)?\s*\n?([\s\S]*?)\n?```", raw)
+    if match:
+        return match.group(1).strip()
+    match = re.search(r"(\{[\s\S]*\})", raw)
+    if match:
+        return match.group(1)
     return raw
 
 
 def parse_llm_json(raw: str) -> Any:
-    """Extract a JSON payload from a raw LLM response (stripping prose/fences via
-    extract_json) and parse it. Raises json.JSONDecodeError (a ValueError) on malformed input."""
+    """Extract a JSON payload from a raw LLM response and parse it.
+
+    Strips prose/fences via extract_json.
+    Raises json.JSONDecodeError (a ValueError) on malformed input.
+    """
     return json.loads(extract_json(raw))
 
 
 def wrap_untrusted(label: str, text: str, *, cap: int | None = None) -> str:
-    """Wrap external/untrusted text in an XML block with a random suffix
-    (S-04). Two layers of defense against the text "escaping" the delimiter:
+    """Wrap external/untrusted text in an XML block with a random suffix (S-04).
+
+    Two layers of defense against the text "escaping" the delimiter:
 
     1. Any literal occurrence of `<label...>`/`</label...>` already present in
        the text is stripped BEFORE wrapping — an attacker who reproduces the
