@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.manual.jobs import verify_job
-from tests.discovery.scan_fakes import CONFIG, PROFILE, evaluation_result
+from tests.discovery.fake_scan import CONFIG, PROFILE, evaluation_result
 
 
 async def test_verify_job_result_text_and_stored_fields_are_pinned(temporary_database):

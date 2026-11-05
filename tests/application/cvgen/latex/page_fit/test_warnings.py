@@ -3,7 +3,7 @@ from unittest.mock import patch
 from moonlighter.application.cvgen.paths import generated_dir_for
 from moonlighter.application.cvgen.service import ensure_tailored_cv
 from tests.application.cvgen.log_records import logged_warnings
-from tests.application.cvgen.tailored_cv_samples import GENERATE_TWO_BULLETS, JOB, fixed_caller
+from tests.application.cvgen.sample_tailored_cv import GENERATE_TWO_BULLETS, JOB, fixed_caller
 
 PAGE_FIT = "moonlighter.application.cvgen.latex.page_fit"
 

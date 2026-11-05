@@ -3,7 +3,7 @@
 import json
 
 from moonlighter.discovery.archive import ArchiveResult
-from moonlighter.discovery.scan.results import ScanKind, ScanReport, scan_report_to_dict
+from moonlighter.discovery.scan.results import ScanKind, ScanResult, scan_report_to_dict
 from moonlighter.discovery.sources.base import SourceStats
 
 EXPECTED_KEYS = [
@@ -22,14 +22,14 @@ EXPECTED_KEYS = [
 
 
 def test_a_report_without_archive_or_stats_keeps_every_key_in_order():
-    payload = scan_report_to_dict(ScanReport(kind=ScanKind.NO_NEW_JOBS))
+    payload = scan_report_to_dict(ScanResult(kind=ScanKind.NO_NEW_JOBS))
     assert list(payload) == EXPECTED_KEYS
     assert payload["archive"] is None
     assert payload["stats"] is None
 
 
 def test_a_report_with_archive_and_stats_keeps_the_same_key_order():
-    report = ScanReport(
+    report = ScanResult(
         kind=ScanKind.NO_NEW_JOBS,
         archive=ArchiveResult(),
         stats={"greenhouse": SourceStats(companies=1, jobs=2, errors=3)},
@@ -41,7 +41,7 @@ def test_a_report_with_archive_and_stats_keeps_the_same_key_order():
 
 def test_scan_report_to_dict_is_json_serialisable_and_carries_the_facts(three_jobs):
 
-    report = ScanReport(
+    report = ScanResult(
         kind=ScanKind.EVALUATED,
         saved=three_jobs,
         spend_hit=True,
@@ -77,7 +77,7 @@ def test_scan_report_to_dict_pins_the_found_but_known_key_on_all_known(three_job
     # test in the suite green before this test existed (mutation checked,
     # reverted).
 
-    report = ScanReport(kind=ScanKind.ALL_KNOWN, threshold=7.0, company="acme", found_but_known=3)
+    report = ScanResult(kind=ScanKind.ALL_KNOWN, threshold=7.0, company="acme", found_but_known=3)
     payload = scan_report_to_dict(report)
     assert "found_but_known" in payload
     assert payload["found_but_known"] == 3

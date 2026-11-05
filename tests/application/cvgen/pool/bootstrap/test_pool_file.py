@@ -5,7 +5,7 @@ import pytest
 from moonlighter.application.cvgen.pool.bootstrap import BootstrapOutcome, bootstrap_cv_pool
 from moonlighter.application.cvgen.pool.bootstrap_error import BootstrapError
 from moonlighter.application.cvgen.pool.loader import load_pool
-from tests.application.cvgen.bootstrap_samples import CANDIDATE_PROFILE, scripted_caller
+from tests.application.cvgen.sample_bootstrap import CANDIDATE_PROFILE, scripted_caller
 
 
 async def test_bootstrap_cv_pool_place_holds_a_missing_title_and_period(monkeypatch, tmp_path):

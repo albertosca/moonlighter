@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.manual.jobs import add_job
-from tests.discovery.scan_fakes import CONFIG, PROFILE, evaluation_result
+from tests.discovery.fake_scan import CONFIG, PROFILE, evaluation_result
 
 
 async def test_add_job_missing_company_title(temporary_database):

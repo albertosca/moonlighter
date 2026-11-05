@@ -7,7 +7,7 @@ from moonlighter.application.assisted.questions import FormQuestion, QuestionKin
 from moonlighter.application.assisted.sheet.results import render_sheet_result
 from moonlighter.application.assisted.sources import greenhouse as greenhouse_source
 from moonlighter.application.assisted.sources import recruitee as recruitee_source
-from tests.application.assisted.service.service_fakes import (
+from tests.application.assisted.service.fake_service import (
     bypass_cv_bootstrap_offer,
     never_fetch_greenhouse,
     never_fetch_recruitee,

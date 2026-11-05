@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.scan.pipeline import evaluate_and_store
 from moonlighter.discovery.screening.no_eval import NO_EVAL
-from tests.discovery.scan_fakes import evaluation_result, make_raw_job, store_config
+from tests.discovery.fake_scan import evaluation_result, make_raw_job, store_config
 
 
 async def test_no_eval_persists_evaluable_jobs_as_needs_review_without_an_llm(temporary_database):

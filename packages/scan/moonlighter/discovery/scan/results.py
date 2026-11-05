@@ -31,7 +31,7 @@ class ScanKind(StrEnum):
 
 
 @dataclass(frozen=True)
-class ScanReport:
+class ScanResult:
     kind: ScanKind
     saved: list[Job] = field(default_factory=list)
     spend_hit: bool = False
@@ -55,18 +55,18 @@ class ScanReport:
         # the contradiction is impossible to express without raising.
         kind = self.kind
         if (self.error is not None) != (kind is ScanKind.UNKNOWN_SOURCE):
-            raise ValueError("ScanReport.error is set exactly when kind is unknown_source")
+            raise ValueError("ScanResult.error is set exactly when kind is unknown_source")
         if kind in (ScanKind.ALL_KNOWN, ScanKind.NO_OPEN_JOBS) and self.company is None:
-            raise ValueError(f"ScanReport kind {kind} names a company; company is required")
+            raise ValueError(f"ScanResult kind {kind} names a company; company is required")
         if (self.found_but_known > 0) != (kind is ScanKind.ALL_KNOWN):
             raise ValueError(
-                "ScanReport.found_but_known is positive exactly when kind is all_known"
+                "ScanResult.found_but_known is positive exactly when kind is all_known"
             )
         if kind is not ScanKind.EVALUATED and (self.saved or self.spend_hit):
-            raise ValueError("only an evaluated ScanReport carries saved/spend_hit")
+            raise ValueError("only an evaluated ScanResult carries saved/spend_hit")
 
 
-def render_scan_report(report: ScanReport) -> str:
+def render_scan_report(report: ScanResult) -> str:
     if report.error is not None:
         return report.error
     body = _body(report)
@@ -79,7 +79,7 @@ def render_scan_report(report: ScanReport) -> str:
     return body
 
 
-def _body(report: ScanReport) -> str:
+def _body(report: ScanResult) -> str:
     match report.kind:
         case ScanKind.NO_NEW_JOBS:
             return "No new jobs found."
@@ -101,7 +101,7 @@ def _notes_starting_with(saved: list[Job], prefix: str) -> int:
     return sum(1 for job in saved if job.score_notes and job.score_notes.startswith(prefix))
 
 
-def _spend_note(report: ScanReport) -> str:
+def _spend_note(report: ScanResult) -> str:
     if not report.spend_hit:
         return ""
     return "\n\n⚠️  Spend limit reached — scan stopped (remaining jobs are left for the next scan)."
@@ -116,7 +116,7 @@ def _verify_note(needs_verification: int) -> str:
     )
 
 
-def _render_counts(report: ScanReport) -> str:
+def _render_counts(report: ScanResult) -> str:
     saved = report.saved
     above = [job for job in saved if job.status == "new"]
     title_filtered = _notes_starting_with(saved, "title filtered:")
@@ -142,7 +142,7 @@ def _render_counts(report: ScanReport) -> str:
     return f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}{notes}"
 
 
-def scan_report_to_dict(report: ScanReport) -> dict[str, Any]:
+def scan_report_to_dict(report: ScanResult) -> dict[str, Any]:
     """The JSON a CLI prints.
 
     Every fact the renderer uses is here, plus the ones it does not (stats): a script reads

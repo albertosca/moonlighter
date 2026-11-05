@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.scan.collection import _run_browser_scanner
 from moonlighter.discovery.sources.base import RawJob, ScannerSessionExpiredError
-from tests.discovery.scan_fakes import CONFIG, FakeBrowserScanner, make_raw_job, run_scan
+from tests.discovery.fake_scan import CONFIG, FakeBrowserScanner, make_raw_job, run_scan
 
 
 async def test_run_browser_scanner_browser_launch_failure_is_silent():

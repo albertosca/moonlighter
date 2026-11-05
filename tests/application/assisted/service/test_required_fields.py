@@ -9,7 +9,7 @@ from moonlighter.application.assisted.sheet.required_labels import mark_required
 from moonlighter.application.assisted.sheet.results import render_sheet_result
 from moonlighter.application.assisted.sources import registry
 from moonlighter.application.assisted.sources.base import SourceMatch
-from tests.application.assisted.service.service_fakes import bypass_cv_bootstrap_offer, stub_caller
+from tests.application.assisted.service.fake_service import bypass_cv_bootstrap_offer, stub_caller
 
 
 class _FakeSource:

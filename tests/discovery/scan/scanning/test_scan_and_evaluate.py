@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.core.db import init_db
 from moonlighter.discovery.scan.scanning import scan_and_evaluate
-from tests.discovery.scan_fakes import make_raw_job
+from tests.discovery.fake_scan import make_raw_job
 
 
 async def test_scan_and_evaluate_archives_last_and_attaches_the_result(temporary_database):

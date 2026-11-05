@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from moonlighter.core.db import ScanLog, init_db
 from moonlighter.discovery.scan.results import render_scan_report
 from moonlighter.discovery.scan.scanning import scan_company
-from tests.discovery.scan_fakes import make_raw_job
+from tests.discovery.fake_scan import make_raw_job
 
 _fake_caller = MagicMock()
 

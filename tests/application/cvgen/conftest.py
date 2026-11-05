@@ -1,6 +1,6 @@
 import pytest
 
-from tests.application.cvgen.tailored_cv_samples import POOL_YAML, TEMPLATE
+from tests.application.cvgen.sample_tailored_cv import POOL_YAML, TEMPLATE
 
 
 @pytest.fixture

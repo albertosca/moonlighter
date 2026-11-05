@@ -3,7 +3,7 @@
 from moonlighter.core.db import Job, ScanLog, init_db
 from moonlighter.discovery.scan.pipeline import evaluate_and_store
 from moonlighter.discovery.sources.base import RawJob
-from tests.discovery.scan_fakes import HOME_BH, make_raw_job, run_scan
+from tests.discovery.fake_scan import HOME_BH, make_raw_job, run_scan
 
 
 async def test_scan_integrity_error_on_save_skips_silently(temporary_database):

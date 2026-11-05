@@ -1,7 +1,7 @@
 """Tests for the title blocklist that skips postings before any model call."""
 
 from moonlighter.discovery.evaluation.title_filter import should_skip_by_title
-from tests.discovery.evaluation.evaluation_fakes import BLOCKLIST
+from tests.discovery.evaluation.fake_evaluation import BLOCKLIST
 
 
 def test_skip_exact_match():

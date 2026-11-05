@@ -4,7 +4,7 @@ import pytest
 
 from moonlighter.application.cvgen.service import ensure_tailored_cv
 from tests.application.cvgen.log_records import logged_warnings
-from tests.application.cvgen.tailored_cv_samples import (
+from tests.application.cvgen.sample_tailored_cv import (
     GENERATE_TWO_BULLETS,
     JOB,
     fixed_caller,

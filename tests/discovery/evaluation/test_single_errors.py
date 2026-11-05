@@ -6,7 +6,7 @@ import pytest
 
 from moonlighter.discovery.evaluation.models import EvaluationResult
 from moonlighter.discovery.evaluation.single import evaluate_job
-from tests.discovery.evaluation.evaluation_fakes import (
+from tests.discovery.evaluation.fake_evaluation import (
     MOCK_LLM_RESPONSE,
     PROFILE,
     SPEND_LIMIT_MESSAGE,
