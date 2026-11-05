@@ -1,3 +1,5 @@
+"""The acknowledgement type in the prompt, and how a failed classification is signalled."""
+
 import json
 
 import pytest
@@ -69,13 +71,13 @@ async def test_unparseable_llm_response_is_not_silently_treated_as_unrelated():
 @pytest.mark.asyncio
 async def test_spend_limit_error_propagates_unwrapped_not_as_classification_error():
     """A spend-limit failure must be recognizable by the caller (via
-    moonlighter.core.llm.is_spend_limit) so it can stop the sync loop instead of
+    moonlighter.core.llm.spend_limit.is_spend_limit) so it can stop the sync loop instead of
     retrying every remaining message against a dead quota — wrapping it in
     ClassificationError like an ordinary failure would hide that distinction."""
 
     async def quota_exhausted_caller(prompt, model, cache_prefix=None):
         raise RuntimeError("rate limit exceeded, please retry later")
 
-    with pytest.raises(RuntimeError) as exc_info:
+    with pytest.raises(RuntimeError) as raised:
         await classify_response({"subject": "x", "body": "y"}, STAGES, quota_exhausted_caller)
-    assert not isinstance(exc_info.value, ClassificationError)
+    assert not isinstance(raised.value, ClassificationError)

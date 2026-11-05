@@ -142,7 +142,6 @@ strict-checking = true
 "tests/test_server_lifespan.py" = ["PLC0415", "PLR0402", "PLR0913", "PLR0917"]
 "tests/test_startup.py" = ["PT018"]
 "tests/test_tool_logging.py" = ["PLC0415"]
-"tests/tracking/test_email_monitor.py" = ["DTZ001", "DTZ011", "ICN001", "N806", "PIE804", "PLC0415", "PLR0917"]
 # END ratchet
 
 [tool.moonlighter.file-length]

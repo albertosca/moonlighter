@@ -1,11 +1,7 @@
-"""
-Tests for the recent-messages search: read state must not gate what the tracker sees.
-"""
+"""The recent-messages search: read state must not gate what the tracker sees."""
 
 from typing import Any
 
-import pytest
-from moonlighter.tracking.gmail_client import GmailAuthError, setup_gmail_service
 from moonlighter.tracking.gmail_messages import fetch_recent_messages
 
 
@@ -71,8 +67,3 @@ def test_the_search_covers_archived_and_spam():
 
 def test_the_messages_come_back():
     assert fetch_recent_messages(FakeService()) == [{"id": "abc"}]
-
-
-def test_setup_gmail_service_without_email_block_raises_config_message():
-    with pytest.raises(GmailAuthError, match=r"email.token_path is not configured"):
-        setup_gmail_service({})
