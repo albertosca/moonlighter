@@ -11,6 +11,7 @@ import re
 from dataclasses import dataclass
 
 import httpx
+
 from moonlighter.core.http_fetch import HEADERS, FetchError, get_json
 from moonlighter.core.urls import normalize_job_url
 
@@ -48,9 +49,11 @@ def strip_tags(raw: str) -> str | None:
 
 
 async def fetch_posting_via_ats(url: str) -> FetchedPosting | None:
-    """Fetch a posting through its ATS's public API. None when the URL matches
-    no known ATS or the API call fails — the caller falls back to the generic
-    HTTP fetch."""
+    """Fetch a posting through its ATS's public API.
+
+    None when the URL matches no known ATS or the API call fails — the caller falls back to the
+    generic HTTP fetch.
+    """
     if match := _GREENHOUSE_URL.search(url):
         return await _fetch_greenhouse(match["board"], match["job_id"])
     if match := _OFFER_URL.match(url):
@@ -113,12 +116,15 @@ async def _fetch_recruitee_offer(host: str, offer: str) -> FetchedPosting | None
 
 
 async def fetch_description(url: str) -> tuple[str | None, str | None]:
-    """Fetches and cleans (strips HTML from) the job description. Returns (description,
-    error) — only one of the two is non-null. Doesn't work on pages that require login."""
+    """Fetches and cleans (strips HTML from) the job description.
+
+    Returns (description, error) — only one of the two is non-null. Doesn't work on pages that
+    require login.
+    """
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             response = await client.get(url, headers=HEADERS)
-        if response.status_code != 200:
+        if response.status_code != httpx.codes.OK:
             return None, (
                 f"Could not fetch the URL (HTTP {response.status_code}). "
                 "Provide 'description' manually."
@@ -137,7 +143,7 @@ async def fetch_description(url: str) -> tuple[str | None, str | None]:
         text = re.split(r"(?is)<(?:script|style|noscript)\b", text, maxsplit=1)[0]
         text = re.sub(r"<[^>]+>", " ", text).strip()
         return re.sub(r"\s+", " ", text)[:8000], None
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - any failure must come back as the message (add_job returns it to the person, ingest skips the URL), never as a raise
         return None, (
             f"Error fetching URL: {error}\n"
             f"For pages that require login (LinkedIn, etc.), provide "
