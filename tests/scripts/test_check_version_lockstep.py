@@ -6,7 +6,8 @@ import check_version_lockstep
 
 def _write_repo(root: Path, versions: dict[str, str], pins: dict[str, str]) -> None:
     """A minimal fake monorepo: packages/<slug>/pyproject.toml with a version,
-    plus packages/full/pyproject.toml with the four ==pins."""
+    plus packages/full/pyproject.toml with the four ==pins.
+    """
     for slug, version in versions.items():
         package_directory = root / "packages" / slug
         package_directory.mkdir(parents=True)

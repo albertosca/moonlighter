@@ -20,9 +20,9 @@ Usage:
 import re
 import sys
 import tomllib
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
+from xml.etree.ElementTree import parse as parse_xml
 
 from readme_links import link_problems
 
@@ -55,7 +55,7 @@ class Facts:
 
 
 def junit_test_count(junit: Path) -> int:
-    root = ET.parse(junit).getroot()  # noqa: S314 - locally generated JUnit report
+    root = parse_xml(junit).getroot()  # noqa: S314 - locally generated JUnit report
     suites = [root] if root.tag == "testsuite" else root.findall("testsuite")
     return sum(int(suite.get("tests", "0")) - int(suite.get("skipped", "0")) for suite in suites)
 

@@ -9,6 +9,7 @@ import reevaluate_bug_victims
 def test_help_text(monkeypatch, capsys, snapshot_text):
     monkeypatch.setenv("COLUMNS", "80")
     monkeypatch.setenv("NO_COLOR", "1")
+    monkeypatch.setenv("PYTHON_COLORS", "0")  # argparse reads it before NO_COLOR
     monkeypatch.setattr(sys, "argv", ["reevaluate_bug_victims.py", "--help"])
 
     with pytest.raises(SystemExit) as stopped:

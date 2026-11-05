@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from moonlighter.core.db import Job
+from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.metrics import operation_metrics
@@ -44,7 +45,7 @@ class Tally:
 class _Batch:
     """The state of one run, with one method per step a job goes through."""
 
-    def __init__(self, caller: Any, total: int, settings: ReevaluationSettings) -> None:
+    def __init__(self, caller: LLMCaller, total: int, settings: ReevaluationSettings) -> None:
         self.caller = caller
         self.total = total
         self.settings = settings
