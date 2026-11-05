@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.core.db import ScanLog, init_db
 from moonlighter.discovery.scan.pipeline import evaluate_and_store
-from tests.discovery.scan_fakes import make_raw_job, run_scan, store_config
+from tests.discovery.fake_scan import make_raw_job, run_scan, store_config
 
 
 async def test_scan_stops_before_llm_after_spend_limit(temporary_database):

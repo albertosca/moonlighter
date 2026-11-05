@@ -7,7 +7,7 @@ from moonlighter.discovery.evaluation.engagement import engagement_section
 from moonlighter.discovery.evaluation.profile_subset import profile_for_eval
 from moonlighter.discovery.evaluation.prompts import EVAL_BATCH_PREFIX, EVAL_PREFIX
 from moonlighter.discovery.evaluation.regional_eligibility import regional_eligibility_section
-from tests.discovery.evaluation.evaluation_fakes import (
+from tests.discovery.evaluation.fake_evaluation import (
     MOCK_LLM_RESPONSE,
     evaluate_once,
     inputs,

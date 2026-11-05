@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.archive import ArchiveResult, ArchiveStaleJobsError
-from moonlighter.discovery.scan.results import ScanKind, ScanReport
+from moonlighter.discovery.scan.results import ScanKind, ScanResult
 from moonlighter.mcp_tools.scanning import add_job, archive_stale_jobs, scan_company, verify_job
 from tests._context import make_test_context
 from tests.mcp_tools._records import make_eval_result
@@ -13,7 +13,7 @@ from tests.mcp_tools._records import make_eval_result
 async def test_scan_company_tool_delegates_to_service(temporary_database):
     init_db()
 
-    fake_report = ScanReport(kind=ScanKind.UNKNOWN_SOURCE, threshold=6.5, error="report")
+    fake_report = ScanResult(kind=ScanKind.UNKNOWN_SOURCE, threshold=6.5, error="report")
     with patch(
         "moonlighter.discovery.scan.scanning.scan_company", new=AsyncMock(return_value=fake_report)
     ) as mock_scan_company:

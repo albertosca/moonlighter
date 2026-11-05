@@ -10,7 +10,7 @@ from moonlighter.application.assisted.questions import FormQuestion, QuestionKin
 from moonlighter.application.assisted.sources import greenhouse as greenhouse_source
 from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
-from tests.application.assisted.service.service_fakes import stub_caller
+from tests.application.assisted.service.fake_service import stub_caller
 
 GREENHOUSE_URL = "https://job-boards.greenhouse.io/acme/jobs/1"
 QUESTION = FormQuestion(label="Favorite language", kind=QuestionKind.TEXT, required=False)

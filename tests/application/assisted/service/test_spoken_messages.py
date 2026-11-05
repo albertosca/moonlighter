@@ -9,7 +9,7 @@ from moonlighter.application.assisted.sheet.required_labels import REQUIRED_KEYW
 from moonlighter.application.assisted.sheet.results import SheetKind
 from moonlighter.application.assisted.sources.pasted import ExtractionError
 from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
-from tests.application.assisted.service.service_fakes import stub_caller
+from tests.application.assisted.service.fake_service import stub_caller
 
 
 async def test_a_failed_paste_reading_is_logged_and_told_to_run_again(

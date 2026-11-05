@@ -3,14 +3,14 @@
 from moonlighter.discovery.archive import ArchiveResult
 from moonlighter.discovery.scan.results import (
     ScanKind,
-    ScanReport,
+    ScanResult,
     _render_counts,
     render_scan_report,
 )
 
 
 def test_render_scan_report_appends_the_warning_last(three_jobs):
-    report = ScanReport(
+    report = ScanResult(
         kind=ScanKind.EVALUATED,
         saved=three_jobs,
         spend_hit=False,
@@ -25,17 +25,17 @@ def test_render_scan_report_empty_saved_without_no_new_jobs_still_computes_count
     # spend-limit stop, or a silently-skipped IntegrityError) and zero jobs
     # survived it -- must render the computed "0 jobs processed..." counts,
     # matching _render_counts([], ...), not the "No new jobs found." literal.
-    report = ScanReport(kind=ScanKind.EVALUATED, saved=[], spend_hit=True, threshold=7.0)
+    report = ScanResult(kind=ScanKind.EVALUATED, saved=[], spend_hit=True, threshold=7.0)
     rendered = render_scan_report(report)
     assert rendered == _render_counts(
-        ScanReport(kind=ScanKind.EVALUATED, saved=[], spend_hit=True, threshold=7.0)
+        ScanResult(kind=ScanKind.EVALUATED, saved=[], spend_hit=True, threshold=7.0)
     )
     assert "jobs processed" in rendered
     assert "No new jobs found." not in rendered
 
 
 def test_render_scan_report_error_short_circuits_everything_else(three_jobs):
-    report = ScanReport(
+    report = ScanResult(
         kind=ScanKind.UNKNOWN_SOURCE,
         threshold=7.0,
         tip="Tip: ignored",
@@ -47,7 +47,7 @@ def test_render_scan_report_error_short_circuits_everything_else(three_jobs):
 
 def test_render_scan_report_appends_the_tip_before_archive_and_warning(three_jobs):
 
-    report = ScanReport(
+    report = ScanResult(
         kind=ScanKind.EVALUATED,
         saved=three_jobs,
         spend_hit=False,

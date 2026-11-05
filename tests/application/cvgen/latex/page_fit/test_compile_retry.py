@@ -3,7 +3,7 @@ from unittest.mock import patch
 from moonlighter.application.cvgen.latex.page_fit import TailoredCV
 from moonlighter.application.cvgen.paths import generated_dir_for
 from moonlighter.application.cvgen.service import ensure_tailored_cv
-from tests.application.cvgen.tailored_cv_samples import JOB, counting_caller
+from tests.application.cvgen.sample_tailored_cv import JOB, counting_caller
 
 
 async def test_no_latex_returns_tex_uncompiled(config):

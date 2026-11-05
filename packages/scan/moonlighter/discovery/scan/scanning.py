@@ -9,7 +9,7 @@ from moonlighter.discovery.archive import archive_stale_jobs
 from moonlighter.discovery.scan.claims import drop_already_seen
 from moonlighter.discovery.scan.collection import collect_raw_jobs, normalize_urls
 from moonlighter.discovery.scan.pipeline import evaluate_and_store
-from moonlighter.discovery.scan.results import ScanKind, ScanReport
+from moonlighter.discovery.scan.results import ScanKind, ScanResult
 from moonlighter.discovery.scan.source_warnings import stats_warnings
 from moonlighter.discovery.screening.no_eval import NoEval
 from moonlighter.discovery.sources.base import BaseScanner, ScanStats
@@ -22,7 +22,7 @@ async def scan_and_evaluate(  # noqa: PLR0917 - test_run_no_eval_passes_no_calle
     config: dict[str, Any],
     profile: dict[str, Any],
     caller: LLMCaller | NoEval,
-) -> ScanReport:
+) -> ScanResult:
     """Scan every configured source, evaluate what no earlier scan saw, and archive stale jobs."""
     companies = load_company_list(phase=None if phase == "all" else phase)
     stats: ScanStats = {}
@@ -32,7 +32,7 @@ async def scan_and_evaluate(  # noqa: PLR0917 - test_run_no_eval_passes_no_calle
     spend_hit = False
     if new_jobs:
         saved, spend_hit = await evaluate_and_store(new_jobs, config, profile, caller=caller)
-    return ScanReport(
+    return ScanResult(
         kind=ScanKind.EVALUATED if new_jobs else ScanKind.NO_NEW_JOBS,
         saved=saved,
         spend_hit=spend_hit,
@@ -45,8 +45,8 @@ async def scan_and_evaluate(  # noqa: PLR0917 - test_run_no_eval_passes_no_calle
 
 def _unknown_source_report(
     source: str, threshold: float, scanners: dict[str, BaseScanner]
-) -> ScanReport:
-    return ScanReport(
+) -> ScanResult:
+    return ScanResult(
         kind=ScanKind.UNKNOWN_SOURCE,
         threshold=threshold,
         error=(
@@ -64,7 +64,7 @@ async def scan_company(
     *,
     profile: dict[str, Any],
     caller: LLMCaller | NoEval,
-) -> ScanReport:
+) -> ScanResult:
     """Scan every open posting at ONE company right now, without touching company_list.yaml.
 
     `company` is an ATS slug, or (Recruitee) a custom career domain.
@@ -84,7 +84,7 @@ async def scan_company(
 
     if new_jobs:
         saved, spend_hit = await evaluate_and_store(new_jobs, config, profile, caller=caller)
-        return ScanReport(
+        return ScanResult(
             kind=ScanKind.EVALUATED,
             saved=saved,
             spend_hit=spend_hit,
@@ -100,7 +100,7 @@ async def scan_company(
     # otherwise) lets the renderer pick the right sentence without lying about
     # which happened; `warning` (via stats_warnings) carries the fetch-error
     # detail when there is one.
-    return ScanReport(
+    return ScanResult(
         kind=ScanKind.ALL_KNOWN if raw_jobs else ScanKind.NO_OPEN_JOBS,
         threshold=threshold,
         tip=tip,

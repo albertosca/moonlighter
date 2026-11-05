@@ -6,7 +6,7 @@ import pytest
 
 from moonlighter.discovery import cli
 from moonlighter.discovery.cli import _run, parse_args
-from moonlighter.discovery.scan.results import ScanKind, ScanReport
+from moonlighter.discovery.scan.results import ScanKind, ScanResult
 
 
 @contextmanager
@@ -57,7 +57,7 @@ def test_parse_args_rejects_a_phase_outside_the_configured_set(capsys):
 
 
 async def test_run_evaluated_scan_exits_0_with_the_report_as_json(temporary_database):
-    report = ScanReport(kind=ScanKind.EVALUATED, threshold=6.5)
+    report = ScanResult(kind=ScanKind.EVALUATED, threshold=6.5)
     with _patched(report):
         payload, code = await _run(parse_args([]))
     assert code == 0
@@ -66,14 +66,14 @@ async def test_run_evaluated_scan_exits_0_with_the_report_as_json(temporary_data
 
 
 async def test_run_nothing_new_exits_1(temporary_database):
-    report = ScanReport(kind=ScanKind.NO_NEW_JOBS, threshold=6.5)
+    report = ScanResult(kind=ScanKind.NO_NEW_JOBS, threshold=6.5)
     with _patched(report):
         payload, code = await _run(parse_args([]))
     assert (payload["kind"], code) == ("no_new_jobs", 1)
 
 
 async def test_run_unknown_source_exits_2(temporary_database):
-    report = ScanReport(
+    report = ScanResult(
         kind=ScanKind.UNKNOWN_SOURCE, threshold=6.5, error="Unknown source 'lever'."
     )
     with _patched(report):
@@ -85,7 +85,7 @@ async def test_run_unknown_source_exits_2(temporary_database):
 async def test_run_no_eval_passes_no_caller_to_the_service(temporary_database):
     # The whole point of --no-eval: make_caller is never even constructed.
 
-    report = ScanReport(kind=ScanKind.NO_NEW_JOBS, threshold=6.5)
+    report = ScanResult(kind=ScanKind.NO_NEW_JOBS, threshold=6.5)
     scan = AsyncMock(return_value=report)
     with (
         patch.object(cli, "bootstrap", return_value=({}, {})),
@@ -124,6 +124,6 @@ def test_scan_help_carries_the_slice_epilog(capsys):
     ],
 )
 async def test_run_with_nothing_to_report_for_a_company_exits_1(temporary_database, kind, extra):
-    with _patched(ScanReport(kind=kind, threshold=6.5, **extra)):
+    with _patched(ScanResult(kind=kind, threshold=6.5, **extra)):
         payload, code = await _run(parse_args(["--company", "greenhouse", "acme"]))
     assert (payload["kind"], code) == (kind.value, 1)

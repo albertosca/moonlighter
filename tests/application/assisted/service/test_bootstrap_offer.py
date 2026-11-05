@@ -10,7 +10,7 @@ from moonlighter.application.assisted.sheet.results import SheetKind, render_she
 from moonlighter.application.assisted.sources import greenhouse as greenhouse_source
 from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
 from moonlighter.core.db import init_db
-from tests.application.assisted.service.service_fakes import (
+from tests.application.assisted.service.fake_service import (
     bypass_cv_bootstrap_offer,
     never_extract,
     never_fetch_greenhouse,

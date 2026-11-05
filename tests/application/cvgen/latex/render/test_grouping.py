@@ -1,6 +1,6 @@
 from moonlighter.application.cvgen.latex.render import render_cv
 from moonlighter.application.cvgen.pool.loader import CVPool, PoolBullet, PoolExperience
-from tests.application.cvgen.latex.render.render_samples import TEMPLATE, make_selection
+from tests.application.cvgen.latex.render.sample_render import TEMPLATE, make_selection
 
 GROUPED_POOL = CVPool(
     experiences=(

@@ -6,7 +6,7 @@ from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.archive import archive_stale_jobs, format_archive_result
 from moonlighter.discovery.staleness import StalenessResult
 from tests.discovery.archive.stale_jobs import make_stale_job
-from tests.discovery.scan_fakes import CONFIG
+from tests.discovery.fake_scan import CONFIG
 
 
 async def test_archive_stale_jobs_filters_by_job_id(temporary_database, monkeypatch):

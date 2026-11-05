@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from moonlighter.discovery.evaluation.single import evaluate_job
-from tests.discovery.evaluation.evaluation_fakes import (
+from tests.discovery.evaluation.fake_evaluation import (
     MOCK_LLM_RESPONSE,
     evaluate_once,
     make_caller,

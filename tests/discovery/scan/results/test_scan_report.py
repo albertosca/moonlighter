@@ -5,13 +5,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from moonlighter.core.db import ScanLog, init_db
 from moonlighter.discovery.scan.results import (
     ScanKind,
-    ScanReport,
+    ScanResult,
     _render_counts,
     render_scan_report,
 )
 from moonlighter.discovery.scan.scanning import scan_company
 from moonlighter.discovery.sources.base import SourceStats
-from tests.discovery.scan_fakes import make_raw_job, run_scan
+from tests.discovery.fake_scan import make_raw_job, run_scan
 
 CONFIG = {"score_threshold": 7.0, "scan_concurrency": 2}
 
@@ -27,46 +27,46 @@ def _patched_scanner(raw_jobs):
 
 
 def test_scan_report_company_is_a_fact_not_a_mode_switch(three_jobs, snapshot_text):
-    # Before: ScanReport(kind=ScanKind.EVALUATED, saved=[...], company="acme") rendered "No open jobs
+    # Before: ScanResult(kind=ScanKind.EVALUATED, saved=[...], company="acme") rendered "No open jobs
     # found at 'acme'" and dropped the whole table. Now scan_company can name
     # the company it scanned on its evaluated shape too, and the output is
     # the same bytes as with no company at all.
-    report = ScanReport(kind=ScanKind.EVALUATED, saved=three_jobs, threshold=7.0, company="acme")
+    report = ScanResult(kind=ScanKind.EVALUATED, saved=three_jobs, threshold=7.0, company="acme")
     snapshot_text(render_scan_report(report), "above_threshold")
 
 
 def test_render_counts_above_threshold_is_unchanged(three_jobs, snapshot_text):
-    report = ScanReport(kind=ScanKind.EVALUATED, saved=three_jobs, spend_hit=False, threshold=7.0)
+    report = ScanResult(kind=ScanKind.EVALUATED, saved=three_jobs, spend_hit=False, threshold=7.0)
     snapshot_text(_render_counts(report), "above_threshold")
 
 
 def test_render_counts_none_above_threshold_is_unchanged(three_jobs, snapshot_text):
-    report = ScanReport(
+    report = ScanResult(
         kind=ScanKind.EVALUATED, saved=three_jobs[1:], spend_hit=False, threshold=7.0
     )
     snapshot_text(_render_counts(report), "none_above")
 
 
 def test_render_counts_spend_hit_is_unchanged(three_jobs, snapshot_text):
-    report = ScanReport(kind=ScanKind.EVALUATED, saved=three_jobs, spend_hit=True, threshold=7.0)
+    report = ScanResult(kind=ScanKind.EVALUATED, saved=three_jobs, spend_hit=True, threshold=7.0)
     snapshot_text(_render_counts(report), "spend_hit")
 
 
 def test_render_scan_report_reproduces_the_old_format_report(three_jobs, snapshot_text):
-    report = ScanReport(kind=ScanKind.EVALUATED, saved=three_jobs, spend_hit=False, threshold=7.0)
+    report = ScanResult(kind=ScanKind.EVALUATED, saved=three_jobs, spend_hit=False, threshold=7.0)
     snapshot_text(render_scan_report(report), "above_threshold")
 
 
 def test_render_scan_report_no_new_jobs_is_the_old_literal_string(snapshot_text):
     # Set only when scan_and_evaluate found zero candidates to evaluate at all.
-    report = ScanReport(kind=ScanKind.NO_NEW_JOBS, threshold=7.0)
+    report = ScanResult(kind=ScanKind.NO_NEW_JOBS, threshold=7.0)
     snapshot_text(render_scan_report(report), "empty")
 
 
 def test_scan_report_stats_is_not_rendered(three_jobs, snapshot_text):
     # The MCP output must not move: stats is for the JSON consumer only.
 
-    report = ScanReport(
+    report = ScanResult(
         kind=ScanKind.EVALUATED,
         saved=three_jobs,
         threshold=7.0,

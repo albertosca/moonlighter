@@ -5,7 +5,7 @@ import logging
 
 from moonlighter.discovery.evaluation.batch import evaluate_jobs_batch
 from moonlighter.discovery.evaluation.models import EvalInput
-from tests.discovery.evaluation.evaluation_fakes import (
+from tests.discovery.evaluation.fake_evaluation import (
     MOCK_LLM_RESPONSE,
     inputs,
     recording_caller,

@@ -8,7 +8,7 @@ from moonlighter.application.cvgen.paths import resolved_pool_path
 from moonlighter.application.cvgen.pool.bootstrap import bootstrap_cv_pool
 from moonlighter.application.cvgen.pool.loader import load_pool
 from moonlighter.application.cvgen.service import ensure_tailored_cv
-from tests.application.cvgen.bootstrap_samples import scripted_caller
+from tests.application.cvgen.sample_bootstrap import scripted_caller
 
 REAL_PROFILE = {
     "name": "Jane Marie Doe",

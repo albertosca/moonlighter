@@ -8,7 +8,7 @@ from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.archive import ArchiveStaleJobsError, archive_stale_jobs
 from moonlighter.discovery.staleness import StalenessResult
 from tests.discovery.archive.stale_jobs import make_stale_job
-from tests.discovery.scan_fakes import CONFIG
+from tests.discovery.fake_scan import CONFIG
 
 
 async def test_archive_stale_jobs_raises_when_job_id_and_company_both_given(temporary_database):

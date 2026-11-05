@@ -1,7 +1,7 @@
 """Rendering the scan counts line, including the needs-review verify note."""
 
 from moonlighter.core.db import init_db
-from moonlighter.discovery.scan.results import ScanKind, ScanReport, _render_counts
+from moonlighter.discovery.scan.results import ScanKind, ScanResult, _render_counts
 from tests.discovery.scan.results.saved_jobs import saved_job
 
 
@@ -16,7 +16,7 @@ async def test_render_counts_needs_review_separately_from_below(temporary_databa
         score_notes="description unavailable — needs manual verification",
     )
     report = _render_counts(
-        ScanReport(
+        ScanResult(
             kind=ScanKind.EVALUATED, saved=[above, below, pending], spend_hit=False, threshold=6.5
         )
     )
@@ -30,7 +30,7 @@ async def test_render_counts_no_verify_line_when_nothing_pending(temporary_datab
     init_db()
     above = saved_job("https://x.com/fr/4", status="new", score=8.0)
     report = _render_counts(
-        ScanReport(kind=ScanKind.EVALUATED, saved=[above], spend_hit=False, threshold=6.5)
+        ScanResult(kind=ScanKind.EVALUATED, saved=[above], spend_hit=False, threshold=6.5)
     )
     assert "need manual verification" not in report
 
@@ -46,7 +46,7 @@ async def test_render_counts_verify_line_shown_even_with_nothing_above_threshold
         score_notes="description unavailable — needs manual verification",
     )
     report = _render_counts(
-        ScanReport(kind=ScanKind.EVALUATED, saved=[pending], spend_hit=False, threshold=6.5)
+        ScanResult(kind=ScanKind.EVALUATED, saved=[pending], spend_hit=False, threshold=6.5)
     )
     assert "None passed the threshold" in report
     assert "1 job(s) need manual verification" in report
@@ -61,7 +61,7 @@ async def test_render_counts_verify_note_is_pinned_exactly(temporary_database):
         score_notes="description unavailable — needs manual verification",
     )
     report = _render_counts(
-        ScanReport(kind=ScanKind.EVALUATED, saved=[pending], spend_hit=False, threshold=6.5)
+        ScanResult(kind=ScanKind.EVALUATED, saved=[pending], spend_hit=False, threshold=6.5)
     )
     assert report == (
         "1 jobs processed. None passed the threshold of 6.5. "

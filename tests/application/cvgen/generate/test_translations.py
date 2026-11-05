@@ -5,7 +5,7 @@ import pytest
 from moonlighter.application.cvgen.generate import decide_cv
 from moonlighter.application.cvgen.latex.cv_template import BaseFields
 from moonlighter.application.cvgen.latex.render import render_cv
-from tests.application.cvgen.selection_samples import (
+from tests.application.cvgen.sample_selection import (
     AI_ENGINEER_JOB,
     BARE_TEMPLATE,
     POOL,
