@@ -6,7 +6,9 @@ config/profile/caller logic, without depending on the global config loaded on im
 """
 
 import asyncio
+import contextlib
 import datetime
+import logging
 from typing import ClassVar
 from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
@@ -555,7 +557,7 @@ async def test_verify_job_below_threshold_archives(temporary_database):
 
 # ── scan_and_evaluate edge branches ──────────────────────────────────────────
 
-from moonlighter.discovery.sources.base import RawJob  # noqa: E402
+from moonlighter.discovery.sources.base import RawJob, ScannerSessionExpiredError  # noqa: E402
 
 
 def _raw(index, title="Engineer", source="greenhouse"):
@@ -1603,3 +1605,516 @@ async def test_a_stray_none_caller_does_not_take_the_no_eval_shortcut(temporary_
             None,
         )
     batch.assert_awaited_once()
+
+
+# ── characterization pins: text, order and defaults no other test checked ────
+
+
+def _store_config(**overrides):
+    return {"score_threshold": 6.5, "title_blocklist": [], **overrides}
+
+
+class _BatchRecorder:
+    """Stands in for evaluate_jobs_batch: records each call and scores every job 8.0."""
+
+    def __init__(self):
+        self.sizes = []
+        self.models = []
+
+    async def __call__(self, jobs, profile, model, caller):
+        self.sizes.append(len(jobs))
+        self.models.append(model)
+        return [_eval(8.0) for _ in jobs]
+
+
+async def test_add_job_result_text_is_pinned_exactly_for_a_new_job(temporary_database):
+    init_db()
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(9.0, caveats=["visa", "relocation"])),
+    ):
+        result = await scan_service.add_job(
+            "https://x.com/pin/1", "Stripe", "Eng", "desc", CONFIG, PROFILE, MagicMock()
+        )
+    job = Job.get(Job.url == "https://x.com/pin/1")
+    assert result == (
+        "✓ NEW — Stripe / Eng\n"
+        "Score: 9.0/10  (threshold: 7.0)\n"
+        "Notes: match\n"
+        "Caveats:\n"
+        "  ⚠ visa\n"
+        "  ⚠ relocation\n"
+        f"id={job.id}"
+    )
+
+
+async def test_add_job_result_text_is_pinned_exactly_for_an_archived_job(temporary_database):
+    init_db()
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(3.0)),
+    ):
+        result = await scan_service.add_job(
+            "https://x.com/pin/2", "Acme", "Eng", "desc", CONFIG, PROFILE, MagicMock()
+        )
+    job = Job.get(Job.url == "https://x.com/pin/2")
+    assert result == (
+        "archived — Acme / Eng\n"
+        "Score: 3.0/10  (threshold: 7.0)\n"
+        "Notes: match\n"
+        "Caveats:\n"
+        "  none\n"
+        f"id={job.id}"
+    )
+
+
+async def test_add_job_persists_every_scored_field(temporary_database):
+    init_db()
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(9.0, caveats=["visa"])),
+    ):
+        await scan_service.add_job(
+            "https://x.com/pin/3", "Stripe", "Eng", "desc", CONFIG, PROFILE, MagicMock()
+        )
+    job = Job.get(Job.url == "https://x.com/pin/3")
+    assert job.source == "manual"
+    assert job.description == "desc"
+    assert job.score == 9.0
+    assert job.score_notes == "match"
+    assert job.caveats == '["visa"]'
+    assert (job.salary_min, job.salary_max) == (150000, 200000)
+    assert (job.salary_currency, job.salary_source) == ("USD", "llm_estimate")
+    assert job.status == "new"
+
+
+async def test_add_job_early_return_messages_are_pinned_exactly(temporary_database):
+    init_db()
+    missing = await scan_service.add_job(
+        "https://x.com/pin/4", "", "", "desc", CONFIG, PROFILE, MagicMock()
+    )
+    assert missing == "Provide at least 'company' and 'title' along with the URL."
+    filtered = await scan_service.add_job(
+        "https://x.com/pin/5", "Acme", "Staff Accountant", "desc", CONFIG, PROFILE, MagicMock()
+    )
+    assert filtered == "Job discarded by the title filter (pattern: 'staff accountant')."
+    Job.create(source="manual", company="Acme", title="x", url="https://x.com/pin/6", status="new")
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(8.0)),
+    ):
+        conflict = await scan_service.add_job(
+            "https://x.com/pin/6", "Acme", "Eng", "desc", CONFIG, PROFILE, MagicMock()
+        )
+    assert conflict == "Job already in the database (URL conflict)."
+
+
+async def test_add_job_existing_job_messages_are_pinned_exactly(temporary_database):
+    init_db()
+    scored = Job.create(
+        source="manual",
+        company="Stripe",
+        title="Eng",
+        url="https://x.com/pin/7",
+        score=7.25,
+        status="new",
+    )
+    ScanLog.create(job_url="https://x.com/pin/7", source="manual")
+    pending = Job.create(
+        source="manual",
+        company="Stripe",
+        title="Eng",
+        url="https://x.com/pin/8",
+        score=None,
+        status="needs_review",
+    )
+    ScanLog.create(job_url="https://x.com/pin/8", source="manual")
+    first = await scan_service.add_job(
+        "https://x.com/pin/7", "Stripe", "Eng", "desc", CONFIG, PROFILE, MagicMock()
+    )
+    second = await scan_service.add_job(
+        "https://x.com/pin/8", "Stripe", "Eng", "desc", CONFIG, PROFILE, MagicMock()
+    )
+    assert first == f"Job already in the database (id={scored.id}, score=7.2, status=new)."
+    assert second == (
+        f"Job already in the database (id={pending.id}, score=—, status=needs_review)."
+        " Use verify_job(job_id, page_text) to score it from the real page."
+    )
+
+
+async def test_add_job_takes_the_model_from_eval_model_then_llm_model_then_the_default(
+    temporary_database,
+):
+    init_db()
+    evaluator = AsyncMock(return_value=_eval(8.0))
+    models = []
+    with patch("moonlighter.discovery.service.evaluate_job", new=evaluator):
+        for index, extra in enumerate(
+            [
+                {"eval_model": "from-eval", "llm_model": "from-llm"},
+                {"llm_model": "from-llm"},
+                {},
+            ]
+        ):
+            config = {"score_threshold": 7.0, **extra}
+            await scan_service.add_job(
+                f"https://x.com/pin/m{index}", "Acme", "Eng", "desc", config, PROFILE, MagicMock()
+            )
+            models.append(evaluator.call_args.kwargs["model"])
+    assert models == ["from-eval", "from-llm", "claude-haiku-4-5-20251001"]
+
+
+async def test_verify_job_result_text_and_stored_fields_are_pinned(temporary_database):
+    init_db()
+    job = Job.create(
+        source="manual",
+        company="Acme",
+        title="Eng",
+        url="https://x.com/pin/v1",
+        status="needs_review",
+        score=None,
+    )
+    with patch(
+        "moonlighter.discovery.service.evaluate_job",
+        new=AsyncMock(return_value=_eval(9.0, caveats=["visa"])),
+    ):
+        result = await scan_service.verify_job(
+            job.id, "a pasted page that is long enough to score", CONFIG, PROFILE, MagicMock()
+        )
+    assert result == (
+        "✓ NEW — Acme / Eng\n"
+        "Score: 9.0/10  (threshold: 7.0)\n"
+        "Notes: match\n"
+        "Caveats:\n"
+        "  ⚠ visa\n"
+        f"id={job.id}"
+    )
+    stored = Job.get_by_id(job.id)
+    assert stored.description == "a pasted page that is long enough to score"
+    assert stored.score == 9.0
+    assert stored.score_notes == "match"
+    assert stored.caveats == '["visa"]'
+    assert (stored.salary_min, stored.salary_max) == (150000, 200000)
+    assert (stored.salary_currency, stored.salary_source) == ("USD", "llm_estimate")
+    assert stored.status == "new"
+
+
+async def test_verify_job_rejection_messages_are_pinned_exactly(temporary_database):
+    init_db()
+    assert await scan_service.verify_job(999, "x", CONFIG, PROFILE, MagicMock()) == (
+        "Job #999 not found."
+    )
+    settled = Job.create(
+        source="manual", company="Acme", title="Eng", url="https://x.com/pin/v2", status="new"
+    )
+    assert await scan_service.verify_job(settled.id, "x", CONFIG, PROFILE, MagicMock()) == (
+        f"Job #{settled.id} is not pending verification (status: 'new')."
+    )
+    pending = Job.create(
+        source="manual",
+        company="Acme",
+        title="Eng",
+        url="https://x.com/pin/v3",
+        status="needs_review",
+    )
+    assert await scan_service.verify_job(pending.id, "  tiny  ", CONFIG, PROFILE, MagicMock()) == (
+        f"That paste is too short to score (4 chars — need at least 30). Job #{pending.id} "
+        "stays pending — open https://x.com/pin/v3 and copy the whole page."
+    )
+
+
+async def test_chunk_persists_filtered_jobs_before_evaluated_ones_in_raw_order(
+    temporary_database,
+):
+    init_db()
+    jobs = [_raw(1), _raw(2, title="Recruiter"), _raw(3), _raw(4, title="Recruiter")]
+    recorder = _BatchRecorder()
+    with patch("moonlighter.discovery.service.evaluate_jobs_batch", new=recorder):
+        saved, spend_hit = await scan_service._evaluate_and_store(
+            jobs, _store_config(title_blocklist=["recruiter"]), {}, MagicMock()
+        )
+    assert spend_hit is False
+    assert recorder.sizes == [2]
+    assert [job.company for job in saved] == ["Co2", "Co4", "Co1", "Co3"]
+
+
+async def test_no_eval_parks_evaluable_jobs_after_the_filtered_ones_in_raw_order(
+    temporary_database,
+):
+    init_db()
+    jobs = [_raw(1), _raw(2, title="Recruiter"), _raw(3), _raw(4, title="Recruiter")]
+    saved, _ = await scan_service._evaluate_and_store(
+        jobs, _store_config(title_blocklist=["recruiter"]), {}, scan_service.NO_EVAL
+    )
+    assert [(job.company, job.status) for job in saved] == [
+        ("Co2", "archived"),
+        ("Co4", "archived"),
+        ("Co1", "needs_review"),
+        ("Co3", "needs_review"),
+    ]
+
+
+async def test_evaluated_jobs_persist_every_scored_field(temporary_database):
+    init_db()
+    batch = AsyncMock(return_value=[_eval(8.0, caveats=["visa"]), _eval(2.0)])
+    with patch("moonlighter.discovery.service.evaluate_jobs_batch", new=batch):
+        saved, _ = await scan_service._evaluate_and_store(
+            [_raw(1), _raw(2)], _store_config(), {}, MagicMock()
+        )
+    first, second = saved
+    assert first.caveats == '["visa"]'
+    assert first.description == "A detailed job description that goes on."
+    assert (first.salary_min, first.salary_max) == (150000, 200000)
+    assert (first.salary_currency, first.salary_source) == ("USD", "llm_estimate")
+    assert (first.score, first.score_notes, first.status) == (8.0, "match", "new")
+    assert (second.score, second.status) == (2.0, "archived")
+
+
+async def test_a_default_batch_holds_five_jobs(temporary_database):
+    init_db()
+    recorder = _BatchRecorder()
+    with patch("moonlighter.discovery.service.evaluate_jobs_batch", new=recorder):
+        await scan_service._evaluate_and_store(
+            [_raw(index) for index in range(7)],
+            _store_config(scan_concurrency=1),
+            {},
+            MagicMock(),
+        )
+    assert recorder.sizes == [5, 2]
+
+
+async def test_default_concurrency_is_five_batches_at_once(temporary_database):
+    init_db()
+    caller = _Tracker()
+    saved, _ = await scan_service._evaluate_and_store(
+        [_raw(index) for index in range(8)],
+        _store_config(eval_model="m", scan_batch_size=1),
+        {},
+        caller,
+    )
+    assert len(saved) == 8
+    assert caller.peak == 5
+
+
+async def test_evaluation_model_comes_from_eval_model_then_llm_model_then_the_default(
+    temporary_database,
+):
+    init_db()
+    recorder = _BatchRecorder()
+    with patch("moonlighter.discovery.service.evaluate_jobs_batch", new=recorder):
+        for index, extra in enumerate(
+            [
+                {"eval_model": "from-eval", "llm_model": "from-llm"},
+                {"llm_model": "from-llm"},
+                {},
+            ]
+        ):
+            await scan_service._evaluate_and_store(
+                [_raw(100 + index)], _store_config(**extra), {}, MagicMock()
+            )
+    assert recorder.models == ["from-eval", "from-llm", "claude-haiku-4-5-20251001"]
+
+
+async def test_unexpected_batch_error_keeps_the_chunk_results_and_logs_with_traceback(
+    temporary_database, caplog
+):
+    init_db()
+    batch = AsyncMock(side_effect=ValueError("unexpected error"))
+    with patch("moonlighter.discovery.service.evaluate_jobs_batch", new=batch):
+        saved, spend_hit = await scan_service._evaluate_and_store(
+            [_raw(1), _raw(2, title="Recruiter")],
+            _store_config(title_blocklist=["recruiter"]),
+            {},
+            MagicMock(),
+        )
+    assert spend_hit is True
+    assert [job.company for job in saved] == ["Co2"]
+    assert [row.job_url for row in ScanLog.select()] == ["https://x.com/scan/2"]
+    records = [record for record in caplog.records if "unexpected error in batch" in record.message]
+    assert [(record.levelno, record.getMessage()) for record in records] == [
+        (logging.ERROR, "scan: unexpected error in batch — unexpected error")
+    ]
+    assert records[0].exc_info is not None
+    assert records[0].exc_info[0] is ValueError
+
+
+async def test_a_batch_that_returns_too_few_results_is_reported_as_failed(
+    temporary_database, caplog
+):
+    init_db()
+    batch = AsyncMock(return_value=[])
+    with patch("moonlighter.discovery.service.evaluate_jobs_batch", new=batch):
+        saved, spend_hit = await scan_service._evaluate_and_store(
+            [_raw(1)], _store_config(), {}, MagicMock()
+        )
+    assert saved == []
+    assert spend_hit is True
+    records = [record for record in caplog.records if "batch failed" in record.message]
+    assert len(records) == 1
+    assert records[0].levelno == logging.ERROR
+    assert records[0].getMessage().startswith("scan: batch failed — zip() argument 2 is shorter")
+    assert records[0].exc_info is None
+
+
+async def test_spend_limit_keeps_the_filtered_jobs_and_logs_the_warning(temporary_database, caplog):
+    init_db()
+
+    async def caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        raise RuntimeError("spend limit reached")
+
+    saved, spend_hit = await scan_service._evaluate_and_store(
+        [_raw(1), _raw(2, title="Recruiter")],
+        _store_config(title_blocklist=["recruiter"], eval_model="m"),
+        {},
+        caller,
+    )
+    assert spend_hit is True
+    assert [job.company for job in saved] == ["Co2"]
+    records = [record for record in caplog.records if "stopped by spend limit" in record.message]
+    assert [(record.levelno, record.getMessage()) for record in records] == [
+        (logging.WARNING, "scan_and_evaluate: stopped by spend limit after 1 jobs")
+    ]
+
+
+@contextlib.contextmanager
+def _patched_feeds(jobs_by_feed):
+    """Replaces each portal feed scanner class with a mock whose scan() returns its jobs."""
+    targets = {
+        "gupy": "moonlighter.discovery.sources.job_feeds.gupy.GupyScanner",
+        "remoteok": "moonlighter.discovery.sources.job_feeds.remoteok.RemoteOKScanner",
+        "remotive": "moonlighter.discovery.sources.job_feeds.remotive.RemotiveScanner",
+        "wwr": "moonlighter.discovery.sources.job_feeds.weworkremotely.WeWorkRemotelyScanner",
+        "hn": "moonlighter.discovery.sources.job_feeds.hacker_news.HNWhoIsHiringScanner",
+    }
+    with contextlib.ExitStack() as stack:
+        for feed, target in targets.items():
+            feed_class = stack.enter_context(patch(target))
+            feed_class.return_value.scan = AsyncMock(return_value=jobs_by_feed.get(feed, []))
+        yield
+
+
+class _PluginJobsScanner:
+    """A browser-scanner plugin that returns one job."""
+
+    def __init__(self, page):
+        pass
+
+    async def scan(self, **keyword_arguments):
+        return [RawJob(source="plugin", company="P", title="Engineer", url="https://p.example/1")]
+
+
+class _ExpiredSessionScanner:
+    """A browser-scanner plugin whose login has expired."""
+
+    def __init__(self, page):
+        pass
+
+    async def scan(self, **keyword_arguments):
+        raise ScannerSessionExpiredError("session expired")
+
+
+async def _collect_with_every_source(keywords, config):
+    async def http_scan(slugs, *, stats):
+        stats["ashby"] = SourceStats(companies=1, jobs=1, errors=1)
+        return [
+            RawJob(
+                source="ashby",
+                company="H",
+                title="Engineer",
+                url="https://x.recruitee.com/o/dev/c/new",
+            )
+        ]
+
+    http_scanner = MagicMock()
+    http_scanner.scan = http_scan
+    feed_jobs = {
+        feed: [RawJob(source=feed, company="F", title="Engineer", url=f"https://{feed}.example/1")]
+        for feed in ("gupy", "remoteok", "remotive", "wwr", "hn")
+    }
+    with (
+        patch(
+            "moonlighter.discovery.service.build_http_scanners",
+            return_value={"ashby": http_scanner},
+        ),
+        patch(
+            "moonlighter.discovery.service.discover_entry_points",
+            return_value=[_PluginJobsScanner, _ExpiredSessionScanner],
+        ),
+        patch("moonlighter.core.browser", create=True) as mock_browser,
+        _patched_feeds(feed_jobs),
+    ):
+        mock_browser.new_page = AsyncMock(return_value=AsyncMock())
+        return await scan_service._collect_raw_jobs(
+            keywords, config, {"ashby": ["acme"], "workday": ["acme"]}
+        )
+
+
+_EVERY_FEED_ON = {
+    "scan_gupy": True,
+    "scan_remoteok": True,
+    "scan_remotive": True,
+    "scan_wwr": True,
+    "scan_hn_whoishiring": True,
+}
+
+
+async def test_collect_raw_jobs_orders_sources_and_normalises_urls():
+    raw_jobs, _ = await _collect_with_every_source("engineer", _EVERY_FEED_ON)
+    assert [raw_job.url for raw_job in raw_jobs] == [
+        "https://x.recruitee.com/o/dev",
+        "https://p.example/1",
+        "https://gupy.example/1",
+        "https://remoteok.example/1",
+        "https://remotive.example/1",
+        "https://wwr.example/1",
+        "https://hn.example/1",
+    ]
+
+
+async def test_collect_raw_jobs_warnings_keep_their_wording_and_order():
+    raw_jobs, warning = await _collect_with_every_source("", _EVERY_FEED_ON)
+    assert warning == (
+        "⚠️  company_list.yaml: unknown source 'workday' — no scanner with that name, "
+        "entries ignored\n"
+        "⚠️  _ExpiredSession: session expired\n"
+        "⚠️  scan_gupy is on but no keywords were given: Gupy is a keyword feed and "
+        "moonlighter has no built-in search term, so it was skipped. Pass keywords.\n"
+        "⚠️  ashby: 1 jobs from 1 company (1 fetch error)"
+    )
+    assert [raw_job.source for raw_job in raw_jobs] == [
+        "ashby",
+        "plugin",
+        "remoteok",
+        "remotive",
+        "wwr",
+        "hn",
+    ]
+
+
+async def test_scan_and_evaluate_archives_last_and_attaches_the_result():
+    order = []
+    raw_job = _raw(1)
+
+    async def evaluate(new_jobs, config, profile, caller):
+        order.append("evaluate")
+        return [], False
+
+    async def archive(job_id, company, config):
+        order.append("archive")
+        return "the-archive-result"
+
+    with (
+        patch("moonlighter.discovery.service.load_company_list", return_value={}),
+        patch(
+            "moonlighter.discovery.service._collect_raw_jobs",
+            new=AsyncMock(return_value=([raw_job], "a warning")),
+        ),
+        patch("moonlighter.discovery.service._evaluate_and_store", new=evaluate),
+        patch("moonlighter.discovery.service.archive_stale_jobs", new=archive),
+    ):
+        report = await scan_service.scan_and_evaluate(
+            "kw", "all", {"score_threshold": 6.5}, {}, MagicMock()
+        )
+    assert order == ["evaluate", "archive"]
+    assert report.archive == "the-archive-result"
+    assert report.warning == "a warning"
