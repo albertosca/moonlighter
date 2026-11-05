@@ -31,6 +31,8 @@ docs = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# scripts/ is not a package: tests import its modules by bare name, as `python scripts/x.py` does.
+pythonpath = ["scripts"]
 addopts = "--cov --cov-fail-under=100 -m 'not e2e'"
 markers = [
     "e2e: end-to-end tests that need a real browser, pdflatex, or the network (run with -m e2e)",
@@ -124,13 +126,6 @@ strict-checking = true
 "tests/_context.py" = ["PLC0415", "PLR0917"]
 "tests/conftest.py" = ["PLC0415", "PLW0603"]
 "tests/scripts/test_build_blocklist.py" = ["FBT003", "PLC0415", "PLR0913", "PLR0917"]
-"tests/scripts/test_check_built_site.py" = ["PLC0415", "PT018"]
-"tests/scripts/test_check_cv_pool_floor.py" = ["PLC0415"]
-"tests/scripts/test_check_docs_parity.py" = ["PLC0415", "PLR0917", "PT018"]
-"tests/scripts/test_check_readme_facts.py" = ["FBT002", "PLC0415", "PLR0917", "PT018"]
-"tests/scripts/test_check_version_lockstep.py" = ["PLC0415", "PT018"]
-"tests/scripts/test_render_diagrams.py" = ["PLC0415", "PT018"]
-"tests/scripts/test_stamp_revision_dates.py" = ["PLC0415", "PT018"]
 "tests/test_package_boundaries.py" = ["C901"]
 "tests/test_performance.py" = ["N806", "PLC0415", "PLR0917"]
 # END ratchet
