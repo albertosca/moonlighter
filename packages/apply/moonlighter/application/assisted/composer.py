@@ -4,125 +4,19 @@ The rule that separates this from the automation it replaces: a question with no
 defensible answer becomes a visible gap. Never an invented answer, never silence.
 """
 
-import logging
-import re
-from pathlib import Path
 from typing import Any
 
-from moonlighter.application.answers.answer_bank import (
-    is_bank_eligible,
-    is_sensitive_label,
-    normalize_question,
-)
 from moonlighter.application.answers.compliance import is_compliance_question
-from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
-from moonlighter.application.answers.field_map import demographic_answer, pre_populate_answers
-from moonlighter.application.answers.needs_review import NEEDS_REVIEW_SENTINEL
-from moonlighter.application.answers.operator_guard import find_operator_marker
-from moonlighter.application.answers.option_matcher import match_option_locally
-from moonlighter.application.answers.profile import profile_for_answers
+from moonlighter.application.answers.field_map import pre_populate_answers
+from moonlighter.application.assisted.answer_screening import screen_answer
+from moonlighter.application.assisted.answer_sources import AnswerSources
 from moonlighter.application.assisted.composed_answer import ComposedAnswer
+from moonlighter.application.assisted.file_gaps import file_gap_reason
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.core.llm.caller import LLMCaller
-from moonlighter.core.llm.spend_limit import is_spend_limit
-from moonlighter.core.parsing import wrap_untrusted
-
-logger = logging.getLogger(__name__)
-
-# File fields whose label asks for a CV/resume — the only ones whose gap should
-# name the configured CV as the file to attach.
-_CV_LABEL = re.compile(r"\bcv\b|resume|curr[ií]c", re.I)
-
-# A choice with more options than this never reaches the LLM: a Lever select of
-# 3,301 options put ~26k tokens of option list into one prompt. The person picks
-# from the form instead.
-LLM_OPTION_LIMIT = 200
-
-PROMPT = """Answer one question on a job application, as the candidate.
-
-Candidate profile:
-{profile}
-
-Job:
-{job}
-
-Question: {label}
-{constraint}
-
-Write the answer in the same language as the job posting above. If the posting is in
-Portuguese, answer in Portuguese; if in English, answer in English. Do not translate
-the posting's language into your own.
-
-You are answering AS the candidate, in the first person. Never write notes,
-instructions, or apologies addressed to whoever is operating this tool — text like
-"the candidate should provide..." or "please supply before submitting" is not an
-answer. If answering would require information you do not have, reply with exactly:
-UNKNOWN
-
-Answer with the answer text only. No preamble, no explanation, no quotes.
-If the profile gives you no basis to answer, reply with exactly: UNKNOWN
-"""
-
-_SPEND_LIMIT_REASON = "the LLM spend limit was hit — generation aborted, answer this yourself"
 
 
-class _GenerationError(Exception):
-    """The LLM call itself failed (spend limit, network, backend outage, ...).
-
-    Distinct on purpose from a plain UNKNOWN: UNKNOWN means the profile gives
-    no basis to answer, which is a fact about the candidate. This means the
-    attempt to answer never completed, which is a fact about the tool run.
-    Conflating the two put "answer generation failed" and "no basis in your
-    profile to answer" behind the same gap reason, which reads as a
-    knowledge gap even when a spend-limit or network error is the real cause.
-    """
-
-
-async def _generate(
-    question: FormQuestion, profile: dict[str, Any], job: dict[str, Any], llm_caller: LLMCaller
-) -> str | None:
-    constraint = ""
-    if question.is_choice:
-        options = "\n".join(f"- {option}" for option in question.options)
-        # "Strongest the profile supports": the model picked "minor limitations"
-        # for a profile saying English (fluent/native) — live, 2026-08-13 — with
-        # the fact right there in the prompt. Hedging downward misrepresents the
-        # candidate exactly like overclaiming does, just in the safer-feeling
-        # direction.
-        # A multi-select answered with a single pick under-claims structurally
-        # ("which of these do you know?"); the model may take every option the
-        # profile supports.
-        how_many = (
-            "one or more of these options, one per line"
-            if question.kind is QuestionKind.MULTI_SELECT
-            else "exactly one of these options"
-        )
-        constraint = (
-            f"Reply with {how_many}, copied verbatim:\n{options}\n"
-            "Pick the strongest option the profile supports: when the profile states "
-            "the fact plainly (a language listed as fluent, a technology used in "
-            "production), do not choose a weaker option than the fact warrants."
-        )
-    prompt = PROMPT.format(
-        # Least privilege at the prompt boundary: references (third-party
-        # contacts), preferences (the salary figure — E2) and demographics
-        # never reach the model. Deterministic pre-population upstream still
-        # uses the full profile; this curation is prompt-only.
-        profile=wrap_untrusted("profile", str(profile_for_answers(profile)), cap=6000),
-        job=wrap_untrusted("job", str(job.get("description") or job), cap=6000),
-        label=question.label,
-        constraint=constraint,
-    )
-    try:
-        raw = await llm_caller(prompt, "claude-sonnet-4-6")
-    except Exception as error:
-        logger.warning("could not generate an answer for %r", question.label)
-        raise _GenerationError(str(error)) from error
-    answer = raw.strip()
-    return None if not answer or answer == "UNKNOWN" else answer
-
-
-async def compose_answers(
+async def compose_answers(  # noqa: PLR0913, PLR0917 - public entry point called with this shape by service.py and the whole test suite
     questions: list[FormQuestion],
     profile: dict[str, Any],
     config: dict[str, Any],
@@ -132,6 +26,7 @@ async def compose_answers(
     job_cache: dict[str, Any] | None = None,
     answer_bank: dict[str, str] | None = None,
 ) -> list[ComposedAnswer]:
+    """One answer or one gap per question, in order; each question waits for the previous one."""
     if job_cache is None:
         job_cache = {}
     if answer_bank is None:
@@ -143,200 +38,37 @@ async def compose_answers(
         job.get("location"),
         job.get("remote_type"),
     )
+    sources = AnswerSources(
+        profile=profile,
+        job=job,
+        llm_caller=llm_caller,
+        known=known,
+        job_cache=job_cache,
+        answer_bank=answer_bank,
+    )
+    return [await _compose_one(question, config, sources) for question in questions]
 
-    composed: list[ComposedAnswer] = []
-    llm_exhausted = False
-    for question in questions:
-        is_llm_generated = False
-        if question.kind is QuestionKind.FILE:
-            # A file cannot be pasted, but naming the exact file to attach turns a
-            # dead end into an instruction — only for CV-shaped labels: a "Cover
-            # letter" gap naming the CV instructs the operator to attach the
-            # wrong document (found on the GitLab gate sheet, 2026-08-13).
-            if _CV_LABEL.search(question.label):
-                # Local import, same cycle-avoidance as answers/cv.py's resolve_cv_path:
-                # answers/assisted must not import cvgen at module level.
-                from moonlighter.application.cvgen.service import generated_dir_for
 
-                try:
-                    path = resolve_cv_path(
-                        str(job.get("company") or ""), config, job_id=job.get("id")
-                    )
-                    reason = f"upload this file yourself: {path}"
-                    tailored_root = (
-                        generated_dir_for(config, int(job["id"])) if job.get("id") else None
-                    )
-                    if tailored_root and Path(path).is_relative_to(tailored_root):
-                        reason += " (tailored for this job — review it before uploading)"
-                except CVNotFoundError:
-                    reason = "upload a file yourself — no CV is configured"
-            else:
-                reason = "upload a file yourself"
-            composed.append(ComposedAnswer(question, None, reason))
-            continue
+async def _compose_one(
+    question: FormQuestion, config: dict[str, Any], sources: AnswerSources
+) -> ComposedAnswer:
+    if question.kind is QuestionKind.FILE:
+        return ComposedAnswer(question, None, file_gap_reason(question, config, sources.job))
 
-        if is_compliance_question(question.label, question.options):
-            # Declaration/conflict-of-interest questions are never answered by
-            # the machine — live 2026-08-21 (gympass #3416): the model signed a
-            # false public-body affiliation. Same deterministic category as
-            # references, salary and demographics; guarded before `known` so no
-            # accidental label collision can pre-populate a declaration either.
-            composed.append(
-                ComposedAnswer(
-                    question,
-                    None,
-                    "declaration/compliance question — answer this yourself",
-                )
-            )
-            continue
+    if is_compliance_question(question.label, question.options):
+        # Declaration/conflict-of-interest questions are never answered by
+        # the machine — live 2026-08-21 (gympass #3416): the model signed a
+        # false public-body affiliation. Same deterministic category as
+        # references, salary and demographics; guarded before `known` so no
+        # accidental label collision can pre-populate a declaration either.
+        return ComposedAnswer(
+            question, None, "declaration/compliance question — answer this yourself"
+        )
 
-        answer: str | None
-        if is_sensitive_label(question.label):
-            # profile_for_answers keeps demographic/reference DATA out of the prompt,
-            # but nothing stops the model from being ASKED a question shaped like one
-            # and hallucinating an answer anyway — which would land on this job's
-            # sheet and in its form_data. So the guard stays ABOVE `known`.
-            #
-            # The one carve-out: a value the operator wrote in profile.yaml's
-            # `demographics:` block is his own answer, not a model guess, so serve it.
-            # Scoped to `demographic_answer`'s five anchored EEO patterns and to
-            # choice questions — real self-identification is always a select.
-            #
-            # Both halves of that scoping are scar tissue from 2026-09-11, when this
-            # was implemented by simply moving the guard below `known`: that handed
-            # the bypass to EVERY rule in _RULES, so a "Professional references (name,
-            # email, LinkedIn)" label came back answered with the LinkedIn URL, and
-            # the then-unanchored `\brace\b` answered "debug a race condition" with
-            # the word "White" — gap_reason None, sheet reporting nothing left to do.
-            configured = demographic_answer(question.label, profile) if question.is_choice else None
-            if configured is None:
-                composed.append(
-                    ComposedAnswer(
-                        question,
-                        None,
-                        "demographic/reference question — answer this yourself",
-                    )
-                )
-                continue
-            answer = configured
-        elif question.label in known:
-            # Presence, not truthiness: known can legitimately map a label to ""
-            # (_salary_expectation with no salary_target configured, by design —
-            # E2 forbids letting the figure fall through to the LLM). `known.get(...)
-            # or ...` treated that deliberate "" the same as absence and asked the
-            # LLM to invent a number anyway.
-            value = known[question.label]
-            if value == "":
-                composed.append(
-                    ComposedAnswer(
-                        question,
-                        None,
-                        "no configured value for this field — answer this yourself",
-                    )
-                )
-                continue
-            answer = value
-        else:
-            # Shape-checked, not just presence-checked: Application.form_data
-            # predates this feature and 8 rows in the live DB still hold the
-            # removed browser-automation tool's flat label->string shape, on
-            # which `[...]["answer"]` raises TypeError before _sheet ever gets
-            # to rewrite the column — permanently breaking those jobs. Same
-            # defensive pattern as answer_bank.promote_application. An empty
-            # "answer" counts as absent for the same reason `known`'s "" does
-            # above: it is not an answer, and treating it as a hit would paste
-            # a blank into a real form.
-            cached = job_cache.get(question.label)
-            if (
-                isinstance(cached, dict)
-                and isinstance(cached.get("answer"), str)
-                and cached["answer"]
-            ):
-                answer = cached["answer"]
-            elif (
-                is_bank_eligible(question.kind)
-                and (bank_answer := answer_bank.get(normalize_question(question.label))) is not None
-            ):
-                answer = bank_answer
-            else:
-                if question.is_choice and len(question.options) > LLM_OPTION_LIMIT:
-                    composed.append(
-                        ComposedAnswer(
-                            question,
-                            None,
-                            f"pick your answer from the {len(question.options)} options on the form",
-                        )
-                    )
-                    continue
-                if llm_exhausted:
-                    composed.append(ComposedAnswer(question, None, _SPEND_LIMIT_REASON))
-                    continue
-                try:
-                    answer = await _generate(question, profile, job, llm_caller)
-                except _GenerationError as error:
-                    # After a spend-limit failure every further call is doomed the
-                    # same way — one gap per remaining generated answer, no more
-                    # calls. Deterministic pre-population above is unaffected.
-                    cause = error.__cause__
-                    if isinstance(cause, Exception) and is_spend_limit(cause):
-                        llm_exhausted = True
-                        composed.append(ComposedAnswer(question, None, _SPEND_LIMIT_REASON))
-                    else:
-                        composed.append(
-                            ComposedAnswer(
-                                question, None, "answer generation failed — answer this yourself"
-                            )
-                        )
-                    continue
-                is_llm_generated = True
-
-        # pre_populate_answers can hand back its own review sentinel instead of a real
-        # value (work-authorization/sponsorship fields when the country can't be inferred;
-        # salary fields when the units disagree) — for ANY question kind, not just choices.
-        # Screened unconditionally, before is_choice, so it never reaches a TEXT/LONG_TEXT
-        # field as a literal "__NEEDS_REVIEW__" answer pasted into a real form.
-        if answer == NEEDS_REVIEW_SENTINEL:
-            composed.append(
-                ComposedAnswer(question, None, "no defensible answer here — answer this yourself")
-            )
-            continue
-
-        if answer is None:
-            composed.append(ComposedAnswer(question, None, "no basis in your profile to answer"))
-            continue
-
-        if not question.is_choice and (marker := find_operator_marker(answer)) is not None:
-            composed.append(
-                ComposedAnswer(
-                    question,
-                    None,
-                    f'the model addressed the operator ("{marker}...") — answer this yourself',
-                )
-            )
-            continue
-
-        if question.kind is QuestionKind.MULTI_SELECT:
-            picks: list[str] = []
-            for part in re.split(r"[\n,]+", answer):
-                matched = match_option_locally(part.strip(), list(question.options))
-                if matched and matched not in picks:
-                    picks.append(matched)
-            if not picks:
-                composed.append(
-                    ComposedAnswer(question, None, "no offered option matches — pick yourself")
-                )
-                continue
-            answer = "\n".join(picks)
-        elif question.is_choice:
-            picked = match_option_locally(answer, list(question.options))
-            if picked is None:
-                composed.append(
-                    ComposedAnswer(question, None, "no offered option matches — pick one yourself")
-                )
-                continue
-            answer = picked
-
-        if is_llm_generated:
-            job_cache[question.label] = {"answer": answer, "kind": question.kind.value}
-        composed.append(ComposedAnswer(question, answer, None))
+    sourced = await sources.find(question)
+    if isinstance(sourced, ComposedAnswer):
+        return sourced
+    composed = screen_answer(question, sourced.answer)
+    if sourced.is_llm_generated and composed.answer is not None:
+        sources.job_cache[question.label] = {"answer": composed.answer, "kind": question.kind.value}
     return composed

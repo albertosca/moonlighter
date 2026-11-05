@@ -50,7 +50,7 @@ async def test_salary_label_is_still_prepopulated_from_full_profile():
 
 @pytest.mark.asyncio
 async def test_salary_label_with_no_target_configured_becomes_a_gap_without_the_llm():
-    """CRITICAL: `known.get(label) or await _generate(...)` treated the deliberate
+    """CRITICAL: `known.get(label) or await generate_answer(...)` treated the deliberate
     "" that _salary_expectation returns when no salary_target_brl_monthly is
     configured as absence, and fell through to the LLM to invent a figure — a
     direct violation of E2 (the salary figure must never reach the model)."""

@@ -120,7 +120,6 @@ strict-checking = true
 "packages/apply/moonlighter/application/answers/profile.py" = ["A005", "D205", "D212"]
 "packages/apply/moonlighter/application/answers/work_auth.py" = ["ARG001", "D205", "D209", "D212"]
 "packages/apply/moonlighter/application/assisted/__init__.py" = ["D104"]
-"packages/apply/moonlighter/application/assisted/composer.py" = ["C901", "FURB167", "PLC0415", "PLR0912", "PLR0913", "PLR0915", "PLR0917"]
 "packages/apply/moonlighter/application/assisted/service.py" = ["C901", "D205", "D209", "I001", "PLR0917"]
 "packages/apply/moonlighter/application/assisted/sources/__init__.py" = ["D104"]
 "packages/apply/moonlighter/application/assisted/sources/base.py" = ["D205", "D209", "FBT001", "I001"]
