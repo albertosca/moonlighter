@@ -85,8 +85,8 @@ def _boolean_labels(payload):
 def test_every_boolean_field_is_a_yes_no_single_select():
     # Workable's `boolean` is its Yes/No question type: the page renders it as
     # YES/NO buttons (Seeq, live 2026-10-05), whether the label ends in "?" or
-    # not ("Expertise in building large React applications with TypeScript"),  # noqa: ERA001 - prose quoting a label, not code
-    # and Devsu's label even says "Selecting 'No' means...". Lever and paste
+    # not, as in the label "Expertise in building large React applications with
+    # TypeScript"; and Devsu's label even says "Selecting 'No' means...". Lever and paste
     # give the same questions as single_select ("Yes", "No"); so does Workable.
     for payload in (SEEQ, DEVSU):
         questions = parse_workable_form(payload)

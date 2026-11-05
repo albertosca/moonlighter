@@ -100,7 +100,7 @@ async def test_a_greenhouse_job_with_questions_returns_a_sheet_not_the_paste_hin
 
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", one_question)
     monkeypatch.setattr(recruitee_source, "fetch_recruitee_questions", never_fetch_recruitee)
-    monkeypatch.setattr(service, "make_caller", lambda config: stub_caller())
+    monkeypatch.setattr(service, "make_caller", lambda config: stub_caller("a generated answer"))
 
     out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
 
@@ -121,7 +121,7 @@ async def test_a_recruitee_job_with_questions_returns_a_sheet_not_the_paste_hint
 
     monkeypatch.setattr(recruitee_source, "fetch_recruitee_questions", one_question)
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", never_fetch_greenhouse)
-    monkeypatch.setattr(service, "make_caller", lambda config: stub_caller())
+    monkeypatch.setattr(service, "make_caller", lambda config: stub_caller("a generated answer"))
 
     out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
 
