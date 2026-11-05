@@ -3,7 +3,7 @@ from moonlighter.application.assisted.sources import registry
 from moonlighter.core.db import Job
 
 # (job.source, job.url, the one source name expected to match, or None).
-# Every later task appends its URLs here: no URL may match two sources.
+# Every new source appends its URLs here: no URL may match two sources.
 CASES = [
     ("greenhouse", "https://job-boards.greenhouse.io/gitlab/jobs/8503792002", "greenhouse"),
     ("manual", "https://boards.greenhouse.io/acme/jobs/1", "greenhouse"),

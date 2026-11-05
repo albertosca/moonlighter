@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 import httpx
 from moonlighter.application.assisted.questions import QuestionKind
@@ -11,9 +10,10 @@ from moonlighter.application.assisted.sources.workable import (
     shortcode_from_url,
 )
 
-FIXTURES = Path(__file__).parent / "fixtures"
-SEEQ = json.loads((FIXTURES / "workable_form_seeq.json").read_text())
-DEVSU = json.loads((FIXTURES / "workable_form_devsu.json").read_text())
+from tests.application.assisted.sources.fixture_files import FIXTURES_DIRECTORY
+
+SEEQ = json.loads((FIXTURES_DIRECTORY / "workable_form_seeq.json").read_text())
+DEVSU = json.loads((FIXTURES_DIRECTORY / "workable_form_devsu.json").read_text())
 
 
 def _labelled_fields(payload):

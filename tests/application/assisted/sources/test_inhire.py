@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 import httpx
 from moonlighter.application.assisted.sources.base import SourceMatch
@@ -10,7 +9,9 @@ from moonlighter.application.assisted.sources.inhire import (
     tenant_and_job_from_url,
 )
 
-DETAIL = json.loads((Path(__file__).parent / "fixtures" / "inhire_job_infleet.json").read_text())
+from tests.application.assisted.sources.fixture_files import FIXTURES_DIRECTORY
+
+DETAIL = json.loads((FIXTURES_DIRECTORY / "inhire_job_infleet.json").read_text())
 JOB_ID = "1a3ea3dc-5558-45b6-aecb-58e89f5af1dd"
 
 

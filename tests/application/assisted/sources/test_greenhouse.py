@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 import httpx
 import pytest
@@ -10,7 +9,9 @@ from moonlighter.application.assisted.sources.greenhouse import (
     parse_greenhouse_questions,
 )
 
-PAYLOAD = json.loads((Path(__file__).parent / "fixtures" / "greenhouse_job.json").read_text())
+from tests.application.assisted.sources.fixture_files import FIXTURES_DIRECTORY
+
+PAYLOAD = json.loads((FIXTURES_DIRECTORY / "greenhouse_job.json").read_text())
 
 
 def test_parses_every_question_in_the_payload():

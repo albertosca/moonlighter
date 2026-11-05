@@ -1,6 +1,5 @@
 import json
 import re
-from pathlib import Path
 
 import pytest
 from moonlighter.application.assisted.questions import QuestionKind
@@ -9,7 +8,9 @@ from moonlighter.application.assisted.sources.pasted import (
     extract_questions_from_page,
 )
 
-PAGE = (Path(__file__).parent / "fixtures" / "pasted_page.txt").read_text()
+from tests.application.assisted.sources.fixture_files import FIXTURES_DIRECTORY
+
+PAGE = (FIXTURES_DIRECTORY / "pasted_page.txt").read_text()
 
 
 def fake_llm(reply: str):

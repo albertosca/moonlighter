@@ -1,7 +1,6 @@
 import html
 import json
 import re
-from pathlib import Path
 
 import httpx
 import pytest
@@ -14,7 +13,9 @@ from moonlighter.application.assisted.sources.lever import (
     posting_from_url,
 )
 
-PAGE = (Path(__file__).parent / "fixtures" / "lever_apply_palantir.html").read_text()
+from tests.application.assisted.sources.fixture_files import FIXTURES_DIRECTORY
+
+PAGE = (FIXTURES_DIRECTORY / "lever_apply_palantir.html").read_text()
 
 
 def _card_fields(page):
