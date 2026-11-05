@@ -41,11 +41,12 @@ async def test_evaluate_10_jobs_concurrent_faster_than_sequential():
     Each mock evaluation has 0.05s delay.
     Sequential: ~0.5s. Concurrent: ~0.05s.
     """
-    call_count = [0]
+    call_count = 0
 
     async def slow_caller(prompt, model, cache_prefix=None):
+        nonlocal call_count
         await asyncio.sleep(0.05)
-        call_count[0] += 1
+        call_count += 1
         return _MODEL_ANSWER
 
     profile = {}
@@ -61,7 +62,7 @@ async def test_evaluate_10_jobs_concurrent_faster_than_sequential():
         await _evaluate(job, profile, slow_caller)
     sequential_elapsed = time.perf_counter() - start_time
 
-    assert call_count[0] == 2 * len(jobs)  # both passes really called the model
+    assert call_count == 2 * len(jobs)  # both passes really called the model
     assert concurrent_elapsed < sequential_elapsed * CONCURRENCY_RATIO, (
         f"Concurrent ({concurrent_elapsed:.3f}s) should be at least 2x faster than sequential ({sequential_elapsed:.3f}s)"
     )
