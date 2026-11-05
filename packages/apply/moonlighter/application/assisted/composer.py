@@ -6,7 +6,6 @@ defensible answer becomes a visible gap. Never an invented answer, never silence
 
 import logging
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +20,7 @@ from moonlighter.application.answers.field_map import demographic_answer, pre_po
 from moonlighter.application.answers.needs_review import NEEDS_REVIEW_SENTINEL
 from moonlighter.application.answers.option_matcher import match_option_locally
 from moonlighter.application.answers.profile import profile_for_answers
+from moonlighter.application.assisted.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
@@ -88,17 +88,6 @@ def _operator_directed(answer: str) -> str | None:
         if marker in lowered:
             return marker
     return None
-
-
-@dataclass(frozen=True)
-class ComposedAnswer:
-    question: FormQuestion
-    answer: str | None
-    gap_reason: str | None
-
-    def __post_init__(self) -> None:
-        if (self.answer is None) == (self.gap_reason is None):
-            raise ValueError("a composed answer is either answered or a gap, never both or neither")
 
 
 _SPEND_LIMIT_REASON = "the LLM spend limit was hit — generation aborted, answer this yourself"

@@ -2,7 +2,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from moonlighter.application.assisted.composer import ComposedAnswer
+from moonlighter.application.assisted.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.results import SheetKind, SheetResult, render_sheet_result
 from moonlighter.application.assisted.service import (

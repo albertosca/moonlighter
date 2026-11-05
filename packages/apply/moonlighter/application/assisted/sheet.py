@@ -4,7 +4,7 @@ The whole application, not a screenshot of part of it: the automation this
 replaces reviewed a 4 500 px form through a viewport capture showing 17% of it.
 """
 
-from moonlighter.application.assisted.composer import ComposedAnswer
+from moonlighter.application.assisted.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.questions import QuestionKind
 
 GAP = "!! I DON'T KNOW"

@@ -8,7 +8,8 @@ from typing import Any
 
 import httpx
 from moonlighter.application.answers.answer_bank import load_answer_bank
-from moonlighter.application.assisted.composer import ComposedAnswer, compose_answers
+from moonlighter.application.assisted.composed_answer import ComposedAnswer
+from moonlighter.application.assisted.composer import compose_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.results import SheetKind, SheetResult
 from moonlighter.application.assisted.sources import registry

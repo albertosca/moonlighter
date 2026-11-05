@@ -1,7 +1,7 @@
 """Pins that a composed answer is either answered or a gap, never both or neither."""
 
 import pytest
-from moonlighter.application.assisted.composer import ComposedAnswer
+from moonlighter.application.assisted.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 
 

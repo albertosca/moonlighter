@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from moonlighter.application.assisted.composer import ComposedAnswer
+from moonlighter.application.assisted.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.sheet import render_sheet
 
 

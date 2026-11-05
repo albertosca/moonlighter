@@ -1,4 +1,4 @@
-from moonlighter.application.assisted.composer import ComposedAnswer
+from moonlighter.application.assisted.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sheet import render_sheet
 
@@ -44,7 +44,7 @@ def multi_choice(
 def _entry_block(sheet: str, marker: str) -> str:
     """Return the single entry paragraph that starts with `marker`, isolated from the rest."""
     entries = sheet.split("\n\n")
-    matches = [e for e in entries if e.startswith(marker)]
+    matches = [entry for entry in entries if entry.startswith(marker)]
     assert len(matches) == 1, f"expected exactly one entry starting with {marker!r}, got {matches}"
     return matches[0]
 
