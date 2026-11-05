@@ -1,13 +1,12 @@
-"""What every moonlighter CLI shares: bootstrap, one JSON document on stdout,
-semantic exit codes.
+"""What every moonlighter CLI shares: bootstrap, one JSON document on stdout, semantic exit codes.
 
 The contract (specs/2026-09-14-model-agnostic-cli-design.md): stdout carries
 exactly one JSON document, always — including on failure — so a shell script
 never has to parse prose; logs and warnings go to stderr; exit codes are
 0 success, 1 expected failure, 2 usage error, 3 unexpected crash. `main()` in
-each slice's cli.py is an untested boundary; everything it calls lives here
-or in that slice's `_run`-style functions, which return (payload, code) and
-never print.
+each slice's cli.py is an untested boundary; everything it calls lives here,
+in core/doctor.py (the `doctor` diagnosis) or in that slice's `_run`-style
+functions, which return (payload, code) and never print.
 """
 
 import argparse
@@ -17,19 +16,14 @@ import logging
 import sys
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from importlib.metadata import entry_points
-from pathlib import Path
 from typing import Any, NoReturn, override
 
-import yaml
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.loading import load_config, load_profile
-from moonlighter.core.config.paths import moonlighter_home
 from moonlighter.core.config.permissions import harden_permissions
 from moonlighter.core.config.validation import validate_config
-from moonlighter.core.db import Job, _db_path, init_db
+from moonlighter.core.db import Job, init_db
 from moonlighter.core.log import setup as setup_logging
-from moonlighter.core.slices import SLICES, capabilities, installed_slices
 
 EXIT_OK = 0
 EXIT_NOTHING = 1
@@ -63,12 +57,14 @@ _JOB_COLUMNS = (
 
 
 class JsonArgumentParser(argparse.ArgumentParser):
-    """An ArgumentParser whose .error() keeps the contract: stdout carries one
-    JSON document even on a bad flag. Plain argparse writes usage prose to
-    stderr and exits 2 with stdout untouched -- a shell script that always
-    parses stdout as JSON gets zero bytes instead of a `usage_error` payload.
+    """An ArgumentParser whose .error() keeps the contract.
+
+    stdout carries one JSON document even on a bad flag. Plain argparse writes
+    usage prose to stderr and exits 2 with stdout untouched -- a shell script that
+    always parses stdout as JSON gets zero bytes instead of a `usage_error` payload.
     --help is unaffected: it never calls .error(), so it keeps going through
-    argparse's own default path (stdout, exit 0)."""
+    argparse's own default path (stdout, exit 0).
+    """
 
     @override
     def error(self, message: str) -> NoReturn:
@@ -78,11 +74,13 @@ class JsonArgumentParser(argparse.ArgumentParser):
 
 
 def bootstrap() -> tuple[dict[str, Any], dict[str, Any]]:
-    """Same boot the MCP server does, minus the server: logging to stderr,
-    config loaded and validated (ConfigError propagates — `run` turns it into
-    JSON + exit 2), profile optional, DB schema ensured, permissions hardened
-    with warnings on stderr. Startup checks (validate_startup) are deliberately
-    absent: they live in moonlighter-full and are MCP-boot UX."""
+    """Same boot the MCP server does, minus the server.
+
+    Logging to stderr, config loaded and validated (ConfigError propagates — `run`
+    turns it into JSON + exit 2), profile optional, DB schema ensured, permissions
+    hardened with warnings on stderr. Startup checks (validate_startup) are
+    deliberately absent: they live in moonlighter-full and are MCP-boot UX.
+    """
     setup_logging()
     config = load_config()
     validate_config(config)
@@ -92,72 +90,8 @@ def bootstrap() -> tuple[dict[str, Any], dict[str, Any]]:
         profile = {}
     init_db()
     for warning in harden_permissions():
-        print(f"⚠️  {warning}", file=sys.stderr, flush=True)
+        print(f"⚠️  {warning}", file=sys.stderr, flush=True)  # noqa: T201 - permission warnings are for the human on stderr; stdout carries only the JSON document
     return config, profile
-
-
-def doctor_payload() -> tuple[dict[str, Any], int]:
-    """Where the state lives and whether it loads. The diagnosis IS the
-    payload -- a broken config is reported, not raised -- so a script can gate
-    on the exit code and a human can read the JSON. Never calls bootstrap():
-    a broken install must still be diagnosable."""
-    home = moonlighter_home()
-    config_path = home / "config.yaml"
-    valid, error = False, None
-    try:
-        validate_config(load_config())
-        valid = True
-    except (ConfigError, OSError, yaml.YAMLError) as failure:
-        error = str(failure)
-    installed = installed_slices()
-    live, missing = capabilities(installed)
-    payload = {
-        "kind": "doctor",
-        "home": str(home),
-        "config": {
-            "path": str(config_path),
-            "exists": config_path.exists(),
-            "valid": valid,
-            "error": error,
-        },
-        "profile": {
-            "path": str(home / "profile.yaml"),
-            "exists": (home / "profile.yaml").exists(),
-        },
-        "db": {"path": _db_path(), "exists": Path(_db_path()).exists()},
-        "slices": installed,
-        "commands": sorted(
-            entry_point.name
-            for entry_point in entry_points(group="console_scripts")
-            if entry_point.name.startswith("moonlighter")
-        ),
-        "capabilities": {
-            "live": [
-                {
-                    "name": capability.name,
-                    "needs": sorted(capability.needs),
-                    "commands": list(capability.commands),
-                    "summary": capability.summary,
-                }
-                for capability in live
-            ],
-            "missing": [
-                {
-                    "name": capability.name,
-                    "needs": sorted(capability.needs),
-                    "commands": list(capability.commands),
-                    "summary": capability.summary,
-                    "needs_install": sorted(
-                        capability.needs
-                        - {slice_name for slice_name in SLICES if installed.get(slice_name, False)}
-                    ),
-                }
-                for capability in missing
-            ],
-        },
-    }
-    is_healthy = valid and config_path.exists()
-    return payload, (EXIT_OK if is_healthy else EXIT_NOTHING)
 
 
 def _iso(value: Any) -> Any:
@@ -181,14 +115,16 @@ def run(
     expected: tuple[type[Exception], ...] = (),
     usage: tuple[type[Exception], ...] = (),
 ) -> int:
-    """Drive one CLI entry to its exit code. ConfigError becomes the JSON
-    document the contract promises, not a trace. `expected` and `usage` let a
-    slice's cli.py classify its own routine exceptions -- a missing credential
-    is not a bug (exit 1, `expected_failure`), a bad argument is not a crash
-    (exit 2, `usage_error`) -- without core/cli.py importing or naming them.
-    An empty tuple (the default) matches nothing, so `run(entry)` behaves
-    exactly as before this existed. Anything left over is the same as always:
-    the JSON is for the machine, the logged traceback is for the human."""
+    """Drive one CLI entry to its exit code.
+
+    ConfigError becomes the JSON document the contract promises, not a trace.
+    `expected` and `usage` let a slice's cli.py classify its own routine exceptions
+    -- a missing credential is not a bug (exit 1, `expected_failure`), a bad
+    argument is not a crash (exit 2, `usage_error`) -- without core/cli.py importing
+    or naming them. An empty tuple (the default) matches nothing, so `run(entry)`
+    behaves exactly as before this existed. Anything left over is the same as
+    always: the JSON is for the machine, the logged traceback is for the human.
+    """
     try:
         payload, code = asyncio.run(entry())
     except ConfigError as error:

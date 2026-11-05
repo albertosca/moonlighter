@@ -279,10 +279,10 @@ def test_job_salary_notes_field(temporary_database):
 
 
 def test_db_path_reads_env_var(temporary_database):
-    """_db_path() returns value of MOONLIGHTER_DB_PATH env var when set."""
-    from moonlighter.core.db import _db_path
+    """db_path() returns value of MOONLIGHTER_DB_PATH env var when set."""
+    from moonlighter.core.db import db_path
 
-    assert _db_path() == temporary_database
+    assert db_path() == temporary_database
 
 
 # ── Application: campos email (email_ref + current_stage) ─────────────────────
@@ -389,27 +389,27 @@ def test_init_db_migrates_old_application_table(temporary_database):
 
 def test_db_path_default_when_env_unset(monkeypatch):
     """No MOONLIGHTER_DB_PATH nor MOONLIGHTER_HOME → default ~/.moonlighter/moonlighter.db."""
-    from moonlighter.core.db import _db_path
+    from moonlighter.core.db import db_path
 
     monkeypatch.delenv("MOONLIGHTER_DB_PATH", raising=False)
     monkeypatch.delenv("MOONLIGHTER_HOME", raising=False)
-    assert _db_path().endswith("/.moonlighter/moonlighter.db")
+    assert db_path().endswith("/.moonlighter/moonlighter.db")
 
 
 def test_db_path_respects_env(monkeypatch):
-    from moonlighter.core.db import _db_path
+    from moonlighter.core.db import db_path
 
     monkeypatch.setenv("MOONLIGHTER_DB_PATH", "/tmp/custom-moonlighter.db")
-    assert _db_path() == "/tmp/custom-moonlighter.db"
+    assert db_path() == "/tmp/custom-moonlighter.db"
 
 
 def test_db_path_follows_moonlighter_home(monkeypatch, tmp_path):
     """With no MOONLIGHTER_DB_PATH, the database follows MOONLIGHTER_HOME (single source)."""
-    from moonlighter.core.db import _db_path
+    from moonlighter.core.db import db_path
 
     monkeypatch.delenv("MOONLIGHTER_DB_PATH", raising=False)
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
-    assert _db_path() == str(tmp_path / "moonlighter.db")
+    assert db_path() == str(tmp_path / "moonlighter.db")
 
 
 # --- init_db delegates schema evolution to run_migrations (E7 T2) ─────────────

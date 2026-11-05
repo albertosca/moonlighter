@@ -27,9 +27,9 @@ from moonlighter.core.cli import (
     EXIT_USAGE,
     JsonArgumentParser,
     bootstrap,
-    doctor_payload,
     run,
 )
+from moonlighter.core.doctor import doctor_payload
 from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.slices import slice_epilog
 from moonlighter.discovery.results import ScanKind, ScanReport, scan_report_to_dict

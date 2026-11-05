@@ -716,7 +716,8 @@ def _dispatch(argv: list[str]) -> int | None:
         sys.stdout.write(_USAGE)
         return 0
     if argv[0] == "doctor":
-        from moonlighter.core.cli import doctor_payload, emit
+        from moonlighter.core.cli import emit
+        from moonlighter.core.doctor import doctor_payload
 
         payload, code = doctor_payload()
         return emit(payload, code)

@@ -2402,7 +2402,7 @@ def test_dispatch_short_help_flag_also_works(capsys):
 def test_dispatch_doctor_emits_the_doctor_payload_and_its_exit_code(capsys):
     from moonlighter import server
 
-    with patch("moonlighter.core.cli.doctor_payload", return_value=({"kind": "doctor"}, 1)):
+    with patch("moonlighter.core.doctor.doctor_payload", return_value=({"kind": "doctor"}, 1)):
         code = server._dispatch(["doctor"])
     assert code == 1
     out = capsys.readouterr().out

@@ -18,7 +18,7 @@ from peewee import (
 )
 
 
-def _db_path() -> str:
+def db_path() -> str:
     # Single source of truth for the DB path: explicit override via MOONLIGHTER_DB_PATH,
     # otherwise falls back to moonlighter_home() (respects MOONLIGHTER_HOME).
     return os.environ.get("MOONLIGHTER_DB_PATH") or str(moonlighter_home() / "moonlighter.db")
@@ -177,7 +177,7 @@ def sync_job_status(application: Application) -> None:
 
 
 def init_db() -> None:
-    path = _db_path()
+    path = db_path()
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     db.init(path)
     db.connect(reuse_if_open=True)

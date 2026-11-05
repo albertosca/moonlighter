@@ -32,11 +32,11 @@ from moonlighter.core.cli import (
     EXIT_OK,
     JsonArgumentParser,
     bootstrap,
-    doctor_payload,
     run,
 )
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.loading import load_config
+from moonlighter.core.doctor import doctor_payload
 from moonlighter.core.ingest import job_from_url
 from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.slices import slice_epilog

@@ -66,31 +66,49 @@ CAPABILITIES: tuple[Capability, ...] = (
 
 
 def installed_slices() -> dict[str, bool]:
-    out = {}
-    for slice_name, dist_name in DIST_NAMES.items():
+    installed = {}
+    for slice_name, distribution_name in DIST_NAMES.items():
         try:
-            distribution(dist_name)
-            out[slice_name] = True
+            distribution(distribution_name)
+            installed[slice_name] = True
         except PackageNotFoundError:
-            out[slice_name] = False
-    return out
+            installed[slice_name] = False
+    return installed
 
 
 def capabilities(installed: dict[str, bool]) -> tuple[list[Capability], list[Capability]]:
-    live = [c for c in CAPABILITIES if all(installed.get(s, False) for s in c.needs)]
-    missing = [c for c in CAPABILITIES if c not in live]
+    live = [
+        capability
+        for capability in CAPABILITIES
+        if all(installed.get(slice_name, False) for slice_name in capability.needs)
+    ]
+    missing = [capability for capability in CAPABILITIES if capability not in live]
     return live, missing
 
 
+def slices_to_install(capability: Capability, installed: dict[str, bool]) -> list[str]:
+    """The slices `capability` needs that are not installed yet, sorted."""
+    return sorted(
+        capability.needs - {slice_name for slice_name in SLICES if installed.get(slice_name, False)}
+    )
+
+
 def slice_epilog(installed: dict[str, bool] | None = None) -> str:
-    """The tail of every CLI's --help: what this install can do, and what each
-    missing slice would add. Wording only -- the structure is the same on
-    every combo."""
+    """The tail of every CLI's --help.
+
+    What this install can do, and what each missing slice would add. Wording
+    only -- the structure is the same on every combo.
+    """
     installed = installed_slices() if installed is None else installed
     _live, missing = capabilities(installed)
-    lines = ["installed: " + ", ".join(s for s in SLICES if installed.get(s, False))]
-    for c in missing:
-        need = ", ".join(sorted(c.needs - {s for s in SLICES if installed.get(s, False)}))
-        cmds = f" ({', '.join(c.commands)})" if c.commands else ""
-        lines.append(f"  install {need} -> would add: {c.name}{cmds} -- {c.summary}")
+    lines = [
+        "installed: "
+        + ", ".join(slice_name for slice_name in SLICES if installed.get(slice_name, False))
+    ]
+    for capability in missing:
+        need = ", ".join(slices_to_install(capability, installed))
+        commands = f" ({', '.join(capability.commands)})" if capability.commands else ""
+        lines.append(
+            f"  install {need} -> would add: {capability.name}{commands} -- {capability.summary}"
+        )
     return "\n".join(lines)
