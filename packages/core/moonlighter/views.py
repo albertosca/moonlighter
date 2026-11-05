@@ -2,15 +2,16 @@
 
 import io
 
-from moonlighter.core.db import Job
 from rich import box
 from rich.console import Console
 from rich.table import Table
 
+from moonlighter.core.db import Job
+
 
 def render_jobs_table(jobs: list[Job], badges: dict[int, str] | None = None) -> str:
-    buf = io.StringIO()
-    console = Console(file=buf, width=120)
+    buffer = io.StringIO()
+    console = Console(file=buffer, width=120)
     table = Table(box=box.SIMPLE_HEAVY, show_lines=False)
     table.add_column("#", style="dim", width=4)
     table.add_column("Company / Title", min_width=28)
@@ -35,7 +36,7 @@ def render_jobs_table(jobs: list[Job], badges: dict[int, str] | None = None) -> 
             _caveat_cell(job),
         )
     console.print(table)
-    return buf.getvalue()
+    return buffer.getvalue()
 
 
 def _salary_cell(job: Job) -> str:

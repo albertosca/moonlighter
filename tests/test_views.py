@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 
 from moonlighter.core.db import Job, init_db
 from moonlighter.views import render_jobs_table
@@ -45,7 +45,7 @@ def test_render_handles_null_score_and_no_salary(temporary_database):
         temporary_database,
         url="https://x.com/3",
         score=None,
-        posted_at=datetime.datetime(2026, 6, 1),
+        posted_at=datetime(2026, 6, 1),  # noqa: DTZ001 - the database stores naive local time
     )
     out = render_jobs_table([Job.get(Job.url == "https://x.com/3")])
     assert "—" in out  # null score becomes an em dash

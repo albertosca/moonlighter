@@ -1,5 +1,7 @@
-"""URL → persisted Job, with no LLM anywhere: the bridge that lets
-`moonlighter-apply prepare --url` work without the scan slice installed.
+"""URL → persisted Job, with no LLM anywhere.
+
+The bridge that lets `moonlighter-apply prepare --url` work without the
+scan slice installed.
 
 Mirrors what add_job does before it evaluates, minus the evaluation: the
 posting is read through its ATS API when the URL has a known shape, else
@@ -11,7 +13,7 @@ ScanLog under source 'manual', the way add_job does, so a later scan does
 not offer it again as new.
 """
 
-import datetime
+from datetime import datetime
 
 from moonlighter.core.db import Job, ScanLog
 from moonlighter.core.posting import fetch_description, fetch_posting_via_ats
@@ -21,14 +23,17 @@ from moonlighter.core.urls import normalize_job_url
 async def job_from_url(
     url: str, *, company: str | None = None, title: str | None = None
 ) -> Job | None:
-    """The Job for `url`: the existing row when there is one, else a new
-    unscored row read from the posting. `company`/`title` override (or
-    supply, for a URL no ATS API recognizes) what the posting itself names.
+    """The Job for `url`.
+
+    The existing row when there is one, else a new unscored row read from the
+    posting. `company`/`title` override (or supply, for a URL no ATS API
+    recognizes) what the posting itself names.
 
     None when the posting cannot be named (no company or title, from either
     the ATS API or the caller) -- the generic page fetch never runs in that
     case, since an unnamed page can't be scored either way -- or when the
-    generic fetch is needed and fails."""
+    generic fetch is needed and fails.
+    """
     url = normalize_job_url(url)
     existing = Job.get_or_none(Job.url == url)
     if existing is not None:
@@ -54,7 +59,7 @@ async def job_from_url(
         score_notes="ingested by URL for a sheet — not evaluated",
         caveats="[]",
         status="needs_review",
-        found_at=datetime.datetime.now(),
+        found_at=datetime.now(),  # noqa: DTZ005 - the database stores naive local time
     )
     ScanLog.get_or_create(job_url=url, defaults={"source": "manual"})
     return job

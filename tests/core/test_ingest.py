@@ -1,12 +1,11 @@
 from unittest.mock import AsyncMock, patch
 
 from moonlighter.core.db import Job, ScanLog, init_db
+from moonlighter.core.ingest import job_from_url
 from moonlighter.core.posting import FetchedPosting
 
 
 async def test_job_from_url_returns_the_existing_job_without_fetching(temporary_database):
-    from moonlighter.core.ingest import job_from_url
-
     init_db()
     existing = Job.create(
         source="greenhouse",
@@ -19,12 +18,11 @@ async def test_job_from_url_returns_the_existing_job_without_fetching(temporary_
         "moonlighter.core.ingest.fetch_posting_via_ats", side_effect=AssertionError("no fetch")
     ):
         job = await job_from_url("https://boards.greenhouse.io/acme/jobs/1/")
-    assert job is not None and job.id == existing.id
+    assert job is not None
+    assert job.id == existing.id
 
 
 async def test_job_from_url_ingests_via_the_ats_api_unscored(temporary_database):
-    from moonlighter.core.ingest import job_from_url
-
     init_db()
     posting = FetchedPosting(
         company="Acme", title="Staff Engineer", description="A long description of the role."
@@ -46,8 +44,6 @@ async def test_job_from_url_ingests_via_the_ats_api_unscored(temporary_database)
 
 
 async def test_job_from_url_falls_back_to_the_generic_fetch_for_the_description(temporary_database):
-    from moonlighter.core.ingest import job_from_url
-
     init_db()
     posting = FetchedPosting(company="Acme", title="Staff Engineer", description=None)
     with (
@@ -58,15 +54,14 @@ async def test_job_from_url_falls_back_to_the_generic_fetch_for_the_description(
         ),
     ):
         job = await job_from_url("https://boards.greenhouse.io/acme/jobs/8")
-    assert job is not None and job.description == "Generic text"
+    assert job is not None
+    assert job.description == "Generic text"
 
 
 async def test_job_from_url_is_none_when_the_posting_cannot_be_named(temporary_database):
     # No ATS match and no overrides: the page cannot name itself, so the
     # generic fetch (an HTTP request) must never run -- a Job row with empty
     # company would poison list_jobs and the sheet header anyway.
-    from moonlighter.core.ingest import job_from_url
-
     init_db()
     with (
         patch("moonlighter.core.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=None)),
@@ -82,8 +77,6 @@ async def test_job_from_url_is_none_when_the_posting_cannot_be_named(temporary_d
 async def test_job_from_url_with_overrides_ingests_a_non_ats_page(temporary_database):
     # No ATS match, but --company/--title supplied: the page can now be
     # named, so the generic fetch runs to supply the description.
-    from moonlighter.core.ingest import job_from_url
-
     init_db()
     with (
         patch("moonlighter.core.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=None)),
@@ -100,8 +93,6 @@ async def test_job_from_url_with_overrides_ingests_a_non_ats_page(temporary_data
 
 
 async def test_job_from_url_is_none_when_the_fetch_fails(temporary_database):
-    from moonlighter.core.ingest import job_from_url
-
     init_db()
     posting = FetchedPosting(company="Acme", title="Eng", description=None)
     with (
