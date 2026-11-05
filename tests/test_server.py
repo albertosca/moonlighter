@@ -77,9 +77,11 @@ async def test_scan_no_new_jobs(temporary_database):
     from moonlighter.server import scan_and_evaluate
 
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
     ):
         for scanner_mock in (MockGH, MockLV, MockAB):
@@ -104,9 +106,11 @@ async def test_scan_and_evaluate_reports_archived_stale_jobs(temporary_database)
     )
 
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
     ):
         for scanner_mock in (MockGH, MockLV, MockAB):
@@ -128,9 +132,11 @@ async def test_scan_and_evaluate_no_new_jobs_still_runs_archive_check(temporary_
     from moonlighter.server import scan_and_evaluate
 
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
     ):
         for scanner_mock in (MockGH, MockLV, MockAB):
@@ -157,9 +163,11 @@ async def test_scan_all_below_threshold(temporary_database):
         description="A detailed job description that goes on.",
     )
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.evaluate_jobs_batch",
@@ -193,9 +201,11 @@ async def test_scan_above_threshold_shows_table(temporary_database):
         description="A detailed job description that goes on.",
     )
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.evaluate_jobs_batch",
@@ -223,9 +233,11 @@ async def test_scan_dedup_against_scan_log(temporary_database):
 
     raw = RawJob(source="greenhouse", company="co", title="Eng", url="https://x.com/3")
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch") as mock_batch,
         patch(
@@ -256,9 +268,11 @@ async def test_scan_linkedin_failure_doesnt_block(temporary_database):
         description="A detailed job description that goes on.",
     )
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.evaluate_jobs_batch",
@@ -299,9 +313,11 @@ async def test_scan_saves_salary_fields(temporary_database):
         salary_source="stated",
     )
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.evaluate_jobs_batch",
@@ -339,9 +355,11 @@ async def test_scan_saves_caveats_as_json(temporary_database):
         score=7.0, score_notes="ok", caveats=["US only", "requires visa"]
     )
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.evaluate_jobs_batch",
@@ -375,9 +393,11 @@ async def test_scan_status_archived_if_below_threshold(temporary_database):
         description="A detailed job description that goes on.",
     )
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.evaluate_jobs_batch",
@@ -1137,9 +1157,11 @@ async def test_scan_concurrent_batch_all_processed(temporary_database):
     ]
     mock_batch = AsyncMock(side_effect=_batch_of(make_eval_result(score=7.0)))
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch(
@@ -1189,9 +1211,11 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(temporary_datab
     mock_batch = AsyncMock(side_effect=spend_limit_error)
 
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch(
@@ -1247,9 +1271,11 @@ async def test_scan_spend_limit_stops_further_batches(temporary_database):
     mock_batch = AsyncMock(side_effect=spend_limit_error)
 
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch(
@@ -1310,9 +1336,11 @@ async def test_scan_non_spend_error_keeps_title_filtered_in_report(temporary_dat
     mock_batch = AsyncMock(side_effect=Exception("unexpected LLM error"))
 
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
         patch(
@@ -1365,9 +1393,11 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tem
     ]
 
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service._claim", side_effect=Exception("db corrupted")),
         patch(
@@ -1602,9 +1632,11 @@ async def test_scan_registered_scanner_session_expired_shows_warning(temporary_d
     from moonlighter.server import scan_and_evaluate
 
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.discover_entry_points",
@@ -1639,9 +1671,11 @@ async def test_scan_registered_scanner_session_expired_does_not_block_http_resul
     )
 
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
             "moonlighter.discovery.service.discover_entry_points",
@@ -1886,19 +1920,19 @@ def _scan_patches(raw_jobs, eval_mock):
     stack = ExitStack()
     stack.enter_context(
         patch(
-            "moonlighter.discovery.sources.http.GreenhouseScanner",
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner",
             **{"return_value.scan": AsyncMock(return_value=raw_jobs)},
         )
     )
     stack.enter_context(
         patch(
-            "moonlighter.discovery.sources.http.LeverScanner",
+            "moonlighter.discovery.sources.company_boards.lever.LeverScanner",
             **{"return_value.scan": AsyncMock(return_value=[])},
         )
     )
     stack.enter_context(
         patch(
-            "moonlighter.discovery.sources.http.AshbyScanner",
+            "moonlighter.discovery.sources.company_boards.ashby.AshbyScanner",
             **{"return_value.scan": AsyncMock(return_value=[])},
         )
     )
@@ -2169,9 +2203,11 @@ async def test_scan_and_evaluate_logs_one_metrics_summary(temporary_database, ca
 
     with (
         caplog.at_level(logging.INFO),
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch_records_calls),
         patch(
@@ -2220,9 +2256,11 @@ async def test_scan_and_evaluate_spend_limit_abort_increments_hits(temporary_dat
 
     with (
         caplog.at_level(logging.INFO),
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch_raises_spend_limit),
         patch(

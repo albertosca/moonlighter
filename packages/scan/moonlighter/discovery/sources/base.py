@@ -31,7 +31,7 @@ class RawJob:
 
 @dataclass
 class SourceStats:
-    """Per-source fetch accounting for one scan run (see _gather_jobs)."""
+    """Per-source fetch accounting for one scan run (see gather_jobs)."""
 
     companies: int = 0  # 0 means a portal feed, not a per-company board
     jobs: int = 0

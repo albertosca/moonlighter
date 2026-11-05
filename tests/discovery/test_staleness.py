@@ -218,13 +218,13 @@ async def test_portal_age_archiving_disabled_with_zero():
 # ── a failed fetch is not "zero open jobs" ────────────────────────────────────
 # Found live on 2026-09-16: a Greenhouse fetch answered HTTP 404 and the run
 # archived a status='new', score-8.5 job with failed_companies == []. The real
-# HTTP scanners never raise — _gather_jobs swallows a failed slug, counts it in
+# HTTP scanners never raise — gather_jobs swallows a failed slug, counts it in
 # stats[source].errors and returns [] — so the exception guard above protects a
 # path production does not take.
 
 
 class _FetchFailingScanner:
-    """Shaped like every _gather_jobs-backed scanner: no exception, [] back,
+    """Shaped like every gather_jobs-backed scanner: no exception, [] back,
     the failure visible only through the stats dict."""
 
     async def scan(self, company_slugs, **keyword_arguments):
@@ -247,14 +247,14 @@ async def test_fetch_error_reported_through_stats_marks_company_failed_not_stale
 
 async def test_http_404_on_the_real_greenhouse_scanner_marks_company_failed_not_stale():
     # The exact live scenario, through the real scanner and the real
-    # _gather_jobs: only the HTTP client is faked, and it answers 404.
-    from moonlighter.discovery.sources.http import GreenhouseScanner
+    # gather_jobs: only the HTTP client is faked, and it answers 404.
+    from moonlighter.discovery.sources.company_boards.greenhouse import GreenhouseScanner
 
     from tests.discovery.sources.test_http import _make_simple_client
 
     job = _job(url="https://boards.greenhouse.io/acme/jobs/1")
     with patch(
-        "moonlighter.discovery.sources.http.httpx.AsyncClient",
+        "moonlighter.discovery.sources.company_boards.gathering.httpx.AsyncClient",
         return_value=_make_simple_client({}, status=404),
     ):
         result = await find_stale_jobs(

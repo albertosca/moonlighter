@@ -207,7 +207,7 @@ async def _scan_gupy(keywords: str, config: dict[str, Any], stats: ScanStats) ->
     since an ungated run returns all-BR jobs that would flood the pipeline."""
     if not config.get("scan_gupy") or not keywords.strip():
         return []
-    from moonlighter.discovery.sources.http import GupyScanner
+    from moonlighter.discovery.sources.job_feeds.gupy import GupyScanner
 
     return await GupyScanner().scan(keywords=keywords, stats=stats)
 
@@ -229,7 +229,7 @@ async def _scan_remoteok(config: dict[str, Any], stats: ScanStats, keywords: str
     by title keywords here before any LLM evaluation."""
     if not config.get("scan_remoteok"):
         return []
-    from moonlighter.discovery.sources.http import RemoteOKScanner
+    from moonlighter.discovery.sources.job_feeds.remoteok import RemoteOKScanner
 
     jobs = await RemoteOKScanner().scan(stats=stats)
     return [job for job in jobs if _matches_keywords(job.title, keywords)]
@@ -243,7 +243,7 @@ async def _scan_remotive(config: dict[str, Any], stats: ScanStats, keywords: str
     before any LLM evaluation."""
     if not config.get("scan_remotive"):
         return []
-    from moonlighter.discovery.sources.http import RemotiveScanner
+    from moonlighter.discovery.sources.job_feeds.remotive import RemotiveScanner
 
     jobs = await RemotiveScanner().scan(category=config.get("remotive_category"), stats=stats)
     return [job for job in jobs if _matches_keywords(job.title, keywords)]
@@ -255,7 +255,7 @@ async def _scan_wwr(config: dict[str, Any], stats: ScanStats, keywords: str) -> 
     is filtered by title keywords here before any LLM evaluation."""
     if not config.get("scan_wwr"):
         return []
-    from moonlighter.discovery.sources.http import WeWorkRemotelyScanner
+    from moonlighter.discovery.sources.job_feeds.weworkremotely import WeWorkRemotelyScanner
 
     jobs = await WeWorkRemotelyScanner().scan(category=config.get("wwr_category"), stats=stats)
     return [job for job in jobs if _matches_keywords(job.title, keywords)]
@@ -271,7 +271,7 @@ async def _scan_hn_whoishiring(
     any LLM evaluation."""
     if not config.get("scan_hn_whoishiring"):
         return []
-    from moonlighter.discovery.sources.http import HNWhoIsHiringScanner
+    from moonlighter.discovery.sources.job_feeds.hacker_news import HNWhoIsHiringScanner
 
     jobs = await HNWhoIsHiringScanner().scan(stats=stats)
     return [job for job in jobs if _matches_keywords(job.title, keywords)]

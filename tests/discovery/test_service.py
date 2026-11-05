@@ -613,9 +613,11 @@ async def _run_scan(
         registered = [_FakeBrowserScanner]
 
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
-        patch("moonlighter.discovery.sources.http.LeverScanner") as MockLV,
-        patch("moonlighter.discovery.sources.http.AshbyScanner") as MockAB,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
+        patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
+        patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch),
         patch("moonlighter.discovery.service.discover_entry_points", return_value=registered),
@@ -1210,7 +1212,7 @@ async def _collect(config):
 
 
 async def test_collect_raw_jobs_skips_gupy_by_default():
-    with patch("moonlighter.discovery.sources.http.GupyScanner") as MockGupy:
+    with patch("moonlighter.discovery.sources.job_feeds.gupy.GupyScanner") as MockGupy:
         MockGupy.return_value.scan = AsyncMock(return_value=[])
         raw_jobs, _ = await _collect({})
     MockGupy.return_value.scan.assert_not_called()
@@ -1221,7 +1223,7 @@ async def test_collect_raw_jobs_calls_gupy_when_config_enabled():
     gupy_job = RawJob(
         source="gupy", company="acme", title="Eng", url="https://acme.gupy.io/1", description="d"
     )
-    with patch("moonlighter.discovery.sources.http.GupyScanner") as MockGupy:
+    with patch("moonlighter.discovery.sources.job_feeds.gupy.GupyScanner") as MockGupy:
         MockGupy.return_value.scan = AsyncMock(return_value=[gupy_job])
         raw_jobs, _ = await _collect({"scan_gupy": True})
     MockGupy.return_value.scan.assert_awaited_once_with(keywords="engineer", stats=ANY)
@@ -1229,7 +1231,7 @@ async def test_collect_raw_jobs_calls_gupy_when_config_enabled():
 
 
 async def test_collect_raw_jobs_skips_remoteok_by_default():
-    with patch("moonlighter.discovery.sources.http.RemoteOKScanner") as MockScanner:
+    with patch("moonlighter.discovery.sources.job_feeds.remoteok.RemoteOKScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[])
         raw_jobs, _ = await _collect({})
     MockScanner.return_value.scan.assert_not_called()
@@ -1240,7 +1242,7 @@ async def test_collect_raw_jobs_calls_remoteok_when_config_enabled():
     # Title must match the "engineer" keyword _collect() passes through, or the
     # dispatcher's own keyword filter (added alongside the config gate) drops it.
     job = RawJob(source="remoteok", company="Acme", title="Engineer", url="https://remoteok.com/1")
-    with patch("moonlighter.discovery.sources.http.RemoteOKScanner") as MockScanner:
+    with patch("moonlighter.discovery.sources.job_feeds.remoteok.RemoteOKScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_remoteok": True})
     MockScanner.return_value.scan.assert_awaited_once_with(stats=ANY)
@@ -1248,7 +1250,7 @@ async def test_collect_raw_jobs_calls_remoteok_when_config_enabled():
 
 
 async def test_collect_raw_jobs_skips_remotive_by_default():
-    with patch("moonlighter.discovery.sources.http.RemotiveScanner") as MockScanner:
+    with patch("moonlighter.discovery.sources.job_feeds.remotive.RemotiveScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[])
         raw_jobs, _ = await _collect({})
     MockScanner.return_value.scan.assert_not_called()
@@ -1257,7 +1259,7 @@ async def test_collect_raw_jobs_skips_remotive_by_default():
 
 async def test_collect_raw_jobs_calls_remotive_when_config_enabled():
     job = RawJob(source="remotive", company="Acme", title="Engineer", url="https://remotive.com/1")
-    with patch("moonlighter.discovery.sources.http.RemotiveScanner") as MockScanner:
+    with patch("moonlighter.discovery.sources.job_feeds.remotive.RemotiveScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_remotive": True})
     MockScanner.return_value.scan.assert_awaited_once_with(category=None, stats=ANY)
@@ -1265,7 +1267,9 @@ async def test_collect_raw_jobs_calls_remotive_when_config_enabled():
 
 
 async def test_collect_raw_jobs_skips_wwr_by_default():
-    with patch("moonlighter.discovery.sources.http.WeWorkRemotelyScanner") as MockScanner:
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.weworkremotely.WeWorkRemotelyScanner"
+    ) as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[])
         raw_jobs, _ = await _collect({})
     MockScanner.return_value.scan.assert_not_called()
@@ -1279,7 +1283,9 @@ async def test_collect_raw_jobs_calls_wwr_when_config_enabled():
         title="Engineer",
         url="https://weworkremotely.com/1",
     )
-    with patch("moonlighter.discovery.sources.http.WeWorkRemotelyScanner") as MockScanner:
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.weworkremotely.WeWorkRemotelyScanner"
+    ) as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_wwr": True})
     MockScanner.return_value.scan.assert_awaited_once_with(category=None, stats=ANY)
@@ -1287,7 +1293,9 @@ async def test_collect_raw_jobs_calls_wwr_when_config_enabled():
 
 
 async def test_collect_raw_jobs_skips_hn_whoishiring_by_default():
-    with patch("moonlighter.discovery.sources.http.HNWhoIsHiringScanner") as MockScanner:
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.HNWhoIsHiringScanner"
+    ) as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[])
         raw_jobs, _ = await _collect({})
     MockScanner.return_value.scan.assert_not_called()
@@ -1301,7 +1309,9 @@ async def test_collect_raw_jobs_calls_hn_whoishiring_when_config_enabled():
         title="Engineer",
         url="https://news.ycombinator.com/item?id=1",
     )
-    with patch("moonlighter.discovery.sources.http.HNWhoIsHiringScanner") as MockScanner:
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.HNWhoIsHiringScanner"
+    ) as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[job])
         raw_jobs, _ = await _collect({"scan_hn_whoishiring": True})
     MockScanner.return_value.scan.assert_awaited_once_with(stats=ANY)
@@ -1323,7 +1333,7 @@ async def test_portal_feed_is_filtered_by_keywords():
         RawJob(source="remoteok", company="b", title="Marketing Lead", url="https://r.ok/2"),
     ]
     with patch(
-        "moonlighter.discovery.sources.http.RemoteOKScanner.scan",
+        "moonlighter.discovery.sources.job_feeds.remoteok.RemoteOKScanner.scan",
         new=AsyncMock(return_value=jobs),
     ):
         got = await _scan_remoteok({"scan_remoteok": True}, {}, "backend")
@@ -1424,7 +1434,9 @@ async def test_scan_company_rejects_unknown_source():
 async def test_scan_company_scans_evaluates_and_reports(temporary_database):
     init_db()
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
         patch(
             "moonlighter.discovery.service._evaluate_and_store",
             new=AsyncMock(return_value=([], False)),
@@ -1442,7 +1454,9 @@ async def test_scan_company_no_new_jobs_skips_evaluation(temporary_database):
     init_db()
     ScanLog.create(job_url="https://x.com/scan/1", source="greenhouse")
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
         patch(
             "moonlighter.discovery.service._evaluate_and_store", new=AsyncMock()
         ) as evaluate_mock,
@@ -1463,7 +1477,9 @@ async def test_scan_company_zero_raw_jobs_does_not_claim_all_already_known(tempo
     which is false when it errored."""
     init_db()
     with (
-        patch("moonlighter.discovery.sources.http.GreenhouseScanner") as MockGH,
+        patch(
+            "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+        ) as MockGH,
         patch(
             "moonlighter.discovery.service._evaluate_and_store", new=AsyncMock()
         ) as evaluate_mock,

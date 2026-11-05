@@ -1,12 +1,10 @@
 from moonlighter.core.sources import Source
-from moonlighter.discovery.sources.http import (
-    AshbyScanner,
-    GreenhouseScanner,
-    LeverScanner,
-    RecruiteeScanner,
-    SmartRecruitersScanner,
-    WorkableScanner,
-)
+from moonlighter.discovery.sources.company_boards.ashby import AshbyScanner
+from moonlighter.discovery.sources.company_boards.greenhouse import GreenhouseScanner
+from moonlighter.discovery.sources.company_boards.lever import LeverScanner
+from moonlighter.discovery.sources.company_boards.recruitee import RecruiteeScanner
+from moonlighter.discovery.sources.company_boards.smartrecruiters import SmartRecruitersScanner
+from moonlighter.discovery.sources.company_boards.workable import WorkableScanner
 from moonlighter.discovery.sources.registry import (
     LISTING_SOURCES,
     SOURCES,

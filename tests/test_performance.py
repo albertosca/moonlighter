@@ -38,7 +38,10 @@ async def _assert_scan_is_concurrent(scanner, source, payload, company_count):
     client = _slow_client(payload)
     stats = {}
 
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.gathering.httpx.AsyncClient",
+        return_value=client,
+    ):
         start_time = time.perf_counter()
         await scanner.scan(slugs, stats=stats)
         concurrent_elapsed = time.perf_counter() - start_time
@@ -61,20 +64,20 @@ async def _assert_scan_is_concurrent(scanner, source, payload, company_count):
 
 
 async def test_greenhouse_scan_20_companies_concurrent():
-    from moonlighter.discovery.sources.http import GreenhouseScanner
+    from moonlighter.discovery.sources.company_boards.greenhouse import GreenhouseScanner
 
     await _assert_scan_is_concurrent(GreenhouseScanner(), "greenhouse", {"jobs": []}, 20)
 
 
 async def test_lever_scan_15_companies_concurrent():
-    from moonlighter.discovery.sources.http import LeverScanner
+    from moonlighter.discovery.sources.company_boards.lever import LeverScanner
 
     await _assert_scan_is_concurrent(LeverScanner(), "lever", [], 15)
 
 
 async def test_ashby_scan_10_companies_concurrent():
     """Ashby is fetched with GET (the REST posting API), not the retired GraphQL POST."""
-    from moonlighter.discovery.sources.http import AshbyScanner
+    from moonlighter.discovery.sources.company_boards.ashby import AshbyScanner
 
     await _assert_scan_is_concurrent(AshbyScanner(), "ashby", {"jobs": []}, 10)
 

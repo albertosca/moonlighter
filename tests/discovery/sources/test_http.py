@@ -7,20 +7,18 @@ import httpx
 import pytest
 from moonlighter.core.http_fetch import HEADERS
 from moonlighter.discovery.sources.base import ScanStats, SourceStats
-from moonlighter.discovery.sources.http import (
-    AshbyScanner,
-    GreenhouseScanner,
-    GupyScanner,
-    HNWhoIsHiringScanner,
-    InHireScanner,
-    LeverScanner,
-    RecruiteeScanner,
-    RemoteOKScanner,
-    RemotiveScanner,
-    SmartRecruitersScanner,
-    WeWorkRemotelyScanner,
-    WorkableScanner,
-)
+from moonlighter.discovery.sources.company_boards.ashby import AshbyScanner
+from moonlighter.discovery.sources.company_boards.greenhouse import GreenhouseScanner
+from moonlighter.discovery.sources.company_boards.inhire import InHireScanner
+from moonlighter.discovery.sources.company_boards.lever import LeverScanner
+from moonlighter.discovery.sources.company_boards.recruitee import RecruiteeScanner
+from moonlighter.discovery.sources.company_boards.smartrecruiters import SmartRecruitersScanner
+from moonlighter.discovery.sources.company_boards.workable import WorkableScanner
+from moonlighter.discovery.sources.job_feeds.gupy import GupyScanner
+from moonlighter.discovery.sources.job_feeds.hacker_news import HNWhoIsHiringScanner
+from moonlighter.discovery.sources.job_feeds.remoteok import RemoteOKScanner
+from moonlighter.discovery.sources.job_feeds.remotive import RemotiveScanner
+from moonlighter.discovery.sources.job_feeds.weworkremotely import WeWorkRemotelyScanner
 
 GREENHOUSE_RESPONSE = {
     "jobs": [
@@ -144,7 +142,10 @@ async def test_greenhouse_html_stripped_from_description():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await GreenhouseScanner().scan(["co"])
     assert len(jobs) == 1
     assert "<" not in jobs[0].description
@@ -165,7 +166,10 @@ async def test_greenhouse_posted_at_parsed():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].posted_at is not None
     assert isinstance(jobs[0].posted_at, datetime)
@@ -184,7 +188,10 @@ async def test_greenhouse_date_only_updated_at_with_z_suffix_parses_to_naive_mid
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].posted_at is not None
     assert jobs[0].posted_at.isoformat() == "2024-01-01T00:00:00"
@@ -203,7 +210,10 @@ async def test_greenhouse_posted_at_invalid_format():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].posted_at is None
 
@@ -220,7 +230,10 @@ async def test_greenhouse_missing_location():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].location is None
     assert jobs[0].remote_type is None
@@ -228,14 +241,20 @@ async def test_greenhouse_missing_location():
 
 async def test_greenhouse_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exception=httpx.ConnectError("timeout"))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_greenhouse_empty_jobs_list():
     mock_client = _make_mock_client({"jobs": []})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -253,7 +272,10 @@ async def test_greenhouse_multiple_companies():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await GreenhouseScanner().scan(["stripe", "linear"])
     assert len(jobs) == 2
 
@@ -272,7 +294,10 @@ async def test_lever_skips_entry_without_title():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.lever.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
@@ -288,7 +313,10 @@ async def test_lever_skips_entry_without_url():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.lever.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
@@ -304,7 +332,10 @@ async def test_lever_timestamp_is_utc_aware():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.lever.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await LeverScanner().scan(["co"])
     assert jobs[0].posted_at is not None
     assert jobs[0].posted_at.tzinfo is not None
@@ -320,28 +351,40 @@ async def test_lever_missing_created_at():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.lever.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await LeverScanner().scan(["co"])
     assert jobs[0].posted_at is None
 
 
 async def test_lever_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exception=httpx.ConnectError("timeout"))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.lever.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_lever_500_response_skips_company():
     mock_client = _make_mock_client([], status_code=500)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.lever.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_lever_empty_array_response():
     mock_client = _make_mock_client([])
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.lever.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
@@ -379,7 +422,10 @@ async def test_greenhouse_partial_failure_continues():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await GreenhouseScanner().scan(["ok1", "fail", "ok2"])
     assert len(jobs) == 2
 
@@ -396,7 +442,10 @@ async def test_lever_multiple_companies_returns_all():
         }
     ]
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.lever.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await LeverScanner().scan(["stripe", "linear"])
     assert len(jobs) == 2
     assert jobs[0].company == "stripe"
@@ -419,7 +468,10 @@ async def test_greenhouse_missing_title_skips_job():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -437,7 +489,10 @@ async def test_greenhouse_missing_absolute_url_skips_job():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -445,7 +500,10 @@ async def test_greenhouse_missing_absolute_url_skips_job():
 async def test_greenhouse_invalid_top_level_schema_returns_empty():
     """API retorna lista em vez de dict com 'jobs' → retorna [] sem crash."""
     mock_client = _make_mock_client([{"title": "Eng"}])  # lista em vez de dict
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -453,7 +511,10 @@ async def test_greenhouse_invalid_top_level_schema_returns_empty():
 async def test_greenhouse_jobs_key_missing_returns_empty():
     """API retorna dict mas sem chave 'jobs' → retorna [] sem crash."""
     mock_client = _make_mock_client({"data": []})  # sem 'jobs'
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs == []
 
@@ -464,7 +525,10 @@ async def test_greenhouse_jobs_key_missing_returns_empty():
 async def test_lever_non_list_response_returns_empty():
     """API retorna dict (ex: erro) em vez de lista → retorna [] sem crash."""
     mock_client = _make_mock_client({"error": "rate limited"})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.lever.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await LeverScanner().scan(["co"])
     assert jobs == []
 
@@ -491,8 +555,13 @@ async def test_greenhouse_logs_scan_start_and_fetched(caplog):
     }
     mock_client = _make_mock_client(payload)
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        caplog.at_level(logging.INFO, logger="moonlighter.discovery.sources.http"),
+        patch(
+            "moonlighter.discovery.sources.company_boards.gathering.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        caplog.at_level(
+            logging.INFO, logger="moonlighter.discovery.sources.company_boards.gathering"
+        ),
     ):
         await scanner.scan(["co"])
     assert "greenhouse" in caplog.text
@@ -513,8 +582,13 @@ async def test_lever_logs_scan_fetched(caplog):
     ]
     mock_client = _make_mock_client(payload)
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        caplog.at_level(logging.INFO, logger="moonlighter.discovery.sources.http"),
+        patch(
+            "moonlighter.discovery.sources.company_boards.gathering.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        caplog.at_level(
+            logging.INFO, logger="moonlighter.discovery.sources.company_boards.gathering"
+        ),
     ):
         await scanner.scan(["co"])
     assert "lever" in caplog.text
@@ -529,7 +603,10 @@ async def test_scan_skips_fetch_exceptions(Scanner):
     """_fetch raises → gather(return_exceptions) returns the exception → ignored (not a list)."""
     mock_client = _make_mock_client({})
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch(
+            "moonlighter.discovery.sources.company_boards.gathering.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
         patch.object(Scanner, "_fetch", new=AsyncMock(side_effect=RuntimeError("boom"))),
     ):
         jobs = await Scanner().scan(["co"])
@@ -557,7 +634,10 @@ WORKABLE_RESPONSE = {
 
 async def test_workable_maps_fields_and_strips_html():
     mock_client = _make_mock_client(WORKABLE_RESPONSE)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.workable.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WorkableScanner().scan(["acme"])
     assert len(jobs) == 1
     scanned_job = jobs[0]
@@ -581,7 +661,10 @@ async def test_workable_skips_entry_without_title():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.workable.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs == []
 
@@ -589,7 +672,10 @@ async def test_workable_skips_entry_without_title():
 async def test_workable_skips_entry_without_url():
     response = {"jobs": [{"title": "Eng", "shortcode": "X", "application_url": ""}]}
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.workable.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs == []
 
@@ -608,7 +694,10 @@ async def test_workable_no_telecommuting_uses_location():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.workable.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs[0].remote_type is None  # bare city: unknown, never invented onsite
 
@@ -624,7 +713,10 @@ async def test_workable_missing_location_parts():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.workable.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs[0].location is None
     assert jobs[0].remote_type is None
@@ -632,28 +724,40 @@ async def test_workable_missing_location_parts():
 
 async def test_workable_500_response_skips_company():
     mock_client = _make_mock_client({}, status_code=500)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.workable.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_workable_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exception=httpx.ConnectError("timeout"))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.workable.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_workable_non_dict_response_returns_empty():
     mock_client = _make_mock_client([{"title": "Eng"}])
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.workable.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_workable_missing_jobs_key_returns_empty():
     mock_client = _make_mock_client({"name": "Acme"})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.workable.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WorkableScanner().scan(["acme"])
     assert jobs == []
 
@@ -677,7 +781,10 @@ RECRUITEE_RESPONSE = {
 
 async def test_recruitee_maps_fields_and_strips_html():
     mock_client = _make_mock_client(RECRUITEE_RESPONSE)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.recruitee.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert len(jobs) == 1
     scanned_job = jobs[0]
@@ -704,7 +811,10 @@ async def test_recruitee_remote_flag_true():
         ]
     }
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.recruitee.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs[0].remote_type == "remote"
 
@@ -712,7 +822,10 @@ async def test_recruitee_remote_flag_true():
 async def test_recruitee_skips_entry_without_title():
     response = {"offers": [{"title": "", "careers_apply_url": ""}]}
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.recruitee.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
 
@@ -720,35 +833,50 @@ async def test_recruitee_skips_entry_without_title():
 async def test_recruitee_skips_entry_without_url():
     response = {"offers": [{"title": "Eng", "careers_apply_url": ""}]}
     mock_client = _make_mock_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.recruitee.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_recruitee_500_response_skips_company():
     mock_client = _make_mock_client({}, status_code=500)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.recruitee.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_recruitee_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exception=httpx.ConnectError("timeout"))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.recruitee.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_recruitee_non_dict_response_returns_empty():
     mock_client = _make_mock_client([{"title": "Eng"}])
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.recruitee.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
 
 
 async def test_recruitee_missing_offers_key_returns_empty():
     mock_client = _make_mock_client({"other": []})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.recruitee.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RecruiteeScanner().scan(["acme"])
     assert jobs == []
 
@@ -853,8 +981,14 @@ async def test_smartrecruiters_paginates_and_fetches_detail():
         }
     )
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["Visa"])
 
@@ -877,8 +1011,14 @@ async def test_smartrecruiters_empty_feed_makes_no_detail_call():
     empty_page = {"offset": 0, "limit": 100, "totalFound": 0, "content": []}
     mock_client = _make_url_branching_client({"postings?limit=100&offset=0": empty_page})
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()) as mock_sleep,
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ) as mock_sleep,
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs == []
@@ -894,8 +1034,14 @@ async def test_smartrecruiters_pagination_terminates_when_content_shorter_than_l
     page = {"offset": 0, "limit": 100, "totalFound": 5, "content": []}
     mock_client = _make_url_branching_client({"postings?limit=100&offset=0": page})
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs == []
@@ -912,8 +1058,14 @@ async def test_smartrecruiters_pagination_terminates_when_offset_reaches_total()
         }
     )
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         await SmartRecruitersScanner().scan(["Visa"])
     # exactly 2 list calls (offset=0, offset=1) then it stops -- proves offset>=total
@@ -961,8 +1113,14 @@ async def test_smartrecruiters_zero_limit_field_does_not_spin():
         }
     )
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
 
@@ -978,8 +1136,14 @@ async def test_smartrecruiters_zero_limit_field_does_not_spin():
 async def test_smartrecruiters_500_response_returns_empty():
     mock_client = _make_flat_client({}, status_code=500)
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs == []
@@ -988,8 +1152,14 @@ async def test_smartrecruiters_500_response_returns_empty():
 async def test_smartrecruiters_non_dict_list_response_returns_empty():
     mock_client = _make_flat_client([{"content": []}])
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs == []
@@ -998,8 +1168,14 @@ async def test_smartrecruiters_non_dict_list_response_returns_empty():
 async def test_smartrecruiters_network_exception_on_list_skips_company():
     mock_client = _make_flat_client(raise_exception=httpx.ConnectError("timeout"))
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs == []
@@ -1019,8 +1195,14 @@ async def test_smartrecruiters_detail_500_yields_none_description():
 
     mock_client.get = AsyncMock(side_effect=fake_get)
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert len(jobs) == 1
@@ -1042,8 +1224,14 @@ async def test_smartrecruiters_detail_network_exception_yields_none_description(
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert len(jobs) == 1
@@ -1065,8 +1253,14 @@ async def test_smartrecruiters_detail_non_dict_response_yields_none_description(
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert len(jobs) == 1
@@ -1085,8 +1279,14 @@ async def test_smartrecruiters_skips_posting_without_id_or_name():
     }
     mock_client = _make_url_branching_client({"postings?limit=100&offset=0": page})
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs == []
@@ -1112,8 +1312,14 @@ async def test_smartrecruiters_no_remote_or_hybrid_flags_uses_location_text():
         }
     )
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs[0].location == "Berlin, Germany"
@@ -1134,8 +1340,14 @@ async def test_smartrecruiters_missing_location_dict():
         }
     )
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs[0].location is None
@@ -1165,8 +1377,14 @@ async def test_smartrecruiters_detail_multiple_sections_concatenated_and_html_st
         }
     )
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     description = jobs[0].description
@@ -1191,8 +1409,14 @@ async def test_smartrecruiters_detail_no_sections_yields_none_description():
         }
     )
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
-        patch("moonlighter.discovery.sources.http.asyncio.sleep", AsyncMock()),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "moonlighter.discovery.sources.company_boards.smartrecruiters.asyncio.sleep",
+            AsyncMock(),
+        ),
     ):
         jobs = await SmartRecruitersScanner().scan(["acme"])
     assert jobs[0].description is None
@@ -1241,7 +1465,9 @@ def _make_gupy_client(url_map):
 
 async def test_gupy_scan_maps_fields_and_strips_html():
     mock_client = _make_gupy_client({"offset=0": _GUPY_P1})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan(keywords="engenheiro")
 
     assert len(jobs) == 1
@@ -1263,7 +1489,9 @@ async def test_gupy_missing_title_or_url_is_skipped():
         "pagination": {"total": 2, "limit": 10, "offset": 0},
     }
     mock_client = _make_gupy_client({"offset=0": page})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs == []
 
@@ -1283,7 +1511,9 @@ async def test_gupy_no_remote_work_uses_workplace_type():
         "pagination": {"total": 1, "limit": 10, "offset": 0},
     }
     mock_client = _make_gupy_client({"offset=0": page})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs[0].remote_type == "hybrid"
 
@@ -1294,7 +1524,9 @@ async def test_gupy_missing_careerpagename_falls_back_to_gupy():
         "pagination": {"total": 1, "limit": 10, "offset": 0},
     }
     mock_client = _make_gupy_client({"offset=0": page})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs[0].company == "gupy"
 
@@ -1305,7 +1537,9 @@ async def test_gupy_no_description_yields_none():
         "pagination": {"total": 1, "limit": 10, "offset": 0},
     }
     mock_client = _make_gupy_client({"offset=0": page})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs[0].description is None
 
@@ -1320,7 +1554,9 @@ async def test_gupy_paginates_across_pages():
         "pagination": {"total": 2, "limit": 1, "offset": 1},
     }
     mock_client = _make_gupy_client({"offset=0": first_posting, "offset=1": second_posting})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan(keywords="eng")
     assert [scanned_job.title for scanned_job in jobs] == ["Eng One", "Eng Two"]
     assert mock_client.get.await_count == 2
@@ -1339,7 +1575,9 @@ async def test_gupy_zero_limit_field_does_not_spin():
     }
     empty_page = {"data": [], "pagination": {"total": 999999, "limit": 0, "offset": 1}}
     mock_client = _make_gupy_client({"offset=0": spinning_page, "offset=1": empty_page})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan(keywords="eng")
     assert len(jobs) == 1
     assert mock_client.get.await_count == 2
@@ -1348,7 +1586,9 @@ async def test_gupy_zero_limit_field_does_not_spin():
 async def test_gupy_empty_page_terminates_immediately():
     page = {"data": [], "pagination": {"total": 0, "limit": 10, "offset": 0}}
     mock_client = _make_gupy_client({"offset=0": page})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs == []
     assert mock_client.get.await_count == 1
@@ -1361,7 +1601,9 @@ async def test_gupy_500_response_returns_empty():
     mock_client.get = AsyncMock(return_value=mock_response)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs == []
 
@@ -1377,7 +1619,9 @@ async def test_gupy_non_json_body_returns_empty():
     mock_client.get = AsyncMock(return_value=mock_response)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs == []
 
@@ -1390,7 +1634,9 @@ async def test_gupy_non_dict_response_returns_empty():
     mock_client.get = AsyncMock(return_value=mock_response)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs == []
 
@@ -1400,7 +1646,9 @@ async def test_gupy_network_exception_returns_empty():
     mock_client.get = AsyncMock(side_effect=httpx.ConnectError("timeout"))
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan(keywords="eng")
     assert jobs == []
 
@@ -1408,7 +1656,9 @@ async def test_gupy_network_exception_returns_empty():
 async def test_gupy_default_keyword_when_not_provided():
     page = {"data": [], "pagination": {"total": 0, "limit": 10, "offset": 0}}
     mock_client = _make_gupy_client({"jobName=&limit=100&offset=0": page})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan()
     assert jobs == []
 
@@ -1416,7 +1666,10 @@ async def test_gupy_default_keyword_when_not_provided():
 async def test_gupy_fetch_failure_logs_a_warning_with_the_traceback(caplog):
     mock_client = _make_mock_client(raise_exception=httpx.ConnectError("timeout"))
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch(
+            "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
         caplog.at_level(logging.WARNING),
     ):
         await GupyScanner().scan(keywords="engenheiro")
@@ -1434,7 +1687,9 @@ async def test_gupy_tags_only_description_yields_an_empty_string():
         "pagination": {"total": 1},
     }
     mock_client = _make_gupy_client({"offset=0": page})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.gupy.httpx.AsyncClient", return_value=mock_client
+    ):
         jobs = await GupyScanner().scan(keywords="engenheiro")
     assert jobs[0].description == ""
 
@@ -1481,7 +1736,10 @@ _REMOTEOK_RESPONSE = [
 
 async def test_remoteok_scan_maps_fields_and_skips_legal_notice_and_missing_url():
     mock_client = _make_simple_client(_REMOTEOK_RESPONSE)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remoteok.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemoteOKScanner().scan()
 
     assert len(jobs) == 1
@@ -1504,7 +1762,10 @@ async def test_remoteok_missing_company_falls_back_to_source_name():
         }
     ]
     mock_client = _make_simple_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remoteok.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemoteOKScanner().scan()
     assert jobs[0].company == "RemoteOK"
 
@@ -1514,21 +1775,30 @@ async def test_remoteok_network_exception_returns_empty():
     mock_client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remoteok.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemoteOKScanner().scan()
     assert jobs == []
 
 
 async def test_remoteok_non_200_returns_empty():
     mock_client = _make_simple_client({}, status=500)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remoteok.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemoteOKScanner().scan()
     assert jobs == []
 
 
 async def test_remoteok_non_list_json_returns_empty():
     mock_client = _make_simple_client({"unexpected": "shape"})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remoteok.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemoteOKScanner().scan()
     assert jobs == []
 
@@ -1544,7 +1814,10 @@ async def test_remoteok_non_json_body_returns_empty():
     mock_client.get = AsyncMock(return_value=mock_response)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remoteok.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemoteOKScanner().scan()
     assert jobs == []
 
@@ -1552,7 +1825,10 @@ async def test_remoteok_non_json_body_returns_empty():
 async def test_remoteok_fetch_failure_logs_a_warning_with_the_traceback(caplog):
     mock_client = _make_mock_client(raise_exception=httpx.ConnectError("boom"))
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch(
+            "moonlighter.discovery.sources.job_feeds.remoteok.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
         caplog.at_level(logging.WARNING),
     ):
         await RemoteOKScanner().scan()
@@ -1571,7 +1847,10 @@ async def test_remoteok_tags_only_description_yields_none():
         {"position": "Eng", "url": "https://remoteok.com/remote-jobs/1", "description": "<p></p>"}
     ]
     mock_client = _make_simple_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remoteok.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemoteOKScanner().scan()
     assert jobs[0].description is None
 
@@ -1600,7 +1879,10 @@ _REMOTIVE_RESPONSE = {
 
 async def test_remotive_scan_maps_fields_and_skips_missing_title():
     mock_client = _make_simple_client(_REMOTIVE_RESPONSE)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remotive.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemotiveScanner().scan()
 
     assert len(jobs) == 1
@@ -1617,14 +1899,20 @@ async def test_remotive_scan_maps_fields_and_skips_missing_title():
 async def test_remotive_missing_company_falls_back_to_source_name():
     response = {"jobs": [{"title": "Eng", "url": "https://remotive.com/1", "company_name": ""}]}
     mock_client = _make_simple_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remotive.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemotiveScanner().scan()
     assert jobs[0].company == "Remotive"
 
 
 async def test_remotive_no_jobs_key_returns_empty():
     mock_client = _make_simple_client({"job-count": 0})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remotive.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemotiveScanner().scan()
     assert jobs == []
 
@@ -1634,14 +1922,20 @@ async def test_remotive_network_exception_returns_empty():
     mock_client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remotive.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemotiveScanner().scan()
     assert jobs == []
 
 
 async def test_remotive_non_dict_json_returns_empty():
     mock_client = _make_simple_client(["unexpected", "shape"])
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remotive.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemotiveScanner().scan()
     assert jobs == []
 
@@ -1656,14 +1950,20 @@ async def test_remotive_non_json_body_returns_empty():
     mock_client.get = AsyncMock(return_value=mock_response)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remotive.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemotiveScanner().scan()
     assert jobs == []
 
 
 async def test_remotive_non_200_returns_empty():
     mock_client = _make_simple_client({}, status=500)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remotive.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemotiveScanner().scan()
     assert jobs == []
 
@@ -1671,7 +1971,10 @@ async def test_remotive_non_200_returns_empty():
 async def test_remotive_fetch_failure_logs_a_warning_with_the_traceback(caplog):
     mock_client = _make_mock_client(raise_exception=httpx.ConnectError("boom"))
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch(
+            "moonlighter.discovery.sources.job_feeds.remotive.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
         caplog.at_level(logging.WARNING),
     ):
         await RemotiveScanner().scan()
@@ -1690,7 +1993,10 @@ async def test_remotive_tags_only_description_yields_none():
         "jobs": [{"title": "Eng", "url": "https://remotive.com/1", "description": "<p></p>"}]
     }
     mock_client = _make_simple_client(response)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.remotive.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await RemotiveScanner().scan()
     assert jobs[0].description is None
 
@@ -1741,7 +2047,10 @@ def _make_rss_client(body, status=200):
 
 async def test_wwr_scan_splits_company_from_title_and_strips_html():
     mock_client = _make_rss_client(_WWR_RSS)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.weworkremotely.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WeWorkRemotelyScanner().scan()
 
     assert len(jobs) == 2  # third item has no <link>, skipped
@@ -1759,7 +2068,10 @@ async def test_wwr_scan_splits_company_from_title_and_strips_html():
 
 async def test_wwr_title_without_colon_falls_back_to_source_name_company():
     mock_client = _make_rss_client(_WWR_RSS)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.weworkremotely.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WeWorkRemotelyScanner().scan()
     no_colon_job = next(
         scanned_job for scanned_job in jobs if scanned_job.title == "Frontend Developer Wanted"
@@ -1772,21 +2084,30 @@ async def test_wwr_network_exception_returns_empty():
     mock_client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.weworkremotely.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WeWorkRemotelyScanner().scan()
     assert jobs == []
 
 
 async def test_wwr_non_200_returns_empty():
     mock_client = _make_rss_client("", status=500)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.weworkremotely.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WeWorkRemotelyScanner().scan()
     assert jobs == []
 
 
 async def test_wwr_malformed_xml_returns_empty():
     mock_client = _make_rss_client("<not-valid-xml")
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.weworkremotely.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WeWorkRemotelyScanner().scan()
     assert jobs == []
 
@@ -1794,7 +2115,10 @@ async def test_wwr_malformed_xml_returns_empty():
 async def test_wwr_missing_pubdate_leaves_posted_at_none():
     rss = _WWR_RSS.replace("<pubDate>Tue, 30 Jun 2026 20:32:52 +0000</pubDate>", "", 1)
     mock_client = _make_rss_client(rss)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.weworkremotely.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WeWorkRemotelyScanner().scan()
     assert jobs[0].posted_at is None
 
@@ -1811,7 +2135,10 @@ async def test_wwr_missing_description_yields_none():
   </channel>
 </rss>"""
     mock_client = _make_rss_client(rss)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.weworkremotely.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WeWorkRemotelyScanner().scan()
     assert jobs[0].description is None
 
@@ -1819,7 +2146,10 @@ async def test_wwr_missing_description_yields_none():
 async def test_wwr_fetch_failure_logs_a_warning_with_the_traceback(caplog):
     mock_client = _make_mock_client(raise_exception=httpx.ConnectError("boom"))
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch(
+            "moonlighter.discovery.sources.job_feeds.weworkremotely.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
         caplog.at_level(logging.WARNING),
     ):
         await WeWorkRemotelyScanner().scan()
@@ -1836,7 +2166,10 @@ async def test_wwr_fetch_failure_logs_a_warning_with_the_traceback(caplog):
 async def test_wwr_http_error_status_logs_a_warning(caplog):
     mock_client = _make_rss_client("", status=500)
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch(
+            "moonlighter.discovery.sources.job_feeds.weworkremotely.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
         caplog.at_level(logging.WARNING),
     ):
         await WeWorkRemotelyScanner().scan()
@@ -1853,7 +2186,10 @@ async def test_wwr_http_error_status_logs_a_warning(caplog):
 async def test_wwr_malformed_feed_logs_a_warning_with_the_traceback(caplog):
     mock_client = _make_rss_client("<not-valid-xml")
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        patch(
+            "moonlighter.discovery.sources.job_feeds.weworkremotely.httpx.AsyncClient",
+            return_value=mock_client,
+        ),
         caplog.at_level(logging.WARNING),
     ):
         await WeWorkRemotelyScanner().scan()
@@ -1872,7 +2208,10 @@ async def test_wwr_tags_only_description_yields_none():
         "&lt;p&gt;Build &lt;strong&gt;things&lt;/strong&gt;.&lt;/p&gt;", "&lt;p&gt;&lt;/p&gt;", 1
     )
     mock_client = _make_rss_client(rss)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.weworkremotely.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await WeWorkRemotelyScanner().scan()
     assert jobs[0].title == "Senior Backend Engineer"
     assert jobs[0].description is None
@@ -1880,7 +2219,10 @@ async def test_wwr_tags_only_description_yields_none():
 
 async def test_wwr_sends_the_moonlighter_user_agent():
     mock_client = _make_rss_client(_WWR_RSS)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.weworkremotely.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         await WeWorkRemotelyScanner().scan()
     mock_client.get.assert_awaited_once_with(
         "https://weworkremotely.com/remote-jobs.rss", headers=HEADERS
@@ -1937,7 +2279,10 @@ def _hn_url_map(*, thread_id=100, kids=(201, 202, 203)):
 
 async def test_hn_scan_finds_thread_and_parses_pipe_separated_title():
     mock_client = _make_hn_client(_hn_url_map())
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
 
     acme = next(scanned_job for scanned_job in jobs if scanned_job.company == "Acme")
@@ -1961,7 +2306,10 @@ async def test_hn_parse_title_truncates_long_rest_after_separator():
     url_map = _hn_url_map(kids=(201,))
     url_map[f"{_HN_BASE}/item/201.json"] = {"id": 201, "text": text}
     mock_client = _make_hn_client(url_map)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     job = next(scanned_job for scanned_job in jobs if scanned_job.company == "Acme")
     assert len(job.title) <= 81  # 80 chars + the "…" ellipsis
@@ -1970,7 +2318,10 @@ async def test_hn_parse_title_truncates_long_rest_after_separator():
 
 async def test_hn_scan_falls_back_to_prose_when_no_separator():
     mock_client = _make_hn_client(_hn_url_map())
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
 
     fallback = next(scanned_job for scanned_job in jobs if scanned_job.url.endswith("id=202"))
@@ -1980,7 +2331,10 @@ async def test_hn_scan_falls_back_to_prose_when_no_separator():
 
 async def test_hn_scan_skips_deleted_comments():
     mock_client = _make_hn_client(_hn_url_map())
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert all(not scanned_job.url.endswith("id=203") for scanned_job in jobs)
 
@@ -1991,7 +2345,10 @@ async def test_hn_no_who_is_hiring_thread_found_returns_empty():
         f"{_HN_BASE}/item/99.json": {"id": 99, "title": "Ask HN: Freelancer? Seeking freelancer?"},
     }
     mock_client = _make_hn_client(url_map)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert jobs == []
 
@@ -2002,7 +2359,10 @@ async def test_hn_thread_with_no_kids_returns_empty():
         f"{_HN_BASE}/item/100.json": {"id": 100, "title": "Ask HN: Who is hiring? (July 2026)"},
     }
     mock_client = _make_hn_client(url_map)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert jobs == []
 
@@ -2012,14 +2372,20 @@ async def test_hn_network_exception_on_user_lookup_returns_empty():
     mock_client.get = AsyncMock(side_effect=httpx.ConnectError("boom"))
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert jobs == []
 
 
 async def test_hn_user_lookup_non_200_returns_empty():
     mock_client = _make_hn_client({})  # every URL 404s
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert jobs == []
 
@@ -2037,7 +2403,10 @@ async def test_hn_thread_lookup_skips_item_non_200_and_continues():
         f"{_HN_BASE}/item/201.json": {"id": 201, "text": "Acme | Remote"},
     }
     mock_client = _make_hn_client(url_map)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert len(jobs) == 1
     assert jobs[0].company == "Acme"
@@ -2068,7 +2437,10 @@ async def test_hn_thread_lookup_skips_item_exception_and_continues():
     mock_client.get = AsyncMock(side_effect=fake_get)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert jobs == []  # thread found (id 100), but it has no kids
 
@@ -2104,7 +2476,10 @@ async def test_hn_fetch_kids_non_200_returns_empty():
     mock_client.get = AsyncMock(side_effect=fake_get)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert jobs == []
 
@@ -2137,7 +2512,10 @@ async def test_hn_fetch_kids_exception_returns_empty():
     mock_client.get = AsyncMock(side_effect=fake_get)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert jobs == []
 
@@ -2146,7 +2524,10 @@ async def test_hn_fetch_comment_non_200_is_dropped():
     url_map = _hn_url_map(kids=(201,))
     del url_map[f"{_HN_BASE}/item/201.json"]  # 201 now 404s -> comment dropped
     mock_client = _make_hn_client(url_map)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert jobs == []
 
@@ -2169,7 +2550,10 @@ async def test_hn_fetch_comment_exception_is_dropped():
     mock_client.get = AsyncMock(side_effect=fake_get)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert jobs == []
 
@@ -2178,7 +2562,10 @@ async def test_hn_comment_with_empty_text_is_dropped():
     url_map = _hn_url_map(kids=(201,))
     url_map[f"{_HN_BASE}/item/201.json"] = {"id": 201, "text": ""}
     mock_client = _make_hn_client(url_map)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert jobs == []
 
@@ -2187,7 +2574,10 @@ async def test_hn_comment_with_only_tags_strips_to_empty_and_is_dropped():
     url_map = _hn_url_map(kids=(201,))
     url_map[f"{_HN_BASE}/item/201.json"] = {"id": 201, "text": "<p></p>"}
     mock_client = _make_hn_client(url_map)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert jobs == []
 
@@ -2201,7 +2591,10 @@ async def test_hn_parse_title_falls_through_when_separator_leads_with_empty_comp
     url_map = _hn_url_map(kids=(201,))
     url_map[f"{_HN_BASE}/item/201.json"] = {"id": 201, "text": text}
     mock_client = _make_hn_client(url_map)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert len(jobs) == 1
     assert jobs[0].company == "HN Who's Hiring"
@@ -2210,7 +2603,10 @@ async def test_hn_parse_title_falls_through_when_separator_leads_with_empty_comp
 
 async def test_hn_sends_the_moonlighter_user_agent_on_every_request():
     mock_client = _make_hn_client(_hn_url_map())
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         await HNWhoIsHiringScanner().scan()
     requests = mock_client.get.await_args_list
     assert requests
@@ -2236,7 +2632,10 @@ async def test_hn_thread_search_looks_at_the_ten_latest_submissions_only():
         f"{_HN_BASE}/item/201.json": {"id": 201, "text": "Acme | Remote | Full-time"},
     }
     mock_client = _make_hn_client(url_map)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     assert jobs == []
     requested_urls = [request.args[0] for request in mock_client.get.await_args_list]
@@ -2269,7 +2668,10 @@ ASHBY_JOB = {
 
 async def test_ashby_scan_success():
     mock_client = _make_mock_client(_ashby_response(ASHBY_JOB))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["openai"])
     assert len(jobs) == 1
     assert jobs[0].company == "openai"
@@ -2283,7 +2685,10 @@ async def test_ashby_uses_the_rest_board_endpoint():
     """Guards the regression directly: a POST to the retired GraphQL endpoint is
     what made every company look empty."""
     mock_client = _make_mock_client(_ashby_response(ASHBY_JOB))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         await AshbyScanner().scan(["openai"])
     mock_client.post.assert_not_called()
     url = mock_client.get.call_args.args[0]
@@ -2292,7 +2697,10 @@ async def test_ashby_uses_the_rest_board_endpoint():
 
 async def test_ashby_is_remote_flag_true():
     mock_client = _make_mock_client(_ashby_response(ASHBY_JOB))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["openai"])
     assert jobs[0].remote_type == "remote"
 
@@ -2300,7 +2708,10 @@ async def test_ashby_is_remote_flag_true():
 async def test_ashby_is_remote_flag_false_uses_location():
     job = {**ASHBY_JOB, "location": "São Paulo, Brazil", "isRemote": False}
     mock_client = _make_mock_client(_ashby_response(job))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs[0].remote_type is None  # bare city: unknown, never invented onsite
 
@@ -2310,21 +2721,30 @@ async def test_ashby_unlisted_job_is_skipped():
     candidate to a page that is not accepting applications."""
     job = {**ASHBY_JOB, "isListed": False}
     mock_client = _make_mock_client(_ashby_response(job))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_ashby_500_response_skips_company():
     mock_client = _make_mock_client({}, status_code=500)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_ashby_network_exception_skips_company():
     mock_client = _make_mock_client(raise_exception=httpx.ConnectError("timeout"))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -2336,7 +2756,10 @@ async def test_ashby_missing_published_at_returns_none():
         if field_name != "publishedAt"
     }
     mock_client = _make_mock_client(_ashby_response(job))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert len(jobs) == 1
     assert jobs[0].posted_at is None
@@ -2345,7 +2768,10 @@ async def test_ashby_missing_published_at_returns_none():
 async def test_ashby_published_at_parsed_as_datetime():
     """The live API returns a timezone-aware ISO timestamp, not a bare date."""
     mock_client = _make_mock_client(_ashby_response(ASHBY_JOB))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["openai"])
     assert isinstance(jobs[0].posted_at, datetime)
 
@@ -2353,14 +2779,20 @@ async def test_ashby_published_at_parsed_as_datetime():
 async def test_ashby_unparseable_published_at_returns_none():
     job = {**ASHBY_JOB, "publishedAt": "not-a-date"}
     mock_client = _make_mock_client(_ashby_response(job))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs[0].posted_at is None
 
 
 async def test_ashby_empty_jobs_returns_empty():
     mock_client = _make_mock_client(_ashby_response())
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -2372,7 +2804,10 @@ async def test_ashby_missing_title_skips_job():
         if field_name != "title"
     }
     mock_client = _make_mock_client(_ashby_response(job))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -2384,28 +2819,40 @@ async def test_ashby_missing_url_skips_job():
         if field_name != "jobUrl"
     }
     mock_client = _make_mock_client(_ashby_response(job))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_ashby_jobs_not_a_list_returns_empty():
     mock_client = _make_mock_client({"jobs": {"unexpected": "shape"}})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_ashby_null_jobs_returns_empty():
     mock_client = _make_mock_client({"jobs": None})
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
 
 async def test_ashby_non_dict_response_returns_empty():
     mock_client = _make_mock_client([{"title": "Eng"}])
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs == []
 
@@ -2611,7 +3058,10 @@ async def test_hn_comment_fetch_failures_count_as_errors_deleted_do_not():
     url_map = _hn_url_map(kids=(201, 203, 999))  # 999 is absent -> 404
     mock_client = _make_hn_client(url_map)
     stats = {}
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan(stats=stats)
 
     assert [scanned_job.company for scanned_job in jobs] == ["Acme"]
@@ -2688,7 +3138,10 @@ def _make_inhire_client(page=INHIRE_PAGE, details=INHIRE_DETAIL, detail_status=2
 
 async def test_inhire_scan_parses_published_jobs_only():
     mock_client = _make_inhire_client()
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.inhire.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await InHireScanner().scan(["alice"])
 
     assert [scanned_job.title for scanned_job in jobs] == [
@@ -2716,7 +3169,10 @@ async def test_inhire_detail_failure_keeps_the_listing_job():
     # One broken detail must not cost the posting — it degrades to the old
     # behavior (description None → needs_review), never drops the job.
     mock_client = _make_inhire_client(detail_status=500)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.inhire.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await InHireScanner().scan(["alice"])
     assert [scanned_job.description for scanned_job in jobs] == [None, None]
     assert len(jobs) == 2
@@ -2727,7 +3183,10 @@ async def test_inhire_detail_wrong_shape_degrades_to_no_description():
     # degrade exactly like an HTTP failure: keep the job, description None.
     details = {"832b18f4-adf6-4c32-8e1b-18321e0b8069": ["not", "a", "dict"], "aaaa": ["nope"]}
     mock_client = _make_inhire_client(details=details)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.inhire.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await InHireScanner().scan(["alice"])
     assert [scanned_job.description for scanned_job in jobs] == [None, None]
 
@@ -2735,7 +3194,7 @@ async def test_inhire_detail_wrong_shape_degrades_to_no_description():
 def test_inhire_slug_reproduces_the_measured_pipe_case():
     # The one canonical example measured live (2026-08-21):
     # "Senior Elixir Engineer | Plataform" → senior-elixir-engineer-or-plataform
-    from moonlighter.discovery.sources.http import _inhire_slug
+    from moonlighter.discovery.sources.company_boards.inhire import _inhire_slug
 
     assert (
         _inhire_slug("Senior Elixir Engineer | Plataform") == "senior-elixir-engineer-or-plataform"
@@ -2747,7 +3206,10 @@ def test_inhire_slug_reproduces_the_measured_pipe_case():
 
 async def test_inhire_sends_the_tenant_header():
     mock_client = _make_mock_client(INHIRE_PAGE)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.inhire.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         await InHireScanner().scan(["alice"])
     first = mock_client.get.call_args_list[0]
     assert first.kwargs["headers"]["X-Tenant"] == "alice"
@@ -2760,7 +3222,10 @@ async def test_inhire_sends_the_tenant_header():
 async def test_inhire_wrong_shape_counts_as_error():
     mock_client = _make_mock_client(["not", "a", "dict"])
     stats = {}
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.inhire.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await InHireScanner().scan(["alice"], stats=stats)
     assert jobs == []
     assert stats["inhire"].errors == 1
@@ -2775,7 +3240,10 @@ def test_inhire_is_a_listing_source_for_staleness():
 async def test_inhire_non_list_jobs_page_counts_as_error():
     mock_client = _make_mock_client({"tenantName": "Alice", "jobsPage": "oops"})
     stats = {}
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.inhire.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await InHireScanner().scan(["alice"], stats=stats)
     assert jobs == []
     assert stats["inhire"].errors == 1
@@ -2798,7 +3266,10 @@ def _lever_posting(*, location, workplace_type=None):
 
 async def _lever_remote_type(posting):
     mock_client = _make_mock_client([posting])
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.lever.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await LeverScanner().scan(["co"])
     return jobs[0].remote_type
 
@@ -2844,7 +3315,10 @@ async def test_ashby_remote_type_fills_from_workplace_type_only_when_text_is_sil
     if workplace_type is not None:
         job["workplaceType"] = workplace_type
     mock_client = _make_mock_client(_ashby_response(job))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs[0].remote_type == expected
 
@@ -2853,7 +3327,10 @@ async def _hn_job(text):
     url_map = _hn_url_map(kids=(201,))
     url_map[f"{_HN_BASE}/item/201.json"] = {"id": 201, "text": text}
     mock_client = _make_hn_client(url_map)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.hacker_news.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await HNWhoIsHiringScanner().scan()
     return jobs[0]
 
@@ -2899,7 +3376,10 @@ async def test_lever_location_lists_every_place_and_remote_among_them_wins():
     posting = _lever_posting(location="San Francisco", workplace_type="onsite")
     posting["categories"]["allLocations"] = ["San Francisco", "Remote (US)", "Toronto"]
     mock_client = _make_mock_client([posting])
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.lever.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await LeverScanner().scan(["co"])
     assert jobs[0].location == "San Francisco; Remote (US); Toronto"
     # A remote option among the places is a statement the text makes, so it beats
@@ -2910,7 +3390,10 @@ async def test_lever_location_lists_every_place_and_remote_among_them_wins():
 async def test_lever_without_all_locations_keeps_the_primary_only():
     posting = _lever_posting(location="Berlin", workplace_type="hybrid")
     mock_client = _make_mock_client([posting])
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.lever.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await LeverScanner().scan(["co"])
     assert jobs[0].location == "Berlin"
     assert jobs[0].remote_type == "hybrid"
@@ -2925,7 +3408,10 @@ async def test_ashby_location_lists_secondary_locations_and_remote_wins():
         "secondaryLocations": [{"location": "Remote"}, {"location": "Toronto"}, {"location": ""}],
     }
     mock_client = _make_mock_client(_ashby_response(job))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs[0].location == "San Francisco; Remote; Toronto"
     assert jobs[0].remote_type == "remote"
@@ -2934,6 +3420,9 @@ async def test_ashby_location_lists_secondary_locations_and_remote_wins():
 async def test_ashby_malformed_secondary_locations_fall_back_to_the_primary():
     job = {**ASHBY_JOB, "location": "Berlin", "isRemote": False, "secondaryLocations": "oops"}
     mock_client = _make_mock_client(_ashby_response(job))
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+    with patch(
+        "moonlighter.discovery.sources.company_boards.ashby.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
         jobs = await AshbyScanner().scan(["co"])
     assert jobs[0].location == "Berlin"

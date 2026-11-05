@@ -17,7 +17,8 @@ from moonlighter.discovery.evaluator import (
     evaluate_job,
     evaluate_jobs_batch,
 )
-from moonlighter.discovery.sources.http import RemotiveScanner, WeWorkRemotelyScanner
+from moonlighter.discovery.sources.job_feeds.remotive import RemotiveScanner
+from moonlighter.discovery.sources.job_feeds.weworkremotely import WeWorkRemotelyScanner
 
 NURSE_PROFILE = {
     "headline": "Registered Nurse",
@@ -126,8 +127,11 @@ async def test_remotive_asks_for_no_category_unless_configured():
         return {"jobs": []}
 
     with (
-        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=Client()),
-        patch("moonlighter.discovery.sources.http.get_json", fake_get_json),
+        patch(
+            "moonlighter.discovery.sources.job_feeds.remotive.httpx.AsyncClient",
+            return_value=Client(),
+        ),
+        patch("moonlighter.discovery.sources.job_feeds.remotive.get_json", fake_get_json),
     ):
         await RemotiveScanner().scan()
         await RemotiveScanner().scan(category="customer-support")
@@ -141,7 +145,7 @@ async def test_remotive_asks_for_no_category_unless_configured():
 
 
 async def test_remotive_dispatch_passes_the_configured_category():
-    with patch("moonlighter.discovery.sources.http.RemotiveScanner") as MockScanner:
+    with patch("moonlighter.discovery.sources.job_feeds.remotive.RemotiveScanner") as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[])
         await scan_service._scan_remotive(
             {"scan_remotive": True, "remotive_category": "design"}, {}, ""
@@ -159,7 +163,7 @@ async def _collect(keywords, config):
 
 @pytest.mark.parametrize("keywords", ["", "   "])
 async def test_gupy_without_keywords_is_skipped_with_a_warning_not_searched_as_software(keywords):
-    with patch("moonlighter.discovery.sources.http.GupyScanner") as MockGupy:
+    with patch("moonlighter.discovery.sources.job_feeds.gupy.GupyScanner") as MockGupy:
         MockGupy.return_value.scan = AsyncMock(return_value=[])
         raw_jobs, warning = await _collect(keywords, {"scan_gupy": True})
     MockGupy.return_value.scan.assert_not_called()
@@ -175,7 +179,7 @@ async def test_gupy_off_and_no_keywords_says_nothing():
 
 
 async def test_gupy_with_keywords_searches_exactly_them():
-    with patch("moonlighter.discovery.sources.http.GupyScanner") as MockGupy:
+    with patch("moonlighter.discovery.sources.job_feeds.gupy.GupyScanner") as MockGupy:
         MockGupy.return_value.scan = AsyncMock(return_value=[])
         await _collect("enfermeiro", {"scan_gupy": True})
     assert MockGupy.return_value.scan.await_args.kwargs["keywords"] == "enfermeiro"
@@ -197,7 +201,10 @@ async def test_wwr_reads_the_all_jobs_feed_unless_a_category_is_configured():
     client.get = fake_get
     client.__aenter__ = AsyncMock(return_value=client)
     client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=client):
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.weworkremotely.httpx.AsyncClient",
+        return_value=client,
+    ):
         await WeWorkRemotelyScanner().scan()
         await WeWorkRemotelyScanner().scan(category="design")
         await WeWorkRemotelyScanner().scan(category="../x")
@@ -210,7 +217,9 @@ async def test_wwr_reads_the_all_jobs_feed_unless_a_category_is_configured():
 
 
 async def test_wwr_dispatch_passes_the_configured_category():
-    with patch("moonlighter.discovery.sources.http.WeWorkRemotelyScanner") as MockScanner:
+    with patch(
+        "moonlighter.discovery.sources.job_feeds.weworkremotely.WeWorkRemotelyScanner"
+    ) as MockScanner:
         MockScanner.return_value.scan = AsyncMock(return_value=[])
         await scan_service._scan_wwr({"scan_wwr": True, "wwr_category": "design"}, {}, "")
     MockScanner.return_value.scan.assert_awaited_once_with(category="design", stats={})
