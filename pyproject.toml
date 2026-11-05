@@ -89,6 +89,12 @@ max-statements = 25
 max-returns = 6
 max-branches = 8
 
+[tool.ruff.lint.flake8-builtins]
+# A005 (a module named after a stdlib module) compares the path from the project root by
+# default, so `core/http.py` passes even though it shadows `http`. Every module here sits
+# inside a package: compare the last component, the gate behind the ban on stdlib names.
+strict-checking = true
+
 [tool.ruff.lint.per-file-ignores]
 # Scripts are standalone executables run from the repository root: not a package
 # (INP001), stdout is their interface (T201), and some fix sys.path first (E402).
@@ -111,7 +117,7 @@ max-branches = 8
 "packages/apply/moonlighter/application/answers/cv.py" = ["D205", "D212", "PLC0415"]
 "packages/apply/moonlighter/application/answers/field_map.py" = ["D205", "D212", "D301", "ERA001", "FURB167", "ISC004", "PLC0415", "PLR0917"]
 "packages/apply/moonlighter/application/answers/option_matcher.py" = ["C901", "D205", "D209", "D212"]
-"packages/apply/moonlighter/application/answers/profile.py" = ["D205", "D212"]
+"packages/apply/moonlighter/application/answers/profile.py" = ["A005", "D205", "D212"]
 "packages/apply/moonlighter/application/answers/work_auth.py" = ["ARG001", "D205", "D209", "D212"]
 "packages/apply/moonlighter/application/assisted/__init__.py" = ["D104"]
 "packages/apply/moonlighter/application/assisted/composer.py" = ["C901", "FURB167", "PLC0415", "PLR0912", "PLR0913", "PLR0915", "PLR0917"]
@@ -139,7 +145,6 @@ max-branches = 8
 "packages/core/moonlighter/core/cli.py" = ["D205", "D209", "I001", "T201"]
 "packages/core/moonlighter/core/db.py" = ["D100", "D205", "D209", "I001", "ICN001", "PLC0415"]
 "packages/core/moonlighter/core/email_alias.py" = ["D415"]
-"packages/core/moonlighter/core/http.py" = ["D205", "D209", "PLR2004"]
 "packages/core/moonlighter/core/ingest.py" = ["D205", "D209", "DTZ005", "ICN001"]
 "packages/core/moonlighter/core/log.py" = ["D100", "D205", "D209", "ISC004", "PLC0415", "PLW0603"]
 "packages/core/moonlighter/core/migrations.py" = ["D100", "D205", "D209", "DTZ005", "I001", "PLC0415", "TRY300"]
@@ -169,7 +174,7 @@ max-branches = 8
 "packages/scan/moonlighter/discovery/service.py" = ["BLE001", "C901", "D205", "D209", "G201", "I001", "PERF401", "PLC0414", "PLC0415", "PLR0912", "PLR0913", "PLR0915", "PLR0917", "PLR2004", "TC006", "TRY300"]
 "packages/scan/moonlighter/discovery/sources/__init__.py" = ["D104"]
 "packages/scan/moonlighter/discovery/sources/base.py" = ["D100", "D205", "D209"]
-"packages/scan/moonlighter/discovery/sources/http.py" = ["BLE001", "C901", "D100", "D205", "D209", "FURB162", "I001", "PLR0912", "PLR0915", "PLR0917", "PLR2004"]
+"packages/scan/moonlighter/discovery/sources/http.py" = ["A005", "BLE001", "C901", "D100", "D205", "D209", "FURB162", "I001", "PLR0912", "PLR0915", "PLR0917", "PLR2004"]
 "packages/scan/moonlighter/discovery/sources/registry.py" = ["D100"]
 "packages/scan/moonlighter/discovery/staleness.py" = ["C901", "DTZ005", "ICN001", "PLR0912", "PLR0917", "PLW2901"]
 "scripts/build_blocklist.py" = ["BLE001", "C901", "D205", "D209", "FBT001", "FBT003", "PLR0912", "PLR0913", "PLR0915", "PLR0917"]

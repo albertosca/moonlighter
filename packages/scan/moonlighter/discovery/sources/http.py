@@ -11,7 +11,7 @@ from typing import Any, ClassVar, override
 from urllib.parse import quote
 
 import httpx
-from moonlighter.core.http import HEADERS, FetchError, get_json, require_dict
+from moonlighter.core.http_fetch import HEADERS, FetchError, get_json, require_dict
 from moonlighter.core.log import get_logger
 from moonlighter.core.posting import strip_tags
 from moonlighter.discovery.sources.base import (
