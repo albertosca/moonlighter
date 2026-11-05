@@ -1,0 +1,652 @@
+[
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "Scan job boards, evaluate with LLM, return new jobs above threshold.\n\nBy default scans only phase 1 (priority BR companies) to save tokens.\nUse phase='phase2', 'phase3', or 'all' to explicitly scan more companies.\n\nArgs:\n    keywords: keywords for the LinkedIn scanner (optional)\n    phase: \"phase1\" (default/BR), \"phase2\" (remote-first global),\n           \"phase3\" (big techs), or \"all\" (everything)\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {
+        "keywords": {
+          "default": "",
+          "title": "Keywords",
+          "type": "string"
+        },
+        "phase": {
+          "default": "phase1",
+          "title": "Phase",
+          "type": "string"
+        }
+      },
+      "title": "scan_and_evaluateArguments",
+      "type": "object"
+    },
+    "name": "scan_and_evaluate",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "scan_and_evaluateOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "Scan every open posting at ONE company right now and evaluate the new ones.\n\nDoes not touch company_list.yaml — use it for ad-hoc checks (\"what is open\nat trm-labs on Ashby?\") without editing config.\n\nArgs:\n    source: ATS name — greenhouse, lever, ashby, workable, recruitee, smartrecruiters\n    company: the company's slug on that ATS (e.g. \"trm-labs\"), or a full\n             custom career domain for Recruitee (e.g. \"jobs.channable.com\")\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {
+        "company": {
+          "title": "Company",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "company"
+      ],
+      "title": "scan_companyArguments",
+      "type": "object"
+    },
+    "name": "scan_company",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "scan_companyOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "Evaluates a manually provided job and saves it to the database.\n\nUseful for LinkedIn postings, job posts, or any source not supported by\nthe automatic scanner. For Greenhouse and Recruitee URLs, any missing\n'company', 'title', or 'description' is auto-filled from the ATS's own API.\nFor everything else, if 'description' is not provided, tries to fetch the\nURL via HTTP (doesn't work for pages requiring authentication, like LinkedIn) —\n'company' and 'title' are still required in that case.\n\nArgs:\n    url: job URL (required, used as unique identifier)\n    company: company name (e.g. \"ifood\"). Optional for routed ATSes (Greenhouse,\n        Recruitee); required otherwise.\n    title: job title (e.g. \"Senior Software Engineer\"). Optional for routed ATSes;\n        required otherwise.\n    description: job description text. If empty, tries to fetch it automatically.\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {
+        "company": {
+          "default": "",
+          "title": "Company",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "title": {
+          "default": "",
+          "title": "Title",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "add_jobArguments",
+      "type": "object"
+    },
+    "name": "add_job",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "add_jobOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "Re-evaluates a job that couldn't be scored automatically because its\ndescription was empty, using text you copy from its real page.\n\nUse this when list_jobs(status=\"needs_review\") shows a pending job: open\nits URL, select the whole page (Cmd+A), copy it (Cmd+C), and pass that\ntext here. The job is scored with the same evaluator as any other job\nand moves to 'new' or 'archived' depending on the configured threshold.\n\nArgs:\n    job_id: the pending job's ID (from list_jobs(status=\"needs_review\") or get_job)\n    page_text: the copied page text — becomes the job's real description\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {
+        "job_id": {
+          "title": "Job Id",
+          "type": "integer"
+        },
+        "page_text": {
+          "title": "Page Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id",
+        "page_text"
+      ],
+      "title": "verify_jobArguments",
+      "type": "object"
+    },
+    "name": "verify_job",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "verify_jobOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "Detect and archive (status='archived', closed_at set) jobs that disappeared from their source.\n\nChecks jobs currently in new/reviewed/applying/needs_review against the source's\ncurrent listing (Greenhouse/Lever/Ashby API, or a LinkedIn page revisit). A company\nwhose check fails (network error, malformed response) is reported explicitly and left\nuntouched — never silently archived by mistake. A job with no listing to compare\nagainst (added by URL, source='manual') is listed with its link for the person to\nconfirm by hand, and is never archived.\n\nArgs:\n    job_id: check only this job (mutually exclusive with company).\n    company: check only jobs from this company, case-insensitive (mutually exclusive\n             with job_id).\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {
+        "company": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Company"
+        },
+        "job_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Job Id"
+        }
+      },
+      "title": "archive_stale_jobsArguments",
+      "type": "object"
+    },
+    "name": "archive_stale_jobs",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "archive_stale_jobsOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "List jobs from DB filtered by status.\n\nOrdering is rejection-aware (see priority.py): a company that recently\nrejected an application sinks toward the end and carries a warning badge —\nthe persisted score is untouched and nothing is hidden.",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 20,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "status": {
+          "default": "new",
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "title": "list_jobsArguments",
+      "type": "object"
+    },
+    "name": "list_jobs",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "list_jobsOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "Get full details of a job posting.",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "get_jobArguments",
+      "type": "object"
+    },
+    "name": "get_job",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "get_jobOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "\nProduce the full set of answers for a job application, for you to paste into\nthe form yourself. Reads the questions from the ATS when it publishes its form\n(Greenhouse, Recruitee, Workable, Lever); otherwise asks you to copy the page.\nInHire lists its required fields in that paste request, so you know up front\nwhat its form will insist on.\njob_id: ID of the job\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {
+        "job_id": {
+          "title": "Job Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "job_id"
+      ],
+      "title": "prepare_applicationArguments",
+      "type": "object"
+    },
+    "name": "prepare_application",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "prepare_applicationOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "\nSame as prepare_application, for a page whose questions no API publishes:\nselect the whole application page, copy it, and pass the text here. When the\njob's ATS publishes its form, the paste is ignored and the published form is\nused instead.\njob_id: ID of the job\npage_text: everything copied off the application page\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {
+        "job_id": {
+          "title": "Job Id",
+          "type": "integer"
+        },
+        "page_text": {
+          "title": "Page Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id",
+        "page_text"
+      ],
+      "title": "prepare_application_from_pasteArguments",
+      "type": "object"
+    },
+    "name": "prepare_application_from_paste",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "prepare_application_from_pasteOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "Show full application funnel: counts and list by status.",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {},
+      "title": "get_pipelineArguments",
+      "type": "object"
+    },
+    "name": "get_pipeline",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "get_pipelineOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "Bring an archived job back to 'reviewed', to apply to it anyway.\n\nUse when the person wants to try a job the scan or archive_stale_jobs archived\n(a low score they disagree with, a posting still open). Only an archived job\ncan be reopened; its closed_at is cleared.\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {
+        "job_id": {
+          "title": "Job Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "job_id"
+      ],
+      "title": "reopen_jobArguments",
+      "type": "object"
+    },
+    "name": "reopen_job",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "reopen_jobOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "\nUpdate application status manually.\nstatus: 'screening' | 'interviews' | 'offer' | 'rejected' | 'submitted' | 'draft'\nnotes: free text notes appended to history\nnext_action: e.g. 'follow up on 2026-06-01'\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {
+        "job_id": {
+          "title": "Job Id",
+          "type": "integer"
+        },
+        "next_action": {
+          "default": "",
+          "title": "Next Action",
+          "type": "string"
+        },
+        "notes": {
+          "default": "",
+          "title": "Notes",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id",
+        "status"
+      ],
+      "title": "update_statusArguments",
+      "type": "object"
+    },
+    "name": "update_status",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "update_statusOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "\nEvery banked screening answer, most recently used first. Entries older than\nanswer_bank_max_age_days are marked expired: kept, but no longer replayed\non a sheet until a new submission refreshes them.\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {},
+      "title": "list_answer_bankArguments",
+      "type": "object"
+    },
+    "name": "list_answer_bank",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "list_answer_bankOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "\nDelete one banked answer by its question text (matched the way the bank\nkeys it: lowercase, collapsed whitespace, no trailing punctuation). Use it\nwhen list_answer_bank shows an answer that is wrong or stale; the next\napplication that asks the question goes to the LLM again.\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {
+        "question": {
+          "title": "Question",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question"
+      ],
+      "title": "forget_answerArguments",
+      "type": "object"
+    },
+    "name": "forget_answer",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "forget_answerOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "\nConfigure Gmail authentication for the account that receives application replies.\nRun only once. Opens the browser to authorize access.\nRequires the OAuth client file at email.credentials_path\n(default MOONLIGHTER_HOME/gmail-client.json) and writes the token to\nemail.token_path — overwriting whatever file that path names.\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {},
+      "title": "setup_emailArguments",
+      "type": "object"
+    },
+    "name": "setup_email",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "setup_emailOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "\nDraft a CV bullet pool + adapted template from your profile.yaml — a\nfirst draft you review and edit, not a finished document. Offered by\nprepare_application whenever it finds no pool yet (see its\ncv_bootstrap_offer response), until you bootstrap one or skip it.\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {},
+      "title": "bootstrap_cv_poolArguments",
+      "type": "object"
+    },
+    "name": "bootstrap_cv_pool",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "bootstrap_cv_poolOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "\nDecline the CV-pool bootstrap offer. You won't be asked again — you can\nstill call bootstrap_cv_pool yourself at any time later.\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {},
+      "title": "skip_cv_bootstrapArguments",
+      "type": "object"
+    },
+    "name": "skip_cv_bootstrap",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "skip_cv_bootstrapOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
+    "description": "\nRead recent emails in the configured Gmail account, whether read or unread,\nclassify them with the LLM, and update the applications database.\nReturns a summary of the updates made.\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {},
+      "title": "sync_email_responsesArguments",
+      "type": "object"
+    },
+    "name": "sync_email_responses",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "sync_email_responsesOutput",
+      "type": "object"
+    },
+    "title": null
+  }
+]

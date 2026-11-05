@@ -1,0 +1,16 @@
+# Setup Warnings
+
+- [WARN] /nonexistent-home/profile.yaml is empty. Fill in skills, experience, and criteria for useful LLM evaluations.
+- [ERROR] llm_backend is 'api' but ANTHROPIC_API_KEY is not in the environment nor in ~/.config/anthropic/api.env. scan_and_evaluate and prepare_application will not work. Set the key, or switch to llm_backend: cli in config.yaml to use your Claude subscription instead.
+- [WARN] CV file not found at /nonexistent-home/cv.pdf. prepare_application won't be able to point you at a file to upload. Add your resume there, or set cv.default in config.yaml to a different path.
+- [WARN] Browser not found at /nonexistent/browser. A browser-based scan extension, if installed, will not work. Install the browser (Chrome/Chromium/Brave) or set browser_path in config.yaml.
+
+# Application Pipeline
+
+## Submitted (1)
+- #1 Stripe/Engineer (05/03) → follow up em 2026-06-01
+
+## Interviews (1)
+- #2 Linear/Designer (—)
+
+**Total applications:** 2

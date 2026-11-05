@@ -1,5 +1,7 @@
 import json
 import logging
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -11,6 +13,7 @@ from moonlighter.core.db import Application, Job, ScanLog, init_db
 from moonlighter.core.metrics import record_call
 from moonlighter.discovery.evaluation.models import EvaluationResult
 from moonlighter.discovery.results import ScanKind, ScanReport
+from moonlighter.server import mcp
 
 from tests._context import make_test_context
 
@@ -2528,3 +2531,36 @@ async def test_skip_cv_bootstrap_tool_records_the_decline(temporary_database):
     result = await server.skip_cv_bootstrap(context=make_test_context())
     assert cv_bootstrap_declined() is True
     assert "won't" in result.lower() or "never" in result.lower() or "skip" in result.lower()
+
+
+# ── pins written before the server was split into modules ─────────────────────
+
+
+async def test_tools_list_surface_is_pinned(snapshot_text):
+    """Names, order, descriptions, input schemas and annotations of every tool, as a
+    client sees them in tools/list."""
+    tools = await mcp.list_tools()
+    dump = [tool.model_dump(mode="json", by_alias=True) for tool in tools]
+    snapshot_text(json.dumps(dump, indent=2, sort_keys=True, ensure_ascii=False), "tools_list")
+
+
+async def test_get_pipeline_whole_text_is_pinned(temporary_database, monkeypatch, snapshot_text):
+    init_db()
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    stripe = create_job(temporary_database, url="https://x.com/pin1", company="Stripe")
+    linear = create_job(
+        temporary_database, url="https://x.com/pin2", company="Linear", title="Designer"
+    )
+    create_application(
+        stripe,
+        status="submitted",
+        applied_at=datetime(2026, 3, 5),
+        next_action="follow up em 2026-06-01",
+    )
+    create_application(linear, status="interviews")
+    from moonlighter.server import get_pipeline
+
+    config = {"llm_backend": "api", "browser_path": "/nonexistent/browser"}
+    with patch("moonlighter.startup.moonlighter_home", return_value=Path("/nonexistent-home")):
+        result = await get_pipeline(context=make_test_context(config=config, profile={}))
+    snapshot_text(result, "get_pipeline")
