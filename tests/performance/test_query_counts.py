@@ -4,7 +4,7 @@ import contextlib
 from unittest.mock import patch
 
 from moonlighter.core.db import Job, ScanLog, db, init_db
-from moonlighter.discovery.claims import drop_already_seen
+from moonlighter.discovery.scan.claims import drop_already_seen
 from moonlighter.discovery.sources.base import RawJob
 from moonlighter.mcp_tools.jobs import list_jobs
 
