@@ -28,8 +28,8 @@ def test_capabilities_split_by_what_is_installed():
     from moonlighter.core.slices import capabilities
 
     live, missing = capabilities({"scan": True, "apply": False, "email": False, "full": False})
-    assert [c.name for c in live] == ["discovery"]
-    assert [c.name for c in missing] == [
+    assert [capability.name for capability in live] == ["discovery"]
+    assert [capability.name for capability in missing] == [
         "sheets",
         "tracking",
         "scan-to-sheet",
@@ -41,8 +41,8 @@ def test_capabilities_split_by_what_is_installed():
 def test_every_capability_names_only_known_slices():
     from moonlighter.core.slices import CAPABILITIES, SLICES
 
-    for c in CAPABILITIES:
-        assert c.needs <= set(SLICES), c.name
+    for capability in CAPABILITIES:
+        assert capability.needs <= set(SLICES), capability.name
 
 
 def test_slice_epilog_says_what_is_installed_and_what_each_missing_slice_unlocks():
@@ -83,3 +83,25 @@ def test_slice_epilog_pins_one_missing_line_verbatim():
         "  install apply -> would add: sheets (moonlighter-apply prepare)"
         " -- compose a paste-ready application sheet, from a job id or straight from a URL"
     ]
+
+
+def test_slice_epilog_pins_the_whole_text_of_a_scan_only_install():
+    # Every missing line at once: CAPABILITIES order, the needs not yet
+    # installed (sorted, joined), and a command list only when there is one.
+    from moonlighter.core.slices import slice_epilog
+
+    text = slice_epilog({"scan": True, "apply": False, "email": False, "full": False})
+    assert text == (
+        "installed: scan\n"
+        "  install apply -> would add: sheets (moonlighter-apply prepare)"
+        " -- compose a paste-ready application sheet, from a job id or straight from a URL\n"
+        "  install email -> would add: tracking (moonlighter-email sync, moonlighter-email register)"
+        " -- register applications and match Gmail replies back to them\n"
+        "  install apply -> would add: scan-to-sheet"
+        " -- one script: scan, pick by score, prepare a sheet for each\n"
+        "  install apply, email -> would add: alias-round-trip"
+        " -- the tracking alias a sheet mints is the one sync matches replies against\n"
+        "  install full -> would add: mcp-server (moonlighter)"
+        " -- the MCP server for Claude Code, plus answer-bank promotion"
+        " when a reply advances an application"
+    )

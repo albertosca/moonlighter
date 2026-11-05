@@ -344,6 +344,73 @@ def test_doctor_payload_live_and_missing_capabilities_share_the_same_keys(
     assert missing_by_name["scan-to-sheet"]["needs_install"] == ["apply"]
 
 
+def test_doctor_payload_keeps_the_key_order_of_every_json_object(
+    temporary_database, monkeypatch, tmp_path
+):
+    # Dict equality ignores key order; the JSON document a script reads does
+    # not. This pins the order of every object doctor emits.
+    from moonlighter.core import cli
+
+    (tmp_path / "config.yaml").write_text("score_threshold: 7.0\n")
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    with patch(
+        "moonlighter.core.cli.installed_slices",
+        return_value={"scan": True, "apply": False, "email": False, "full": False},
+    ):
+        payload, _code = cli.doctor_payload()
+
+    assert list(payload) == [
+        "kind",
+        "home",
+        "config",
+        "profile",
+        "db",
+        "slices",
+        "commands",
+        "capabilities",
+    ]
+    assert list(payload["config"]) == ["path", "exists", "valid", "error"]
+    assert list(payload["profile"]) == ["path", "exists"]
+    assert list(payload["db"]) == ["path", "exists"]
+    assert list(payload["capabilities"]) == ["live", "missing"]
+    assert [list(capability) for capability in payload["capabilities"]["live"]] == [
+        ["name", "needs", "commands", "summary"],
+    ]
+    assert [list(capability) for capability in payload["capabilities"]["missing"]] == [
+        ["name", "needs", "commands", "summary", "needs_install"],
+        ["name", "needs", "commands", "summary", "needs_install"],
+        ["name", "needs", "commands", "summary", "needs_install"],
+        ["name", "needs", "commands", "summary", "needs_install"],
+        ["name", "needs", "commands", "summary", "needs_install"],
+    ]
+
+
+def test_doctor_payload_lists_every_slice_a_missing_capability_still_needs_sorted(
+    temporary_database, monkeypatch, tmp_path
+):
+    # missing[] keeps the CAPABILITIES order, and needs_install is sorted:
+    # alias-round-trip needs two slices, and both are absent here.
+    from moonlighter.core import cli
+
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    with patch(
+        "moonlighter.core.cli.installed_slices",
+        return_value={"scan": True, "apply": False, "email": False, "full": False},
+    ):
+        payload, _code = cli.doctor_payload()
+
+    assert [
+        (capability["name"], capability["needs_install"])
+        for capability in payload["capabilities"]["missing"]
+    ] == [
+        ("sheets", ["apply"]),
+        ("tracking", ["email"]),
+        ("scan-to-sheet", ["apply"]),
+        ("alias-round-trip", ["apply", "email"]),
+        ("mcp-server", ["full"]),
+    ]
+
+
 def test_doctor_payload_reports_a_malformed_yaml_config_instead_of_crashing(
     temporary_database, monkeypatch, tmp_path
 ):
