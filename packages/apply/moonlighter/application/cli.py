@@ -20,7 +20,7 @@ from typing import Any
 from moonlighter.application.commands.bootstrap_cv import run_bootstrap_cv
 from moonlighter.application.commands.doctor import run_doctor
 from moonlighter.application.commands.prepare import run_prepare
-from moonlighter.application.cvgen.bootstrap_error import BootstrapError
+from moonlighter.application.cvgen.pool.bootstrap_error import BootstrapError
 from moonlighter.core.cli import JsonArgumentParser, bootstrap, run
 from moonlighter.core.slices import slice_epilog
 

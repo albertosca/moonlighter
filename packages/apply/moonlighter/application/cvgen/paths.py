@@ -22,7 +22,7 @@ def generated_dir_for(config: dict[str, Any], job_id: int) -> Path:
 # Conventional defaults used whenever cv.pool/cv.template_dir is absent from
 # config -- the feature still turns on purely by the file existing (opt-in
 # by existence, unchanged), it just has somewhere to exist without the user
-# hand-writing the config key first. Only the bootstrap (cvgen/bootstrap.py)
+# hand-writing the config key first. Only the bootstrap (cvgen/pool/bootstrap.py)
 # ever writes here; nothing conjures a file at this path on its own.
 _DEFAULT_POOL_NAME = "cv-pool.yaml"
 _DEFAULT_TEMPLATE_DIR_NAME = "cv-templates"

@@ -6,9 +6,11 @@ from mcp.server.mcpserver import Context
 
 from moonlighter._tool_logging import tool_logged
 from moonlighter.app_context import AppContext, refreshed_app_context
-from moonlighter.application.cvgen.bootstrap import bootstrap_cv_pool as bootstrap_cv_pool_service
-from moonlighter.application.cvgen.bootstrap_error import BootstrapError
-from moonlighter.application.cvgen.compile import latex_available
+from moonlighter.application.cvgen.latex.compile import latex_available
+from moonlighter.application.cvgen.pool.bootstrap import (
+    bootstrap_cv_pool as bootstrap_cv_pool_service,
+)
+from moonlighter.application.cvgen.pool.bootstrap_error import BootstrapError
 from moonlighter.core.db import record_cv_bootstrap_decline
 from moonlighter.core.llm.dispatch import make_caller
 

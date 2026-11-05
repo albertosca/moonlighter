@@ -7,7 +7,7 @@ from moonlighter.application.assisted.questions import FormQuestion, QuestionKin
 from moonlighter.application.assisted.results import render_sheet_result
 from moonlighter.application.assisted.sources import greenhouse as greenhouse_source
 from moonlighter.application.assisted.sources import recruitee as recruitee_source
-from moonlighter.application.cvgen.page_fit import TailoredCV
+from moonlighter.application.cvgen.latex.page_fit import TailoredCV
 
 from tests.application.assisted.service.service_fakes import (
     bypass_cv_bootstrap_offer,

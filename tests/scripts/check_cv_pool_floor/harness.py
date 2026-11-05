@@ -4,7 +4,7 @@ import textwrap
 from unittest.mock import patch
 
 import check_cv_pool_floor
-from moonlighter.application.cvgen.pool import load_pool
+from moonlighter.application.cvgen.pool.loader import load_pool
 
 POOL_YAML = textwrap.dedent("""\
     experiences:

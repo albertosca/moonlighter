@@ -24,7 +24,7 @@ Some questions should not be answered by a model at all. Before drafting, plain 
 
 ### Model text escaped, never validated, into the CV's LaTeX
 
-The tailored CV compiles model-written text with `pdflatex`, which makes that text a code-injection surface. Two earlier designs let the model's translations carry LaTeX and tried to validate it; both were bypassed. The instructive bypass was `^^5c`: TeX turns it into a backslash while tokenising, so no check for a literal backslash sees it, and `\input{...}` could then embed a local file into the PDF you upload to an employer. Now [`escape_latex`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/cvgen/latex_text.py) rewrites every TeX special character, `^` included, so there is nothing left to detect. The cost: model output can't carry formatting beyond `**bold**`.
+The tailored CV compiles model-written text with `pdflatex`, which makes that text a code-injection surface. Two earlier designs let the model's translations carry LaTeX and tried to validate it; both were bypassed. The instructive bypass was `^^5c`: TeX turns it into a backslash while tokenising, so no check for a literal backslash sees it, and `\input{...}` could then embed a local file into the PDF you upload to an employer. Now [`escape_latex`](https://github.com/albertosca/moonlighter/blob/main/packages/apply/moonlighter/application/cvgen/latex/text.py) rewrites every TeX special character, `^` included, so there is nothing left to detect. The cost: model output can't carry formatting beyond `**bold**`.
 
 ### Five slices with a tested import boundary and lockstep releases
 

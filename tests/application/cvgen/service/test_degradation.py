@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from moonlighter.application.cvgen.page_fit import TailoredCV
+from moonlighter.application.cvgen.latex.page_fit import TailoredCV
 from moonlighter.application.cvgen.paths import generated_dir_for
 from moonlighter.application.cvgen.service import ensure_tailored_cv
 
@@ -18,7 +18,7 @@ async def test_generation_failure_degrades_to_none(config):
     assert not (generated_dir_for(config, 42) / "USE_BASE").exists()
     good_call, good_calls = counting_caller()
     with patch(
-        "moonlighter.application.cvgen.page_fit.compile_pdf",
+        "moonlighter.application.cvgen.latex.page_fit.compile_pdf",
         side_effect=lambda tex: tex.with_suffix(".pdf"),
     ):
         retry = await ensure_tailored_cv(JOB, config, {}, caller=good_call)
@@ -86,7 +86,7 @@ async def test_a_wrong_shaped_llm_response_still_produces_a_cv(config):
     )
     call, calls = counting_caller(response)
     with patch(
-        "moonlighter.application.cvgen.page_fit.compile_pdf",
+        "moonlighter.application.cvgen.latex.page_fit.compile_pdf",
         side_effect=lambda tex: tex.with_suffix(".pdf"),
     ):
         result = await ensure_tailored_cv(JOB, config, {}, caller=call)

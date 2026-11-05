@@ -5,7 +5,7 @@ from typing import Any
 
 import yaml
 
-from moonlighter.application.cvgen.links import link_report
+from moonlighter.application.cvgen.latex.links import link_report
 from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.loading import load_config

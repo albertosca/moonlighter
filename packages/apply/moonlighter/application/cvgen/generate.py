@@ -9,11 +9,15 @@ never rendered (specs/2026-08-25-tailored-cv-design.md).
 from typing import Any, Final, Literal
 
 from moonlighter.application.answers.operator_guard import find_operator_marker
-from moonlighter.application.cvgen.cv_template import BaseFields
-from moonlighter.application.cvgen.latex_text import is_typesettable
-from moonlighter.application.cvgen.pool import CVPool
-from moonlighter.application.cvgen.render import MAXIMUM_BULLETS, MAXIMUM_OPEN_SOURCE, CVSelection
-from moonlighter.application.cvgen.selection_prompt import prompt_prefix
+from moonlighter.application.cvgen.latex.cv_template import BaseFields
+from moonlighter.application.cvgen.latex.render import (
+    MAXIMUM_BULLETS,
+    MAXIMUM_OPEN_SOURCE,
+    CVSelection,
+)
+from moonlighter.application.cvgen.latex.text import is_typesettable
+from moonlighter.application.cvgen.pool.loader import CVPool
+from moonlighter.application.cvgen.pool.selection_prompt import prompt_prefix
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.log import get_logger

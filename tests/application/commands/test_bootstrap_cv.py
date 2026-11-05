@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, Mock
 
 from moonlighter.application import cli
 from moonlighter.application.commands import bootstrap_cv as bootstrap_cv_command
-from moonlighter.application.cvgen.bootstrap import BootstrapOutcome
+from moonlighter.application.cvgen.pool.bootstrap import BootstrapOutcome
 from moonlighter.core.db import cv_bootstrap_declined, init_db
 
 

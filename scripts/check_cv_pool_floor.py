@@ -11,9 +11,9 @@ Usage:
 import sys
 from typing import Any
 
-from moonlighter.application.cvgen.compile import compile_pdf, latex_available, page_count
-from moonlighter.application.cvgen.pool import CVPool, PoolError, load_pool
-from moonlighter.application.cvgen.render import CVSelection, render_cv
+from moonlighter.application.cvgen.latex.compile import compile_pdf, latex_available, page_count
+from moonlighter.application.cvgen.latex.render import CVSelection, render_cv
+from moonlighter.application.cvgen.pool.loader import CVPool, PoolError, load_pool
 from moonlighter.core.config.loading import load_config
 from moonlighter.core.config.paths import resolve_under_home
 

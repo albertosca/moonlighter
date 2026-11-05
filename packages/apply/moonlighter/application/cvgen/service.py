@@ -9,18 +9,18 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Literal, NamedTuple
 
-from moonlighter.application.cvgen.compile import looks_like_a_compiled_pdf
-from moonlighter.application.cvgen.cv_template import (
+from moonlighter.application.cvgen.generate import USE_BASE, decide_cv
+from moonlighter.application.cvgen.latex.compile import looks_like_a_compiled_pdf
+from moonlighter.application.cvgen.latex.cv_template import (
     BaseFields,
     base_fields,
     relanguage_fallback_fields,
     template_text,
 )
-from moonlighter.application.cvgen.generate import USE_BASE, decide_cv
-from moonlighter.application.cvgen.page_fit import TailoredCV, after_compile, fit_to_one_page
+from moonlighter.application.cvgen.latex.page_fit import TailoredCV, after_compile, fit_to_one_page
+from moonlighter.application.cvgen.latex.render import CVSelection
 from moonlighter.application.cvgen.paths import generated_dir_for, resolved_pool_path
-from moonlighter.application.cvgen.pool import CVPool, PoolError, load_pool
-from moonlighter.application.cvgen.render import CVSelection
+from moonlighter.application.cvgen.pool.loader import CVPool, PoolError, load_pool
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.log import get_logger

@@ -1,7 +1,7 @@
 import json
 from unittest.mock import patch
 
-from moonlighter.application.cvgen.page_fit import TailoredCV
+from moonlighter.application.cvgen.latex.page_fit import TailoredCV
 from moonlighter.application.cvgen.paths import generated_dir_for
 from moonlighter.application.cvgen.service import ensure_tailored_cv
 
@@ -17,7 +17,7 @@ async def test_no_pool_configured_is_none_without_calls(tmp_path):
 async def test_generates_writes_tex_and_compiles(config):
     call, _ = counting_caller()
     with patch(
-        "moonlighter.application.cvgen.page_fit.compile_pdf",
+        "moonlighter.application.cvgen.latex.page_fit.compile_pdf",
         side_effect=lambda tex: tex.with_suffix(".pdf"),
     ):
         result = await ensure_tailored_cv(JOB, config, {}, caller=call)
@@ -58,10 +58,10 @@ async def test_a_truncated_cached_pdf_is_not_trusted(config):
     call, calls = counting_caller(GENERATE)
     with (
         patch(
-            "moonlighter.application.cvgen.page_fit.compile_pdf",
+            "moonlighter.application.cvgen.latex.page_fit.compile_pdf",
             side_effect=lambda tex: tex.with_suffix(".pdf"),
         ),
-        patch("moonlighter.application.cvgen.page_fit.latex_available", return_value=True),
+        patch("moonlighter.application.cvgen.latex.page_fit.latex_available", return_value=True),
     ):
         result = await ensure_tailored_cv(JOB, config, {}, caller=call)
     # Regenerates instead of serving the truncated file — proves the cache
@@ -79,10 +79,10 @@ async def test_a_directory_named_cv_pdf_is_not_trusted(config):
     call, calls = counting_caller(GENERATE)
     with (
         patch(
-            "moonlighter.application.cvgen.page_fit.compile_pdf",
+            "moonlighter.application.cvgen.latex.page_fit.compile_pdf",
             side_effect=lambda tex: tex.with_suffix(".pdf"),
         ),
-        patch("moonlighter.application.cvgen.page_fit.latex_available", return_value=True),
+        patch("moonlighter.application.cvgen.latex.page_fit.latex_available", return_value=True),
     ):
         result = await ensure_tailored_cv(JOB, config, {}, caller=call)
     assert calls["n"] == 1

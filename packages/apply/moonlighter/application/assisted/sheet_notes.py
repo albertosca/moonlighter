@@ -6,7 +6,7 @@ from typing import Any
 
 from moonlighter.application.assisted.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.cvgen.page_fit import TailoredCV
+from moonlighter.application.cvgen.latex.page_fit import TailoredCV
 from moonlighter.core.email_alias import is_email_label
 
 

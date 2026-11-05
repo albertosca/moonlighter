@@ -1,7 +1,7 @@
 """bootstrap_cv_pool reports what it generated or why not, and skip_cv_bootstrap records the decline."""
 
-from moonlighter.application.cvgen.bootstrap import BootstrapOutcome
-from moonlighter.application.cvgen.bootstrap_error import BootstrapError
+from moonlighter.application.cvgen.pool.bootstrap import BootstrapOutcome
+from moonlighter.application.cvgen.pool.bootstrap_error import BootstrapError
 from moonlighter.core.db import cv_bootstrap_declined, init_db
 from moonlighter.mcp_tools import cv_pool
 

@@ -2,7 +2,7 @@
 
 import json
 
-from moonlighter.application.cvgen.pool import CVPool, PoolBullet, PoolExperience
+from moonlighter.application.cvgen.pool.loader import CVPool, PoolBullet, PoolExperience
 
 POOL = CVPool(
     experiences=(
