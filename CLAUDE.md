@@ -2,7 +2,7 @@
 
 Monorepo of 5 PEP 420 namespace packages under `packages/*/moonlighter/` — never add `__init__.py` at the `moonlighter/` namespace level.
 
-`core` (config, db, llm, plugins) · `scan` (discovery: scanners, evaluator, staleness) · `apply` (assisted composer) · `email` (reply tracking) · `full` (the MCP server, `packages/full/moonlighter/server.py`). Entry points: `moonlighter` (MCP), `moonlighter-scan`, `moonlighter-apply`, `moonlighter-email` (JSON CLIs, one per slice).
+`core` (config, db, llm, plugins) · `scan` (discovery: scanners, evaluator, staleness) · `apply` (assisted composer) · `email` (reply tracking) · `full` (the MCP server: `packages/full/moonlighter/server.py` registers the tools that live in `mcp_tools/`). Entry points: `moonlighter` (MCP), `moonlighter-scan`, `moonlighter-apply`, `moonlighter-email` (JSON CLIs, one per slice).
 
 Outside `packages/`: `guide/en|pt` (docs site source) · `scripts/` (CI checks, docs build, diagram render) · `assets/` (diagrams, social preview).
 
@@ -20,7 +20,7 @@ Outside `packages/`: `guide/en|pt` (docs site source) · `scripts/` (CI checks, 
 - e2e tests are deselected by default (`addopts` carries `-m 'not e2e'`); run them with `uv run pytest -m e2e` — on `main` they need `pdflatex` and the network (live ATS form checks in `tests/application/assisted/test_live_sources.py`; browser e2e live on `feat/ats-automation`). A skipped e2e counts as a FAILURE (`tests/_e2e_guard.py`).
 - Try a tool version before merging its Dependabot PR: `uvx ruff@0.16.3 format --check packages tests`.
 - Lint: `uv run ruff check .` · Format: `uv run ruff format --check .`
-- Types (mirror of ci.yml): `uv run mypy --package moonlighter.core --package moonlighter.discovery --package moonlighter.application --package moonlighter.tracking --package moonlighter.server --package moonlighter.startup --package moonlighter.views --package moonlighter._tool_logging --package moonlighter.init` — always `--package`, never file paths (paths duplicate module resolution in namespace packages). `scripts/` is not a package and gets its own line, `uv run mypy scripts/` — `ci.yml` runs both.
+- Types (mirror of ci.yml): `uv run mypy --package moonlighter.core --package moonlighter.discovery --package moonlighter.application --package moonlighter.tracking --package moonlighter.server --package moonlighter.app_context --package moonlighter.mcp_tools --package moonlighter.priority --package moonlighter.startup --package moonlighter.views --package moonlighter._tool_logging --package moonlighter.init` — always `--package`, never file paths (paths duplicate module resolution in namespace packages). `scripts/` is not a package and gets its own line, `uv run mypy scripts/` — `ci.yml` runs both.
 - Docs site: `bash scripts/build_docs.sh` builds `guide/en` + `guide/pt` into `site/` (Zensical, one build per language, then assembled — building both into one `site_dir` wipes a language). Preview one language live: `uv run --group docs zensical serve -f zensical.en.yml`. `--stamp` is CI-only (edits the working copy, refuses a shallow clone).
 - README facts: `uv run pytest -q --junitxml=test-report.xml && uv run python scripts/check_readme_facts.py --junit test-report.xml` — fails when a written number is false or stale by more than 200 tests; update the facts blocks (both READMEs, both site homes, llms.txt) and `assets/site/social-preview.svg` + its PNG together.
 - Zensical is pre-1.0: build a Dependabot bump locally (`uv run --group docs --with zensical==X zensical build --strict -f zensical.en.yml`) before merging it.

@@ -99,6 +99,8 @@ strict-checking = true
 # Scripts are standalone executables run from the repository root: not a package
 # (INP001), stdout is their interface (T201), and some fix sys.path first (E402).
 "scripts/*" = ["E402", "INP001", "T201"]
+# The setup wizard talks to the user on stdout: print is its interface.
+"packages/full/moonlighter/init.py" = ["T201"]
 # S101: assert is pytest's idiom. S105/S106: mock credentials such as "refresh_token".
 # S108: /tmp paths in fixtures, never at runtime. PLR2004: a literal expected value is
 # the point of an assertion. ARG: fakes must match the signature they replace, and
@@ -110,10 +112,6 @@ strict-checking = true
 # BEGIN ratchet
 # Files not yet migrated to the profile above (plan 2026-11-04, showcase quality).
 # Each task deletes its files' lines; the block is empty and removed at the end.
-"packages/full/moonlighter/_tool_logging.py" = ["D205"]
-"packages/full/moonlighter/init.py" = ["I001", "PLC0415", "T201"]
-"packages/full/moonlighter/priority.py" = ["D205", "D209", "DTZ005", "ICN001"]
-"packages/full/moonlighter/startup.py" = ["C901", "D100", "D205", "D209", "PLR0911"]
 "scripts/build_blocklist.py" = ["BLE001", "C901", "D205", "D209", "FBT001", "FBT003", "PLR0912", "PLR0913", "PLR0915", "PLR0917"]
 "scripts/check_built_site.py" = ["C901", "D205", "D209", "FBT001", "PERF401", "PLR0912"]
 "scripts/check_cv_pool_floor.py" = ["C901", "D205", "D209", "PLR0911"]
@@ -133,12 +131,8 @@ strict-checking = true
 "tests/scripts/test_check_version_lockstep.py" = ["PLC0415", "PT018"]
 "tests/scripts/test_render_diagrams.py" = ["PLC0415", "PT018"]
 "tests/scripts/test_stamp_revision_dates.py" = ["PLC0415", "PT018"]
-"tests/test_mcp_stdio.py" = ["PLR0917"]
 "tests/test_package_boundaries.py" = ["C901"]
 "tests/test_performance.py" = ["N806", "PLC0415", "PLR0917"]
-"tests/test_priority.py" = ["DTZ001", "ICN001"]
-"tests/test_startup.py" = ["PT018"]
-"tests/test_tool_logging.py" = ["PLC0415"]
 # END ratchet
 
 [tool.moonlighter.file-length]
@@ -160,6 +154,9 @@ source_pkgs = [
     "moonlighter.application",
     "moonlighter.tracking",
     "moonlighter.server",
+    "moonlighter.app_context",
+    "moonlighter.mcp_tools",
+    "moonlighter.priority",
     "moonlighter.startup",
     "moonlighter.views",
     "moonlighter._tool_logging",

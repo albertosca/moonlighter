@@ -35,6 +35,9 @@ uv run mypy \
   --package moonlighter.application \
   --package moonlighter.tracking \
   --package moonlighter.server \
+  --package moonlighter.app_context \
+  --package moonlighter.mcp_tools \
+  --package moonlighter.priority \
   --package moonlighter.startup \
   --package moonlighter.views \
   --package moonlighter._tool_logging \
