@@ -18,7 +18,7 @@ async def test_llm_failure_does_not_burn_the_message_and_retries_on_next_sync(te
     processed. It has to survive to be retried by a later sync with a
     healthy LLM. Revert the classification.py/email_monitor.py fix (make
     classify_response fall back to _classification_from({}) on any
-    exception, and drop the try/except around it in sync_responses) and
+    exception, and drop the try/except around it in _classify) and
     this test fails — the first sync marks msg0 processed via the
     'unrelated' fallback, so the second sync's healthy caller never even
     gets invoked for it."""

@@ -105,7 +105,7 @@ async def test_fuzzy_match_never_registers_a_new_stage(temporary_database):
 
 async def test_legitimately_registered_new_stage_is_accepted(temporary_database):
     """A declared new_stage (registered via register_new_stage BEFORE
-    _advance_application runs) must be accepted — it's not hallucination,
+    advance_application runs) must be accepted — it's not hallucination,
     it's a deliberate feature."""
     init_db()
     job = make_job(temporary_database)

@@ -142,5 +142,5 @@ async def test_ambiguous_match_marks_uncertain_in_notes(temporary_database):
     ):
         updates = await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
 
-    # Nenhuma application pode ter sido atualizada definitivamente — uncertain
+    # No application can have been updated for certain — uncertain
     assert any("uncertain" in (update.get("match_type", "")) for update in updates)

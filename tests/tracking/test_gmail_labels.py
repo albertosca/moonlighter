@@ -33,7 +33,7 @@ class TestMarkProcessed:
 
 
 def test_get_or_create_label_returns_existing():
-    """Label already exists → returns the existing id (280-282)."""
+    """Label already exists → returns the existing id."""
     service = MagicMock()
     service.users().labels().list().execute.return_value = {
         "labels": [{"name": "moonlighter/processed", "id": "Label_42"}]
@@ -42,7 +42,7 @@ def test_get_or_create_label_returns_existing():
 
 
 def test_get_or_create_label_creates_when_missing():
-    """Label doesn't exist → creates it and returns the new id (283-296)."""
+    """Label doesn't exist → creates it and returns the new id."""
     service = MagicMock()
     service.users().labels().list().execute.return_value = {"labels": []}
     service.users().labels().create().execute.return_value = {"id": "Label_new"}
@@ -50,7 +50,7 @@ def test_get_or_create_label_creates_when_missing():
 
 
 def test_get_or_create_label_skips_non_matching_then_creates():
-    """An existing label that doesn't match is skipped (281->280) and the target is created."""
+    """An existing label that doesn't match is skipped and the target is created."""
     service = MagicMock()
     service.users().labels().list().execute.return_value = {
         "labels": [{"name": "OTHER", "id": "x"}]

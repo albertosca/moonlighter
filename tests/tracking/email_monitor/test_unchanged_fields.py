@@ -106,9 +106,9 @@ async def test_acknowledgement_end_to_end_leaves_status_and_stage_untouched(temp
     'acknowledgement', which real ATS receipts sometimes do. This holds
     only because classify_response's _classification_from strips
     stage/new_stage for acknowledgement BEFORE register_new_stage and
-    _advance_application run in sync_responses; if that stripping ever
+    advance_application run in _apply_reply; if that stripping ever
     regressed, register_new_stage would register the volunteered stage as
-    legitimately new, and _advance_application would then find it 'known'
+    legitimately new, and advance_application would then find it 'known'
     and write it to current_stage. That coupling was previously untested —
     this is the test that would catch a regression in it."""
     init_db()

@@ -8,14 +8,14 @@ from tests.tracking.gmail_payloads import b64
 
 
 def test_extract_body_html_top_level():
-    """Top-level text/html payload is decoded (169)."""
+    """Top-level text/html payload is decoded."""
     payload = {"mimeType": "text/html", "body": {"data": b64("<p>Hi</p>")}}
     assert "Hi" in extract_body(payload)
 
 
 def test_extract_body_multipart_skips_empty_parts_then_finds_html():
-    """text/plain and text/html parts with empty data are skipped (177->174, 181->180);
-    the html with data is accepted (183)."""
+    """text/plain and text/html parts with empty data are skipped;
+    the html with data is accepted."""
     payload = {
         "mimeType": "multipart/alternative",
         "parts": [
@@ -28,7 +28,7 @@ def test_extract_body_multipart_skips_empty_parts_then_finds_html():
 
 
 def test_extract_body_recurses_into_nested_multipart():
-    """Nested multipart is resolved via recursion (186-189)."""
+    """Nested multipart is resolved via recursion."""
     payload = {
         "mimeType": "multipart/mixed",
         "parts": [
@@ -46,12 +46,12 @@ def test_extract_body_unknown_mime_returns_empty():
 
 
 def test_decode_data_invalid_base64_returns_empty():
-    """Invalid Base64 → '' without raising (199-200)."""
+    """Invalid Base64 → '' without raising."""
     assert _decode_data("!!!notbase64@@@") == ""
 
 
 def test_extract_body_multipart_unresolvable_returns_empty():
-    """Parts that don't resolve to text → recursion ends without finding anything (186->191, 188->186)."""
+    """Parts that don't resolve to text → recursion ends without finding anything."""
     payload = {
         "mimeType": "multipart/mixed",
         "parts": [{"mimeType": "application/octet-stream", "body": {}}],

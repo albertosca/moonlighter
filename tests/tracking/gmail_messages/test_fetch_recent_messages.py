@@ -20,7 +20,7 @@ class TestFetchRecentMessages:
 
         call_keyword_arguments = listing.call_args.kwargs
         assert "in:anywhere" in call_keyword_arguments.get("q", "")
-        assert "labelIds" not in call_keyword_arguments, "labelIds=[INBOX] exclui o spam"
+        assert "labelIds" not in call_keyword_arguments, "labelIds=[INBOX] would exclude spam"
 
     def test_does_not_gate_on_read_state(self):
         """A person reads their mail; a reply already read is exactly the reply
