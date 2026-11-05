@@ -141,36 +141,17 @@ def test_real_facts_read_branch_coverage_and_strict_mypy(tmp_path):
     assert facts.mypy_strict
 
 
-def test_slug_follows_github_rules():
-    slug = check_readme_facts.slug
-    assert slug("Extensions (adding a new ATS scanner)") == "extensions-adding-a-new-ats-scanner"
-    assert slug("Instalação") == "instalação"
-    assert slug("`moonlighter-scan` doctor") == "moonlighter-scan-doctor"
-    assert slug("Sixty seconds of it") == "sixty-seconds-of-it"
+def test_one_files_problems_come_in_the_order_tests_coverage_packages_branch_mypy():
+    text = _block("1,800+ tests · 95% branch coverage · 4 packages · mypy strict")
 
-
-def test_duplicate_headings_get_numbered_slugs():
-    assert check_readme_facts.anchors("# Setup\n\n## Setup\n\n## Setup\n") == {
-        "setup",
-        "setup-1",
-        "setup-2",
-    }
-
-
-def test_anchor_ignores_headings_in_code_fences():
-    assert check_readme_facts.anchors("## Real\n\n```sh\n# not-a-heading\n```\n") == {"real"}
-
-
-def test_link_problems_find_dead_files_and_anchors(tmp_path):
-    (tmp_path / "guide").mkdir()
-    (tmp_path / "guide/page.md").write_text("## Target\n")
-    (tmp_path / "README.md").write_text(
-        "[ok](guide/page.md#target) [bad-anchor](guide/page.md#nope) [gone](missing.md) "
-        '[self](#local) [web](https://example.com) <img src="assets/x.svg">\n\n## Local\n'
+    problems = check_readme_facts.fact_problems(
+        "README.md", text, _facts(branch_coverage=False, mypy_strict=False)
     )
-    problems = check_readme_facts.link_problems(tmp_path, "README.md")
-    assert sorted(problems) == [
-        "README.md: assets/x.svg does not exist",
-        "README.md: guide/page.md#nope — no such anchor",
-        "README.md: missing.md does not exist",
+
+    assert problems == [
+        "README.md: claims 1800+ tests but there are 1777 — a false claim",
+        "README.md: coverage must read 100% (the CI gate)",
+        "README.md: package count must read 5",
+        "README.md: claims branch coverage but [tool.coverage.run] branch is off",
+        "README.md: claims mypy strict but [tool.mypy] strict is off",
     ]

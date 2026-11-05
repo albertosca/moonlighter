@@ -104,3 +104,26 @@ def test_pages_missing_in_pt_are_listed_before_pages_missing_in_en(tmp_path):
         "missing in en: a-only-pt.md",
         "shared.md: en H2/H3 sequence [2] != pt [3]",
     ]
+
+
+def test_problems_are_sorted_within_each_kind_whatever_the_set_order(tmp_path):
+    # Eight names per kind: an unsorted set would match the sorted order only by a 1-in-40320 accident.
+    for index in range(8):
+        name = f"page-{index}.md"
+        _page(tmp_path, "en", f"only-en-{name}", text="# A\n")
+        _page(tmp_path, "pt", f"only-pt-{name}", text="# A\n")
+        _page(tmp_path, "en", f"both-{name}", text="## A\n")
+        _page(tmp_path, "pt", f"both-{name}", text="### A\n")
+
+    problems = check_docs_parity.parity_problems(tmp_path)
+
+    missing_in_pt = [problem for problem in problems if problem.startswith("missing in pt")]
+    different = [problem for problem in problems if "H2/H3" in problem]
+    assert missing_in_pt == sorted(missing_in_pt)
+    assert different == sorted(different)
+    assert [len(missing_in_pt), len(different)] == [8, 8]
+    assert problems == [
+        *missing_in_pt,
+        *[problem for problem in problems if problem.startswith("missing in en")],
+        *different,
+    ]
