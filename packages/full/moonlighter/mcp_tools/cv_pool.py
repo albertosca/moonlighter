@@ -11,7 +11,7 @@ from moonlighter.application.cvgen.pool.bootstrap import (
     bootstrap_cv_pool as bootstrap_cv_pool_service,
 )
 from moonlighter.application.cvgen.pool.bootstrap_error import BootstrapError
-from moonlighter.core.db import record_cv_bootstrap_decline
+from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
 from moonlighter.core.llm.dispatch import make_caller
 
 

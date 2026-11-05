@@ -7,6 +7,7 @@ import httpx
 from moonlighter.application.answers.bank.store import load_answer_bank
 from moonlighter.application.assisted.composition.composer import compose_answers
 from moonlighter.application.assisted.questions import FormQuestion
+from moonlighter.application.assisted.sheet.bootstrap_offer import cv_bootstrap_offer
 from moonlighter.application.assisted.sheet.notes import (
     alias_note,
     cv_note,
@@ -24,10 +25,9 @@ from moonlighter.application.assisted.sources.pasted import (
     ExtractionError,
     extract_questions_from_page,
 )
-from moonlighter.application.cvgen.paths import resolved_pool_path
 from moonlighter.application.cvgen.service import ensure_tailored_cv
 from moonlighter.core.config.defaults import DEFAULTS
-from moonlighter.core.db import Application, Job, cv_bootstrap_declined
+from moonlighter.core.db import Application, Job
 from moonlighter.core.email_alias import build_email_alias, new_email_ref
 from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.log import get_logger
@@ -57,8 +57,18 @@ async def _api_form(job: Job) -> tuple[list[FormQuestion], tuple[str, ...]]:
         return [], await required_fields_or_empty(match, client)
 
 
-def _tracking_alias(job: Job, config: dict[str, Any]) -> str | None:
-    """The +ref alias for this application, minting the draft Application row on first use.
+def _job_dict(job: Job) -> dict[str, Any]:
+    """The job fields the CV tailoring and the answer composer both read."""
+    return {
+        "id": job.id,
+        "title": job.title,
+        "company": job.company,
+        "description": job.description,
+    }
+
+
+def _tracking_alias(application: Application, config: dict[str, Any]) -> str | None:
+    """The +ref alias for this application, minting its ref on first use.
 
     The ref is reused forever after (a regenerated ref orphans every reply already
     sent to the old one). None when no tracking mailbox is configured — the sheet
@@ -67,7 +77,6 @@ def _tracking_alias(job: Job, config: dict[str, Any]) -> str | None:
     address = (config.get("email") or {}).get("address")
     if not address:
         return None
-    application, _ = Application.get_or_create(job=job, defaults={"status": "draft"})
     if not application.email_ref:
         application.email_ref = new_email_ref()
         application.save()
@@ -89,7 +98,7 @@ async def _sheet(
     )
     caller = make_caller(config)
     tailored = await ensure_tailored_cv(
-        {"id": job.id, "title": job.title, "company": job.company, "description": job.description},
+        _job_dict(job),
         config,
         profile,
         caller=caller,
@@ -98,21 +107,14 @@ async def _sheet(
         questions,
         profile,
         config,
-        {
-            "id": job.id,
-            "title": job.title,
-            "company": job.company,
-            "description": job.description,
-            "location": job.location,
-            "remote_type": job.remote_type,
-        },
+        {**_job_dict(job), "location": job.location, "remote_type": job.remote_type},
         caller,
         job_cache=job_cache,
         answer_bank=answer_bank,
     )
     application.form_data = well_shaped_form_data(job_cache)
     application.save()
-    alias = _tracking_alias(job, config)
+    alias = _tracking_alias(application, config)
     if alias is not None:
         composed = with_tracking_alias(composed, alias)
     return SheetResult(
@@ -130,27 +132,12 @@ async def _sheet(
     )
 
 
-_CV_BOOTSTRAP_OFFER_MESSAGE = (
-    "You don't have a tailored-CV pool yet. I can draft one from your profile.yaml — "
-    "call the bootstrap_cv_pool tool to generate it, or skip_cv_bootstrap if you'd "
-    "rather not use this feature. I'll keep offering this on every "
-    "prepare_application until you either bootstrap a pool or skip it. "
-    "From a shell: `moonlighter-apply bootstrap-cv` (add --skip to decline)."
-)
-
-
-def _cv_bootstrap_offer(config: dict[str, Any]) -> SheetResult | None:
-    if resolved_pool_path(config).exists() or cv_bootstrap_declined():
-        return None
-    return failed_sheet(SheetKind.CV_BOOTSTRAP_OFFER, _CV_BOOTSTRAP_OFFER_MESSAGE)
-
-
 def _precheck(job_id: int, config: dict[str, Any]) -> Job | SheetResult:
     """The job, or the sheet that ends the request before any question is read."""
     job = Job.get_or_none(Job.id == job_id)
     if job is None:
         return failed_sheet(SheetKind.JOB_NOT_FOUND, f"Job {job_id} not found.")
-    if (offer := _cv_bootstrap_offer(config)) is not None:
+    if (offer := cv_bootstrap_offer(config)) is not None:
         return offer
     return job
 
@@ -158,6 +145,7 @@ def _precheck(job_id: int, config: dict[str, Any]) -> Job | SheetResult:
 async def prepare_application(
     job_id: int, config: dict[str, Any], profile: dict[str, Any]
 ) -> SheetResult:
+    """The sheet for a job, read from its ATS form; a paste hint when the ATS publishes none."""
     job = _precheck(job_id, config)
     if isinstance(job, SheetResult):
         return job
@@ -173,6 +161,7 @@ async def prepare_application(
 async def prepare_application_from_paste(
     job_id: int, page_text: str, config: dict[str, Any], *, profile: dict[str, Any]
 ) -> SheetResult:
+    """The sheet for a job whose form was pasted as page text; the ATS form wins when it has one."""
     job = _precheck(job_id, config)
     if isinstance(job, SheetResult):
         return job

@@ -1,7 +1,8 @@
 """The job, config, profile and questions the sheet-result tests prepare applications from."""
 
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.core.db import Job, init_db, record_cv_bootstrap_decline
+from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
+from moonlighter.core.db import Job, init_db
 
 CONFIG = {"llm_model": "claude-sonnet-4-6"}
 PROFILE = {"name": "Jane Doe", "email": "jane@example.com"}

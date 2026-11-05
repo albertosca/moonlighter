@@ -5,7 +5,8 @@ from unittest.mock import AsyncMock, Mock
 from moonlighter.application import cli
 from moonlighter.application.commands import bootstrap_cv as bootstrap_cv_command
 from moonlighter.application.cvgen.pool.bootstrap import BootstrapOutcome
-from moonlighter.core.db import cv_bootstrap_declined, init_db
+from moonlighter.core.cv_bootstrap import cv_bootstrap_declined
+from moonlighter.core.db import init_db
 
 
 async def test_bootstrap_cv_subcommand_reports_what_it_generated(monkeypatch, tmp_path):

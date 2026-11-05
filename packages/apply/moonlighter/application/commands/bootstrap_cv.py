@@ -5,7 +5,7 @@ from typing import Any
 
 from moonlighter.application.cvgen.pool.bootstrap import bootstrap_cv_pool
 from moonlighter.core.cli import EXIT_OK
-from moonlighter.core.db import record_cv_bootstrap_decline
+from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
 from moonlighter.core.llm.dispatch import make_caller
 
 

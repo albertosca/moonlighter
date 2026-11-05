@@ -150,42 +150,6 @@ class CVBootstrapDecline(BaseModel):
     declined_at = DateTimeField(default=datetime.now)
 
 
-def cv_bootstrap_declined() -> bool:
-    return CVBootstrapDecline.select().exists()
-
-
-def record_cv_bootstrap_decline() -> None:
-    if not cv_bootstrap_declined():
-        CVBootstrapDecline.create()
-
-
-_APP_TO_JOB_STATUS = {
-    "submitted": "applied",
-    "screening": "applied",
-    "interviews": "applied",
-    "offer": "applied",
-    "rejected": "rejected",
-}
-
-
-def sync_job_status(application: Application) -> None:
-    """Pulls Job.status along whenever Application.status changes.
-
-    Provenance: 2026-08-21 manual triage — 5 jobs still 'new' while their
-    Application was already submitted/rejected, nearly offering a duplicate
-    application twice in one session. Every Application.status writer calls
-    this after saving; 'draft' maps to nothing (a draft is not yet an
-    application the queue should hide).
-    """
-    target = _APP_TO_JOB_STATUS.get(str(application.status))
-    if target is None:
-        return
-    job = application.job
-    if job.status != target:
-        job.status = target
-        job.save()
-
-
 def init_db() -> None:
     path = db_path()
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -195,6 +159,6 @@ def init_db() -> None:
         [Job, Application, ScanLog, ProcessedEmail, AnswerBankEntry, CVBootstrapDecline],
         safe=True,
     )
-    from moonlighter.core.migrations import run_migrations  # noqa: PLC0415 - migrations calls get_logger() at import, which configures logging; keep that out of import moonlighter.core.db
+    from moonlighter.core.migration_runner import run_migrations  # noqa: PLC0415 - migration_runner calls get_logger() at import, which configures logging; keep that out of import moonlighter.core.db
 
     run_migrations(db)

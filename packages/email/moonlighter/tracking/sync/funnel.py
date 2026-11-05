@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from typing import Any
 
-from moonlighter.core.db import sync_job_status
+from moonlighter.core.job_status import sync_job_status
 
 # Canonical funnel progression order — the status only ever moves forward, never back.
 _STATUS_ORDER = ["draft", "submitted", "screening", "interviews", "offer", "rejected"]

@@ -1,6 +1,7 @@
 """sync_job_status moves Job.status to "applied" or "rejected" as its Application advances, and leaves it alone for a draft."""
 
-from moonlighter.core.db import Application, Job, init_db, sync_job_status
+from moonlighter.core.db import Application, Job, init_db
+from moonlighter.core.job_status import sync_job_status
 from tests.core.db.sample_job import make_job
 
 # ── sync_job_status ──────────────────────────────────────────────────────────

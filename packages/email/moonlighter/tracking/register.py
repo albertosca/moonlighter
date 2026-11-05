@@ -10,8 +10,9 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from moonlighter.core.db import Application, Job, sync_job_status
+from moonlighter.core.db import Application, Job
 from moonlighter.core.email_alias import build_email_alias, new_email_ref
+from moonlighter.core.job_status import sync_job_status
 
 
 class RegisterKind(StrEnum):

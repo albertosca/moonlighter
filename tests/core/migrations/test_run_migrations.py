@@ -3,8 +3,9 @@
 import peewee
 import pytest
 
-from moonlighter.core import migrations
-from moonlighter.core.migrations import MIGRATIONS, current_version, run_migrations
+from moonlighter.core import migration_runner
+from moonlighter.core.migration_runner import current_version, run_migrations
+from moonlighter.core.migrations import MIGRATIONS
 from tests.core.migrations.unmigrated_db import fresh_db
 
 
@@ -88,7 +89,7 @@ def test_failed_migration_leaves_version_at_last_fully_applied(tmp_path, monkeyp
         raise peewee.OperationalError("simulated failure, not a lock")
 
     broken_migrations = [*MIGRATIONS, (7, "boom", _boom)]
-    monkeypatch.setattr(migrations, "MIGRATIONS", broken_migrations)
+    monkeypatch.setattr(migration_runner, "MIGRATIONS", broken_migrations)
 
     with pytest.raises(peewee.OperationalError):
         run_migrations(db)

@@ -97,7 +97,7 @@ async def bootstrap_cv_pool(
     # from a bad draft is a pool file already overwritten with garbage. The
     # temp file never touches pool_path until it has already proven loadable,
     # so a failed draft leaves the previous pool (or no pool) exactly as it
-    # was -- nothing for _cv_bootstrap_offer or ensure_tailored_cv to trip on.
+    # was -- nothing for cv_bootstrap_offer or ensure_tailored_cv to trip on.
     tmp_path = pool_path.with_suffix(".yaml.tmp")
     tmp_path.write_text(DRAFT_HEADER + dump_pool(pool))
     try:

@@ -3,7 +3,7 @@
 from typing import Any
 
 from moonlighter.application.assisted.questions import FormQuestion
-from moonlighter.core.db import record_cv_bootstrap_decline
+from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
 
 
 def never_fetch_greenhouse(board: str, job_id: str, client: Any) -> Any:

@@ -5,8 +5,9 @@ import time
 import peewee
 import pytest
 
-from moonlighter.core import migrations
-from moonlighter.core.migrations import MIGRATIONS, current_version, run_migrations
+from moonlighter.core import migration_runner
+from moonlighter.core.migration_runner import current_version, run_migrations
+from moonlighter.core.migrations import MIGRATIONS
 from tests.core.migrations.unmigrated_db import fresh_db
 
 
@@ -22,25 +23,25 @@ def test_locked_db_retries_then_succeeds(*, tmp_path, monkeypatch, open_dbs, raw
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     db = fresh_db(tmp_path / "t.db", open_dbs, timeout=0)
 
-    monkeypatch.setattr(migrations, "_backup", lambda db: raw_locker.execute("BEGIN EXCLUSIVE"))
+    monkeypatch.setattr(
+        migration_runner, "_backup", lambda db: raw_locker.execute("BEGIN EXCLUSIVE")
+    )
 
-    sleep_calls = {"n": 0}
     slept = []
     real_sleep = time.sleep
 
     def _fake_sleep(seconds):
-        sleep_calls["n"] += 1
         slept.append(seconds)
-        if sleep_calls["n"] == 2:
+        if len(slept) == 2:
             # Simulate B5 finishing its write and releasing the lock.
             raw_locker.execute("COMMIT")
         real_sleep(0)
 
-    monkeypatch.setattr(migrations.time, "sleep", _fake_sleep)
+    monkeypatch.setattr(migration_runner.time, "sleep", _fake_sleep)
 
     applied = run_migrations(db)
 
-    assert sleep_calls["n"] == 2
+    assert len(slept) == 2
     assert slept == [0.5, 0.5]  # pins _LOCK_BACKOFF_S: the real pause between retries
     assert applied == [name for _, name, _ in MIGRATIONS]
     assert current_version(db) == len(MIGRATIONS)
@@ -59,29 +60,29 @@ def test_locked_db_exhausts_retries_and_raises(*, tmp_path, monkeypatch, open_db
     the very first attempt instead of retrying and exhausting the budget.
     Confirmed by temporarily reverting the except clause to
     `sqlite3.OperationalError` and re-running this test: it failed with
-    `sleep_calls["n"] == 0` instead of the expected `_LOCK_RETRIES - 1`.
+    `len(slept) == 0` instead of the expected `_LOCK_RETRIES - 1`.
     """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     db = fresh_db(tmp_path / "t.db", open_dbs, timeout=0)
 
-    monkeypatch.setattr(migrations, "_backup", lambda db: raw_locker.execute("BEGIN EXCLUSIVE"))
+    monkeypatch.setattr(
+        migration_runner, "_backup", lambda db: raw_locker.execute("BEGIN EXCLUSIVE")
+    )
 
-    sleep_calls = {"n": 0}
     slept = []
     real_sleep = time.sleep
 
     def _fake_sleep(seconds):
-        sleep_calls["n"] += 1
         slept.append(seconds)
         real_sleep(0)
 
-    monkeypatch.setattr(migrations.time, "sleep", _fake_sleep)
+    monkeypatch.setattr(migration_runner.time, "sleep", _fake_sleep)
 
     with pytest.raises(peewee.OperationalError, match="locked"):
         run_migrations(db)
 
-    assert sleep_calls["n"] == migrations._LOCK_RETRIES - 1
-    assert slept == [0.5] * (migrations._LOCK_RETRIES - 1)
+    assert len(slept) == migration_runner._LOCK_RETRIES - 1
+    assert slept == [0.5] * (migration_runner._LOCK_RETRIES - 1)
 
     raw_locker.execute("ROLLBACK")  # release the lock so we can inspect state
     assert current_version(db) == 0

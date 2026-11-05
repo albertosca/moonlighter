@@ -1,6 +1,7 @@
 """cv_bootstrap_declined stays False until a decline is recorded, and recording a second decline is harmless."""
 
-from moonlighter.core.db import cv_bootstrap_declined, init_db, record_cv_bootstrap_decline
+from moonlighter.core.cv_bootstrap import cv_bootstrap_declined, record_cv_bootstrap_decline
+from moonlighter.core.db import init_db
 
 
 def test_cv_bootstrap_declined_is_false_until_recorded(temporary_database):

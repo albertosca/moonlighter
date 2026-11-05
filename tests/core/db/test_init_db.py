@@ -1,7 +1,8 @@
 """init_db creates the tables, adds the columns an older schema lacks, keeps existing rows, and ends at the latest migration version."""
 
 from moonlighter.core.db import Application, Job, db, init_db
-from moonlighter.core.migrations import MIGRATIONS, current_version
+from moonlighter.core.migration_runner import current_version
+from moonlighter.core.migrations import MIGRATIONS
 from tests.core.db.sample_job import make_job
 
 

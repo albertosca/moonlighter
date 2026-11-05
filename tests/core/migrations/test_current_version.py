@@ -1,6 +1,6 @@
 """current_version reads 0 from a database with no schema_version table or with an empty one, and writes nothing."""
 
-from moonlighter.core.migrations import current_version
+from moonlighter.core.migration_runner import current_version
 from tests.core.migrations.unmigrated_db import fresh_db
 
 
