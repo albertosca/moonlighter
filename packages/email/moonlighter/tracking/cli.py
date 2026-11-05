@@ -22,6 +22,7 @@ standalone email install. Exit 0 (kind "registered") when the job exists,
 """
 
 import argparse
+import sys
 from typing import Any
 
 from moonlighter.core.cli import (
@@ -75,7 +76,5 @@ async def _run(arguments: argparse.Namespace) -> tuple[dict[str, Any], int]:
 
 
 def main() -> None:  # pragma: no cover - entry point (boundary)
-    import sys
-
     arguments = parse_args()
     sys.exit(run(lambda: _run(arguments), expected=EXPECTED_FAILURES))

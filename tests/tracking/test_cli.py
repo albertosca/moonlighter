@@ -1,18 +1,21 @@
+"""The moonlighter-email command line: its grammar, exit codes and JSON payloads."""
+
 import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from moonlighter.core.cli import run
+from moonlighter.tracking import cli
+from moonlighter.tracking.cli import parse_args
+from moonlighter.tracking.gmail_client import GmailAuthError
+from moonlighter.tracking.register import RegisterKind, RegisterResult
 
 
 def test_parse_args_sync():
-    from moonlighter.tracking.cli import parse_args
-
     assert parse_args(["sync"]).command == "sync"
 
 
 def test_parse_args_with_no_command_emits_usage_error_json_on_stdout(capsys):
-    from moonlighter.tracking.cli import parse_args
-
     with pytest.raises(SystemExit) as exit_info:
         parse_args([])
     assert exit_info.value.code == 2
@@ -21,8 +24,6 @@ def test_parse_args_with_no_command_emits_usage_error_json_on_stdout(capsys):
 
 
 async def test_run_sync_exits_0_with_the_updates_as_json(temporary_database):
-    from moonlighter.tracking import cli
-
     updates = [
         {
             "job_id": 7,
@@ -47,8 +48,6 @@ async def test_run_sync_exits_0_with_the_updates_as_json(temporary_database):
 
 
 async def test_run_sync_with_no_updates_exits_1(temporary_database):
-    from moonlighter.tracking import cli
-
     with (
         patch.object(cli, "bootstrap", return_value=({"email": {}}, {})),
         patch.object(cli, "make_caller", return_value=object()),
@@ -65,10 +64,6 @@ def test_run_via_run_classifies_a_missing_gmail_token_as_an_expected_failure(
     # with a full traceback today. A missing credential is a routine,
     # anticipated failure -- exit 1, kind "expected_failure" -- not a crash.
     # Goes THROUGH run() with the real module tuple, per the review brief.
-    from moonlighter.core.cli import run
-    from moonlighter.tracking import cli
-    from moonlighter.tracking.gmail_client import GmailAuthError
-
     with (
         patch.object(cli, "bootstrap", return_value=({"email": {}}, {})),
         patch.object(cli, "make_caller", return_value=object()),
@@ -83,9 +78,6 @@ def test_run_via_run_classifies_a_missing_gmail_token_as_an_expected_failure(
 
 
 async def test_run_register_exits_0_and_prints_the_alias(temporary_database):
-    from moonlighter.tracking import cli
-    from moonlighter.tracking.register import RegisterKind, RegisterResult
-
     register_result = RegisterResult(
         RegisterKind.REGISTERED,
         7,
@@ -109,9 +101,6 @@ async def test_run_register_exits_0_and_prints_the_alias(temporary_database):
 
 
 async def test_run_register_unknown_job_exits_1(temporary_database):
-    from moonlighter.tracking import cli
-    from moonlighter.tracking.register import RegisterKind, RegisterResult
-
     register_result = RegisterResult(RegisterKind.JOB_NOT_FOUND, 7, error="Job 7 not found.")
     with (
         patch.object(cli, "bootstrap", return_value=({}, {})),
@@ -122,23 +111,17 @@ async def test_run_register_unknown_job_exits_1(temporary_database):
 
 
 def test_email_keeps_its_grammar_and_gains_doctor():
-    from moonlighter.tracking.cli import parse_args
-
     assert parse_args(["doctor"]).command == "doctor"
     assert parse_args(["sync"]).command == "sync"
 
 
 async def test_email_doctor_returns_the_doctor_payload(temporary_database):
-    from moonlighter.tracking import cli
-
     with patch.object(cli, "doctor_payload", return_value=({"kind": "doctor"}, 0)):
         payload, code = await cli._run(cli.parse_args(["doctor"]))
     assert (payload, code) == ({"kind": "doctor"}, 0)
 
 
 def test_email_help_carries_the_slice_epilog(capsys):
-    from moonlighter.tracking.cli import parse_args
-
     with pytest.raises(SystemExit) as exit_info:
         parse_args(["--help"])
     assert exit_info.value.code == 0
