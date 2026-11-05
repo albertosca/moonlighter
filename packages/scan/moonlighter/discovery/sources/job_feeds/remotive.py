@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 class RemotiveScanner(BaseScanner):
     """Remotive is a portal-wide remote-jobs board like RemoteOKScanner.
 
-    Not registered in SOURCES, dispatched separately in service.py, gated
+    Not registered in SOURCES, dispatched separately in portals.py, gated
     behind a config flag (off by default).
 
     ToS note: max 4 requests/day, must link back to Remotive as source. No

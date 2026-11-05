@@ -25,7 +25,7 @@ class GupyScanner(BaseScanner):
     other HTTP scanners it is keyword-driven and builds its own client rather
     than routing through gather_jobs(slugs). Not registered in SOURCES;
     dispatched separately (mirrors the LinkedIn model) and gated behind a config
-    flag in service.py.
+    flag in portals.py.
     """
 
     BASE = "https://employability-portal.gupy.io/api/v1/jobs?jobName={kw}&limit={limit}&offset={offset}"

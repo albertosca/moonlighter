@@ -1,5 +1,5 @@
 """archive_stale_jobs: detects jobs whose source posting disappeared and marks
-them archived with closed_at set. Extracted from discovery/service.py (pure move, no behavior
+them archived with closed_at set. Extracted from the old discovery/service.py (pure move, no behavior
 change)."""
 
 import datetime

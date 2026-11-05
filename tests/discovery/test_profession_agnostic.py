@@ -10,11 +10,12 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.validation import validate_config
-from moonlighter.discovery import service as scan_service
+from moonlighter.discovery.collection import collect_raw_jobs
 from moonlighter.discovery.evaluation.batch import evaluate_jobs_batch
 from moonlighter.discovery.evaluation.engagement import engagement_section
 from moonlighter.discovery.evaluation.models import EvalInput
 from moonlighter.discovery.evaluation.single import evaluate_job
+from moonlighter.discovery.portals import scan_portals
 from moonlighter.discovery.sources.job_feeds.remotive import RemotiveScanner
 from moonlighter.discovery.sources.job_feeds.weworkremotely import WeWorkRemotelyScanner
 
@@ -143,28 +144,26 @@ async def test_remotive_asks_for_no_category_unless_configured():
 
 
 async def test_remotive_dispatch_passes_the_configured_category():
-    with patch("moonlighter.discovery.sources.job_feeds.remotive.RemotiveScanner") as MockScanner:
-        MockScanner.return_value.scan = AsyncMock(return_value=[])
-        await scan_service._scan_remotive(
-            {"scan_remotive": True, "remotive_category": "design"}, {}, ""
-        )
-    MockScanner.return_value.scan.assert_awaited_once_with(category="design", stats={})
+    with patch("moonlighter.discovery.portals.RemotiveScanner") as mock_scanner:
+        mock_scanner.return_value.scan = AsyncMock(return_value=[])
+        await scan_portals({"scan_remotive": True, "remotive_category": "design"}, {}, "")
+    mock_scanner.return_value.scan.assert_awaited_once_with(category="design", stats={})
 
 
 async def _collect(keywords, config):
     with (
-        patch("moonlighter.discovery.service.build_http_scanners", return_value={}),
-        patch("moonlighter.discovery.service.discover_entry_points", return_value=[]),
+        patch("moonlighter.discovery.collection.build_http_scanners", return_value={}),
+        patch("moonlighter.discovery.collection.discover_entry_points", return_value=[]),
     ):
-        return await scan_service._collect_raw_jobs(keywords, config, {})
+        return await collect_raw_jobs(keywords, config, {})
 
 
 @pytest.mark.parametrize("keywords", ["", "   "])
 async def test_gupy_without_keywords_is_skipped_with_a_warning_not_searched_as_software(keywords):
-    with patch("moonlighter.discovery.sources.job_feeds.gupy.GupyScanner") as MockGupy:
-        MockGupy.return_value.scan = AsyncMock(return_value=[])
+    with patch("moonlighter.discovery.portals.GupyScanner") as mock_gupy:
+        mock_gupy.return_value.scan = AsyncMock(return_value=[])
         raw_jobs, warning = await _collect(keywords, {"scan_gupy": True})
-    MockGupy.return_value.scan.assert_not_called()
+    mock_gupy.return_value.scan.assert_not_called()
     assert raw_jobs == []
     assert warning is not None
     assert "scan_gupy" in warning
@@ -177,10 +176,10 @@ async def test_gupy_off_and_no_keywords_says_nothing():
 
 
 async def test_gupy_with_keywords_searches_exactly_them():
-    with patch("moonlighter.discovery.sources.job_feeds.gupy.GupyScanner") as MockGupy:
-        MockGupy.return_value.scan = AsyncMock(return_value=[])
+    with patch("moonlighter.discovery.portals.GupyScanner") as mock_gupy:
+        mock_gupy.return_value.scan = AsyncMock(return_value=[])
         await _collect("enfermeiro", {"scan_gupy": True})
-    assert MockGupy.return_value.scan.await_args.kwargs["keywords"] == "enfermeiro"
+    assert mock_gupy.return_value.scan.await_args.kwargs["keywords"] == "enfermeiro"
 
 
 async def test_wwr_reads_the_all_jobs_feed_unless_a_category_is_configured():
@@ -215,12 +214,10 @@ async def test_wwr_reads_the_all_jobs_feed_unless_a_category_is_configured():
 
 
 async def test_wwr_dispatch_passes_the_configured_category():
-    with patch(
-        "moonlighter.discovery.sources.job_feeds.weworkremotely.WeWorkRemotelyScanner"
-    ) as MockScanner:
-        MockScanner.return_value.scan = AsyncMock(return_value=[])
-        await scan_service._scan_wwr({"scan_wwr": True, "wwr_category": "design"}, {}, "")
-    MockScanner.return_value.scan.assert_awaited_once_with(category="design", stats={})
+    with patch("moonlighter.discovery.portals.WeWorkRemotelyScanner") as mock_scanner:
+        mock_scanner.return_value.scan = AsyncMock(return_value=[])
+        await scan_portals({"scan_wwr": True, "wwr_category": "design"}, {}, "")
+    mock_scanner.return_value.scan.assert_awaited_once_with(category="design", stats={})
 
 
 @pytest.mark.parametrize("key", ["remotive_category", "wwr_category"])

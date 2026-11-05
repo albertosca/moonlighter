@@ -16,7 +16,7 @@ class HNWhoIsHiringScanner(BaseScanner):
     """Hacker News' monthly 'Who is hiring?' thread, via the official HN Firebase API.
 
     No auth, no bot-detection concern. Portal-wide like RemoteOKScanner -- not
-    registered in SOURCES, dispatched separately in service.py, gated behind a
+    registered in SOURCES, dispatched separately in portals.py, gated behind a
     config flag (off by default).
 
     The weakest signal of the 4 new boards: postings are free-text comments,

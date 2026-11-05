@@ -170,11 +170,11 @@ async def test_scan_all_below_threshold(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=4.0)),
         ),
         patch(
-            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
@@ -208,11 +208,11 @@ async def test_scan_above_threshold_shows_table(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
         ),
         patch(
-            "moonlighter.discovery.service.load_company_list",
+            "moonlighter.discovery.scanning.load_company_list",
             return_value={"greenhouse": ["stripe"]},
         ),
     ):
@@ -239,9 +239,9 @@ async def test_scan_dedup_against_scan_log(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.service.evaluate_jobs_batch") as mock_batch,
+        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch") as mock_batch,
         patch(
-            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
@@ -250,7 +250,7 @@ async def test_scan_dedup_against_scan_log(temporary_database):
         mock_browser.new_page = AsyncMock(side_effect=Exception("no browser"))
         result = await scan_and_evaluate(context=make_test_context())
     # evaluate_jobs_batch is genuinely not called: the scanner returned the job but
-    # dedup (a pre-existing ScanLog) filtered it before it reached _evaluate_and_store.
+    # dedup (a pre-existing ScanLog) filtered it before it reached evaluate_and_store.
     mock_batch.assert_not_called()
     assert "No new jobs found" in result
 
@@ -275,11 +275,11 @@ async def test_scan_linkedin_failure_doesnt_block(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
         ),
         patch(
-            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
@@ -320,11 +320,11 @@ async def test_scan_saves_salary_fields(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
             new=_batch_of(eval_result),
         ),
         patch(
-            "moonlighter.discovery.service.load_company_list",
+            "moonlighter.discovery.scanning.load_company_list",
             return_value={"greenhouse": ["stripe"]},
         ),
     ):
@@ -362,11 +362,11 @@ async def test_scan_saves_caveats_as_json(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
             new=_batch_of(eval_result),
         ),
         patch(
-            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
@@ -400,11 +400,11 @@ async def test_scan_status_archived_if_below_threshold(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=3.0)),
         ),
         patch(
-            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=[raw])
@@ -426,7 +426,7 @@ async def test_scan_company_tool_delegates_to_service(temporary_database):
 
     fake_report = ScanReport(kind=ScanKind.UNKNOWN_SOURCE, threshold=6.5, error="report")
     with patch(
-        "moonlighter.discovery.service.scan_company", new=AsyncMock(return_value=fake_report)
+        "moonlighter.discovery.scanning.scan_company", new=AsyncMock(return_value=fake_report)
     ) as mock_scan_company:
         result = await scan_company("greenhouse", "stripe", context=make_test_context())
     assert result == "report"
@@ -1163,9 +1163,9 @@ async def test_scan_concurrent_batch_all_processed(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
+        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=mock_batch),
         patch(
-            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
@@ -1217,9 +1217,9 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(temporary_datab
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
+        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=mock_batch),
         patch(
-            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
@@ -1277,9 +1277,9 @@ async def test_scan_spend_limit_stops_further_batches(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
+        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=mock_batch),
         patch(
-            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
@@ -1342,9 +1342,9 @@ async def test_scan_non_spend_error_keeps_title_filtered_in_report(temporary_dat
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.service.evaluate_jobs_batch", new=mock_batch),
+        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=mock_batch),
         patch(
-            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
@@ -1399,9 +1399,9 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tem
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.service._claim", side_effect=Exception("db corrupted")),
+        patch("moonlighter.discovery.screening.claim", side_effect=Exception("db corrupted")),
         patch(
-            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
@@ -1639,7 +1639,7 @@ async def test_scan_registered_scanner_session_expired_shows_warning(temporary_d
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.service.discover_entry_points",
+            "moonlighter.discovery.collection.discover_entry_points",
             return_value=[_FakeSessionExpiredSource],
         ),
     ):
@@ -1678,15 +1678,15 @@ async def test_scan_registered_scanner_session_expired_does_not_block_http_resul
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.service.discover_entry_points",
+            "moonlighter.discovery.collection.discover_entry_points",
             return_value=[_FakeSessionExpiredSource],
         ),
         patch(
-            "moonlighter.discovery.service.evaluate_jobs_batch",
+            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
             new=_batch_of(make_eval_result(score=8.0)),
         ),
         patch(
-            "moonlighter.discovery.service.load_company_list",
+            "moonlighter.discovery.scanning.load_company_list",
             return_value={"greenhouse": ["stripe"]},
         ),
     ):
@@ -1951,10 +1951,10 @@ def _scan_patches(raw_jobs, eval_mock):
             for job in jobs
         ]
 
-    stack.enter_context(patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch))
+    stack.enter_context(patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=_batch))
     stack.enter_context(
         patch(
-            "moonlighter.discovery.service.load_company_list",
+            "moonlighter.discovery.scanning.load_company_list",
             return_value={"greenhouse": ["co"]},
         )
     )
@@ -2046,12 +2046,12 @@ async def test_scan_already_in_scan_log_skips_llm(temporary_database):
 
 
 async def test_add_job_tool_delegates_to_service(temporary_database):
-    """O wrapper MCP add_job delega ao scan_service e devolve o resultado."""
+    """O wrapper MCP add_job delega ao manual_jobs.add_job e devolve o resultado."""
     init_db()
     from moonlighter.server import add_job
 
     with patch(
-        "moonlighter.discovery.service.evaluate_job",
+        "moonlighter.discovery.manual_jobs.evaluate_job",
         new=AsyncMock(return_value=make_eval_result(8.0)),
     ):
         result = await add_job(
@@ -2065,7 +2065,7 @@ async def test_add_job_tool_delegates_to_service(temporary_database):
 
 
 async def test_verify_job_tool_delegates_to_service(temporary_database):
-    """The verify_job MCP wrapper delegates to scan_service and returns the result."""
+    """The verify_job MCP wrapper delegates to manual_jobs.verify_job and returns the result."""
     init_db()
     from moonlighter.server import verify_job
 
@@ -2078,7 +2078,7 @@ async def test_verify_job_tool_delegates_to_service(temporary_database):
         score=None,
     )
     with patch(
-        "moonlighter.discovery.service.evaluate_job",
+        "moonlighter.discovery.manual_jobs.evaluate_job",
         new=AsyncMock(return_value=make_eval_result(8.0)),
     ):
         result = await verify_job(
@@ -2102,7 +2102,7 @@ async def test_tool_archive_stale_jobs_delegates_and_formats(temporary_database)
         failed_companies=["beta"],
     )
     with patch(
-        "moonlighter.server.scan_service.archive_stale_jobs",
+        "moonlighter.discovery.archive.archive_stale_jobs",
         new=AsyncMock(return_value=fake_result),
     ):
         result = await archive_stale_jobs(context=make_test_context())
@@ -2117,7 +2117,7 @@ async def test_tool_archive_stale_jobs_passes_filters(temporary_database):
     from moonlighter.server import archive_stale_jobs
 
     mock_service = AsyncMock(return_value=ArchiveResult())
-    with patch("moonlighter.server.scan_service.archive_stale_jobs", new=mock_service):
+    with patch("moonlighter.discovery.archive.archive_stale_jobs", new=mock_service):
         await archive_stale_jobs(job_id=123, company=None, context=make_test_context())
 
     mock_service.assert_awaited_once()
@@ -2132,7 +2132,7 @@ async def test_tool_archive_stale_jobs_rejects_both_filters(temporary_database):
     from moonlighter.server import archive_stale_jobs
 
     with patch(
-        "moonlighter.server.scan_service.archive_stale_jobs",
+        "moonlighter.discovery.archive.archive_stale_jobs",
         new=AsyncMock(side_effect=ArchiveStaleJobsError("Provide job_id OR company, not both.")),
     ):
         result = await archive_stale_jobs(job_id=1, company="acme", context=make_test_context())
@@ -2209,9 +2209,9 @@ async def test_scan_and_evaluate_logs_one_metrics_summary(temporary_database, ca
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch_records_calls),
+        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=_batch_records_calls),
         patch(
-            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)
@@ -2250,7 +2250,7 @@ async def test_scan_and_evaluate_spend_limit_abort_increments_hits(temporary_dat
     async def _batch_raises_spend_limit(jobs, profile, model, caller):
         # Deliberately does NOT call record_spend_limit_hit() itself — the
         # production `except is_spend_limit(e)` catch site in
-        # moonlighter.discovery.service is what must record the hit, exactly
+        # moonlighter.discovery.pipeline is what must record the hit, exactly
         # once, before propagating.
         raise RuntimeError("spend limit reached")
 
@@ -2262,9 +2262,9 @@ async def test_scan_and_evaluate_spend_limit_abort_increments_hits(temporary_dat
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as MockLV,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as MockAB,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.service.evaluate_jobs_batch", new=_batch_raises_spend_limit),
+        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=_batch_raises_spend_limit),
         patch(
-            "moonlighter.discovery.service.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
         ),
     ):
         MockGH.return_value.scan = AsyncMock(return_value=raws)

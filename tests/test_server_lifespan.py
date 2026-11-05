@@ -103,7 +103,7 @@ async def test_a_config_edit_reaches_the_next_tool_call_without_reconnecting(
     config_path = tmp_path / "config.yaml"
     _write(config_path, "score_threshold: 7.0\n")
     service = AsyncMock(return_value=ArchiveResult())
-    monkeypatch.setattr(server.scan_service, "archive_stale_jobs", service)
+    monkeypatch.setattr(server.archive, "archive_stale_jobs", service)
     api_caller = object()
     monkeypatch.setattr(server, "make_caller", lambda config: api_caller)
     async with server.lifespan(server.mcp) as app_context:

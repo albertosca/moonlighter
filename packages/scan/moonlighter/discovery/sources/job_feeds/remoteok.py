@@ -16,7 +16,7 @@ class RemoteOKScanner(BaseScanner):
     """RemoteOK is a portal-wide remote-jobs board (all companies, all categories).
 
     Like GupyScanner, it doesn't route through gather_jobs(slugs). Not
-    registered in SOURCES; dispatched separately in service.py, gated behind a
+    registered in SOURCES; dispatched separately in portals.py, gated behind a
     config flag (off by default).
     """
 

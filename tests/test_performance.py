@@ -268,7 +268,7 @@ async def test_list_jobs_returns_one_page_with_a_query_count_independent_of_tabl
 async def test_drop_already_seen_uses_one_query_whatever_the_scan_log_size(temporary_database):
     """Dedup of 1000 scanned URLs reads ScanLog once and keeps only the unseen job."""
     from moonlighter.core.db import ScanLog, init_db
-    from moonlighter.discovery.service import _drop_already_seen
+    from moonlighter.discovery.claims import drop_already_seen
     from moonlighter.discovery.sources.base import RawJob
 
     init_db()
@@ -288,7 +288,7 @@ async def test_drop_already_seen_uses_one_query_whatever_the_scan_log_size(tempo
 
     def drop_and_count(raw_jobs):
         with _count_queries() as spy:
-            kept = _drop_already_seen(raw_jobs)
+            kept = drop_already_seen(raw_jobs)
         return kept, spy.call_count
 
     log_urls(0, 100)

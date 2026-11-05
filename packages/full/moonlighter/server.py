@@ -35,7 +35,7 @@ from moonlighter.core.log import get_logger
 from moonlighter.core.log import setup as _setup_logging
 from moonlighter.core.metrics import operation_metrics
 from moonlighter.core.parsing import wrap_untrusted
-from moonlighter.discovery import service as scan_service
+from moonlighter.discovery import archive, manual_jobs, scanning
 from moonlighter.discovery.archive import ArchiveStaleJobsError, format_archive_result
 from moonlighter.discovery.results import render_scan_report
 from moonlighter.priority import company_rejection_ages, rejection_badge, rejection_penalty
@@ -188,7 +188,7 @@ async def scan_and_evaluate(
     app = _app(context)
     with operation_metrics("scan_and_evaluate"):
         return render_scan_report(
-            await scan_service.scan_and_evaluate(
+            await scanning.scan_and_evaluate(
                 keywords, phase, app.config, app.profile, app.llm_caller
             )
         )
@@ -210,8 +210,8 @@ async def scan_company(source: str, company: str, *, context: Context[AppContext
     app = _app(context)
     with operation_metrics("scan_company"):
         return render_scan_report(
-            await scan_service.scan_company(
-                source, company, app.config, app.profile, app.llm_caller
+            await scanning.scan_company(
+                source, company, app.config, profile=app.profile, caller=app.llm_caller
             )
         )
 
@@ -244,7 +244,7 @@ async def add_job(
         description: job description text. If empty, tries to fetch it automatically.
     """
     app = _app(context)
-    return await scan_service.add_job(
+    return await manual_jobs.add_job(
         url, company, title, description, app.config, app.profile, app.llm_caller
     )
 
@@ -270,7 +270,9 @@ async def verify_job(
         page_text: the copied page text — becomes the job's real description
     """
     app = _app(context)
-    return await scan_service.verify_job(job_id, page_text, app.config, app.profile, app.llm_caller)
+    return await manual_jobs.verify_job(
+        job_id, page_text, app.config, profile=app.profile, caller=app.llm_caller
+    )
 
 
 @mcp.tool()
@@ -297,7 +299,7 @@ async def archive_stale_jobs(
     """
     app = _app(context)
     try:
-        result = await scan_service.archive_stale_jobs(job_id, company, app.config)
+        result = await archive.archive_stale_jobs(job_id, company, app.config)
     except ArchiveStaleJobsError as error:
         return str(error)
     return format_archive_result(result)

@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 class WeWorkRemotelyScanner(BaseScanner):
     """WeWorkRemotely is a portal-wide RSS feed, like RemoteOKScanner.
 
-    Not registered in SOURCES, dispatched separately in service.py, gated
+    Not registered in SOURCES, dispatched separately in portals.py, gated
     behind a config flag (off by default).
     """
 
