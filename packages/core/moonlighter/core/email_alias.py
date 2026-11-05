@@ -25,10 +25,10 @@ def new_email_ref() -> str:
     return "".join(secrets.choice(_REF_ALPHABET) for _ in range(_REF_LENGTH))
 
 
-def build_email_alias(address: str, ref: str) -> str:
-    """'you@gmail.com' + 'x7k2mp' → 'you+x7k2mp@gmail.com'"""
+def build_email_alias(address: str, email_reference: str) -> str:
+    """'you@gmail.com' + 'x7k2mp' → 'you+x7k2mp@gmail.com'."""
     local, _, domain = address.partition("@")
-    return f"{local}+{ref}@{domain}"
+    return f"{local}+{email_reference}@{domain}"
 
 
 def is_email_label(label: str) -> bool:

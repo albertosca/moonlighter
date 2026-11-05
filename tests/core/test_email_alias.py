@@ -9,8 +9,8 @@ from moonlighter.core.email_alias import (
 
 def test_a_ref_carries_no_case_so_a_provider_cannot_change_it():
     for _ in range(200):
-        ref = new_email_ref()
-        assert ref == ref.lower()
+        email_reference = new_email_ref()
+        assert email_reference == email_reference.lower()
 
 
 def test_a_ref_avoids_characters_a_human_would_misread():

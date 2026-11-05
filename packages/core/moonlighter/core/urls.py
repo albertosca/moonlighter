@@ -32,8 +32,9 @@ def _strip_tracking_params(url: str) -> str:
 
 
 def normalize_job_url(url: str) -> str:
-    """Normalize a job posting URL for dedup: strip tracking params, the
-    Recruitee apply-suffix, and trailing slashes/whitespace.
+    """Normalize a job posting URL for dedup.
+
+    Strip tracking params, the Recruitee apply-suffix, and trailing slashes/whitespace.
 
     Recruitee's API returns apply URLs ending in /c/new which may not match
     the human-pasted posting URL, causing false positives in dedup checks.

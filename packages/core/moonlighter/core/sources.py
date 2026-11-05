@@ -1,3 +1,5 @@
+"""The Source enum: the job sources and ATS platforms moonlighter knows about."""
+
 from enum import StrEnum
 
 

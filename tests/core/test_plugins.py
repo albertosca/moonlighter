@@ -1,3 +1,6 @@
+from importlib.metadata import EntryPoint
+from unittest.mock import patch
+
 from moonlighter.core.plugins import discover_entry_points, discover_entry_points_by_name
 
 
@@ -9,9 +12,6 @@ def test_discover_entry_points_loads_a_real_registered_entry_point():
     # moonlighter-core itself doesn't register anything in this group; this proves
     # the loader can resolve an arbitrary importable class by dotted path via a
     # real EntryPoint object, without needing an actual separate installed package.
-    from importlib.metadata import EntryPoint
-    from unittest.mock import patch
-
     fake_ep = EntryPoint(
         name="fake",
         value="moonlighter.core.plugins:discover_entry_points",
@@ -27,9 +27,6 @@ def test_discover_entry_points_by_name_returns_empty_dict_for_unknown_group():
 
 
 def test_discover_entry_points_by_name_keys_by_entry_point_name():
-    from importlib.metadata import EntryPoint
-    from unittest.mock import patch
-
     fake_ep = EntryPoint(
         name="fake",
         value="moonlighter.core.plugins:discover_entry_points",

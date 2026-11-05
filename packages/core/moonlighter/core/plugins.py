@@ -13,15 +13,18 @@ from typing import Any
 
 
 def discover_entry_points(group: str) -> list[type]:
-    """Loads and returns every class registered under `group`. Empty list (never
-    raises) if nothing is registered -- the steady state whenever an optional
-    plugin package isn't installed."""
-    return [ep.load() for ep in entry_points(group=group)]
+    """Loads and returns every class registered under `group`.
+
+    Empty list (never raises) if nothing is registered -- the steady state whenever an optional
+    plugin package isn't installed.
+    """
+    return [entry_point.load() for entry_point in entry_points(group=group)]
 
 
 def discover_entry_points_by_name(group: str) -> dict[str, Any]:
-    """Like discover_entry_points, but keyed by each entry point's own name --
-    for groups where the caller needs to look an object up by identifier (e.g.
-    a platform name), not just get a flat list. Empty dict (never raises) if
-    nothing is registered."""
-    return {ep.name: ep.load() for ep in entry_points(group=group)}
+    """Like discover_entry_points, but keyed by each entry point's own name.
+
+    For groups where the caller needs to look an object up by identifier (e.g. a platform name),
+    not just get a flat list. Empty dict (never raises) if nothing is registered.
+    """
+    return {entry_point.name: entry_point.load() for entry_point in entry_points(group=group)}
