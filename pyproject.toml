@@ -189,7 +189,6 @@ strict-checking = true
 "tests/application/test_cli.py" = ["PLC0415"]
 "tests/conftest.py" = ["PLC0415", "PLW0603"]
 "tests/discovery/test_cli.py" = ["PLC0415"]
-"tests/discovery/test_evaluator.py" = ["FBT003", "PLC0415", "PT018", "TRY002"]
 "tests/discovery/test_profession_agnostic.py" = ["N806", "PLC0415"]
 "tests/discovery/test_scan_report.py" = ["PLC0415"]
 "tests/discovery/test_service.py" = ["DTZ005", "ICN001", "N806", "PLC0415", "PLR0913", "PLR0917", "PT018"]
