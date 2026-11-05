@@ -10,7 +10,7 @@ class MigrationDatabase(Protocol):
     """The slice of a peewee database the migrations use.
 
     peewee's stubs leave `execute_sql` and `connection` untyped, so annotating with
-    `MigrationDatabase` would make every call an untyped-call error under strict mypy.
+    `peewee.Database` would make every call an untyped-call error under strict mypy.
     """
 
     def execute_sql(self, sql: str, params: tuple[Any, ...] | None = None) -> sqlite3.Cursor: ...
