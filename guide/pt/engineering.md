@@ -58,7 +58,8 @@ Um [workspace uv](https://docs.astral.sh/uv/concepts/workspaces/) com 5 namespac
 ## Gates de qualidade
 
 - **Suíte de testes com 100% de cobertura de branches** — o número atual de testes está na [linha de prova do README](https://github.com/albertosca/moonlighter/blob/main/README.pt.md), conferida pelo CI; a cobertura é imposta como gate de CI (`--cov-fail-under=100`), não é número de dashboard.
-- **mypy strict** nos nove módulos `moonlighter.*` (os alvos `--package` do mypy); **ruff** com o ruleset de segurança (`S`) ligado.
+- **mypy strict** em todos os módulos `moonlighter.*` (os alvos `--package` no CI) e em `scripts/`; **ruff** com todas as famílias de regras selecionadas (`select = ["ALL"]`), cada exceção listada no `pyproject.toml` com o seu motivo.
+- **Módulos pequenos, funções simples** — nenhum módulo com mais de 200 linhas sem um motivo registrado, e nenhum com mais de 250; nenhuma função com complexidade cognitiva acima de 10. Os dois são gates de CI, e cada um foi provado reprovando um arquivo propositalmente grande ou emaranhado antes de entrar.
 - **Releases em lockstep** — os cinco pacotes precisam concordar em versão, pins e tag antes de qualquer upload; a checagem roda antes do build, porque upload no PyPI é irreversível.
 - **main protegida** — toda mudança entra por pull request, com o CLA, a suíte de testes e uma auditoria de segurança como checks obrigatórios.
 - **Rascunhado do seu perfil, lacunas sinalizadas** — as respostas são rascunhadas a partir do seu perfil, e o modelo é instruído a responder UNKNOWN quando o seu perfil não lhe dá base; isso volta para você como uma lacuna. Alguns campos são decididos em código, não pelo modelo: um salário cujas unidades não batem com a pretensão configurada, ou uma pergunta de autorização de trabalho cujo país não dá para inferir, sempre volta para você como lacuna. O modelo ainda pode errar uma resposta, e é por isso que você revisa toda folha.

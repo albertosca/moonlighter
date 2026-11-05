@@ -58,7 +58,8 @@ A [uv workspace](https://docs.astral.sh/uv/concepts/workspaces/) of 5 namespace 
 ## Quality gates
 
 - **Test suite with 100% branch coverage** — the current test count is on the [README's proof line](https://github.com/albertosca/moonlighter#readme), checked by CI; coverage is enforced as a CI gate (`--cov-fail-under=100`), not a dashboard number.
-- **mypy strict** across all nine `moonlighter.*` modules (the mypy `--package` targets); **ruff** with the security (`S`) ruleset on.
+- **mypy strict** across every `moonlighter.*` module (the `--package` targets in CI) and `scripts/`; **ruff** with every rule family selected (`select = ["ALL"]`), each exception listed in `pyproject.toml` with its reason.
+- **Small modules, simple functions** — no module over 200 lines without a recorded reason, and none over 250; no function over cognitive complexity 10. Both are CI gates, and each was proven to fail on a deliberately oversized or tangled file before it went on.
 - **Lockstep releases** — the five packages must agree on version, pins and tag before anything uploads; the check runs before the build, because PyPI uploads are irreversible.
 - **Protected main** — every change lands by pull request, with the CLA, the test suite and a security audit as required checks.
 - **Drafted from your profile, gaps flagged** — answers are drafted from your profile, and the model is told to answer UNKNOWN when your profile gives it no basis; that comes back to you as a gap. Some fields are decided in code, not by the model: a salary whose units disagree with your configured target, or a work-authorization question whose country can't be inferred, is always returned to you as a gap. The model can still get an answer wrong, which is why you review every sheet.

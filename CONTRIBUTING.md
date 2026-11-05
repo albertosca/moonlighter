@@ -24,11 +24,13 @@ uv sync --all-packages
 
 ## Quality bar
 
-Every change must pass all three before review:
+Every change must pass every check below before review:
 
 ```bash
 uv run pytest                    # 100% branch coverage is enforced
 uv run ruff check . && uv run ruff format --check .
+uv run python scripts/check_file_length.py                         # no module over 200 lines
+uv run complexipy packages scripts tests --max-complexity-allowed 10   # no function over 10
 uv run mypy \
   --package moonlighter.core \
   --package moonlighter.discovery \
@@ -42,6 +44,7 @@ uv run mypy \
   --package moonlighter.views \
   --package moonlighter._tool_logging \
   --package moonlighter.init
+uv run mypy scripts/
 ```
 
 Tests are written first. Coverage is gated at 100% — use `# pragma: no cover` only for
