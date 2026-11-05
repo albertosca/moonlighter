@@ -87,3 +87,31 @@ def test_real_repo_is_currently_consistent():
     # real pyproject.toml files correctly, not just the synthetic fixture shape.
     repo_root = Path(__file__).resolve().parents[2]
     assert check_version_lockstep.check(repo_root) == []
+
+
+def test_main_prints_the_exact_success_line(tmp_path, capsys):
+    _write_repo(tmp_path, CONSISTENT, CONSISTENT_PINS)
+
+    assert check_version_lockstep.main(tmp_path) == 0
+
+    assert capsys.readouterr().out == "Version lockstep is consistent at 0.2.0.\n"
+
+
+def test_main_prints_every_mismatch_under_one_header_and_returns_one(tmp_path, capsys):
+    versions = {**CONSISTENT, "core": "0.3.0"}
+    _write_repo(tmp_path, versions, {**CONSISTENT_PINS, "email": "0.1.0"})
+
+    assert check_version_lockstep.main(tmp_path) == 1
+
+    assert capsys.readouterr().out == (
+        "Version lockstep broken:\n"
+        "  - packages/core/pyproject.toml is at 0.3.0, expected 0.2.0 (to match moonlighter-full)\n"
+        "  - packages/full/pyproject.toml pins moonlighter-email==0.1.0, expected ==0.2.0\n"
+    )
+
+
+def test_a_pin_missing_from_full_is_skipped_without_a_report(tmp_path):
+    pins = {slug: pin for slug, pin in CONSISTENT_PINS.items() if slug != "scan"}
+    _write_repo(tmp_path, CONSISTENT, pins)
+
+    assert check_version_lockstep.check(tmp_path) == []

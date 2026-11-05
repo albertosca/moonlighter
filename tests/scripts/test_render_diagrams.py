@@ -49,3 +49,64 @@ def test_no_text_is_painted_in_a_low_contrast_token():
     sources = sorted(_DIAGRAM_SOURCES.glob("*.svg"))
     offenders = [source.name for source in sources if low_contrast_text.search(source.read_text())]
     assert offenders == []
+
+
+def test_main_writes_a_light_and_a_dark_file_per_source_into_the_diagrams_directory(
+    tmp_path, monkeypatch, capsys
+):
+    source_directory = tmp_path / "src"
+    source_directory.mkdir()
+    (source_directory / "b.svg").write_text('<rect fill="{{ground}}"/>')
+    (source_directory / "a.svg").write_text('<rect stroke="{{fg}}"/>')
+    (source_directory / "notes.txt").write_text("{{ignored}}")
+    monkeypatch.setattr(render_diagrams, "_ROOT", tmp_path)
+
+    assert render_diagrams.main(["x"]) == 0
+
+    assert capsys.readouterr().out == (
+        "wrote a-light.svg\nwrote a-dark.svg\nwrote b-light.svg\nwrote b-dark.svg\n"
+    )
+    assert sorted(path.name for path in tmp_path.glob("*.svg")) == [
+        "a-dark.svg",
+        "a-light.svg",
+        "b-dark.svg",
+        "b-light.svg",
+    ]
+    assert (tmp_path / "a-light.svg").read_text() == '<rect stroke="#1F2B47"/>'
+    assert (tmp_path / "b-dark.svg").read_text() == '<rect fill="#1F2B47"/>'
+
+
+def test_main_stops_with_an_error_on_an_unknown_token_after_writing_earlier_files(
+    tmp_path, monkeypatch
+):
+    source_directory = tmp_path / "src"
+    source_directory.mkdir()
+    (source_directory / "a.svg").write_text("{{fg}}")
+    (source_directory / "b.svg").write_text("{{nope}}")
+    monkeypatch.setattr(render_diagrams, "_ROOT", tmp_path)
+
+    with pytest.raises(KeyError, match="nope"):
+        render_diagrams.main(["x"])
+
+    assert (tmp_path / "a-dark.svg").exists()
+    assert not (tmp_path / "b-light.svg").exists()
+
+
+def test_main_renders_the_sources_in_name_order_whatever_order_the_filesystem_lists_them(
+    tmp_path, monkeypatch, capsys
+):
+    source_directory = tmp_path / "src"
+    source_directory.mkdir()
+    for name in ("a", "b", "c"):
+        (source_directory / f"{name}.svg").write_text("{{fg}}")
+    real_glob = Path.glob
+    monkeypatch.setattr(
+        Path, "glob", lambda self, pattern: iter(sorted(real_glob(self, pattern), reverse=True))
+    )
+    monkeypatch.setattr(render_diagrams, "_ROOT", tmp_path)
+
+    render_diagrams.main(["x"])
+
+    assert capsys.readouterr().out.splitlines() == [
+        f"wrote {name}-{theme}.svg" for name in ("a", "b", "c") for theme in ("light", "dark")
+    ]
