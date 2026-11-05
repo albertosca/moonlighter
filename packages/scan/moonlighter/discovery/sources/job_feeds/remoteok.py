@@ -1,12 +1,12 @@
 """RemoteOK's portal-wide remote-jobs feed."""
 
-import re
 from typing import Any, override
 
 import httpx
 
 from moonlighter.core.http_fetch import FetchError, get_json
 from moonlighter.core.log import get_logger
+from moonlighter.core.posting import normalize_feed_description
 from moonlighter.discovery.sources.base import BaseScanner, RawJob, ScanStats, SourceStats
 
 logger = get_logger(__name__)
@@ -41,7 +41,7 @@ class RemoteOKScanner(BaseScanner):
                     url=url,
                     location=item.get("location") or None,
                     remote_type="remote",
-                    description=self._description(item.get("description") or ""),
+                    description=normalize_feed_description(item.get("description") or ""),
                 )
             )
         if stats is not None:
@@ -59,12 +59,3 @@ class RemoteOKScanner(BaseScanner):
             # A shape change is an error, not a silent zero.
             return [], 1
         return data, 0
-
-    @staticmethod
-    def _description(raw_description: str) -> str | None:
-        description = None
-        if raw_description:
-            description = re.sub(r"<[^>]+>", " ", raw_description).strip()
-            description = re.sub(r"\s+", " ", description)
-            description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
-        return description

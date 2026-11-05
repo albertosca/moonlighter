@@ -1,6 +1,5 @@
 """Remotive's portal-wide remote-jobs feed, optionally narrowed to one category."""
 
-import re
 from typing import Any, override
 from urllib.parse import quote
 
@@ -8,6 +7,7 @@ import httpx
 
 from moonlighter.core.http_fetch import FetchError, get_json
 from moonlighter.core.log import get_logger
+from moonlighter.core.posting import normalize_feed_description
 from moonlighter.discovery.sources.base import BaseScanner, RawJob, ScanStats, SourceStats
 
 logger = get_logger(__name__)
@@ -35,8 +35,8 @@ class RemotiveScanner(BaseScanner):
         category = keyword_arguments.get("category")
         # No category configured: every category, narrowed afterwards by the title
         # keywords. Never a built-in profession.
-        url = f"{self.BASE}?category={quote(str(category))}" if category else self.BASE
-        data, errors = await self._fetch_postings(url)
+        feed_url = f"{self.BASE}?category={quote(str(category))}" if category else self.BASE
+        data, errors = await self._fetch_postings(feed_url)
         jobs: list[RawJob] = []
         for item in data.get("jobs") or []:
             title, url = item.get("title"), item.get("url")
@@ -50,7 +50,7 @@ class RemotiveScanner(BaseScanner):
                     url=url,
                     location=item.get("candidate_required_location") or None,
                     remote_type="remote",
-                    description=self._description(item.get("description") or ""),
+                    description=normalize_feed_description(item.get("description") or ""),
                 )
             )
         if stats is not None:
@@ -69,12 +69,3 @@ class RemotiveScanner(BaseScanner):
             # A shape change is an error, not a silent zero.
             return {}, 1
         return data, 0
-
-    @staticmethod
-    def _description(raw_description: str) -> str | None:
-        description = None
-        if raw_description:
-            description = re.sub(r"<[^>]+>", " ", raw_description).strip()
-            description = re.sub(r"\s+", " ", description)
-            description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
-        return description

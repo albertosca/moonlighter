@@ -3,7 +3,7 @@
 import asyncio
 import html
 import re
-from typing import Any, override
+from typing import Any, cast, override
 
 import httpx
 
@@ -88,12 +88,12 @@ class HNWhoIsHiringScanner(BaseScanner):
                 return int(item_id)
         return None
 
-    async def _submitted_ids(self, client: httpx.AsyncClient) -> Any:
+    async def _submitted_ids(self, client: httpx.AsyncClient) -> list[int]:
         try:
             http_response = await client.get(f"{self.BASE}/user/whoishiring.json", headers=HEADERS)
             if http_response.status_code != httpx.codes.OK:
                 return []
-            return (http_response.json() or {}).get("submitted") or []
+            return cast("list[int]", (http_response.json() or {}).get("submitted") or [])
         except Exception:  # noqa: BLE001 - any failure to read the user record means no thread, which scan counts as one error
             return []
 

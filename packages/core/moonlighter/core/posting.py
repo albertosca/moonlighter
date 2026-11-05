@@ -48,6 +48,22 @@ def strip_tags(raw: str) -> str | None:
     return re.sub(r"\s+", " ", text).strip() or None
 
 
+def normalize_feed_description(raw_description: str) -> str | None:
+    """Plain text of a job feed's HTML description, or None when no text is left.
+
+    Three passes, in this order: strip the tags, collapse whitespace, then
+    reattach punctuation a removed tag left detached. A single tag-strip regex
+    leaves double spaces and a space before punctuation on nested tags.
+    """
+    # None-init + if-guard keeps mypy's inferred type as str | None throughout, not just str.
+    description = None
+    if raw_description:
+        description = re.sub(r"<[^>]+>", " ", raw_description).strip()
+        description = re.sub(r"\s+", " ", description)
+        description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
+    return description
+
+
 async def fetch_posting_via_ats(url: str) -> FetchedPosting | None:
     """Fetch a posting through its ATS's public API.
 

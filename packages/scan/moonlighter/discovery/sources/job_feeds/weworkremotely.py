@@ -1,7 +1,6 @@
 """WeWorkRemotely's portal-wide RSS feed, optionally narrowed to one category."""
 
 import contextlib
-import re
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from typing import Any, override
@@ -12,6 +11,7 @@ import httpx
 
 from moonlighter.core.http_fetch import HEADERS
 from moonlighter.core.log import get_logger
+from moonlighter.core.posting import normalize_feed_description
 from moonlighter.discovery.sources.base import BaseScanner, RawJob, ScanStats, SourceStats
 
 logger = get_logger(__name__)
@@ -100,7 +100,7 @@ class WeWorkRemotelyScanner(BaseScanner):
                     url=url,
                     location=(item.findtext("region") or "").strip() or None,
                     remote_type="remote",
-                    description=scanner_class._description(item.findtext("description") or ""),
+                    description=normalize_feed_description(item.findtext("description") or ""),
                     posted_at=scanner_class._published_at(item.findtext("pubDate")),
                 )
             )
@@ -120,17 +120,3 @@ class WeWorkRemotelyScanner(BaseScanner):
             with contextlib.suppress(Exception):
                 posted_at = parsedate_to_datetime(pub_date)
         return posted_at
-
-    @staticmethod
-    def _description(raw_description: str) -> str | None:
-        # Same 3-pass normalization as RemotiveScanner (strip tags -> collapse
-        # whitespace -> reattach punctuation) -- a single tag-strip regex leaves
-        # double spaces / space-before-punctuation on nested tags.
-        # None-init + if-guard (matching RemoteOKScanner/RemotiveScanner)
-        # keeps mypy's inferred type as str | None throughout, not just str.
-        description = None
-        if raw_description:
-            description = re.sub(r"<[^>]+>", " ", raw_description).strip()
-            description = re.sub(r"\s+", " ", description)
-            description = re.sub(r"\s+([.!?,;:])", r"\1", description) or None
-        return description
