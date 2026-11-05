@@ -1,8 +1,13 @@
 import json
-from unittest.mock import AsyncMock, patch
+import sys
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+import yaml
+from moonlighter.application import cli
 from moonlighter.application.assisted.results import SheetKind, SheetResult
+from moonlighter.application.cvgen.bootstrap import BootstrapOutcome
+from moonlighter.core.config.errors import ConfigError
 
 
 def test_parse_args_prepare_with_optional_paste():
@@ -404,3 +409,152 @@ async def test_apply_doctor_online_says_when_there_was_nothing_to_check(temporar
     assert payload["links"] == []
     assert "no CV template" in payload["links_note"]
     assert code == 0
+
+
+def test_parse_args_usage_errors_carry_the_message_the_operator_reads(capsys):
+    expectations = (
+        (["prepare"], "prepare takes exactly one of JOB_ID or --url"),
+        (["prepare", "42", "--url", "https://x"], "prepare takes exactly one of JOB_ID or --url"),
+        (
+            ["prepare", "42", "--company", "Acme"],
+            "--company and --title are only meaningful with --url",
+        ),
+        (
+            ["prepare", "42", "--title", "Eng"],
+            "--company and --title are only meaningful with --url",
+        ),
+    )
+    for argv, message in expectations:
+        with pytest.raises(SystemExit):
+            cli.parse_args(argv)
+        payload = json.loads(capsys.readouterr().out)
+        assert payload == {"kind": "usage_error", "error": message}
+
+
+def test_parse_args_reads_sys_argv_when_given_no_argv(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["moonlighter-apply", "doctor", "--online"])
+    parsed_arguments = cli.parse_args()
+    assert (parsed_arguments.command, parsed_arguments.online) == ("doctor", True)
+
+
+@pytest.mark.parametrize(
+    "failure", [ConfigError("bad config"), OSError("bad disk"), yaml.YAMLError("bad yaml")]
+)
+async def test_apply_doctor_online_reports_every_load_failure_with_the_same_prefix(
+    temporary_database, failure
+):
+    with (
+        patch.object(cli, "doctor_payload", return_value=({"kind": "doctor"}, 1)),
+        patch.object(cli, "load_config", side_effect=failure),
+    ):
+        payload, code = await cli._run(cli.parse_args(["doctor", "--online"]))
+    assert payload["links"] is None
+    assert payload["links_error"] == f"config does not load: {failure}"
+    assert "links_note" not in payload
+    assert code == 1
+
+
+async def test_apply_doctor_online_nothing_to_check_note_is_this_exact_sentence(
+    temporary_database,
+):
+    with (
+        patch.object(cli, "doctor_payload", return_value=({"kind": "doctor"}, 0)),
+        patch.object(cli, "link_report", AsyncMock(return_value=[])),
+    ):
+        payload, _ = await cli._run(cli.parse_args(["doctor", "--online"]))
+    assert payload["links_note"] == (
+        "no CV template with header links found in cv.template_dir; nothing checked"
+    )
+
+
+async def test_apply_doctor_never_calls_bootstrap_even_online(temporary_database):
+    with (
+        patch.object(cli, "bootstrap") as bootstrap_spy,
+        patch.object(cli, "doctor_payload", return_value=({"kind": "doctor"}, 0)),
+        patch.object(cli, "link_report", AsyncMock(return_value=[])),
+    ):
+        await cli._run(cli.parse_args(["doctor"]))
+        await cli._run(cli.parse_args(["doctor", "--online"]))
+    bootstrap_spy.assert_not_called()
+
+
+async def test_bootstrap_cv_subcommand_payload_has_exactly_these_keys_and_values(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(cli, "bootstrap", lambda: ({}, {"name": "Jane"}))
+    outcome = BootstrapOutcome(
+        pool_path=tmp_path / "cv-pool.yaml",
+        template_path=tmp_path / "cv-templates" / "cv-template.en.tex",
+        pdf_path=tmp_path / "sample.pdf",
+        bullet_count=3,
+    )
+
+    async def _fake_bootstrap(profile, config, caller, *, force=False):
+        return outcome
+
+    monkeypatch.setattr(cli, "bootstrap_cv_pool", _fake_bootstrap)
+    payload, code = await cli._run(cli.parse_args(["bootstrap-cv"]))
+    assert code == 0
+    assert payload == {
+        "kind": "cv_bootstrap",
+        "pool_path": str(tmp_path / "cv-pool.yaml"),
+        "template_path": str(tmp_path / "cv-templates" / "cv-template.en.tex"),
+        "pdf_path": str(tmp_path / "sample.pdf"),
+        "bullet_count": 3,
+    }
+
+
+async def test_bootstrap_cv_subcommand_hands_over_profile_config_and_the_caller_in_order(
+    monkeypatch, tmp_path
+):
+    config, profile, caller = {"config": 1}, {"profile": 2}, object()
+    monkeypatch.setattr(cli, "bootstrap", lambda: (config, profile))
+    caller_factory = Mock(return_value=caller)
+    monkeypatch.setattr(cli, "make_caller", caller_factory)
+    drafter = AsyncMock(
+        return_value=BootstrapOutcome(tmp_path / "p.yaml", tmp_path / "t.tex", None, 1)
+    )
+    monkeypatch.setattr(cli, "bootstrap_cv_pool", drafter)
+    await cli._run(cli.parse_args(["bootstrap-cv"]))
+    caller_factory.assert_called_once_with(config)
+    drafter.assert_awaited_once_with(profile, config, caller, force=False)
+
+
+async def test_bootstrap_cv_skip_payload_is_exactly_the_skipped_kind(
+    monkeypatch, temporary_database
+):
+    monkeypatch.setattr(cli, "bootstrap", lambda: ({}, {"name": "Jane"}))
+    payload, code = await cli._run(cli.parse_args(["bootstrap-cv", "--skip"]))
+    assert (payload, code) == ({"kind": "cv_bootstrap_skipped"}, 0)
+
+
+async def test_run_prepare_hands_over_job_id_config_and_profile_in_order(temporary_database):
+    config, profile = {"config": 1}, {"profile": 2}
+    result = SheetResult(
+        kind=SheetKind.SHEET, composed=[], job_title="T", company="C", apply_url="u"
+    )
+    prepare = AsyncMock(return_value=result)
+    with (
+        patch.object(cli, "bootstrap", return_value=(config, profile)),
+        patch.object(cli, "prepare_application", new=prepare),
+    ):
+        await cli._run(cli.parse_args(["prepare", "42"]))
+    prepare.assert_awaited_once_with(42, config, profile)
+
+
+async def test_run_prepare_with_paste_hands_over_text_config_and_profile_by_keyword(
+    temporary_database, tmp_path
+):
+    config, profile = {"config": 1}, {"profile": 2}
+    page = tmp_path / "page.txt"
+    page.write_text("Full name")
+    result = SheetResult(
+        kind=SheetKind.SHEET, composed=[], job_title="T", company="C", apply_url="u"
+    )
+    paste = AsyncMock(return_value=result)
+    with (
+        patch.object(cli, "bootstrap", return_value=(config, profile)),
+        patch.object(cli, "prepare_application_from_paste", new=paste),
+    ):
+        await cli._run(cli.parse_args(["prepare", "42", "--paste", str(page)]))
+    paste.assert_awaited_once_with(42, "Full name", config, profile=profile)
