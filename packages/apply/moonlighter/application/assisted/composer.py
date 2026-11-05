@@ -35,8 +35,8 @@ async def compose_answers(  # noqa: PLR0913, PLR0917 - public entry point called
         [question.label for question in questions],
         profile,
         config,
-        job.get("location"),
-        job.get("remote_type"),
+        job_location=job.get("location"),
+        job_remote_type=job.get("remote_type"),
     )
     sources = AnswerSources(
         profile=profile,

@@ -1,6 +1,6 @@
-"""The static rule ladder: which profile value answers which label, first match winning."""
+"""The static rule ladder's order: which profile value answers which label, first match winning."""
 
-from moonlighter.application.answers.field_map import _RULES
+from moonlighter.application.answers.static_rules import _RULES
 
 EXPECTED_PATTERN_ORDER = [
     r"^(your\s+)?full\s+name",

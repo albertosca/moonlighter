@@ -130,9 +130,9 @@ async def test_pre_population_runs_once_over_every_label(monkeypatch, include_qu
     real_pre_populate = composer.pre_populate_answers
     calls: list[list[str]] = []
 
-    def spy(labels, *rest):
+    def spy(labels, *rest, **keywords):
         calls.append(list(labels))
-        return real_pre_populate(labels, *rest)
+        return real_pre_populate(labels, *rest, **keywords)
 
     monkeypatch.setattr(composer, "pre_populate_answers", spy)
     questions = [

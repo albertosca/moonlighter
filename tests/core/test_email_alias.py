@@ -54,4 +54,4 @@ def test_is_email_label_rejects_labels_that_merely_start_with_the_word():
 
 def test_is_email_label_rejects_unrelated_labels():
     assert not is_email_label("Nome*")
-    assert not is_email_label("Your email")  # anchored, like field_map's own rule
+    assert not is_email_label("Your email")  # anchored, like static_rules' own rule

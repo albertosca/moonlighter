@@ -12,7 +12,7 @@ from moonlighter.application.answers.bank_eligibility import (
     is_sensitive_label,
     normalize_question,
 )
-from moonlighter.application.answers.field_map import demographic_answer
+from moonlighter.application.answers.demographics import demographic_answer
 from moonlighter.application.assisted.answer_generation import GenerationError, generate_answer
 from moonlighter.application.assisted.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion
@@ -76,7 +76,7 @@ class AnswerSources:
             return SourcedAnswer(configured)
         if question.label in self.known:
             # Presence, not truthiness: known can legitimately map a label to ""
-            # (_salary_expectation with no salary_target configured, by design —
+            # (salary_expectation with no salary_target configured, by design —
             # E2 forbids letting the figure fall through to the LLM). `known.get(...)
             # or ...` treated that deliberate "" the same as absence and asked the
             # LLM to invent a number anyway.

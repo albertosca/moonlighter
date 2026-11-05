@@ -114,7 +114,6 @@ strict-checking = true
 "packages/apply/moonlighter/application/answers/__init__.py" = ["D104"]
 "packages/apply/moonlighter/application/answers/compliance.py" = ["D205", "D209"]
 "packages/apply/moonlighter/application/answers/cv.py" = ["D205", "D212", "PLC0415"]
-"packages/apply/moonlighter/application/answers/field_map.py" = ["D205", "D212", "D301", "ERA001", "FURB167", "ISC004", "PLC0415", "PLR0917"]
 "packages/apply/moonlighter/application/answers/option_matcher.py" = ["C901", "D205", "D209", "D212"]
 "packages/apply/moonlighter/application/answers/profile.py" = ["A005", "D205", "D212"]
 "packages/apply/moonlighter/application/answers/work_auth.py" = ["ARG001", "D205", "D209", "D212"]

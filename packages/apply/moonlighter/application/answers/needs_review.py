@@ -2,9 +2,9 @@
 
 # Sentinel for a form field the LLM did not (or should not) answer, stopping in front
 # of the operator instead of guessing. This is a constant, not a config key: every
-# producer (field_map.py's salary rule, work_auth.py's authorization and sponsorship
+# producer (salary.py's salary rule, work_auth.py's authorization and sponsorship
 # rule, both reached through pre_populate_answers) and every consumer
-# (assisted/composer.py, which turns the marker into a visible gap) must agree on the
+# (assisted/answer_screening.py, which turns the marker into a visible gap) must agree on the
 # exact same string, or an unanswered field silently degrades into whatever literal
 # text was configured — shown to the operator as a finished answer, ready to paste
 # into a real form, instead of a gap. There is no way to make that divergence safe by

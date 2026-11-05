@@ -13,7 +13,7 @@ import secrets
 _REF_ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789"
 _REF_LENGTH = 8
 
-# Anchored like field_map's own email rule (`^e-?mail`), so the two definitions of
+# Anchored like static_rules' own email rule (`^e-?mail`), so the two definitions of
 # "the email field" cannot drift apart: the alias replaces exactly the labels the
 # field map would have filled with the profile email. The \b keeps "Emailing
 # preferences" out while letting "E-mail*" and "Email address" in.

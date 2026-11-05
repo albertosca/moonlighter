@@ -116,7 +116,7 @@ async def test_a_yes_no_question_with_a_required_marker_is_still_a_question(labe
 )
 async def test_the_label_comes_back_without_its_required_or_optional_marker(label, clean):
     """Decided 2026-09-29: the label is the question, the marker is `required`.
-    The model already drops markers on its own (forge PT-BR run), and field_map
+    The model already drops markers on its own (forge PT-BR run), and label_cleaning
     strips them before matching anyway; the code makes it deterministic."""
     reply = json.dumps({"questions": [{"label": label, "kind": "text", "required": True}]})
     call, _ = fake_llm(reply)

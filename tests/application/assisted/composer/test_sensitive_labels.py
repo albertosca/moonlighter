@@ -39,7 +39,7 @@ PROFILE_WITH_DEMOGRAPHICS = {
 async def test_a_configured_demographic_value_answers_instead_of_gapping():
     # The guard exists to stop the MODEL from inventing an answer, not to stop
     # Alberto's own configured answer from being used. When profile.yaml's
-    # demographics block holds a value, field_map answers it deterministically —
+    # demographics block holds a value, demographics.py answers it deterministically —
     # never_called proves this is not the LLM doing it.
     question = FormQuestion(
         label="Gender", kind=QuestionKind.SINGLE_SELECT, required=True, options=("Male", "Female")
@@ -139,7 +139,7 @@ async def test_a_configured_demographic_answer_is_never_written_to_the_job_cache
 
 @pytest.mark.asyncio
 async def test_references_gap_even_when_demographics_are_configured():
-    # References are third-party data with no field_map rule by design, so they
+    # References are third-party data with no static_rules.py rule by design, so they
     # stay a gap regardless of what the demographics block holds.
     question = FormQuestion(label="References", kind=QuestionKind.LONG_TEXT, required=True)
     composed = await compose_answers([question], PROFILE_WITH_DEMOGRAPHICS, {}, JOB, never_called)
