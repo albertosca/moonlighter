@@ -1,8 +1,8 @@
 from unittest.mock import AsyncMock, patch
 
 from moonlighter.core.db import Job, ScanLog, init_db
-from moonlighter.core.ingest import job_from_url
-from moonlighter.core.posting import FetchedPosting
+from moonlighter.core.web.ingest import job_from_url
+from moonlighter.core.web.posting import FetchedPosting
 
 
 async def test_job_from_url_returns_the_existing_job_without_fetching(temporary_database):
@@ -15,7 +15,7 @@ async def test_job_from_url_returns_the_existing_job_without_fetching(temporary_
         status="new",
     )
     with patch(
-        "moonlighter.core.ingest.fetch_posting_via_ats", side_effect=AssertionError("no fetch")
+        "moonlighter.core.web.ingest.fetch_posting_via_ats", side_effect=AssertionError("no fetch")
     ):
         job = await job_from_url("https://boards.greenhouse.io/acme/jobs/1/")
     assert job is not None
@@ -28,7 +28,7 @@ async def test_job_from_url_ingests_via_the_ats_api_unscored(temporary_database)
         company="Acme", title="Staff Engineer", description="A long description of the role."
     )
     with patch(
-        "moonlighter.core.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=posting)
+        "moonlighter.core.web.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=posting)
     ):
         job = await job_from_url("https://boards.greenhouse.io/acme/jobs/7")
     assert job is not None
@@ -47,9 +47,11 @@ async def test_job_from_url_falls_back_to_the_generic_fetch_for_the_description(
     init_db()
     posting = FetchedPosting(company="Acme", title="Staff Engineer", description=None)
     with (
-        patch("moonlighter.core.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=posting)),
         patch(
-            "moonlighter.core.ingest.fetch_description",
+            "moonlighter.core.web.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=posting)
+        ),
+        patch(
+            "moonlighter.core.web.ingest.fetch_description",
             new=AsyncMock(return_value=("Generic text", None)),
         ),
     ):
@@ -64,9 +66,11 @@ async def test_job_from_url_is_none_when_the_posting_cannot_be_named(temporary_d
     # company would poison list_jobs and the sheet header anyway.
     init_db()
     with (
-        patch("moonlighter.core.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=None)),
         patch(
-            "moonlighter.core.ingest.fetch_description",
+            "moonlighter.core.web.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=None)
+        ),
+        patch(
+            "moonlighter.core.web.ingest.fetch_description",
             side_effect=AssertionError("no fetch"),
         ),
     ):
@@ -79,9 +83,11 @@ async def test_job_from_url_with_overrides_ingests_a_non_ats_page(temporary_data
     # named, so the generic fetch runs to supply the description.
     init_db()
     with (
-        patch("moonlighter.core.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=None)),
         patch(
-            "moonlighter.core.ingest.fetch_description",
+            "moonlighter.core.web.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=None)
+        ),
+        patch(
+            "moonlighter.core.web.ingest.fetch_description",
             new=AsyncMock(return_value=("Page text", None)),
         ),
     ):
@@ -96,9 +102,11 @@ async def test_job_from_url_is_none_when_the_fetch_fails(temporary_database):
     init_db()
     posting = FetchedPosting(company="Acme", title="Eng", description=None)
     with (
-        patch("moonlighter.core.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=posting)),
         patch(
-            "moonlighter.core.ingest.fetch_description",
+            "moonlighter.core.web.ingest.fetch_posting_via_ats", new=AsyncMock(return_value=posting)
+        ),
+        patch(
+            "moonlighter.core.web.ingest.fetch_description",
             new=AsyncMock(return_value=(None, "HTTP 404")),
         ),
     ):

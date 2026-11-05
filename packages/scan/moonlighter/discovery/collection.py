@@ -4,7 +4,7 @@ from dataclasses import replace
 from typing import Any
 
 from moonlighter.core.plugins import discover_entry_points
-from moonlighter.core.urls import normalize_job_url
+from moonlighter.core.web.urls import normalize_job_url
 from moonlighter.discovery.portals import scan_portals
 from moonlighter.discovery.source_warnings import stats_warnings
 from moonlighter.discovery.sources.base import (

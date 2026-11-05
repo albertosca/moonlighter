@@ -6,7 +6,7 @@ from typing import Any, override
 
 import httpx
 
-from moonlighter.core.http_fetch import FetchError, get_json, require_dict
+from moonlighter.core.web.http_fetch import FetchError, get_json, require_dict
 from moonlighter.discovery.sources.base import BaseScanner, RawJob, normalize_remote_type
 from moonlighter.discovery.sources.company_boards.gathering import gather_jobs
 

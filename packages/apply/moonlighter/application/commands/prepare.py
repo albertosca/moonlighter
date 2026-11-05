@@ -15,7 +15,7 @@ from moonlighter.application.assisted.service import (
     prepare_application_from_paste,
 )
 from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK
-from moonlighter.core.ingest import job_from_url
+from moonlighter.core.web.ingest import job_from_url
 
 
 def _read_paste(source: str) -> str:

@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.core.db import Job, init_db
-from moonlighter.core.posting import FetchedPosting
+from moonlighter.core.web.posting import FetchedPosting
 from moonlighter.discovery.manual_jobs import add_job
 
 from tests.discovery.scan_fakes import CONFIG, PROFILE, evaluation_result
@@ -23,7 +23,7 @@ async def test_add_job_fetches_description_when_empty(temporary_database):
     init_db()
     acm, _ = _http_client(text="<html><body>Real desc</body></html>")
     with (
-        patch("moonlighter.core.posting.httpx.AsyncClient", return_value=acm),
+        patch("moonlighter.core.web.posting.httpx.AsyncClient", return_value=acm),
         patch(
             "moonlighter.discovery.manual_jobs.evaluate_job",
             new=AsyncMock(return_value=evaluation_result(8.0)),
@@ -139,7 +139,7 @@ async def test_add_job_marks_a_remote_ats_posting_remote(temporary_database):
 async def test_add_job_http_non_200_returns_error(temporary_database):
     init_db()
     acm, _ = _http_client(status_code=404)
-    with patch("moonlighter.core.posting.httpx.AsyncClient", return_value=acm):
+    with patch("moonlighter.core.web.posting.httpx.AsyncClient", return_value=acm):
         result = await add_job(
             "https://x.com/3", "Stripe", "Engineer", "", CONFIG, PROFILE, MagicMock()
         )
@@ -151,7 +151,7 @@ async def test_add_job_http_exception_returns_error(temporary_database):
     acm = MagicMock()
     acm.__aenter__ = AsyncMock(side_effect=Exception("connection refused"))
     acm.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.core.posting.httpx.AsyncClient", return_value=acm):
+    with patch("moonlighter.core.web.posting.httpx.AsyncClient", return_value=acm):
         result = await add_job(
             "https://x.com/4", "Stripe", "Engineer", "", CONFIG, PROFILE, MagicMock()
         )

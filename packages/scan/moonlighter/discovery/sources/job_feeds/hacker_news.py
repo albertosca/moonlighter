@@ -7,7 +7,7 @@ from typing import Any, cast, override
 
 import httpx
 
-from moonlighter.core.http_fetch import HEADERS, get_json
+from moonlighter.core.web.http_fetch import HEADERS, get_json
 from moonlighter.discovery.sources.base import BaseScanner, RawJob, ScanStats, SourceStats
 from moonlighter.discovery.sources.job_feeds.hacker_news_parsing import parse_title, parse_workplace
 

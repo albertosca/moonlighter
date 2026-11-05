@@ -15,7 +15,7 @@ from typing import Any
 from moonlighter.core.db import Job
 from moonlighter.core.log import get_logger
 from moonlighter.core.plugins import discover_entry_points_by_name
-from moonlighter.core.urls import normalize_job_url
+from moonlighter.core.web.urls import normalize_job_url
 from moonlighter.discovery.sources.base import BaseScanner, ScanStats
 from moonlighter.discovery.sources.registry import LISTING_SOURCES, PORTAL_SOURCES
 

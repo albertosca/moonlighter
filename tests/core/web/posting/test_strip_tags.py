@@ -1,6 +1,6 @@
 """strip_tags is public for other packages, and turns markup into whitespace-collapsed text, or None when no text is left."""
 
-from moonlighter.core.posting import strip_tags
+from moonlighter.core.web.posting import strip_tags
 
 
 def test_strip_tags_is_public_so_other_packages_can_import_it_directly():

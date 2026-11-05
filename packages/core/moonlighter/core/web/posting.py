@@ -12,8 +12,8 @@ from dataclasses import dataclass
 
 import httpx
 
-from moonlighter.core.http_fetch import HEADERS, FetchError, get_json
-from moonlighter.core.urls import normalize_job_url
+from moonlighter.core.web.http_fetch import HEADERS, FetchError, get_json
+from moonlighter.core.web.urls import normalize_job_url
 
 _GREENHOUSE_URL = re.compile(r"greenhouse\.io/(?P<board>[^/]+)/jobs/(?P<job_id>\d+)")
 # Any host with a Recruitee-shaped /o/{offer} path: subdomain customers AND

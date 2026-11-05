@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-from moonlighter.core.http_fetch import HEADERS
+from moonlighter.core.web.http_fetch import HEADERS
 from moonlighter.discovery.sources.job_feeds.hacker_news import HNWhoIsHiringScanner
 
 from tests.discovery.sources.job_feeds.hacker_news.fake_api import (

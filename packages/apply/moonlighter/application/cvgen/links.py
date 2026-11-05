@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 
 from moonlighter.application.cvgen.paths import resolved_template_dir
-from moonlighter.core.http_fetch import HEADERS
+from moonlighter.core.web.http_fetch import HEADERS
 
 _TEMPLATE_NAMES = ("cv-template.en.tex", "cv-template.pt.tex")
 _URL_COMMAND = re.compile(r"\\(?:httplink|href|homepage)(?:\[[^\]]*\])?\{([^}]+)\}")

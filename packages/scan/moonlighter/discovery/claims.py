@@ -3,7 +3,7 @@
 from peewee import IntegrityError
 
 from moonlighter.core.db import ScanLog
-from moonlighter.core.urls import normalize_job_url
+from moonlighter.core.web.urls import normalize_job_url
 from moonlighter.discovery.sources.base import RawJob
 
 

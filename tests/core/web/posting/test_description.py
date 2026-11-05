@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from moonlighter.core.posting import fetch_description
+from moonlighter.core.web.posting import fetch_description
 
 
 async def test_fetch_description_drops_style_and_script_contents():
@@ -60,7 +60,7 @@ async def test_fetch_description_reports_a_non_200_instead_of_guessing():
     client.get = AsyncMock(return_value=MagicMock(status_code=404, text=""))
     client.__aenter__ = AsyncMock(return_value=client)
     client.__aexit__ = AsyncMock(return_value=False)
-    with patch("moonlighter.core.posting.httpx.AsyncClient", return_value=client):
+    with patch("moonlighter.core.web.posting.httpx.AsyncClient", return_value=client):
         text, error = await fetch_description("https://x.com/job")
     assert text is None
     assert "HTTP 404" in (error or "")

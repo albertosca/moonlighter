@@ -16,8 +16,8 @@ not offer it again as new.
 from datetime import datetime
 
 from moonlighter.core.db import Job, ScanLog
-from moonlighter.core.posting import fetch_description, fetch_posting_via_ats
-from moonlighter.core.urls import normalize_job_url
+from moonlighter.core.web.posting import fetch_description, fetch_posting_via_ats
+from moonlighter.core.web.urls import normalize_job_url
 
 
 async def job_from_url(

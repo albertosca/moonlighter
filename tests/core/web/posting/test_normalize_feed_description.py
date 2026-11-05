@@ -1,6 +1,6 @@
 """normalize_feed_description turns a feed's HTML description into tidy plain text, or None when no text is left."""
 
-from moonlighter.core.posting import normalize_feed_description
+from moonlighter.core.web.posting import normalize_feed_description
 
 
 def test_tags_only_description_yields_none():

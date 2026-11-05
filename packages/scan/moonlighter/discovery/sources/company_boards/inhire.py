@@ -7,8 +7,8 @@ from typing import Any, ClassVar, override
 
 import httpx
 
-from moonlighter.core.http_fetch import HEADERS, FetchError, get_json, require_dict
-from moonlighter.core.posting import strip_tags
+from moonlighter.core.web.http_fetch import HEADERS, FetchError, get_json, require_dict
+from moonlighter.core.web.posting import strip_tags
 from moonlighter.discovery.sources.base import BaseScanner, RawJob
 from moonlighter.discovery.sources.company_boards.gathering import gather_jobs
 

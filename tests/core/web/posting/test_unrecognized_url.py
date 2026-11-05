@@ -1,7 +1,7 @@
 """fetch_posting_via_ats returns None for a URL that matches no known ATS shape."""
 
 import pytest
-from moonlighter.core.posting import fetch_posting_via_ats
+from moonlighter.core.web.posting import fetch_posting_via_ats
 
 
 @pytest.mark.asyncio

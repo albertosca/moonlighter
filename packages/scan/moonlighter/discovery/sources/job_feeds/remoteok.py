@@ -4,9 +4,9 @@ from typing import Any, override
 
 import httpx
 
-from moonlighter.core.http_fetch import FetchError, get_json
 from moonlighter.core.log import get_logger
-from moonlighter.core.posting import normalize_feed_description
+from moonlighter.core.web.http_fetch import FetchError, get_json
+from moonlighter.core.web.posting import normalize_feed_description
 from moonlighter.discovery.sources.base import BaseScanner, RawJob, ScanStats, SourceStats
 
 logger = get_logger(__name__)

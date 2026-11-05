@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
-from moonlighter.core.http_fetch import FetchError, get_json, require_dict
+from moonlighter.core.web.http_fetch import FetchError, get_json, require_dict
 
 
 @pytest.mark.asyncio
