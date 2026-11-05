@@ -1,10 +1,15 @@
+import asyncio
 import json
 import logging
 from dataclasses import FrozenInstanceError
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import yaml
 from moonlighter.discovery.evaluator import (
+    EVAL_BATCH_PREFIX,
+    EVAL_PREFIX,
+    LOCATION_PRECEDENCES,
     EvalInput,
     EvaluationResult,
     _as_float,
@@ -12,9 +17,11 @@ from moonlighter.discovery.evaluator import (
     _as_salary_currency,
     _as_salary_source,
     _parse_batch,
+    engagement_section,
     evaluate_job,
     evaluate_jobs_batch,
     profile_for_eval,
+    regional_eligibility_section,
     should_skip_by_title,
 )
 
@@ -1615,3 +1622,316 @@ async def test_the_profile_can_let_the_generic_remote_claim_win():
 async def test_required_fluency_in_a_language_the_profile_lacks_is_a_hard_filter():
     for prefix in await _prefixes_for({"languages": ["Portuguese", "English"]}):
         assert "fluency in a language the candidate's profile does not list" in prefix
+
+
+# ── pins: behaviour no other test checked, written before evaluator.py was split ──
+
+SPEND_LIMIT_MESSAGE = "You've hit your monthly spend limit · raise it at claude.ai/settings/usage"
+
+
+def _recording_caller(*replies: str):
+    """A caller that answers with `replies` in order (the last one repeats) and keeps every call."""
+    calls: list[tuple[str, str, str | None]] = []
+
+    async def caller(prompt, model, cache_prefix=None):
+        calls.append((prompt, model, cache_prefix))
+        return replies[min(len(calls), len(replies)) - 1]
+
+    return caller, calls
+
+
+async def _evaluate(caller, *, profile=None, location=None, remote_type=None):
+    return await evaluate_job(
+        company="Co",
+        title="Eng",
+        description="desc",
+        profile=PROFILE if profile is None else profile,
+        _caller=caller,
+        location=location,
+        remote_type=remote_type,
+    )
+
+
+def _warnings(caplog):
+    return [record for record in caplog.records if record.levelno == logging.WARNING]
+
+
+async def test_a_reply_that_is_not_json_is_stored_with_this_exact_note():
+    result = await _evaluate(_make_caller("not json"))
+    assert result == EvaluationResult(score=0.0, score_notes="parse error: LLM returned non-JSON")
+
+
+async def test_a_failed_call_is_stored_with_the_error_text_after_a_fixed_prefix():
+    # scripts/build_blocklist.py and scripts/reevaluate_bug_victims.py find these rows by this prefix.
+    async def failing_caller(prompt, model, cache_prefix=None):
+        raise RuntimeError("claude CLI exited with code 1")
+
+    result = await _evaluate(failing_caller)
+    assert result == EvaluationResult(
+        score=0.0, score_notes="evaluation error: claude CLI exited with code 1"
+    )
+
+
+async def test_a_reply_that_is_json_but_not_an_object_is_an_evaluation_error():
+    # _result_from runs inside the try, so the AttributeError becomes a stored result.
+    result = await _evaluate(_make_caller("[]"))
+    assert result.score == 0.0
+    assert result.score_notes == "evaluation error: 'list' object has no attribute 'get'"
+
+
+async def test_building_the_prompt_is_outside_the_try_so_its_errors_propagate():
+    caller, calls = _recording_caller(MOCK_LLM_RESPONSE)
+    with pytest.raises(TypeError):
+        await evaluate_job(
+            company="Co",
+            title="Eng",
+            description="desc",
+            profile=None,
+            _caller=caller,
+            location=None,
+            remote_type=None,
+        )
+    assert calls == []
+
+
+async def test_the_default_model_is_claude_sonnet_4_6():
+    caller, calls = _recording_caller(MOCK_LLM_RESPONSE)
+    await _evaluate(caller)
+    assert calls[0][1] == "claude-sonnet-4-6"
+
+
+async def test_a_spend_limit_in_evaluate_job_is_recorded_before_it_propagates():
+    async def caller(prompt, model, cache_prefix=None):
+        raise RuntimeError(SPEND_LIMIT_MESSAGE)
+
+    with (
+        patch("moonlighter.discovery.evaluator.record_spend_limit_hit") as record,
+        pytest.raises(RuntimeError, match="spend limit"),
+    ):
+        await _evaluate(caller)
+    record.assert_called_once_with()
+
+
+async def test_an_ordinary_error_in_evaluate_job_records_no_spend_limit_hit():
+    async def caller(prompt, model, cache_prefix=None):
+        raise RuntimeError("boom")
+
+    with patch("moonlighter.discovery.evaluator.record_spend_limit_hit") as record:
+        await _evaluate(caller)
+    record.assert_not_called()
+
+
+async def test_a_spend_limit_in_the_batch_call_is_recorded_before_it_propagates():
+    async def caller(prompt, model, cache_prefix=None):
+        raise RuntimeError(SPEND_LIMIT_MESSAGE)
+
+    with (
+        patch("moonlighter.discovery.evaluator.record_spend_limit_hit") as record,
+        pytest.raises(RuntimeError, match="spend limit"),
+    ):
+        await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    record.assert_called_once_with()
+
+
+async def test_an_ordinary_error_in_the_batch_call_records_no_spend_limit_hit():
+    async def caller(prompt, model, cache_prefix=None):
+        raise RuntimeError("boom")
+
+    with patch("moonlighter.discovery.evaluator.record_spend_limit_hit") as record:
+        await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    record.assert_not_called()
+
+
+async def test_evaluate_job_logs_what_it_evaluates_and_the_score(caplog):
+    with caplog.at_level(logging.DEBUG):
+        await _evaluate(_make_caller(MOCK_LLM_RESPONSE))
+    messages = [record.getMessage() for record in caplog.records if record.levelno == logging.DEBUG]
+    assert "evaluating Co/Eng" in messages
+    assert "→ score 8.5 (Co)" in messages
+
+
+async def test_a_parse_failure_is_logged_as_a_warning_with_the_traceback(caplog):
+    with caplog.at_level(logging.DEBUG):
+        await _evaluate(_make_caller("not json"))
+    (record,) = _warnings(caplog)
+    assert record.getMessage() == "evaluator: parse error for Co/Eng"
+    assert record.exc_info is not None
+
+
+async def test_a_failed_call_is_logged_as_a_warning_with_the_traceback(caplog):
+    async def caller(prompt, model, cache_prefix=None):
+        raise RuntimeError("boom")
+
+    with caplog.at_level(logging.DEBUG):
+        await _evaluate(caller)
+    (record,) = _warnings(caplog)
+    assert record.getMessage() == "evaluator: error for Co/Eng — boom"
+    assert record.exc_info is not None
+
+
+async def test_a_failed_batch_call_is_logged_with_the_traceback_before_the_fallback(caplog):
+    async def caller(prompt, model, cache_prefix=None):
+        raise RuntimeError("boom")
+
+    with caplog.at_level(logging.DEBUG):
+        await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    record = _warnings(caplog)[0]
+    assert record.getMessage() == "batch eval: call error — fallback per-job: boom"
+    assert record.exc_info is not None
+
+
+async def test_an_invalid_batch_reply_is_logged_without_a_traceback_before_the_fallback(caplog):
+    caller, _ = _recording_caller("garbage", MOCK_LLM_RESPONSE)
+    with caplog.at_level(logging.DEBUG):
+        await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    (record,) = _warnings(caplog)
+    assert record.getMessage() == "batch eval: invalid parse — fallback per-job (2 jobs)"
+    assert record.exc_info is None
+
+
+async def test_a_batch_of_no_jobs_still_asks_the_model_once():
+    caller, calls = _recording_caller("[]")
+    assert await evaluate_jobs_batch([], {}, "m", caller) == []
+    assert len(calls) == 1
+    assert "exactly 0 objects" in calls[0][2]
+
+
+async def test_a_batch_reply_that_is_not_text_propagates_instead_of_falling_back():
+    async def caller(prompt, model, cache_prefix=None):
+        return None
+
+    with pytest.raises(TypeError):
+        await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+
+
+async def test_the_batch_prompt_carries_each_jobs_location_and_remote_type():
+    # Route of the 2026-08-21 GitLab false positives: no other test saw the batch lines.
+    jobs = [
+        EvalInput("Acme", "Eng", "d0", "Bangalore, India", "remote"),
+        EvalInput("Beta", "Dev", "d1"),
+    ]
+    caller, calls = _recording_caller('[{"score": 1.0}, {"score": 2.0}]')
+    await evaluate_jobs_batch(jobs, {}, "m", caller)
+    prompt = calls[0][0]
+    assert (
+        "Company: Acme\nTitle: Eng\nLocation: Bangalore, India\nRemote type: remote\nDescription:\nd0"
+        in prompt
+    )
+    assert "Company: Beta\nTitle: Dev\nDescription:\nd1" in prompt
+    assert prompt.count("Location:") == 1
+    assert prompt.count("Remote type:") == 1
+
+
+async def test_a_batch_of_one_job_forwards_its_location_to_the_single_prompt():
+    caller, calls = _recording_caller('{"score": 1.0}')
+    await evaluate_jobs_batch([EvalInput("Acme", "Eng", "d0", "Italy", "hybrid")], {}, "m", caller)
+    assert "Location: Italy\nRemote type: hybrid\nDescription:\nd0" in calls[0][0]
+
+
+async def test_the_per_job_fallback_forwards_the_model_and_each_jobs_location():
+    jobs = [
+        EvalInput("Acme", "Eng", "d0", "Bangalore, India", "remote"),
+        EvalInput("Beta", "Dev", "d1"),
+    ]
+    caller, calls = _recording_caller("garbage", '{"score": 5.0}')
+    await evaluate_jobs_batch(jobs, {}, "model-x", caller)
+    assert [model for _, model, _ in calls] == ["model-x", "model-x", "model-x"]
+    assert "Company: Acme" in calls[1][0]
+    assert "Location: Bangalore, India\nRemote type: remote" in calls[1][0]
+    assert "Company: Beta" in calls[2][0]
+    assert "Location:" not in calls[2][0]
+
+
+async def test_the_per_job_fallback_runs_one_job_at_a_time_in_order():
+    log = []
+    calls = {"count": 0}
+
+    async def caller(prompt, model, cache_prefix=None):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return "garbage"
+        label = "Co0" if "Company: Co0" in prompt else "Co1"
+        log.append(f"start {label}")
+        await asyncio.sleep(0)
+        log.append(f"end {label}")
+        return '{"score": 5.0}'
+
+    await evaluate_jobs_batch(_inputs(2), {}, "m", caller)
+    assert log == ["start Co0", "end Co0", "start Co1", "end Co1"]
+
+
+async def test_each_batch_posting_is_capped_at_8000_characters():
+    job = EvalInput("Co", "Eng", "x" * 10000)
+    caller, calls = _recording_caller('[{"score": 1.0}, {"score": 2.0}]')
+    await evaluate_jobs_batch([job, EvalInput("Co", "Dev", "d")], {}, "m", caller)
+    assert "x" * 8001 not in calls[0][0]
+    assert "x" * 7964 in calls[0][0]
+
+
+async def test_the_single_posting_body_is_company_title_location_remote_type_description():
+    caller, calls = _recording_caller(MOCK_LLM_RESPONSE)
+    await _evaluate(caller, location="Bangalore, India", remote_type="remote")
+    assert (
+        "Company: Co\nTitle: Eng\nLocation: Bangalore, India\nRemote type: remote\nDescription:\ndesc"
+        in calls[0][0]
+    )
+
+
+async def test_empty_location_and_remote_type_add_no_lines():
+    caller, calls = _recording_caller(MOCK_LLM_RESPONSE)
+    await _evaluate(caller, location="", remote_type="")
+    assert "Company: Co\nTitle: Eng\nDescription:\ndesc" in calls[0][0]
+
+
+PROFILE_WITH_EVERY_SECTION = {
+    "headline": "São Paulo ≤ 2.0 — dev",
+    "summary": "s",
+    "preferences": {"engagement": "permanent"},
+    "criteria": {"location_precedence": "generic"},
+}
+
+
+async def test_the_single_prefix_is_the_template_filled_with_the_three_profile_sections():
+    caller, calls = _recording_caller(MOCK_LLM_RESPONSE)
+    await _evaluate(caller, profile=PROFILE_WITH_EVERY_SECTION)
+    prefix = calls[0][2]
+    assert prefix == EVAL_PREFIX.format(
+        profile_yaml=yaml.dump(profile_for_eval(PROFILE_WITH_EVERY_SECTION), allow_unicode=True),
+        regional_eligibility=regional_eligibility_section(PROFILE_WITH_EVERY_SECTION),
+        engagement_section=engagement_section(PROFILE_WITH_EVERY_SECTION),
+    )
+    assert "headline: São Paulo ≤ 2.0 — dev" in prefix
+    assert prefix.index("headline:") < prefix.index("summary:")
+
+
+async def test_the_batch_prefix_is_the_template_filled_with_the_sections_and_the_job_count():
+    caller, calls = _recording_caller("[" + ", ".join(['{"score": 1.0}'] * 3) + "]")
+    await evaluate_jobs_batch(_inputs(3), PROFILE_WITH_EVERY_SECTION, "m", caller)
+    prefix = calls[0][2]
+    assert prefix == EVAL_BATCH_PREFIX.format(
+        profile_yaml=yaml.dump(profile_for_eval(PROFILE_WITH_EVERY_SECTION), allow_unicode=True),
+        regional_eligibility=regional_eligibility_section(PROFILE_WITH_EVERY_SECTION),
+        engagement_section=engagement_section(PROFILE_WITH_EVERY_SECTION),
+        n=3,
+    )
+    assert "You will be given 3 job postings" in prefix
+    assert "exactly 3 objects" in prefix
+    assert "headline: São Paulo ≤ 2.0 — dev" in prefix
+
+
+def test_the_location_precedences_keep_their_order_because_startup_prints_them():
+    assert LOCATION_PRECEDENCES == ("specific", "generic")
+
+
+def test_an_unknown_location_precedence_falls_back_to_specific():
+    unknown = {"criteria": {"location_precedence": "bogus"}}
+    assert regional_eligibility_section(unknown) == regional_eligibility_section({})
+    assert regional_eligibility_section(
+        {"criteria": "not a mapping"}
+    ) == regional_eligibility_section({})
+
+
+def test_the_engagement_section_is_stripped_and_ends_with_a_blank_line():
+    section = engagement_section({"preferences": {"engagement": "  permanent  "}})
+    assert "targets permanent positions" in section
+    assert section.endswith("\n\n")
