@@ -91,7 +91,7 @@ max-branches = 8
 
 [tool.ruff.lint.flake8-builtins]
 # A005 (a module named after a stdlib module) compares the path from the project root by
-# default, so `core/http.py` passes even though it shadows `http`. Every module here sits
+# default, so `core/http.py` would pass though it shadows `http`. Every module here sits
 # inside a package: compare the last component, the gate behind the ban on stdlib names.
 strict-checking = true
 

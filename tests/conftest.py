@@ -40,7 +40,7 @@ def _isolate_moonlighter_home() -> None:
     pytest_configure runs before collection/import and is the standard hook
     for environment setup that must precede it.
 
-    Only MOONLIGHTER_HOME is set here: moonlighter.core.db._db_path() already falls
+    Only MOONLIGHTER_HOME is set here: moonlighter.core.db.db_path() already falls
     back to moonlighter_home() / "moonlighter.db" when MOONLIGHTER_DB_PATH is unset, so
     this alone keeps init_db() out of the real directory too. The per-test
     temporary_database fixture below still overrides MOONLIGHTER_DB_PATH with a fresh path
