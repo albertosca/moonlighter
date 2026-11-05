@@ -1,14 +1,11 @@
 """init_db creates the tables, adds the columns an older schema lacks, keeps existing rows, and ends at the latest migration version."""
 
-import os
-
 from moonlighter.core.db import Application, Job, db, init_db
 from moonlighter.core.migrations import MIGRATIONS, current_version
 from tests.core.db.sample_job import make_job
 
 
 def test_init_creates_tables(temporary_database):
-    os.environ["MOONLIGHTER_DB_PATH"] = temporary_database
     init_db()
     # Tables exist and accept writes
     job = Job.create(

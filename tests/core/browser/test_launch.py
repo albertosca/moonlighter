@@ -15,6 +15,7 @@ async def test_launch_browser_uses_random_port_flag(tmp_path):
         patch("moonlighter.core.browser.subprocess.Popen", return_value=mock_process) as popen,
         patch("moonlighter.core.browser._read_devtools_port", side_effect=[None, 9333]),
         patch("moonlighter.core.browser._devtools_ready", return_value=True),
+        patch("moonlighter.core.browser.asyncio.sleep", new=AsyncMock()),
     ):
         port = await browser._launch_browser(CONFIG, tmp_path)
     assert port == 9333

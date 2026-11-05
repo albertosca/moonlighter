@@ -1,7 +1,6 @@
 """The Job model stores its salary and nullable columns, defaults status to "new", keeps url unique, decodes caveats and records its timestamps."""
 
 import json
-import os
 from datetime import datetime, timedelta
 
 import pytest
@@ -115,14 +114,12 @@ def test_job_posted_at_nullable(temporary_database):
 
 
 def test_job_closed_at_is_null_by_default(temporary_database):
-    os.environ["MOONLIGHTER_DB_PATH"] = temporary_database
     init_db()
     job = make_job()
     assert job.closed_at is None
 
 
 def test_job_closed_at_stored_and_retrieved(temporary_database):
-    os.environ["MOONLIGHTER_DB_PATH"] = temporary_database
     init_db()
     when = datetime(2026, 7, 1, 12, 0, 0)  # noqa: DTZ001 - the database stores naive local time
     job = make_job(status="archived", closed_at=when)

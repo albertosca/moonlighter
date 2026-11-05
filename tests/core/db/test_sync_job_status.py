@@ -1,7 +1,5 @@
 """sync_job_status moves Job.status to "applied" or "rejected" as its Application advances, and leaves it alone for a draft."""
 
-import os
-
 from moonlighter.core.db import Application, Job, init_db, sync_job_status
 from tests.core.db.sample_job import make_job
 
@@ -13,7 +11,6 @@ from tests.core.db.sample_job import make_job
 
 
 def _sync_pair(temporary_database, app_status):
-    os.environ["MOONLIGHTER_DB_PATH"] = temporary_database
     init_db()
     job = make_job(status="new")
     app = Application.create(job=job, status=app_status)

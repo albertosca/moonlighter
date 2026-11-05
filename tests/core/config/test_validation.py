@@ -10,8 +10,7 @@ from moonlighter.core.config.validation import validate_config
 
 
 def _valid_config():
-    # A fully-populated, valid config (defaults + the optional blocks).
-    return load_config()  # DEFAULTS-merged, no user file in test env → valid baseline
+    return load_config()  # valid baseline: DEFAULTS-merged, no user file in the test env
 
 
 class TestValidateConfig:

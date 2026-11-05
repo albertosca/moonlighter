@@ -20,16 +20,17 @@ def test_locked_db_retries_then_succeeds(*, tmp_path, monkeypatch, open_dbs, raw
     stub's own setup hang if the lock were taken any earlier.
     """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
-    monkeypatch.setattr(migrations, "_LOCK_BACKOFF_S", 0)
     db = fresh_db(tmp_path / "t.db", open_dbs, timeout=0)
 
     monkeypatch.setattr(migrations, "_backup", lambda db: raw_locker.execute("BEGIN EXCLUSIVE"))
 
     sleep_calls = {"n": 0}
+    slept = []
     real_sleep = time.sleep
 
     def _fake_sleep(seconds):
         sleep_calls["n"] += 1
+        slept.append(seconds)
         if sleep_calls["n"] == 2:
             # Simulate B5 finishing its write and releasing the lock.
             raw_locker.execute("COMMIT")
@@ -40,6 +41,7 @@ def test_locked_db_retries_then_succeeds(*, tmp_path, monkeypatch, open_dbs, raw
     applied = run_migrations(db)
 
     assert sleep_calls["n"] == 2
+    assert slept == [0.5, 0.5]  # pins _LOCK_BACKOFF_S: the real pause between retries
     assert applied == [name for _, name, _ in MIGRATIONS]
     assert current_version(db) == len(MIGRATIONS)
 
@@ -60,16 +62,17 @@ def test_locked_db_exhausts_retries_and_raises(*, tmp_path, monkeypatch, open_db
     `sleep_calls["n"] == 0` instead of the expected `_LOCK_RETRIES - 1`.
     """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
-    monkeypatch.setattr(migrations, "_LOCK_BACKOFF_S", 0)
     db = fresh_db(tmp_path / "t.db", open_dbs, timeout=0)
 
     monkeypatch.setattr(migrations, "_backup", lambda db: raw_locker.execute("BEGIN EXCLUSIVE"))
 
     sleep_calls = {"n": 0}
+    slept = []
     real_sleep = time.sleep
 
     def _fake_sleep(seconds):
         sleep_calls["n"] += 1
+        slept.append(seconds)
         real_sleep(0)
 
     monkeypatch.setattr(migrations.time, "sleep", _fake_sleep)
@@ -78,6 +81,7 @@ def test_locked_db_exhausts_retries_and_raises(*, tmp_path, monkeypatch, open_db
         run_migrations(db)
 
     assert sleep_calls["n"] == migrations._LOCK_RETRIES - 1
+    assert slept == [0.5] * (migrations._LOCK_RETRIES - 1)
 
     raw_locker.execute("ROLLBACK")  # release the lock so we can inspect state
     assert current_version(db) == 0

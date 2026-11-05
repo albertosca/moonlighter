@@ -1,6 +1,5 @@
 """ScanLog keeps one row per job URL whatever the source, and stamps scanned_at at creation."""
 
-import os
 from datetime import datetime, timedelta
 
 import pytest
@@ -10,7 +9,6 @@ from moonlighter.core.db import ScanLog, init_db
 
 
 def test_scan_log_dedup(temporary_database):
-    os.environ["MOONLIGHTER_DB_PATH"] = temporary_database
     init_db()
     ScanLog.create(job_url="https://example.com/job/1", source="greenhouse")
     urls = {row.job_url for row in ScanLog.select()}
