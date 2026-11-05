@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from moonlighter.core.http_fetch import HEADERS
 from moonlighter.discovery.sources.base import ScanStats, SourceStats
 from moonlighter.discovery.sources.http import (
     AshbyScanner,
@@ -168,6 +169,25 @@ async def test_greenhouse_posted_at_parsed():
         jobs = await GreenhouseScanner().scan(["co"])
     assert jobs[0].posted_at is not None
     assert isinstance(jobs[0].posted_at, datetime)
+
+
+async def test_greenhouse_date_only_updated_at_with_z_suffix_parses_to_naive_midnight():
+    response = {
+        "jobs": [
+            {
+                "id": 1,
+                "title": "Eng",
+                "absolute_url": "https://boards.greenhouse.io/co/jobs/1",
+                "location": {"name": "Remote"},
+                "updated_at": "2024-01-01Z",
+            }
+        ]
+    }
+    mock_client = _make_mock_client(response)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await GreenhouseScanner().scan(["co"])
+    assert jobs[0].posted_at is not None
+    assert jobs[0].posted_at.isoformat() == "2024-01-01T00:00:00"
 
 
 async def test_greenhouse_posted_at_invalid_format():
@@ -1393,6 +1413,32 @@ async def test_gupy_default_keyword_when_not_provided():
     assert jobs == []
 
 
+async def test_gupy_fetch_failure_logs_a_warning_with_the_traceback(caplog):
+    mock_client = _make_mock_client(raise_exception=httpx.ConnectError("timeout"))
+    with (
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        caplog.at_level(logging.WARNING),
+    ):
+        await GupyScanner().scan(keywords="engenheiro")
+    gupy_records = [record for record in caplog.records if record.getMessage().startswith("[gupy]")]
+    assert [record.getMessage() for record in gupy_records] == [
+        "[gupy] fetch failed: ConnectError: timeout"
+    ]
+    assert gupy_records[0].levelno == logging.WARNING
+    assert gupy_records[0].exc_info is not None
+
+
+async def test_gupy_tags_only_description_yields_an_empty_string():
+    page = {
+        "data": [{"name": "Eng", "jobUrl": "https://acme.gupy.io/job/1", "description": "<p></p>"}],
+        "pagination": {"total": 1},
+    }
+    mock_client = _make_gupy_client({"offset=0": page})
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await GupyScanner().scan(keywords="engenheiro")
+    assert jobs[0].description == ""
+
+
 # --- RemoteOKScanner tests ---
 
 
@@ -1503,6 +1549,33 @@ async def test_remoteok_non_json_body_returns_empty():
     assert jobs == []
 
 
+async def test_remoteok_fetch_failure_logs_a_warning_with_the_traceback(caplog):
+    mock_client = _make_mock_client(raise_exception=httpx.ConnectError("boom"))
+    with (
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        caplog.at_level(logging.WARNING),
+    ):
+        await RemoteOKScanner().scan()
+    remoteok_records = [
+        record for record in caplog.records if record.getMessage().startswith("[remoteok]")
+    ]
+    assert [record.getMessage() for record in remoteok_records] == [
+        "[remoteok] fetch failed: ConnectError: boom"
+    ]
+    assert remoteok_records[0].levelno == logging.WARNING
+    assert remoteok_records[0].exc_info is not None
+
+
+async def test_remoteok_tags_only_description_yields_none():
+    response = [
+        {"position": "Eng", "url": "https://remoteok.com/remote-jobs/1", "description": "<p></p>"}
+    ]
+    mock_client = _make_simple_client(response)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemoteOKScanner().scan()
+    assert jobs[0].description is None
+
+
 # --- RemotiveScanner tests ---
 
 _REMOTIVE_RESPONSE = {
@@ -1593,6 +1666,33 @@ async def test_remotive_non_200_returns_empty():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await RemotiveScanner().scan()
     assert jobs == []
+
+
+async def test_remotive_fetch_failure_logs_a_warning_with_the_traceback(caplog):
+    mock_client = _make_mock_client(raise_exception=httpx.ConnectError("boom"))
+    with (
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        caplog.at_level(logging.WARNING),
+    ):
+        await RemotiveScanner().scan()
+    remotive_records = [
+        record for record in caplog.records if record.getMessage().startswith("[remotive]")
+    ]
+    assert [record.getMessage() for record in remotive_records] == [
+        "[remotive] fetch failed: ConnectError: boom"
+    ]
+    assert remotive_records[0].levelno == logging.WARNING
+    assert remotive_records[0].exc_info is not None
+
+
+async def test_remotive_tags_only_description_yields_none():
+    response = {
+        "jobs": [{"title": "Eng", "url": "https://remotive.com/1", "description": "<p></p>"}]
+    }
+    mock_client = _make_simple_client(response)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await RemotiveScanner().scan()
+    assert jobs[0].description is None
 
 
 # --- WeWorkRemotelyScanner tests ---
@@ -1714,6 +1814,77 @@ async def test_wwr_missing_description_yields_none():
     with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
         jobs = await WeWorkRemotelyScanner().scan()
     assert jobs[0].description is None
+
+
+async def test_wwr_fetch_failure_logs_a_warning_with_the_traceback(caplog):
+    mock_client = _make_mock_client(raise_exception=httpx.ConnectError("boom"))
+    with (
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        caplog.at_level(logging.WARNING),
+    ):
+        await WeWorkRemotelyScanner().scan()
+    feed_records = [
+        record for record in caplog.records if record.getMessage().startswith("[weworkremotely]")
+    ]
+    assert [record.getMessage() for record in feed_records] == [
+        "[weworkremotely] fetch failed: boom"
+    ]
+    assert feed_records[0].levelno == logging.WARNING
+    assert feed_records[0].exc_info is not None
+
+
+async def test_wwr_http_error_status_logs_a_warning(caplog):
+    mock_client = _make_rss_client("", status=500)
+    with (
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        caplog.at_level(logging.WARNING),
+    ):
+        await WeWorkRemotelyScanner().scan()
+    feed_records = [
+        record for record in caplog.records if record.getMessage().startswith("[weworkremotely]")
+    ]
+    assert [record.getMessage() for record in feed_records] == [
+        "[weworkremotely] fetch failed: HTTP 500"
+    ]
+    assert feed_records[0].levelno == logging.WARNING
+    assert feed_records[0].exc_info is None
+
+
+async def test_wwr_malformed_feed_logs_a_warning_with_the_traceback(caplog):
+    mock_client = _make_rss_client("<not-valid-xml")
+    with (
+        patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client),
+        caplog.at_level(logging.WARNING),
+    ):
+        await WeWorkRemotelyScanner().scan()
+    feed_records = [
+        record for record in caplog.records if record.getMessage().startswith("[weworkremotely]")
+    ]
+    assert [record.getMessage() for record in feed_records] == [
+        "[weworkremotely] malformed feed: unclosed token: line 1, column 0"
+    ]
+    assert feed_records[0].levelno == logging.WARNING
+    assert feed_records[0].exc_info is not None
+
+
+async def test_wwr_tags_only_description_yields_none():
+    rss = _WWR_RSS.replace(
+        "&lt;p&gt;Build &lt;strong&gt;things&lt;/strong&gt;.&lt;/p&gt;", "&lt;p&gt;&lt;/p&gt;", 1
+    )
+    mock_client = _make_rss_client(rss)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await WeWorkRemotelyScanner().scan()
+    assert jobs[0].title == "Senior Backend Engineer"
+    assert jobs[0].description is None
+
+
+async def test_wwr_sends_the_moonlighter_user_agent():
+    mock_client = _make_rss_client(_WWR_RSS)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        await WeWorkRemotelyScanner().scan()
+    mock_client.get.assert_awaited_once_with(
+        "https://weworkremotely.com/remote-jobs.rss", headers=HEADERS
+    )
 
 
 # --- HNWhoIsHiringScanner tests ---
@@ -2035,6 +2206,41 @@ async def test_hn_parse_title_falls_through_when_separator_leads_with_empty_comp
     assert len(jobs) == 1
     assert jobs[0].company == "HN Who's Hiring"
     assert jobs[0].title == text
+
+
+async def test_hn_sends_the_moonlighter_user_agent_on_every_request():
+    mock_client = _make_hn_client(_hn_url_map())
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        await HNWhoIsHiringScanner().scan()
+    requests = mock_client.get.await_args_list
+    assert requests
+    assert [request.kwargs for request in requests] == [{"headers": HEADERS}] * len(requests)
+
+
+async def test_hn_thread_search_looks_at_the_ten_latest_submissions_only():
+    ten_latest_submissions = {
+        f"{_HN_BASE}/item/{item_id}.json": {
+            "id": item_id,
+            "title": "Ask HN: Freelancer? Seeking freelancer?",
+        }
+        for item_id in range(1, 11)
+    }
+    url_map = {
+        f"{_HN_BASE}/user/whoishiring.json": {"submitted": list(range(1, 12))},
+        **ten_latest_submissions,
+        f"{_HN_BASE}/item/11.json": {
+            "id": 11,
+            "title": "Ask HN: Who is hiring? (June 2026)",
+            "kids": [201],
+        },
+        f"{_HN_BASE}/item/201.json": {"id": 201, "text": "Acme | Remote | Full-time"},
+    }
+    mock_client = _make_hn_client(url_map)
+    with patch("moonlighter.discovery.sources.http.httpx.AsyncClient", return_value=mock_client):
+        jobs = await HNWhoIsHiringScanner().scan()
+    assert jobs == []
+    requested_urls = [request.args[0] for request in mock_client.get.await_args_list]
+    assert f"{_HN_BASE}/item/11.json" not in requested_urls
 
 
 # --- AshbyScanner ---
