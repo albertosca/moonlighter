@@ -87,3 +87,12 @@ def test_default_threshold_accepts_0_8_and_refuses_0_75():
 
 def test_a_none_answer_is_treated_as_empty():
     assert match_option_locally(None, ["A", "B"]) is None
+
+
+def test_an_exact_match_beats_an_earlier_prefix_match():
+    assert match_option_locally("Yes", ["Yes, remote", "Yes"]) == "Yes"
+
+
+def test_a_prefix_match_beats_an_earlier_fuzzy_match():
+    # "yess" scores 0.857 against "yes", above the default threshold.
+    assert match_option_locally("Yes", ["Yess", "Yes, remote"]) == "Yes, remote"
