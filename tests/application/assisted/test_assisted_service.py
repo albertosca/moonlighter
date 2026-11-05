@@ -13,6 +13,7 @@ import httpx
 import pytest
 from moonlighter.application.assisted import service
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.application.assisted.required_labels import mark_required
 from moonlighter.application.assisted.results import SheetKind, render_sheet_result
 from moonlighter.application.assisted.sources import greenhouse as greenhouse_source
 from moonlighter.application.assisted.sources import recruitee as recruitee_source
@@ -349,7 +350,7 @@ async def test_paste_with_no_recognisable_questions_says_so(job_factory, monkeyp
     monkeypatch.setattr(service, "extract_questions_from_page", _empty_extraction)
 
     out = render_sheet_result(
-        await service.prepare_application_from_paste(job.id, "just marketing copy", {}, {})
+        await service.prepare_application_from_paste(job.id, "just marketing copy", {}, profile={})
     )
 
     assert "No questions could be found" in out
@@ -369,7 +370,9 @@ async def test_paste_whose_reading_failed_says_so_instead_of_blaming_the_paste(
 
     monkeypatch.setattr(service, "extract_questions_from_page", failed_extraction)
     out = render_sheet_result(
-        await service.prepare_application_from_paste(job.id, "the whole copied page", {}, {})
+        await service.prepare_application_from_paste(
+            job.id, "the whole copied page", {}, profile={}
+        )
     )
     assert "Was the whole page copied" not in out
     assert "run it again" in out
@@ -391,7 +394,9 @@ async def test_paste_with_questions_returns_a_sheet(job_factory, monkeypatch):
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller("we love it here"))
 
     out = render_sheet_result(
-        await service.prepare_application_from_paste(job.id, "the whole copied page", {}, {})
+        await service.prepare_application_from_paste(
+            job.id, "the whole copied page", {}, profile={}
+        )
     )
 
     assert "No questions could be found" not in out
@@ -401,7 +406,9 @@ async def test_paste_with_questions_returns_a_sheet(job_factory, monkeypatch):
 
 async def test_paste_for_a_missing_job_is_reported_rather_than_raising(monkeypatch):
     monkeypatch.setattr(service, "extract_questions_from_page", _never_extract)
-    out = render_sheet_result(await service.prepare_application_from_paste(999999, "text", {}, {}))
+    out = render_sheet_result(
+        await service.prepare_application_from_paste(999999, "text", {}, profile={})
+    )
     assert "999999" in out
 
 
@@ -436,7 +443,7 @@ async def test_the_email_answer_carries_the_tracking_alias_not_the_profile_email
 
     out = render_sheet_result(
         await service.prepare_application_from_paste(
-            job.id, "the page", _TRACKING_CONFIG, {"email": "personal@gmail.com"}
+            job.id, "the page", _TRACKING_CONFIG, profile={"email": "personal@gmail.com"}
         )
     )
 
@@ -453,11 +460,11 @@ async def test_preparing_twice_reuses_the_same_application_and_ref(job_factory, 
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
 
     first = render_sheet_result(
-        await service.prepare_application_from_paste(job.id, "p", _TRACKING_CONFIG, {})
+        await service.prepare_application_from_paste(job.id, "p", _TRACKING_CONFIG, profile={})
     )
     reference = Application.get(Application.job == job).email_ref
     second = render_sheet_result(
-        await service.prepare_application_from_paste(job.id, "p", _TRACKING_CONFIG, {})
+        await service.prepare_application_from_paste(job.id, "p", _TRACKING_CONFIG, profile={})
     )
 
     assert Application.select().where(Application.job == job).count() == 1
@@ -476,7 +483,7 @@ async def test_an_unanswered_email_question_is_answered_by_the_alias(job_factory
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
 
     out = render_sheet_result(
-        await service.prepare_application_from_paste(job.id, "p", _TRACKING_CONFIG, {})
+        await service.prepare_application_from_paste(job.id, "p", _TRACKING_CONFIG, profile={})
     )
 
     reference = Application.get(Application.job == job).email_ref
@@ -491,7 +498,7 @@ async def test_without_email_config_the_sheet_keeps_the_profile_email(job_factor
 
     out = render_sheet_result(
         await service.prepare_application_from_paste(
-            job.id, "p", {}, {"email": "personal@gmail.com"}
+            job.id, "p", {}, profile={"email": "personal@gmail.com"}
         )
     )
 
@@ -519,7 +526,7 @@ async def test_a_choice_question_mentioning_email_is_not_overwritten(job_factory
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller("Yes"))
 
     out = render_sheet_result(
-        await service.prepare_application_from_paste(job.id, "p", _TRACKING_CONFIG, {})
+        await service.prepare_application_from_paste(job.id, "p", _TRACKING_CONFIG, profile={})
     )
 
     # The choice keeps its own answer; the alias reaches the operator through
@@ -543,7 +550,7 @@ async def test_an_alias_with_no_email_question_is_surfaced_on_the_sheet(job_fact
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
 
     out = render_sheet_result(
-        await service.prepare_application_from_paste(job.id, "p", _TRACKING_CONFIG, {})
+        await service.prepare_application_from_paste(job.id, "p", _TRACKING_CONFIG, profile={})
     )
 
     reference = Application.get(Application.job == job).email_ref
@@ -615,11 +622,11 @@ async def test_preparing_the_same_job_twice_reuses_the_job_cache_and_skips_the_l
     monkeypatch.setattr(service, "extract_questions_from_page", one_essay)
     monkeypatch.setattr(service, "make_caller", lambda config: counting_caller)
 
-    await service.prepare_application_from_paste(job.id, "p", {}, {})
+    await service.prepare_application_from_paste(job.id, "p", {}, profile={})
     calls_after_first = calls
     assert calls_after_first > 0
 
-    await service.prepare_application_from_paste(job.id, "p", {}, {})
+    await service.prepare_application_from_paste(job.id, "p", {}, profile={})
     assert calls == calls_after_first  # second call served entirely from the job cache
 
 
@@ -650,7 +657,7 @@ async def test_a_submitted_bank_eligible_answer_is_available_to_a_different_job(
     monkeypatch.setattr(service, "extract_questions_from_page", one_boolean)
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller("Yes"))
 
-    await service.prepare_application_from_paste(job1.id, "p", {}, {})
+    await service.prepare_application_from_paste(job1.id, "p", {}, profile={})
     application1 = Application.get(Application.job == job1)
     # Promotion is server.py's job (Task 5) — simulate it here directly against
     # the module this task owns, so this test does not depend on Task 5 yet.
@@ -667,7 +674,9 @@ async def test_a_submitted_bank_eligible_answer_is_available_to_a_different_job(
 
     monkeypatch.setattr(service, "make_caller", lambda config: _never_llm_here)
 
-    out2 = render_sheet_result(await service.prepare_application_from_paste(job2.id, "p", {}, {}))
+    out2 = render_sheet_result(
+        await service.prepare_application_from_paste(job2.id, "p", {}, profile={})
+    )
     assert label in out2
     assert "Yes" in out2
 
@@ -694,7 +703,9 @@ async def test_a_legacy_flat_form_data_row_self_heals_into_the_new_shape(job_fac
     monkeypatch.setattr(service, "extract_questions_from_page", one_question)
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller())
 
-    out = render_sheet_result(await service.prepare_application_from_paste(job.id, "p", {}, {}))
+    out = render_sheet_result(
+        await service.prepare_application_from_paste(job.id, "p", {}, profile={})
+    )
 
     assert "a generated answer" in out  # the run completed instead of raising
     healed = Application.get(Application.id == application.id).get_form_data()
@@ -722,12 +733,14 @@ async def test_a_banked_answer_older_than_max_age_is_not_replayed(job_factory, m
 
     monkeypatch.setattr(service, "extract_questions_from_page", one_boolean)
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller("Yes"))
-    await service.prepare_application_from_paste(job1.id, "p", {}, {})
+    await service.prepare_application_from_paste(job1.id, "p", {}, profile={})
     promote_application(Application.get(Application.job == job1).get_form_data(), job1.id)
     AnswerBankEntry.update(updated_at=datetime.now() - timedelta(days=100)).execute()
 
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller("No"))
-    out2 = render_sheet_result(await service.prepare_application_from_paste(job2.id, "p", {}, {}))
+    out2 = render_sheet_result(
+        await service.prepare_application_from_paste(job2.id, "p", {}, profile={})
+    )
     assert label in out2
     assert "No" in out2
     assert "Yes" not in out2  # the stale banked answer must not leak through
@@ -790,7 +803,7 @@ async def test_prepare_application_from_paste_also_offers_the_bootstrap_when_no_
     monkeypatch.setattr(service, "extract_questions_from_page", _never_extract)
     job = job_factory(source="smartrecruiters", url="https://jobs.smartrecruiters.com/x/y")
 
-    result = await service.prepare_application_from_paste(job.id, "the whole page", {}, {})
+    result = await service.prepare_application_from_paste(job.id, "the whole page", {}, profile={})
 
     assert result.kind is SheetKind.CV_BOOTSTRAP_OFFER
     assert "bootstrap_cv_pool" in result.error
@@ -871,7 +884,7 @@ async def test_paste_on_an_api_job_uses_the_api_and_says_so(job_factory, monkeyp
 
     monkeypatch.setattr(service, "extract_questions_from_page", never_extract)
 
-    result = await service.prepare_application_from_paste(job.id, "Q1? Q2?", {}, {})
+    result = await service.prepare_application_from_paste(job.id, "Q1? Q2?", {}, profile={})
 
     assert [item.question.label for item in result.composed] == ["From the API"]
     assert result.source_note == service.SOURCE_NOTE_PASTE_IGNORED
@@ -895,7 +908,7 @@ async def test_paste_on_an_api_job_falls_back_to_the_paste_when_the_api_fails(
 
     monkeypatch.setattr(service, "extract_questions_from_page", extract)
 
-    result = await service.prepare_application_from_paste(job.id, "Q1?", {}, {})
+    result = await service.prepare_application_from_paste(job.id, "Q1?", {}, profile={})
 
     assert [item.question.label for item in result.composed] == ["From the paste"]
     assert result.source_note is None
@@ -929,7 +942,7 @@ async def test_paste_on_inhire_marks_the_required_fields(job_factory, monkeypatc
 
     monkeypatch.setattr(service, "extract_questions_from_page", extract)
 
-    result = await service.prepare_application_from_paste(job.id, "page", {}, {})
+    result = await service.prepare_application_from_paste(job.id, "page", {}, profile={})
 
     required = {item.question.label: item.question.required for item in result.composed}
     assert required == {
@@ -956,5 +969,5 @@ def test_required_ids_match_their_common_portuguese_and_accented_wordings(
     required_label, form_label
 ):
     question = FormQuestion(label=form_label, kind=QuestionKind.TEXT, required=False)
-    [marked] = service._mark_required([question], (required_label,))
+    [marked] = mark_required([question], (required_label,))
     assert marked.required is True

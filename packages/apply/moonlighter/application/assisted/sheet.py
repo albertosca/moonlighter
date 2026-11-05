@@ -5,7 +5,7 @@ replaces reviewed a 4 500 px form through a viewport capture showing 17% of it.
 """
 
 from moonlighter.application.assisted.composed_answer import ComposedAnswer
-from moonlighter.application.assisted.questions import QuestionKind
+from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 
 GAP = "!! I DON'T KNOW"
 NO_QUESTIONS_FOUND = (
@@ -26,28 +26,34 @@ def _not_chosen(others: list[str]) -> list[str]:
     return [f"  not chosen: {' / '.join(others)}"]
 
 
-def _entry(index: int, total: int, item: ComposedAnswer) -> str:
-    question = item.question
+def _marks(question: FormQuestion) -> list[str]:
     marks = ["required"] if question.required else []
     if question.kind is QuestionKind.MULTI_SELECT:
         marks.append(f"pick any of {len(question.options)}")
     elif question.is_choice:
         marks.append(f"pick 1 of {len(question.options)}")
-    suffix = f"  ({', '.join(marks)})" if marks else ""
+    return marks
 
-    lines = [f"[{index}/{total}] {question.label}{suffix}"]
+
+def _answer_lines(item: ComposedAnswer) -> list[str]:
+    question = item.question
     if item.answer is None:
-        lines.append(f"{GAP} — {item.gap_reason}")
-    elif question.kind is QuestionKind.MULTI_SELECT:
+        return [f"{GAP} — {item.gap_reason}"]
+    if question.kind is QuestionKind.MULTI_SELECT:
         chosen = item.answer.split("\n")
-        lines.extend(f"> {pick}" for pick in chosen)
-        lines.extend(_not_chosen([option for option in question.options if option not in chosen]))
-    elif question.is_choice:
-        lines.append(f"> {item.answer}")
-        lines.extend(_not_chosen([option for option in question.options if option != item.answer]))
-    else:
-        lines.append(item.answer)
-    return "\n".join(lines)
+        others = [option for option in question.options if option not in chosen]
+        return [*(f"> {pick}" for pick in chosen), *_not_chosen(others)]
+    if question.is_choice:
+        others = [option for option in question.options if option != item.answer]
+        return [f"> {item.answer}", *_not_chosen(others)]
+    return [item.answer]
+
+
+def _entry(index: int, total: int, item: ComposedAnswer) -> str:
+    question = item.question
+    marks = _marks(question)
+    suffix = f"  ({', '.join(marks)})" if marks else ""
+    return "\n".join([f"[{index}/{total}] {question.label}{suffix}", *_answer_lines(item)])
 
 
 def render_sheet(

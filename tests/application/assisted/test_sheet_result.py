@@ -215,7 +215,7 @@ async def test_prepare_from_paste_sheet_is_unchanged(temporary_database, snapsho
         patch("moonlighter.application.assisted.service._tracking_alias", return_value=None),
     ):
         out = render_sheet_result(
-            await prepare_application_from_paste(job.id, PAGE, CONFIG, PROFILE)
+            await prepare_application_from_paste(job.id, PAGE, CONFIG, profile=PROFILE)
         )
     snapshot_text(out, "paste_sheet")
 
@@ -233,14 +233,16 @@ async def test_prepare_from_paste_no_questions_is_unchanged(temporary_database, 
         ),
     ):
         out = render_sheet_result(
-            await prepare_application_from_paste(job.id, PAGE, CONFIG, PROFILE)
+            await prepare_application_from_paste(job.id, PAGE, CONFIG, profile=PROFILE)
         )
     snapshot_text(out, "paste_no_questions")
 
 
 async def test_prepare_from_paste_job_not_found_is_unchanged(temporary_database, snapshot_text):
     init_db()
-    out = render_sheet_result(await prepare_application_from_paste(4242, PAGE, CONFIG, PROFILE))
+    out = render_sheet_result(
+        await prepare_application_from_paste(4242, PAGE, CONFIG, profile=PROFILE)
+    )
     snapshot_text(out, "paste_job_not_found")
 
 

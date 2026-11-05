@@ -19,9 +19,12 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from moonlighter.application.assisted.results import SheetKind, sheet_result_to_dict
-from moonlighter.application.assisted.service import (
+from moonlighter.application.assisted.results import (
+    SheetKind,
     failed_sheet,
+    sheet_result_to_dict,
+)
+from moonlighter.application.assisted.service import (
     prepare_application,
     prepare_application_from_paste,
 )
@@ -157,7 +160,7 @@ async def _run(arguments: argparse.Namespace) -> tuple[dict[str, Any], int]:
         job_id = job.id
     if arguments.paste is not None:
         result = await prepare_application_from_paste(
-            job_id, _read_paste(arguments.paste), config, profile
+            job_id, _read_paste(arguments.paste), config, profile=profile
         )
     else:
         result = await prepare_application(job_id, config, profile)

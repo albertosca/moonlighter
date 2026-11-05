@@ -80,3 +80,17 @@ def sheet_result_to_dict(result: SheetResult) -> dict[str, Any]:
         "notes": {"alias": result.alias_note, "cv": result.cv_note, "source": result.source_note},
         "error": result.error,
     }
+
+
+def failed_sheet(kind: SheetKind, message: str, *, apply_url: str = "") -> SheetResult:
+    """A sheet that never got past an early check: no job, no questions.
+
+    The empty title/company are what the renderer's error short-circuit
+    ignores, so they carry no information. apply_url defaults empty too (no
+    job in hand for JOB_NOT_FOUND/NO_QUESTIONS) but the NEEDS_PASTE call site
+    passes job.url explicitly: a script reading apply_url off that result
+    needs the URL to open and paste from, and PASTE_HINT already has it.
+    """
+    return SheetResult(
+        kind=kind, composed=[], job_title="", company="", apply_url=apply_url, error=message
+    )

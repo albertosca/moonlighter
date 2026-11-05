@@ -276,7 +276,8 @@ async def test_the_prompt_covers_the_three_remaining_ambiguities():
     call, captured = fake_llm(json.dumps({"questions": []}))
     await extract_questions_from_page(PAGE, call)
     prompt = captured["prompt"]
-    assert "searchable dropdown" in prompt and "options []" in prompt
+    assert "searchable dropdown" in prompt
+    assert "options []" in prompt
     # Narrowed after the first re-run: "Start typing..." fields became long_text.
     assert "typing placeholder" in prompt
     assert "several lines or paragraphs" in prompt
@@ -289,4 +290,5 @@ async def test_the_prompt_says_open_questions_are_long_text():
     why...", "Describe...", "Cover Letter") returned as text."""
     call, captured = fake_llm(json.dumps({"questions": []}))
     await extract_questions_from_page(PAGE, call)
-    assert "open question" in captured["prompt"] and "long_text" in captured["prompt"]
+    assert "open question" in captured["prompt"]
+    assert "long_text" in captured["prompt"]

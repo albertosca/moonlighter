@@ -108,7 +108,7 @@ def test_a_choice_card_without_options_degrades_to_long_text():
 
 def test_a_malformed_card_makes_the_form_unreadable():
     page = PAGE.replace('name="cards[', 'data-broken="1" value="{not json" name="cards[', 1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011 - the message is json's own decode error
         parse_lever_form(page)
 
 
@@ -131,12 +131,12 @@ def test_custom_questions_in_the_markup_without_a_card_template_make_the_form_un
 
 
 def test_a_card_without_fields_makes_the_form_unreadable():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="a Lever card template has no list of fields"):
         parse_lever_form(_card_page({"questions": []}, custom_questions=0))
 
 
 def test_a_card_whose_fields_are_not_a_list_makes_the_form_unreadable():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="a Lever card template has no list of fields"):
         parse_lever_form(_card_page({"fields": 5}, custom_questions=0))
 
 
@@ -162,7 +162,7 @@ def test_a_page_without_a_form_has_no_questions():
 
 def test_a_card_that_is_not_an_object_makes_the_form_unreadable():
     page = '<form><input value="[1, 2]" name="cards[1][baseTemplate]"></form>'
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="a Lever card template is not a JSON object"):
         parse_lever_form(page)
 
 

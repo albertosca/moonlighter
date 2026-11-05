@@ -4,6 +4,8 @@ from moonlighter.application.assisted.sources.base import (
     questions_or_empty,
     required_fields_or_empty,
 )
+from moonlighter.application.assisted.sources.greenhouse import GreenhouseSource
+from moonlighter.application.assisted.sources.recruitee import RecruiteeSource
 
 
 class _UnreachableSource:
@@ -40,9 +42,6 @@ async def test_a_source_that_cannot_be_reached_has_no_questions():
 
 
 async def test_the_adapted_sources_publish_no_separate_required_fields():
-    from moonlighter.application.assisted.sources.greenhouse import GreenhouseSource
-    from moonlighter.application.assisted.sources.recruitee import RecruiteeSource
-
     async with httpx.AsyncClient() as client:
         for source in (GreenhouseSource(), RecruiteeSource()):
             assert await source.required_fields(SourceMatch(source, ("a", "b")), client) == ()

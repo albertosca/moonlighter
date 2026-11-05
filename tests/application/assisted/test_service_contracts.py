@@ -7,6 +7,7 @@ import httpx
 import pytest
 from moonlighter.application.assisted import service
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.application.assisted.required_labels import REQUIRED_KEYWORDS
 from moonlighter.application.assisted.results import SheetKind
 from moonlighter.application.assisted.sources import greenhouse as greenhouse_source
 from moonlighter.application.assisted.sources.pasted import ExtractionError
@@ -144,7 +145,7 @@ async def test_a_failed_paste_reading_is_logged_and_told_to_run_again(
     monkeypatch.setattr(service, "extract_questions_from_page", refuse)
 
     with caplog.at_level(logging.WARNING):
-        result = await service.prepare_application_from_paste(job.id, "page", {}, {})
+        result = await service.prepare_application_from_paste(job.id, "page", {}, profile={})
 
     assert result.kind is SheetKind.NO_QUESTIONS
     assert result.error == (
@@ -168,7 +169,7 @@ async def test_a_paste_without_questions_asks_whether_the_whole_page_was_copied(
     monkeypatch.setattr(service, "make_caller", lambda config: _stub_caller_for)
     monkeypatch.setattr(service, "extract_questions_from_page", nothing)
 
-    result = await service.prepare_application_from_paste(job.id, "page", {}, {})
+    result = await service.prepare_application_from_paste(job.id, "page", {}, profile={})
 
     assert result.error == "No questions could be found in that text. Was the whole page copied?"
 
@@ -189,7 +190,7 @@ async def test_the_bootstrap_offer_says_exactly_this(job_factory, monkeypatch, t
 
 
 def test_the_required_keywords_are_frozen():
-    assert service._REQUIRED_KEYWORDS == {
+    assert REQUIRED_KEYWORDS == {
         "LinkedIn": ("linkedin",),
         "Salary expectation": (
             "salary",

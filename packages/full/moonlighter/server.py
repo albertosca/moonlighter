@@ -401,7 +401,7 @@ async def prepare_application_from_paste(
     with operation_metrics("prepare_application_from_paste"):
         return render_sheet_result(
             await assisted_service.prepare_application_from_paste(
-                job_id, page_text, app.config, app.profile
+                job_id, page_text, app.config, profile=app.profile
             )
         )
 
