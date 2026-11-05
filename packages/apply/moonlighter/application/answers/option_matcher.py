@@ -1,5 +1,4 @@
-"""
-Selects the right dropdown option from the intended answer.
+"""Selects the right dropdown option from the intended answer.
 
 Conservative hybrid: first tries to match locally (exact > startswith with
 word-boundary > fuzzy >= threshold) — zero cost. Only when the local match
@@ -13,13 +12,16 @@ import re
 from difflib import SequenceMatcher
 
 
-def _norm(s: str) -> str:
-    return re.sub(r"\s+", " ", (s or "").strip().lower())
+def _norm(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip().lower())
 
 
 def _starts_with_word(longer: str, prefix: str) -> bool:
-    """True if `longer` starts with `prefix` at a word boundary (the character
-    following the prefix, if any, is not alphanumeric). Avoids 'No' matching 'Not sure'."""
+    """True if `longer` starts with `prefix` at a word boundary.
+
+    The character following the prefix, if any, is not alphanumeric. Avoids 'No'
+    matching 'Not sure'.
+    """
     if not prefix or not longer.startswith(prefix):
         return False
     if len(longer) == len(prefix):
@@ -27,36 +29,51 @@ def _starts_with_word(longer: str, prefix: str) -> bool:
     return not longer[len(prefix)].isalnum()
 
 
-def match_option_locally(answer: str, options: list[str], threshold: float = 0.8) -> str | None:
-    """
-    Returns the EXACT TEXT of the option that best matches `answer`, or None.
-    Order: exact (normalized) > startswith with word-boundary (in both directions)
-    > fuzzy (difflib ratio >= threshold). Zero cost, no LLM.
-    """
-    a = _norm(answer)
-    if not a or not options:
-        return None
-    norm_opts = [(_norm(o), o) for o in options]
+def _exact_match(answer: str, normalised_options: list[tuple[str, str]]) -> str | None:
+    """The first option whose normalised text equals the answer."""
+    for normalised, original in normalised_options:
+        if normalised == answer:
+            return original
+    return None
 
-    # 1) exact
-    for no, orig in norm_opts:
-        if no == a:
-            return orig
 
-    # 2) startswith with word-boundary (option starts with answer, or vice versa)
-    for no, orig in norm_opts:
-        if _starts_with_word(no, a) or _starts_with_word(a, no):
-            return orig
+def _prefix_match(answer: str, normalised_options: list[tuple[str, str]]) -> str | None:
+    """The first option that starts with the answer, or that the answer starts with."""
+    for normalised, original in normalised_options:
+        if _starts_with_word(normalised, answer) or _starts_with_word(answer, normalised):
+            return original
+    return None
 
-    # 3) fuzzy
+
+def _fuzzy_match(
+    answer: str, normalised_options: list[tuple[str, str]], threshold: float
+) -> str | None:
+    """The first option with the highest difflib ratio, when it reaches the threshold."""
     best, best_ratio = None, 0.0
-    for no, orig in norm_opts:
-        ratio = SequenceMatcher(None, a, no).ratio()
+    for normalised, original in normalised_options:
+        ratio = SequenceMatcher(None, answer, normalised).ratio()
         if ratio > best_ratio:
-            best, best_ratio = orig, ratio
+            best, best_ratio = original, ratio
     if best_ratio >= threshold:
         return best
     return None
+
+
+def match_option_locally(answer: str, options: list[str], threshold: float = 0.8) -> str | None:
+    """Returns the EXACT TEXT of the option that best matches `answer`, or None.
+
+    Order: exact (normalized) > startswith with word-boundary (in both directions)
+    > fuzzy (difflib ratio >= threshold). Zero cost, no LLM.
+    """
+    normalised_answer = _norm(answer)
+    if not normalised_answer or not options:
+        return None
+    normalised_options = [(_norm(option), option) for option in options]
+    return (
+        _exact_match(normalised_answer, normalised_options)
+        or _prefix_match(normalised_answer, normalised_options)
+        or _fuzzy_match(normalised_answer, normalised_options, threshold)
+    )
 
 
 _PICK_PROMPT = """You are selecting the single best dropdown option for a job application field.
