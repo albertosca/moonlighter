@@ -60,6 +60,7 @@ async def _score(run: _Run, saved: list[Job], to_evaluate: list[RawJob]) -> list
             [_eval_input(raw) for raw in to_evaluate],
             run.profile,
             run.model,
+            # mypy cannot carry the `is NO_EVAL` narrowing from `_evaluate_chunk` into `_score`.
             caller=cast("LLMCaller", run.caller),
         )
     except Exception as error:

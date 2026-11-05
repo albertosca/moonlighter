@@ -3,11 +3,11 @@
 from moonlighter.discovery.archive import ArchiveResult, format_archive_result
 
 
-def testformat_archive_result_empty():
+def test_format_archive_result_empty():
     assert format_archive_result(ArchiveResult()) == "No closed jobs found."
 
 
-def testformat_archive_result_archived_only():
+def test_format_archive_result_archived_only():
     result = ArchiveResult(
         archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}]
     )
@@ -16,14 +16,14 @@ def testformat_archive_result_archived_only():
     assert "acme / Engineer — https://x.com/1" in formatted
 
 
-def testformat_archive_result_failed_only():
+def test_format_archive_result_failed_only():
     result = ArchiveResult(failed_companies=["acme"])
     formatted = format_archive_result(result)
     assert "No closed jobs found." in formatted
     assert "Could not check: acme" in formatted
 
 
-def testformat_archive_result_archived_and_failed():
+def test_format_archive_result_archived_and_failed():
     result = ArchiveResult(
         archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}],
         failed_companies=["beta"],

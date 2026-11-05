@@ -49,15 +49,15 @@ class FakeBrowserScanner:
     see docs/superpowers/specs/2026-07-22-linkedin-plugin-split-design.md).
     run_scan configures its scan() return/raise per test via closure."""
 
-    _exc: Exception | None = None
+    _raised_error: Exception | None = None
     _jobs: ClassVar[list] = []
 
     def __init__(self, page):
         pass
 
     async def scan(self, **keyword_arguments):
-        if self._exc is not None:
-            raise self._exc
+        if self._raised_error is not None:
+            raise self._raised_error
         return self._jobs
 
 
@@ -78,12 +78,12 @@ async def run_scan(  # noqa: PLR0913 - every knob a scan test turns, all keyword
     _eval_per_job = eval_mock or AsyncMock(return_value=evaluation_result(8.0))
 
     async def _batch(jobs, profile, model, *, caller):
-        # Applies eval_mock to each job in the batch; errors propagate to evaluate_chunk.
+        # Applies eval_mock to each job in the batch; errors propagate to the batch handler in `_score`, which releases the claims.
         return [await _eval_per_job(job.company, model) for job in jobs]
 
     registered = []
     if linkedin_error is not None or linkedin_jobs is not None:
-        FakeBrowserScanner._exc = linkedin_error
+        FakeBrowserScanner._raised_error = linkedin_error
         FakeBrowserScanner._jobs = linkedin_jobs or []
         registered = [FakeBrowserScanner]
 

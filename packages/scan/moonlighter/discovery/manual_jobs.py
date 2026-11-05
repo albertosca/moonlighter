@@ -3,12 +3,11 @@
 from dataclasses import dataclass, replace
 from typing import Any
 
-from peewee import IntegrityError
-
-from moonlighter.core.db import Job, ScanLog
+from moonlighter.core.db import Job
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.posting import fetch_description, fetch_posting_via_ats
 from moonlighter.core.urls import normalize_job_url
+from moonlighter.discovery.claims import claim_url
 from moonlighter.discovery.evaluation.single import evaluate_job
 from moonlighter.discovery.evaluation.title_filter import should_skip_by_title
 from moonlighter.discovery.evaluator_inputs import (
@@ -66,11 +65,8 @@ def _persist_manual(posting: _Posting, **scoring: Any) -> Job | None:
         posted_at=None,
         **scoring,
     )
-    if job is not None:
-        try:
-            ScanLog.create(job_url=posting.url, source="manual")
-        except IntegrityError:
-            return None
+    if job is not None and not claim_url(posting.url, "manual"):
+        return None
     return job
 
 

@@ -8,6 +8,11 @@ from moonlighter.discovery.sources.base import RawJob
 
 
 def claim(raw: RawJob) -> bool:
+    """Reserve the raw job's URL in ScanLog before any work (see `claim_url`)."""
+    return claim_url(raw.url, raw.source)
+
+
+def claim_url(url: str, source: str) -> bool:
     """Reserve the URL in ScanLog before any work.
 
     ScanLog.create is synchronous, so asyncio doesn't switch context between the
@@ -16,7 +21,7 @@ def claim(raw: RawJob) -> bool:
     URL was already reserved.
     """
     try:
-        ScanLog.create(job_url=raw.url, source=raw.source)
+        ScanLog.create(job_url=url, source=source)
     except IntegrityError:
         return False
     return True
