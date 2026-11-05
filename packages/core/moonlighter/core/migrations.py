@@ -1,3 +1,5 @@
+"""Schema migrations for the local SQLite store: numbered steps, applied once each and in order."""
+
 import sqlite3
 import time
 from collections.abc import Callable
@@ -6,6 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import peewee
+
+from moonlighter.core.config.paths import moonlighter_home
 from moonlighter.core.log import get_logger
 
 logger = get_logger(__name__)
@@ -69,12 +73,11 @@ def _m005_backfill_job_status_from_applications(db: Any) -> None:
 
 
 def _m006_fix_invented_onsite_remote_types(db: Any) -> None:
-    # The old normalize_remote_type invented 'onsite' for any unrecognized
-    # location (English-only vocabulary + onsite default) — live bug iFood
-    # #2811 ("Remoto" → onsite). Since the regional filter cuts onsite/hybrid
-    # outside Belo Horizonte deterministically, an invented onsite is an
-    # invented archive. Only 'onsite' rows are touched: the API remote flags
-    # never produced that value. SQL mirrors the fixed normalizer's order.
+    # The old normalize_remote_type invented 'onsite' for any unrecognized location (English-only
+    # vocabulary + onsite default) — live bug iFood #2811 ("Remoto" → onsite). Since the regional
+    # filter cuts onsite/hybrid outside Belo Horizonte deterministically, an invented onsite is an
+    # invented archive. Only 'onsite' rows are touched: the API remote flags never produced that
+    # value. SQL mirrors the fixed normalizer's order.
     if not (_has_column(db, "job", "remote_type") and _has_column(db, "job", "location")):
         return
     db.execute_sql(
@@ -105,12 +108,13 @@ MIGRATIONS: list[tuple[int, str, Callable[[Any], None]]] = [
 
 
 def current_version(db: Any) -> int:
-    """Read-only: version of the schema currently applied to `db`. 0 when
-    `schema_version` doesn't exist yet or holds no row (a pre-migration-system
-    DB, e.g. one that already got the old ad-hoc ALTERs but never had this
-    table). Never creates or writes anything — callers that need the table to
-    exist go through `_ensure_schema_version_table` inside the migration's
-    lock-retry region instead."""
+    """Read-only: version of the schema currently applied to `db`.
+
+    0 when `schema_version` doesn't exist yet or holds no row (a pre-migration-system DB, e.g. one
+    that already got the old ad-hoc ALTERs but never had this table). Never creates or writes
+    anything — callers that need the table to exist go through `_ensure_schema_version_table` inside
+    the migration's lock-retry region instead.
+    """
     cursor = db.execute_sql("PRAGMA table_info(schema_version)")
     if not cursor.fetchall():
         return 0
@@ -121,10 +125,12 @@ def current_version(db: Any) -> int:
 
 
 def _ensure_schema_version_table(db: Any) -> None:
-    """Create `schema_version` and seed it at 0 if it doesn't exist yet. Only
-    called from inside the lock-retry region in `run_migrations`, after the
-    pre-migration backup, so it is retried on a B5 lock like every other
-    migration write and never appears in the backup snapshot."""
+    """Create `schema_version` and seed it at 0 if it doesn't exist yet.
+
+    Only called from inside the lock-retry region in `run_migrations`, after the pre-migration
+    backup, so it is retried on a B5 lock like every other migration write and never appears in the
+    backup snapshot.
+    """
     db.execute_sql("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)")
     row = db.execute_sql("SELECT version FROM schema_version LIMIT 1").fetchone()
     if row is None:
@@ -132,11 +138,9 @@ def _ensure_schema_version_table(db: Any) -> None:
 
 
 def _backup(db: Any) -> Path:
-    from moonlighter.core.config.paths import moonlighter_home
-
     backups = Path(moonlighter_home()) / "backups"
     backups.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")  # noqa: DTZ005 - backup names carry naive local time, and the rotation below sorts them by name
     destination = backups / f"pre-migration-{stamp}.db"
     target = sqlite3.connect(destination)
     try:
@@ -149,50 +153,47 @@ def _backup(db: Any) -> Path:
 
 
 def _run_locked(db: Any, name: str, action: Callable[[], None]) -> None:
-    """Run `action` inside a transaction, retrying a bounded number of times
-    when the failure is a "database is locked" error raised by peewee (the
-    type every write through `db.atomic()`/`execute_sql` actually raises —
-    NOT `sqlite3.OperationalError`, which is a distinct, unrelated type).
-    Any other OperationalError, or the last attempt, re-raises immediately."""
+    """Run `action` inside a transaction, retrying a bounded number of times on a lock error.
+
+    It retries only when the failure is a "database is locked" error raised by peewee (the type
+    every write through `db.atomic()`/`execute_sql` actually raises — NOT
+    `sqlite3.OperationalError`, which is a distinct, unrelated type). Any other OperationalError, or
+    the last attempt, re-raises immediately.
+    """
     for attempt in range(_LOCK_RETRIES):  # pragma: no branch - always breaks or raises
         try:
             with db.atomic():
                 action()
-            return
         except peewee.OperationalError as error:
-            if "locked" in str(error).lower() and attempt < _LOCK_RETRIES - 1:
-                logger.warning("%s: DB locked, retrying (%d)", name, attempt + 1)
-                time.sleep(_LOCK_BACKOFF_S)
-                continue
-            raise
+            if not ("locked" in str(error).lower() and attempt < _LOCK_RETRIES - 1):
+                raise
+            logger.warning("%s: DB locked, retrying (%d)", name, attempt + 1)
+            time.sleep(_LOCK_BACKOFF_S)
+        else:
+            return
 
 
 def run_migrations(db: Any) -> list[str]:
-    """Bring `db` up to the latest schema version, applying only pending
-    migrations. Returns the names of the migrations actually applied (empty
-    when the schema is already current). Takes a consistent pre-migration
-    backup only when there is at least one pending migration. Each migration
-    (and the schema_version table setup itself) runs in its own transaction,
-    retried on a B5-style lock — a failure leaves the version at the last
-    fully-applied migration, never a torn state."""
+    """Bring `db` up to the latest schema version, applying only pending migrations.
+
+    Returns the names of the migrations actually applied (empty when the schema is already current).
+    Takes a consistent pre-migration backup only when there is at least one pending migration. Each
+    migration (and the schema_version table setup itself) runs in its own transaction, retried on a
+    B5-style lock — a failure leaves the version at the last fully-applied migration, never a torn
+    state.
+    """
     version = current_version(db)
-    pending = [
-        (migration_version, name, migrate)
-        for migration_version, name, migrate in MIGRATIONS
-        if migration_version > version
-    ]
+    pending = [(number, name, migrate) for number, name, migrate in MIGRATIONS if number > version]
     if not pending:
         return []
     _backup(db)
     _run_locked(db, "schema_version_table", lambda: _ensure_schema_version_table(db))
     applied: list[str] = []
-    for migration_version, name, migrate in pending:
+    for number, name, migrate in pending:
 
-        def _apply(
-            migration_version: int = migration_version, migrate: Callable[[Any], None] = migrate
-        ) -> None:
+        def _apply(number: int = number, migrate: Callable[[Any], None] = migrate) -> None:
             migrate(db)
-            db.execute_sql("UPDATE schema_version SET version = ?", (migration_version,))
+            db.execute_sql("UPDATE schema_version SET version = ?", (number,))
 
         _run_locked(db, name, _apply)
         applied.append(name)
