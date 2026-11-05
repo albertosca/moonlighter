@@ -708,7 +708,7 @@ class TestRegisterNewStageBounds:
 
 class TestParseMessage:
     def test_extracts_plain_text_body(self):
-        from moonlighter.tracking.gmail_client import parse_message
+        from moonlighter.tracking.gmail_messages import parse_message
 
         raw_message = _build_gmail_message(
             to_address=BASE_EMAIL,
@@ -728,7 +728,7 @@ class TestParseMessage:
         assert "Congratulations" in result["body"]
 
     def test_falls_back_to_html_when_no_plain(self):
-        from moonlighter.tracking.gmail_client import parse_message
+        from moonlighter.tracking.gmail_messages import parse_message
 
         raw_message = {
             "id": "msg456",
@@ -754,7 +754,7 @@ class TestParseMessage:
         assert "Hello" in result["body"]
 
     def test_prefers_plain_over_html_in_multipart(self):
-        from moonlighter.tracking.gmail_client import parse_message
+        from moonlighter.tracking.gmail_messages import parse_message
 
         raw_message = {
             "id": "msg789",
@@ -784,7 +784,7 @@ class TestParseMessage:
         assert result["body"] == "Texto puro"
 
     def test_handles_missing_body_gracefully(self):
-        from moonlighter.tracking.gmail_client import parse_message
+        from moonlighter.tracking.gmail_messages import parse_message
 
         raw_message = {
             "id": "msg000",
@@ -879,7 +879,7 @@ class TestFetchRecentMessages:
         for the holepunch application on 2026-08-04, and the monitor could not see
         it: SPAM is a separate label from INBOX, so labelIds=[INBOX] hid it entirely.
         "We received your application" is the reply least worth missing."""
-        from moonlighter.tracking.gmail_client import fetch_recent_messages
+        from moonlighter.tracking.gmail_messages import fetch_recent_messages
 
         service = MagicMock()
         listing = service.users.return_value.messages.return_value.list
@@ -895,7 +895,7 @@ class TestFetchRecentMessages:
         """A person reads their mail; a reply already read is exactly the reply
         worth recording. Re-processing is prevented by ProcessedEmail, not by
         the unread flag."""
-        from moonlighter.tracking.gmail_client import fetch_recent_messages
+        from moonlighter.tracking.gmail_messages import fetch_recent_messages
 
         service = MagicMock()
         listing = service.users.return_value.messages.return_value.list
@@ -907,7 +907,7 @@ class TestFetchRecentMessages:
         assert "is:unread" not in call_keyword_arguments.get("q", "")
 
     def test_bounds_the_search_by_the_lookback_window(self):
-        from moonlighter.tracking.gmail_client import fetch_recent_messages
+        from moonlighter.tracking.gmail_messages import fetch_recent_messages
 
         service = MagicMock()
         listing = service.users.return_value.messages.return_value.list
@@ -919,7 +919,7 @@ class TestFetchRecentMessages:
         assert "newer_than:7d" in call_keyword_arguments.get("q", "")
 
     def test_returns_list_of_id_and_thread_id(self):
-        from moonlighter.tracking.gmail_client import fetch_recent_messages
+        from moonlighter.tracking.gmail_messages import fetch_recent_messages
 
         service = MagicMock()
         resolved_messages = [{"id": "a1", "threadId": "t1"}, {"id": "a2", "threadId": "t2"}]
@@ -932,7 +932,7 @@ class TestFetchRecentMessages:
         assert result[1]["threadId"] == "t2"
 
     def test_returns_empty_list_when_no_messages(self):
-        from moonlighter.tracking.gmail_client import fetch_recent_messages
+        from moonlighter.tracking.gmail_messages import fetch_recent_messages
 
         service = MagicMock()
         service.users().messages().list().execute.return_value = {}
@@ -941,7 +941,7 @@ class TestFetchRecentMessages:
         assert result == []
 
     def test_respects_max_results(self):
-        from moonlighter.tracking.gmail_client import fetch_recent_messages
+        from moonlighter.tracking.gmail_messages import fetch_recent_messages
 
         service = MagicMock()
         service.users().messages().list().execute.return_value = {}
@@ -959,7 +959,7 @@ class TestFetchRecentMessages:
         old is:unread design, this time-window design has no drain)."""
         import logging
 
-        from moonlighter.tracking.gmail_client import fetch_recent_messages
+        from moonlighter.tracking.gmail_messages import fetch_recent_messages
 
         service = MagicMock()
         full_page = {
@@ -967,7 +967,7 @@ class TestFetchRecentMessages:
         }
         service.users().messages().list().execute.return_value = full_page
 
-        with caplog.at_level(logging.WARNING, logger="moonlighter.tracking.gmail_client"):
+        with caplog.at_level(logging.WARNING, logger="moonlighter.tracking.gmail_messages"):
             result = fetch_recent_messages(service, maximum_results=3)
 
         assert len(result) == 3
@@ -976,14 +976,14 @@ class TestFetchRecentMessages:
     def test_does_not_warn_when_below_the_cap(self, caplog):
         import logging
 
-        from moonlighter.tracking.gmail_client import fetch_recent_messages
+        from moonlighter.tracking.gmail_messages import fetch_recent_messages
 
         service = MagicMock()
         service.users().messages().list().execute.return_value = {
             "messages": [{"id": "m0", "threadId": "t0"}]
         }
 
-        with caplog.at_level(logging.WARNING, logger="moonlighter.tracking.gmail_client"):
+        with caplog.at_level(logging.WARNING, logger="moonlighter.tracking.gmail_messages"):
             fetch_recent_messages(service, maximum_results=50)
 
         assert caplog.text == ""
@@ -992,7 +992,7 @@ class TestFetchRecentMessages:
         """A mailbox with more messages than max_results must not silently
         truncate — fetch_recent_messages follows nextPageToken to collect them
         all, up to the hard page bound."""
-        from moonlighter.tracking.gmail_client import fetch_recent_messages
+        from moonlighter.tracking.gmail_messages import fetch_recent_messages
 
         service = MagicMock()
         responses = [
@@ -1009,7 +1009,7 @@ class TestFetchRecentMessages:
         assert [message["id"] for message in result] == ["m0", "m1", "m2"]
 
     def test_second_page_request_carries_the_returned_page_token(self):
-        from moonlighter.tracking.gmail_client import fetch_recent_messages
+        from moonlighter.tracking.gmail_messages import fetch_recent_messages
 
         service = MagicMock()
         listing = service.users.return_value.messages.return_value.list
@@ -1029,7 +1029,7 @@ class TestFetchRecentMessages:
         and hitting that bound is logged, same as hitting max_results."""
         import logging
 
-        from moonlighter.tracking.gmail_client import _MAX_PAGES, fetch_recent_messages
+        from moonlighter.tracking.gmail_messages import _MAXIMUM_PAGES, fetch_recent_messages
 
         service = MagicMock()
         # Every page is below max_results (so the per-page warning doesn't fire)
@@ -1039,10 +1039,10 @@ class TestFetchRecentMessages:
             "nextPageToken": "more",
         }
 
-        with caplog.at_level(logging.WARNING, logger="moonlighter.tracking.gmail_client"):
+        with caplog.at_level(logging.WARNING, logger="moonlighter.tracking.gmail_messages"):
             result = fetch_recent_messages(service, maximum_results=50)
 
-        assert len(result) == _MAX_PAGES
+        assert len(result) == _MAXIMUM_PAGES
         assert "page" in caplog.text.lower()
 
 
@@ -1051,7 +1051,7 @@ class TestFetchRecentMessages:
 
 class TestMarkProcessed:
     def test_removes_unread_label_and_adds_processed_label(self):
-        from moonlighter.tracking.gmail_client import mark_processed
+        from moonlighter.tracking.gmail_labels import mark_processed
 
         service = MagicMock()
         service.users().messages().modify().execute.return_value = {}
@@ -1067,7 +1067,7 @@ class TestMarkProcessed:
         assert "Label_123" in body.get("addLabelIds", [])
 
     def test_calls_execute(self):
-        from moonlighter.tracking.gmail_client import mark_processed
+        from moonlighter.tracking.gmail_labels import mark_processed
 
         service = MagicMock()
         service.users().messages().modify().execute.return_value = {}
@@ -1430,7 +1430,7 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -1478,7 +1478,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed") as mock_mark,
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -1536,7 +1536,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -1588,7 +1588,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -1641,7 +1641,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -1686,7 +1686,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -1733,7 +1733,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -1778,7 +1778,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -1822,7 +1822,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed") as mock_mark,
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -1879,7 +1879,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -1932,7 +1932,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -1976,7 +1976,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -2026,7 +2026,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -2073,7 +2073,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -2121,7 +2121,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -2175,7 +2175,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -2214,7 +2214,7 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed") as mock_mark,
-            patch("moonlighter.tracking.email_monitor._get_or_create_label") as mock_label,
+            patch("moonlighter.tracking.email_monitor.get_or_create_label") as mock_label,
         ):
             from moonlighter.tracking.email_monitor import sync_responses
 
@@ -2253,7 +2253,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed") as mock_mark,
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -2306,7 +2306,7 @@ class TestSyncResponses:
             ),
             patch("moonlighter.tracking.email_monitor.fetch_recent_messages", return_value=[]),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -2354,7 +2354,7 @@ class TestSyncResponses:
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -2387,7 +2387,7 @@ class TestSyncResponses:
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -2443,7 +2443,7 @@ class TestSyncResponses:
             patch("moonlighter.tracking.email_monitor.parse_message", parse_mock),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -2508,7 +2508,7 @@ class TestSyncResponses:
             patch("moonlighter.tracking.email_monitor.parse_message", return_value=message),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -2565,7 +2565,7 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -2615,7 +2615,7 @@ class TestSyncResponses:
                 new=AsyncMock(return_value=classify_result),
             ),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_proc"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_proc"
             ),
         ):
             from moonlighter.tracking.email_monitor import sync_responses
@@ -2652,16 +2652,16 @@ def test_setup_gmail_service_raises_without_google_libs():
 
 def test_extract_body_html_top_level():
     """Top-level text/html payload is decoded (169)."""
-    from moonlighter.tracking.gmail_client import _extract_body
+    from moonlighter.tracking.message_body import extract_body
 
     payload = {"mimeType": "text/html", "body": {"data": _b64("<p>Hi</p>")}}
-    assert "Hi" in _extract_body(payload)
+    assert "Hi" in extract_body(payload)
 
 
 def test_extract_body_multipart_skips_empty_parts_then_finds_html():
     """text/plain and text/html parts with empty data are skipped (177->174, 181->180);
     the html with data is accepted (183)."""
-    from moonlighter.tracking.gmail_client import _extract_body
+    from moonlighter.tracking.message_body import extract_body
 
     payload = {
         "mimeType": "multipart/alternative",
@@ -2671,12 +2671,12 @@ def test_extract_body_multipart_skips_empty_parts_then_finds_html():
             {"mimeType": "text/html", "body": {"data": _b64("<b>real</b>")}},
         ],
     }
-    assert "real" in _extract_body(payload)
+    assert "real" in extract_body(payload)
 
 
 def test_extract_body_recurses_into_nested_multipart():
     """Nested multipart is resolved via recursion (186-189)."""
-    from moonlighter.tracking.gmail_client import _extract_body
+    from moonlighter.tracking.message_body import extract_body
 
     payload = {
         "mimeType": "multipart/mixed",
@@ -2687,18 +2687,18 @@ def test_extract_body_recurses_into_nested_multipart():
             }
         ],
     }
-    assert "nested body" in _extract_body(payload)
+    assert "nested body" in extract_body(payload)
 
 
 def test_extract_body_unknown_mime_returns_empty():
-    from moonlighter.tracking.gmail_client import _extract_body
+    from moonlighter.tracking.message_body import extract_body
 
-    assert _extract_body({"mimeType": "application/pdf", "body": {}}) == ""
+    assert extract_body({"mimeType": "application/pdf", "body": {}}) == ""
 
 
 def test_decode_data_invalid_base64_returns_empty():
     """Invalid Base64 → '' without raising (199-200)."""
-    from moonlighter.tracking.gmail_client import _decode_data
+    from moonlighter.tracking.message_body import _decode_data
 
     assert _decode_data("!!!notbase64@@@") == ""
 
@@ -2708,23 +2708,23 @@ def test_decode_data_invalid_base64_returns_empty():
 
 def test_get_or_create_label_returns_existing():
     """Label already exists → returns the existing id (280-282)."""
-    from moonlighter.tracking.gmail_client import _get_or_create_label
+    from moonlighter.tracking.gmail_labels import get_or_create_label
 
     service = MagicMock()
     service.users().labels().list().execute.return_value = {
         "labels": [{"name": "moonlighter/processed", "id": "Label_42"}]
     }
-    assert _get_or_create_label(service, "moonlighter/processed") == "Label_42"
+    assert get_or_create_label(service, "moonlighter/processed") == "Label_42"
 
 
 def test_get_or_create_label_creates_when_missing():
     """Label doesn't exist → creates it and returns the new id (283-296)."""
-    from moonlighter.tracking.gmail_client import _get_or_create_label
+    from moonlighter.tracking.gmail_labels import get_or_create_label
 
     service = MagicMock()
     service.users().labels().list().execute.return_value = {"labels": []}
     service.users().labels().create().execute.return_value = {"id": "Label_new"}
-    assert _get_or_create_label(service, "moonlighter/processed") == "Label_new"
+    assert get_or_create_label(service, "moonlighter/processed") == "Label_new"
 
 
 # ── _TYPE_TO_STATUS ──────────────────────────────────────────────────────────
@@ -2955,25 +2955,25 @@ def testrun_gmail_oauth_raises_without_oauthlib():
 
 def test_extract_body_multipart_unresolvable_returns_empty():
     """Parts that don't resolve to text → recursion ends without finding anything (186->191, 188->186)."""
-    from moonlighter.tracking.gmail_client import _extract_body
+    from moonlighter.tracking.message_body import extract_body
 
     payload = {
         "mimeType": "multipart/mixed",
         "parts": [{"mimeType": "application/octet-stream", "body": {}}],
     }
-    assert _extract_body(payload) == ""
+    assert extract_body(payload) == ""
 
 
 def test_get_or_create_label_skips_non_matching_then_creates():
     """An existing label that doesn't match is skipped (281->280) and the target is created."""
-    from moonlighter.tracking.gmail_client import _get_or_create_label
+    from moonlighter.tracking.gmail_labels import get_or_create_label
 
     service = MagicMock()
     service.users().labels().list().execute.return_value = {
         "labels": [{"name": "OTHER", "id": "x"}]
     }
     service.users().labels().create().execute.return_value = {"id": "Label_new"}
-    assert _get_or_create_label(service, "moonlighter/processed") == "Label_new"
+    assert get_or_create_label(service, "moonlighter/processed") == "Label_new"
 
 
 def test_resolve_application_fuzzy_zero_matches_is_uncertain(temporary_database):
@@ -3030,7 +3030,7 @@ class TestArchiveAfterSync:
             patch("moonlighter.tracking.email_monitor.archive_message") as mock_archive,
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_p"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_p"
             ),
         ):
             updates = await sync_responses(config, _make_llm_caller(classification))
@@ -3175,7 +3175,7 @@ class TestArchiveAfterSync:
             ),
             patch("moonlighter.tracking.email_monitor.mark_processed"),
             patch(
-                "moonlighter.tracking.email_monitor._get_or_create_label", return_value="Label_p"
+                "moonlighter.tracking.email_monitor.get_or_create_label", return_value="Label_p"
             ),
         ):
             updates = await sync_responses(
@@ -3207,7 +3207,7 @@ class TestArchiveAfterSync:
 
 
 def test_archive_message_removes_unread_and_inbox():
-    from moonlighter.tracking.gmail_client import archive_message
+    from moonlighter.tracking.gmail_labels import archive_message
 
     service = MagicMock()
     archive_message(service, "m1")

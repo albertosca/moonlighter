@@ -112,7 +112,6 @@ strict-checking = true
 # Each task deletes its files' lines; the block is empty and removed at the end.
 "packages/email/moonlighter/tracking/__init__.py" = ["D104"]
 "packages/email/moonlighter/tracking/cli.py" = ["PLC0415"]
-"packages/email/moonlighter/tracking/gmail_client.py" = ["BLE001", "C901", "D200", "D205", "D209", "D212"]
 "packages/email/moonlighter/tracking/register.py" = ["D205", "DTZ005", "ICN001"]
 "packages/full/moonlighter/_tool_logging.py" = ["D205"]
 "packages/full/moonlighter/init.py" = ["I001", "PLC0415", "T201"]
@@ -148,7 +147,6 @@ strict-checking = true
 "tests/test_tool_logging.py" = ["PLC0415"]
 "tests/tracking/test_cli.py" = ["PLC0415"]
 "tests/tracking/test_email_monitor.py" = ["DTZ001", "DTZ011", "ICN001", "N806", "PIE804", "PLC0415", "PLR0917"]
-"tests/tracking/test_gmail_client.py" = ["N803", "PLR0917"]
 "tests/tracking/test_register.py" = ["PLC0415", "PT018"]
 # END ratchet
 

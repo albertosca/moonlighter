@@ -1,8 +1,5 @@
-"""
-Gmail API surface: authentication, message fetch/parse, label management.
-"""
+"""Gmail authentication: the OAuth token, the scope it needs, and the API resource."""
 
-import base64
 import json
 import logging
 from pathlib import Path
@@ -35,27 +32,31 @@ class GmailAuthError(Exception):
     pass
 
 
-# ── Gmail API: authentication and reading ───────────────────────────────────
+# ── Gmail API: authentication ───────────────────────────────────────────────
 
 
 _MUTATING_FLAGS = ("mark_processed", "archive_ref_matched", "archive_all_classified")
 
 
 def _required_scope(config: dict[str, Any]) -> str:
-    """gmail.modify only when the operator opts into some Gmail mutation
-    (marking processed, or the program-C archive flags); readonly by default —
-    the sync is 100% read-only save for those opt-ins (S-08)."""
+    """gmail.modify only when the operator opts into some Gmail mutation.
+
+    That is marking processed, or the program-C archive flags; readonly by default —
+    the sync is 100% read-only save for those opt-ins (S-08).
+    """
     email_config = config.get("email", {})
     mutates = any(email_config.get(flag, False) for flag in _MUTATING_FLAGS)
     return SCOPE_MODIFY if mutates else SCOPE_READONLY
 
 
-def _warn_if_scope_mismatch(creds: Any, required_scope: str) -> None:
-    """The saved token may carry a broader scope than currently needed
-    (e.g. an old token with gmail.modify when mark_processed=false only needs
-    gmail.readonly). Never revokes on its own — just warns, once, clearly
-    (S-08). Defensive: only acts if .scopes is actually a real sequence."""
-    granted = getattr(creds, "scopes", None)
+def _warn_if_scope_mismatch(credentials: Any, required_scope: str) -> None:
+    """The saved token may carry a broader scope than currently needed.
+
+    For example an old token with gmail.modify when mark_processed=false only needs
+    gmail.readonly. Never revokes on its own — just warns, once, clearly
+    (S-08). Defensive: only acts if .scopes is actually a real sequence.
+    """
+    granted = getattr(credentials, "scopes", None)
     if not isinstance(granted, (list, set, tuple)):
         return
     granted_set = set(granted)
@@ -109,8 +110,10 @@ def _is_ours(token_path: Path) -> bool:
 
 def setup_gmail_service(config: dict[str, Any]) -> Any:
     """Loads credentials + OAuth2 token and returns the Gmail API resource.
+
     Raises GmailAuthError with a clear message if the token doesn't exist; refreshes
-    automatically if expired."""
+    automatically if expired.
+    """
     if Credentials is None or build is None:
         raise GmailAuthError(
             "google-api-python-client not installed. "
@@ -134,9 +137,9 @@ def setup_gmail_service(config: dict[str, Any]) -> Any:
     # flags a token broader than we need. Narrowing here is not a privilege
     # reduction — it just makes the refresh fail.
     scopes = _token_scopes(token_path) or [required_scope]
-    creds = Credentials.from_authorized_user_file(str(token_path), scopes)  # type: ignore[no-untyped-call]
-    if not creds.valid and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
+    credentials = Credentials.from_authorized_user_file(str(token_path), scopes)  # type: ignore[no-untyped-call]
+    if not credentials.valid and credentials.expired and credentials.refresh_token:
+        credentials.refresh(Request())
         # Persist only a token file we own. `token_path` may point at another
         # project's file — that is a supported setup, and how this account's
         # credential is kept alive today. google-auth's serialisation would
@@ -144,168 +147,12 @@ def setup_gmail_service(config: dict[str, Any]) -> Any:
         # `scope` string, plus expiry and universe_domain) and can break the
         # owner. Refreshing in memory costs one request per sync.
         if _is_ours(token_path):
-            token_path.write_text(creds.to_json())
+            token_path.write_text(credentials.to_json())
         else:
             logger.debug("token at %s belongs to another project — not writing back", token_path)
 
-    _warn_if_scope_mismatch(creds, required_scope)
-    return build("gmail", "v1", credentials=creds)
-
-
-_MAX_PAGES = 10  # hard upper bound: 10 pages × 50/page = 500 messages per sync, max
-
-
-def fetch_recent_messages(
-    service: Any, lookback_days: int = 30, maximum_results: int = 50
-) -> list[dict[str, Any]]:
-    """Recent messages, whether or not they have been read. Returns a list of
-    {id, threadId}.
-
-    Read state is deliberately not part of the search: a person reads their mail, and
-    a reply that has been read is exactly the reply worth recording. Re-processing is
-    prevented by ProcessedEmail, not by the unread flag.
-
-    `in:anywhere` rather than labelIds=[INBOX]: SPAM is a separate label from INBOX,
-    so the label filter hid every message Gmail had flagged. ATS confirmations sent to
-    a plus-alias land there routinely — one did, for the holepunch application on
-    2026-08-04 — and "we received your application" is the single reply least worth
-    missing.
-
-    Paginates via nextPageToken up to _MAX_PAGES pages, so a mailbox with more than
-    maximum_results messages inside the lookback window doesn't silently lose the older
-    ones: Gmail returns newest-first and the query can't exclude already-processed
-    messages, so a single unpaginated page truncates and those older messages age out
-    of the window before ever being fetched — with no drain mechanism (the previous
-    is:unread design had one: marking a message read removed it from the query; this
-    time-window design doesn't). The page bound exists so a huge mailbox can't spin
-    forever; hitting it is logged just like hitting maximum_results on a single page.
-    """
-    query = f"newer_than:{lookback_days}d in:anywhere"
-    messages: list[dict[str, Any]] = []
-    page_token: str | None = None
-    for page in range(1, _MAX_PAGES + 1):
-        response = (
-            service.users()
-            .messages()
-            .list(
-                userId="me",
-                q=query,
-                maxResults=maximum_results,
-                pageToken=page_token,
-            )
-            .execute()
-        )
-        page_messages = response.get("messages", [])
-        messages.extend(page_messages)
-        if len(page_messages) == maximum_results:
-            logger.warning(
-                "fetch_recent_messages: page %d returned the full %d-message cap — "
-                "more messages may exist in the %dd lookback window",
-                page,
-                maximum_results,
-                lookback_days,
-            )
-        page_token = response.get("nextPageToken")
-        if not page_token:
-            break
-    else:
-        logger.warning(
-            "fetch_recent_messages: hit the %d-page cap (%d messages fetched) — "
-            "older messages in the %dd lookback window may still be unfetched",
-            _MAX_PAGES,
-            len(messages),
-            lookback_days,
-        )
-    return messages
-
-
-def parse_message(service: Any, message_id: str) -> dict[str, Any]:
-    """Extracts to, from_, subject, body from a Gmail message."""
-    raw = service.users().messages().get(userId="me", id=message_id, format="full").execute()
-    payload = raw.get("payload", {})
-    headers = {header["name"].lower(): header["value"] for header in payload.get("headers", [])}
-    return {
-        "to": headers.get("to", ""),
-        "from_": headers.get("from", ""),
-        "subject": headers.get("subject", ""),
-        "body": _extract_body(payload),
-    }
-
-
-def _extract_body(payload: dict[str, Any]) -> str:
-    """Extracts the message body, preferring text/plain over text/html."""
-    mime = payload.get("mimeType", "")
-    if mime in ("text/plain", "text/html"):
-        return _decode_data(payload.get("body", {}).get("data", ""))
-    if mime.startswith("multipart/"):
-        return _extract_multipart(payload.get("parts", []))
-    return ""
-
-
-def _extract_multipart(parts: list[dict[str, Any]]) -> str:
-    """Looks for the body in a multipart message: text/plain first, then text/html,
-    and finally recurses into nested parts (multipart within multipart)."""
-    for preferred in ("text/plain", "text/html"):
-        for part in parts:
-            if part.get("mimeType") == preferred:
-                data = part.get("body", {}).get("data", "")
-                if data:
-                    return _decode_data(data)
-    for part in parts:
-        body = _extract_body(part)
-        if body:
-            return body
-    return ""
-
-
-def _decode_data(data: str) -> str:
-    if not data:
-        return ""
-    try:
-        return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace")
-    except Exception:
-        return ""
-
-
-def archive_message(service: Any, message_id: str) -> None:
-    """Marks read and archives (removes UNREAD and INBOX) — program C's
-    post-sync cleanup, gated by the email.archive_* flags upstream."""
-    service.users().messages().modify(
-        userId="me",
-        id=message_id,
-        body={"removeLabelIds": ["UNREAD", "INBOX"]},
-    ).execute()
-
-
-def mark_processed(service: Any, message_id: str, label_id: str) -> None:
-    """Marks as read and applies the 'moonlighter/processed' label."""
-    service.users().messages().modify(
-        userId="me",
-        id=message_id,
-        body={"removeLabelIds": ["UNREAD"], "addLabelIds": [label_id]},
-    ).execute()
-
-
-def _get_or_create_label(service: Any, label_name: str) -> str:
-    """Returns the label's ID, creating it if it doesn't exist yet."""
-    labels = service.users().labels().list(userId="me").execute()
-    for label in labels.get("labels", []):
-        if label["name"] == label_name:
-            return str(label["id"])
-    created = (
-        service.users()
-        .labels()
-        .create(
-            userId="me",
-            body={
-                "name": label_name,
-                "labelListVisibility": "labelShow",
-                "messageListVisibility": "show",
-            },
-        )
-        .execute()
-    )
-    return str(created["id"])
+    _warn_if_scope_mismatch(credentials, required_scope)
+    return build("gmail", "v1", credentials=credentials)
 
 
 def run_gmail_oauth(
@@ -318,8 +165,8 @@ def run_gmail_oauth(
         )
     scope = _required_scope(config or {})
     flow = InstalledAppFlow.from_client_secrets_file(credentials_path, [scope])
-    creds = flow.run_local_server(port=0)
+    credentials = flow.run_local_server(port=0)
     expanded = Path(token_path).expanduser()
     expanded.parent.mkdir(parents=True, exist_ok=True)
-    expanded.write_text(creds.to_json())
+    expanded.write_text(credentials.to_json())
     expanded.chmod(0o600)

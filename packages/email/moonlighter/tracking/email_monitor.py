@@ -16,14 +16,9 @@ from moonlighter.core.metrics import record_spend_limit_hit
 from moonlighter.tracking.application_matching import extract_ref, resolve_application
 from moonlighter.tracking.classification import classify_response
 from moonlighter.tracking.funnel import advance_application
-from moonlighter.tracking.gmail_client import (
-    _get_or_create_label,
-    archive_message,
-    fetch_recent_messages,
-    mark_processed,
-    parse_message,
-    setup_gmail_service,
-)
+from moonlighter.tracking.gmail_client import setup_gmail_service
+from moonlighter.tracking.gmail_labels import archive_message, get_or_create_label, mark_processed
+from moonlighter.tracking.gmail_messages import fetch_recent_messages, parse_message
 from moonlighter.tracking.interview_stages import register_new_stage
 from moonlighter.tracking.sync_report import make_suggestion, make_update
 
@@ -103,7 +98,7 @@ def _gmail_handles(service: Any, email_config: dict[str, Any]) -> _GmailHandles:
     # (ProcessedEmail). Only writes to Gmail (read + label) if mark_processed=True.
     mutate_gmail = bool(email_config.get("mark_processed", False))
     label_name = email_config.get("processed_label", "moonlighter/processed")
-    label_id = _get_or_create_label(service, label_name) if mutate_gmail else None
+    label_id = get_or_create_label(service, label_name) if mutate_gmail else None
     return _GmailHandles(service=service, mutate_gmail=mutate_gmail, label_id=label_id)
 
 
