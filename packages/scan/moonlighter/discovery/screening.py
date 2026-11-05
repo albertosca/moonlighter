@@ -40,7 +40,9 @@ def _fields_without_llm(raw: RawJob, rules: ScreeningRules) -> dict[str, Any] | 
     if matched:
         return archived_fields(f"title filtered: {matched!r}")
     if (
-        classify_location(raw.location, raw.remote_type, rules.home_city, rules.eligible_regions)
+        classify_location(
+            raw.location, raw.remote_type, rules.home_city, eligible_regions=rules.eligible_regions
+        )
         is Eligibility.INELIGIBLE
     ):
         # Onsite/hybrid outside the profile's home city: no JD wording

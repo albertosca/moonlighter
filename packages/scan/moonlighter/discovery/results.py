@@ -17,9 +17,11 @@ from moonlighter.views import render_jobs_table
 
 
 class ScanKind(StrEnum):
-    """Which of the five shapes a scan produced. One field, exhaustive, so the
-    renderer dispatches on it and a CLI can map it to an exit code without
-    parsing the message."""
+    """Which of the five shapes a scan produced.
+
+    One field, exhaustive, so the renderer dispatches on it and a CLI can map it to an exit
+    code without parsing the message.
+    """
 
     EVALUATED = "evaluated"  # candidates were evaluated: saved/spend_hit carry the counts
     NO_NEW_JOBS = "no_new_jobs"  # scan_and_evaluate: nothing to evaluate at all
@@ -51,16 +53,16 @@ class ScanReport:
         # kind existed, `company` and `no_new_jobs` were renderer mode switches
         # that silently discarded saved/spend_hit when combined with them; now
         # the contradiction is impossible to express without raising.
-        k = self.kind
-        if (self.error is not None) != (k is ScanKind.UNKNOWN_SOURCE):
+        kind = self.kind
+        if (self.error is not None) != (kind is ScanKind.UNKNOWN_SOURCE):
             raise ValueError("ScanReport.error is set exactly when kind is unknown_source")
-        if k in (ScanKind.ALL_KNOWN, ScanKind.NO_OPEN_JOBS) and self.company is None:
-            raise ValueError(f"ScanReport kind {k} names a company; company is required")
-        if (self.found_but_known > 0) != (k is ScanKind.ALL_KNOWN):
+        if kind in (ScanKind.ALL_KNOWN, ScanKind.NO_OPEN_JOBS) and self.company is None:
+            raise ValueError(f"ScanReport kind {kind} names a company; company is required")
+        if (self.found_but_known > 0) != (kind is ScanKind.ALL_KNOWN):
             raise ValueError(
                 "ScanReport.found_but_known is positive exactly when kind is all_known"
             )
-        if k is not ScanKind.EVALUATED and (self.saved or self.spend_hit):
+        if kind is not ScanKind.EVALUATED and (self.saved or self.spend_hit):
             raise ValueError("only an evaluated ScanReport carries saved/spend_hit")
 
 
@@ -87,43 +89,48 @@ def _body(report: ScanReport) -> str:
                 f"({report.found_but_known} found, all already known)."
             )
         case ScanKind.NO_OPEN_JOBS:
-            return f"No open jobs found at {report.company!r} (see warnings below if the fetch failed)."
+            return (
+                f"No open jobs found at {report.company!r} "
+                "(see warnings below if the fetch failed)."
+            )
         case _:
             return _render_counts(report)
 
 
-def _render_counts(report: ScanReport) -> str:
-    saved = report.saved
-    spend_hit = report.spend_hit
-    threshold = report.threshold
+def _notes_starting_with(saved: list[Job], prefix: str) -> int:
+    return sum(1 for job in saved if job.score_notes and job.score_notes.startswith(prefix))
 
-    above = [j for j in saved if j.status == "new"]
-    title_filtered = sum(
-        1 for j in saved if j.score_notes and j.score_notes.startswith("title filtered:")
-    )
-    location_ineligible = sum(
-        1 for j in saved if j.score_notes and j.score_notes.startswith("location ineligible:")
-    )
-    needs_verification = sum(1 for j in saved if j.status == "needs_review")
-    below = len(saved) - len(above) - title_filtered - location_ineligible - needs_verification
-    spend_note = (
-        "\n\n⚠️  Spend limit reached — scan stopped (remaining jobs are left for the next scan)."
-        if spend_hit
-        else ""
-    )
-    verify_note = (
+
+def _spend_note(report: ScanReport) -> str:
+    if not report.spend_hit:
+        return ""
+    return "\n\n⚠️  Spend limit reached — scan stopped (remaining jobs are left for the next scan)."
+
+
+def _verify_note(needs_verification: int) -> str:
+    if not needs_verification:
+        return ""
+    return (
         f"\n\n⚠️  {needs_verification} job(s) need manual verification — "
         f"list_jobs(status='needs_review') to see them, verify_job(job_id, page_text) to score one."
-        if needs_verification
-        else ""
     )
+
+
+def _render_counts(report: ScanReport) -> str:
+    saved = report.saved
+    above = [job for job in saved if job.status == "new"]
+    title_filtered = _notes_starting_with(saved, "title filtered:")
+    location_ineligible = _notes_starting_with(saved, "location ineligible:")
+    needs_verification = sum(1 for job in saved if job.status == "needs_review")
+    below = len(saved) - len(above) - title_filtered - location_ineligible - needs_verification
+    notes = _spend_note(report) + _verify_note(needs_verification)
 
     if not above:
         return (
-            f"{len(saved)} jobs processed. None passed the threshold of {threshold}. "
+            f"{len(saved)} jobs processed. None passed the threshold of {report.threshold}. "
             f"({title_filtered} filtered by title, {location_ineligible} location ineligible, "
             f"{below} below score)"
-            f"{spend_note}{verify_note}"
+            f"{notes}"
         )
 
     table = render_jobs_table(above)
@@ -132,24 +139,24 @@ def _render_counts(report: ScanReport) -> str:
         f"{below} below threshold  |  {title_filtered} filtered by title  |  "
         f"{location_ineligible} location ineligible"
     )
-    return (
-        f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}"
-        f"{spend_note}{verify_note}"
-    )
+    return f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}{notes}"
 
 
 def scan_report_to_dict(report: ScanReport) -> dict[str, Any]:
-    """The JSON a CLI prints. Every fact the renderer uses is here, plus the
-    ones it does not (stats): a script reads counts, never sentences."""
+    """The JSON a CLI prints.
+
+    Every fact the renderer uses is here, plus the ones it does not (stats): a script reads
+    counts, never sentences.
+    """
     return {
         "kind": report.kind.value,
         "threshold": report.threshold,
         "spend_hit": report.spend_hit,
         "company": report.company,
         "found_but_known": report.found_but_known,
-        "saved": [job_to_dict(j) for j in report.saved],
+        "saved": [job_to_dict(job) for job in report.saved],
         "archive": asdict(report.archive) if report.archive is not None else None,
-        "stats": {k: asdict(v) for k, v in report.stats.items()}
+        "stats": {source: asdict(stat) for source, stat in report.stats.items()}
         if report.stats is not None
         else None,
         "warning": report.warning,

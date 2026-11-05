@@ -34,8 +34,10 @@ _ONSITE_KINDS = frozenset({"onsite", "hybrid"})
 
 
 def eligible_regions_from(profile: dict[str, Any]) -> tuple[str, ...]:
-    """`criteria.eligible_regions` as a tuple of non-empty strings. Absent, not a
-    list, or holding non-strings: those entries are unknown, never a default."""
+    """`criteria.eligible_regions` as a tuple of non-empty strings.
+
+    Absent, not a list, or holding non-strings: those entries are unknown, never a default.
+    """
     criteria = profile.get("criteria")
     regions = criteria.get("eligible_regions") if isinstance(criteria, dict) else None
     if not isinstance(regions, list):
@@ -45,8 +47,10 @@ def eligible_regions_from(profile: dict[str, Any]) -> tuple[str, ...]:
 
 @lru_cache(maxsize=32)
 def _region_pattern(regions: tuple[str, ...]) -> re.Pattern[str] | None:
-    """The profile's own words, escaped, matched as whole words (a lookaround
-    pair instead of \\b so a name ending in punctuation still matches)."""
+    r"""The profile's own words, escaped, matched as whole words.
+
+    A lookaround pair instead of \b so a name ending in punctuation still matches.
+    """
     if not regions:
         return None
     alternatives = "|".join(rf"(?<!\w){re.escape(region)}(?!\w)" for region in regions)
@@ -57,6 +61,7 @@ def classify_location(
     location: str | None,
     remote_type: str | None,
     home_city: str | None = None,
+    *,
     eligible_regions: Sequence[str] = (),
 ) -> Eligibility:
     """Classify a posting's structured location/remote_type against the rule above.
