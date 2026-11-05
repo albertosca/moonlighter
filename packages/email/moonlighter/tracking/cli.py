@@ -32,7 +32,7 @@ from moonlighter.core.cli import (
     doctor_payload,
     run,
 )
-from moonlighter.core.llm import make_caller
+from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.slices import slice_epilog
 from moonlighter.tracking.email_monitor import sync_responses
 from moonlighter.tracking.gmail_client import GmailAuthError

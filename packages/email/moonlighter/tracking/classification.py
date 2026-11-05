@@ -5,7 +5,8 @@ Classification of email responses via LLM.
 import logging
 from typing import Any
 
-from moonlighter.core.llm import LLMCaller, is_spend_limit
+from moonlighter.core.llm.caller import LLMCaller
+from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.parsing import parse_llm_json, wrap_untrusted
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class ClassificationError(Exception):
 
     Callers must NOT mark the message processed when this is raised — leave it
     for the next sync to retry. A spend-limit failure propagates unwrapped (see
-    ``moonlighter.core.llm.is_spend_limit``) so the caller can recognize it and
+    ``moonlighter.core.llm.spend_limit.is_spend_limit``) so the caller can recognize it and
     stop the loop instead of retrying every remaining message against a dead
     quota.
     """

@@ -30,7 +30,7 @@ from moonlighter.core.cli import (
     doctor_payload,
     run,
 )
-from moonlighter.core.llm import make_caller
+from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.slices import slice_epilog
 from moonlighter.discovery.results import ScanKind, ScanReport, scan_report_to_dict
 from moonlighter.discovery.service import NO_EVAL, scan_and_evaluate, scan_company

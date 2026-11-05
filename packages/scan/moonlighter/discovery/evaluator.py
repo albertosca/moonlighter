@@ -4,7 +4,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import yaml
-from moonlighter.core.llm import LLMCaller, is_spend_limit, make_api_caller
+from moonlighter.core.llm.anthropic_api import make_api_caller
+from moonlighter.core.llm.caller import LLMCaller
+from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.log import get_logger
 from moonlighter.core.metrics import record_spend_limit_hit
 from moonlighter.core.parsing import parse_llm_json, wrap_untrusted

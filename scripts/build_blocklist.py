@@ -33,7 +33,8 @@ from typing import Any
 from moonlighter.core.config.loading import load_config, load_profile
 from moonlighter.core.config.paths import moonlighter_home
 from moonlighter.core.db import Job, init_db
-from moonlighter.core.llm import LLMCaller, make_caller
+from moonlighter.core.llm.caller import LLMCaller
+from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.log import setup as setup_logging
 from moonlighter.core.metrics import operation_metrics
 from moonlighter.core.parsing import extract_json

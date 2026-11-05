@@ -22,7 +22,8 @@ from moonlighter.application.answers.needs_review import NEEDS_REVIEW_SENTINEL
 from moonlighter.application.answers.option_matcher import match_option_locally
 from moonlighter.application.answers.profile import profile_for_answers
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.core.llm import LLMCaller, is_spend_limit
+from moonlighter.core.llm.caller import LLMCaller
+from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.parsing import wrap_untrusted
 
 logger = logging.getLogger(__name__)

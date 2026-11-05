@@ -28,7 +28,7 @@ from moonlighter.core.email_alias import (
     is_email_label,
     new_email_ref,
 )
-from moonlighter.core.llm import make_caller
+from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.log import get_logger
 
 logger = get_logger(__name__)

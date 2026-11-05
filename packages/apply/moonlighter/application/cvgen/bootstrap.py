@@ -38,7 +38,8 @@ from moonlighter.application.cvgen.service import (
     resolved_template_dir,
     strip_marker_lines,
 )
-from moonlighter.core.llm import LLMCaller, is_spend_limit
+from moonlighter.core.llm.caller import LLMCaller
+from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.log import get_logger
 from moonlighter.core.parsing import parse_llm_json
 

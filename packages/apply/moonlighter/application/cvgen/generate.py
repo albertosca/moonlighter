@@ -10,7 +10,8 @@ from typing import Any, Final, Literal
 from moonlighter.application.answers.profile import profile_for_answers
 from moonlighter.application.cvgen.pool import CVPool
 from moonlighter.application.cvgen.render import CVSelection, is_typesettable
-from moonlighter.core.llm import LLMCaller, is_spend_limit
+from moonlighter.core.llm.caller import LLMCaller
+from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.log import get_logger
 from moonlighter.core.parsing import parse_llm_json, wrap_untrusted
 

@@ -7,15 +7,16 @@ test runs plain shell probes under the exact permission profile the backend
 passes, with no model involved.
 """
 
-import http.server
 import os
 import secrets
 import subprocess
-import threading
 from pathlib import Path
 
 import pytest
-from moonlighter.core.llm import _call_codex, _codex_permission_args, codex_executable
+from moonlighter.core.llm.codex import call_codex, codex_executable
+from moonlighter.core.llm.codex_profile import _codex_permission_args
+
+from tests.core.llm.canary_server import start_canary_server
 
 pytestmark = pytest.mark.e2e
 
@@ -32,22 +33,6 @@ def _require_codex() -> str:
     return executable
 
 
-def _start_canary_server(request_log: list[str]) -> http.server.HTTPServer:
-    class LoggingHandler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self) -> None:
-            request_log.append(self.path)
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"canary page")
-
-        def log_message(self, format: str, *arguments: object) -> None:
-            return
-
-    server = http.server.HTTPServer(("127.0.0.1", 0), LoggingHandler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    return server
-
-
 def test_codex_profile_confines_reads_writes_and_network(tmp_path):
     executable = _require_codex()
     auth_file = Path.home() / ".codex" / "auth.json"
@@ -59,7 +44,7 @@ def test_codex_profile_confines_reads_writes_and_network(tmp_path):
     outside.mkdir()
     (outside / "secret.txt").write_text(secrets.token_hex(16))
     request_log: list[str] = []
-    server = _start_canary_server(request_log)
+    server = start_canary_server(request_log)
     port = server.server_address[1]
     probe = (
         f"cat {workspace}/inside.txt >/dev/null; echo inside_read=$?; "
@@ -83,7 +68,7 @@ def test_codex_profile_confines_reads_writes_and_network(tmp_path):
     outcomes = dict(
         line.split("=", 1) for line in result.stdout.splitlines() if line.count("=") == 1
     )
-    print(result.stdout, result.stderr)
+    print(result.stdout, result.stderr)  # noqa: T201 - a live canary shows its raw output to whoever runs it with -s
     assert outcomes.get("inside_read") == "0", "positive control failed: the probe could not run"
     for denied in ("outside_read", "auth_read", "ssh_list", "write", "network"):
         assert outcomes.get(denied) not in (None, "0"), (denied, outcomes)
@@ -95,10 +80,10 @@ async def test_codex_call_answers_and_leaves_no_trace_of_the_prompt(tmp_path, mo
     _require_codex()
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     token = secrets.token_hex(16)
-    answer = await _call_codex(
+    answer = await call_codex(
         f"Reply with the single word OK and nothing else.\nreference: {token}", CODEX_MODEL
     )
-    print(answer)
+    print(answer)  # noqa: T201 - a live canary shows its raw output to whoever runs it with -s
     assert answer.strip(), "codex returned nothing: the run proves nothing"
     codex_home = Path.home() / ".codex"
     leaks = [

@@ -38,7 +38,7 @@ from moonlighter.core.cli import (
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.loading import load_config
 from moonlighter.core.ingest import job_from_url
-from moonlighter.core.llm import make_caller
+from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.slices import slice_epilog
 
 # A missing --paste path is a bad argument, not a crash -- run() maps it to

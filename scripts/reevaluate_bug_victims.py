@@ -29,7 +29,8 @@ from typing import Any
 
 from moonlighter.core.config.loading import load_config, load_profile
 from moonlighter.core.db import Job, init_db
-from moonlighter.core.llm import is_spend_limit, make_caller
+from moonlighter.core.llm.dispatch import make_caller
+from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.log import setup as setup_logging
 from moonlighter.core.metrics import operation_metrics
 from moonlighter.discovery.evaluator import evaluate_job, should_skip_by_title

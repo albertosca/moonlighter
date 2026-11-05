@@ -29,7 +29,8 @@ from moonlighter.core.config.paths import moonlighter_home, resolve_under_home
 from moonlighter.core.config.permissions import harden_permissions
 from moonlighter.core.config.validation import validate_config
 from moonlighter.core.db import Application, Job, init_db, sync_job_status
-from moonlighter.core.llm import LLMCaller, make_caller
+from moonlighter.core.llm.caller import LLMCaller
+from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.log import get_logger
 from moonlighter.core.log import setup as _setup_logging
 from moonlighter.core.metrics import operation_metrics

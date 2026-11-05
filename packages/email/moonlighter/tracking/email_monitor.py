@@ -10,7 +10,8 @@ import logging
 import re
 from typing import Any
 
-from moonlighter.core.llm import LLMCaller, is_spend_limit
+from moonlighter.core.llm.caller import LLMCaller
+from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.metrics import record_spend_limit_hit
 from moonlighter.tracking.classification import classify_response
 from moonlighter.tracking.gmail_client import (

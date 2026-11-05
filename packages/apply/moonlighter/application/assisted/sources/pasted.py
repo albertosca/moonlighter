@@ -10,7 +10,7 @@ from typing import Any
 
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sources.base import is_question, yes_no_for
-from moonlighter.core.llm import LLMCaller
+from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.parsing import parse_llm_json, wrap_untrusted
 
 _CHOICE_KINDS = frozenset({QuestionKind.SINGLE_SELECT, QuestionKind.MULTI_SELECT})
