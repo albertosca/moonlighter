@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 import build_blocklist
+import pytest
 
 
 def test_confirm_write_yes_returns_true():
@@ -82,3 +83,39 @@ async def test_run_dry_run_never_prompts_either(tmp_path, monkeypatch):
         await build_blocklist._run(3.0, None, True, "model", {}, {}, assume_yes=False)
 
     assert not (tmp_path / "blocklist_learned.yaml").exists()
+
+
+def test_load_learned_without_a_file_is_empty(tmp_path, monkeypatch):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+
+    assert build_blocklist._load_learned() == []
+
+
+@pytest.mark.parametrize("content", ["", "other_key: [x]\n"])
+def test_load_learned_tolerates_an_empty_file_and_a_missing_key(tmp_path, monkeypatch, content):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "blocklist_learned.yaml").write_text(content)
+
+    assert build_blocklist._load_learned() == []
+
+
+def test_save_learned_merges_without_duplicates_keeping_the_order(tmp_path, monkeypatch):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "blocklist_learned.yaml").write_text("title_blocklist:\n- b\n- a\n")
+
+    build_blocklist._save_learned(["c", "a", "c", "d"])
+
+    assert (tmp_path / "blocklist_learned.yaml").read_text() == (
+        "title_blocklist:\n- b\n- a\n- c\n- d\n"
+    )
+
+
+def test_save_learned_creates_the_home_directory(tmp_path, monkeypatch):
+    home = tmp_path / "missing" / "home"
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(home))
+
+    build_blocklist._save_learned(["ação"])
+
+    assert (home / "blocklist_learned.yaml").read_text(encoding="utf-8") == (
+        "title_blocklist:\n- ação\n"
+    )

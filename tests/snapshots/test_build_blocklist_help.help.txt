@@ -1,0 +1,30 @@
+usage: build_blocklist.py [-h] [--threshold THRESHOLD] [--dry-run]
+                          [--company COMPANY] [--yes]
+
+Analyzes low-scoring jobs and proposes AI-validated blocklist patterns.
+
+Workflow:
+  1. Fetches archived jobs with 0 < score <= threshold (genuinely evaluated)
+  2. Groups titles by company
+  3. For each company, asks LLM: "propose safe substrings to block"
+  4. LLM returns patterns with reasoning and safe=true/false flag
+  5. Approved patterns (safe=true) go to blocklist_learned.yaml
+  6. load_config() already merges the file into title_blocklist
+
+Usage:
+    python scripts/build_blocklist.py [--threshold 3.0] [--dry-run] [--company SLUG]
+
+Flags:
+    --threshold  Maximum score to consider a job as a candidate (default: 3.0)
+    --dry-run    Shows what would be added without writing to the file
+    --company    Process a single company
+
+options:
+  -h, --help            show this help message and exit
+  --threshold THRESHOLD
+                        Maximum score to consider (default: 3.0)
+  --dry-run             Do not write to the file
+  --company COMPANY     Process a single company
+  --yes, -y             Save approved patterns without asking for confirmation
+                        (S-10: by default, always confirm before merging into
+                        the real blocklist).

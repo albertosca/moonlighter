@@ -1,0 +1,31 @@
+usage: reevaluate_bug_victims.py [-h] [--dry-run] [--company COMPANY]
+                                 [--limit LIMIT] [--model MODEL]
+                                 [--title-only] [--concurrency CONCURRENCY]
+
+Re-evaluates jobs archived by the stdin bug (score_notes starts with
+'evaluation error: claude CLI exited with code 1').
+
+Uses eval_model from config (default: Haiku) to reduce cost.
+Applies title_blocklist from config before calling LLM — zero cost.
+
+Usage:
+    python scripts/reevaluate_bug_victims.py [--dry-run] [--company SLUG] [--limit N] [--model MODEL] [--title-only] [--concurrency N]
+
+Flags:
+    --dry-run       Shows what would be done without writing to the database.
+    --company       Filter by company (ex: --company nubank).
+    --limit         Process at most N jobs (useful for testing).
+    --model         Override eval_model from config.
+    --title-only    Send only the title to LLM (without full description). Much cheaper.
+    --concurrency N How many evaluations to run in parallel (default: 5).
+                    On first spend limit, stop everything immediately.
+
+options:
+  -h, --help            show this help message and exit
+  --dry-run             Do not write to the database
+  --company COMPANY     Filter by company
+  --limit LIMIT         Maximum jobs to process
+  --model MODEL         Override eval_model from config
+  --title-only          Use only the title (no description) — much cheaper
+  --concurrency CONCURRENCY
+                        Evaluations in parallel (default: 5)

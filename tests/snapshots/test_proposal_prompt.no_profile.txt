@@ -1,0 +1,32 @@
+You are building a job title blocklist for the candidate, a senior software engineer specializing in software engineering.
+
+The following job titles at **Acme** were evaluated and scored 3.0 or below out of 10 — meaning they are clearly irrelevant for them:
+
+- Office Manager
+- Recruiter Lead
+
+Your task: propose minimal, safe **substring patterns** (lowercase) to block future titles like these before they reach the LLM evaluator.
+
+A pattern is SAFE only if you are confident that **every possible job title containing it** would be irrelevant for a senior software engineer. When in doubt, mark safe=false.
+
+Examples of UNSAFE patterns (too broad):
+- "analista" alone → "analista de segurança" could be relevant
+- "gerente" alone → "Engineering Manager" might appear in PT-BR as "Gerente de Engenharia"
+- "especialista" alone → "Especialista de Plataforma" could be a tech role
+
+Examples of SAFE patterns:
+- "gerente de relacionamento" → always a banking relationship manager, never engineering
+- "banco de talentos" → always a talent pool post, not a real opening
+- "estagiár" → always an intern position
+
+Return a JSON array (no markdown):
+[
+  {
+    "pattern": "lowercase substring to match",
+    "examples": ["example title 1", "example title 2"],
+    "safe": true,
+    "reasoning": "one sentence explaining why all matching titles would be irrelevant"
+  }
+]
+
+Return [] if no safe patterns can be identified.
