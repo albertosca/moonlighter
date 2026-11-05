@@ -113,11 +113,6 @@ strict-checking = true
 # documentation, so the summary-line rule does not apply.
 "tests/*" = ["S101", "S105", "S106", "S108", "PLR2004", "ARG001", "ARG002", "ARG005", "SLF001", "D100", "D104", "D205"]
 
-# BEGIN ratchet
-# Files not yet migrated to the profile above (plan 2026-11-04, showcase quality).
-# Each task deletes its files' lines; the block is empty and removed at the end.
-# END ratchet
-
 [tool.moonlighter.file-length]
 # A file past `limit` is a module doing more than one thing (scripts/check_file_length.py).
 limit = 200
@@ -128,6 +123,8 @@ ceiling = 250
 [tool.complexipy]
 # Cognitive complexity per function: stricter than SonarQube's default (15) and
 # wemake-python-styleguide's (12). Nesting costs more than branching, which is the point.
+# CI repeats this value as `--max-complexity-allowed 10` (.github/workflows/ci.yml): the
+# two must agree, so change both together.
 max-complexity-allowed = 10
 
 [tool.coverage.run]
