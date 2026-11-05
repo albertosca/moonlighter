@@ -110,8 +110,6 @@ strict-checking = true
 # BEGIN ratchet
 # Files not yet migrated to the profile above (plan 2026-11-04, showcase quality).
 # Each task deletes its files' lines; the block is empty and removed at the end.
-"packages/apply/moonlighter/application/__init__.py" = ["D104"]
-"packages/apply/moonlighter/application/cli.py" = ["C901", "I001", "PLC0415", "PLR0912", "PLR0915"]
 "packages/email/moonlighter/tracking/__init__.py" = ["D104"]
 "packages/email/moonlighter/tracking/classification.py" = ["D200", "D205", "D209", "D212", "PLR0917"]
 "packages/email/moonlighter/tracking/cli.py" = ["PLC0415"]
@@ -133,7 +131,6 @@ strict-checking = true
 "scripts/render_diagrams.py" = ["ARG001", "D205"]
 "scripts/stamp_revision_dates.py" = ["D205"]
 "tests/_context.py" = ["PLC0415", "PLR0917"]
-"tests/application/test_cli.py" = ["PLC0415"]
 "tests/conftest.py" = ["PLC0415", "PLW0603"]
 "tests/scripts/test_build_blocklist.py" = ["FBT003", "PLC0415", "PLR0913", "PLR0917"]
 "tests/scripts/test_check_built_site.py" = ["PLC0415", "PT018"]
