@@ -1,6 +1,4 @@
-"""
-Classification of email responses via LLM.
-"""
+"""Classification of email responses via LLM."""
 
 import logging
 from typing import Any
@@ -13,8 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class ClassificationError(Exception):
-    """Raised when classify_response could not produce a real classification —
-    the LLM call raised, or the response could not be parsed.
+    """Raised when classify_response could not produce a real classification.
+
+    The LLM call raised, or the response could not be parsed.
 
     This exists to make a FAILED classification distinguishable from a successful
     classification of type == "unrelated": both used to fall through to
@@ -35,16 +34,19 @@ async def classify_response(
     message: dict[str, Any],
     stages: list[str],
     llm_caller: LLMCaller,
+    *,
     model: str = "claude-sonnet-4-6",
 ) -> dict[str, Any]:
-    """Classifies an email response via LLM. Returns dict with type, stage,
-    new_stage, company, job_title, summary.
+    """Classifies an email response via LLM.
+
+    Returns dict with type, stage, new_stage, company, job_title, summary.
 
     Raises ClassificationError if the LLM call failed or its response could not
     be parsed — never silently returns type='unrelated' for those cases (see
     ClassificationError's docstring for why). A spend-limit exception propagates
     unwrapped instead of becoming a ClassificationError, so the caller can tell
-    "quota exhausted" apart from an ordinary per-message failure."""
+    "quota exhausted" apart from an ordinary per-message failure.
+    """
     stages_text = ", ".join(stages)
     email_body = (
         f"From: {message.get('from_', '')}\n"

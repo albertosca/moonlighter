@@ -1,19 +1,21 @@
-"""
-Email monitor for job applications.
+"""Email monitor for job applications.
 
 Monitors the configured Gmail account, classifies replies with the LLM,
 and automatically updates the applications pipeline.
 """
 
-import datetime
 import logging
-import re
+from contextlib import suppress
+from dataclasses import dataclass
 from typing import Any
 
+from moonlighter.core.db import ProcessedEmail
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.metrics import record_spend_limit_hit
+from moonlighter.tracking.application_matching import extract_ref, resolve_application
 from moonlighter.tracking.classification import classify_response
+from moonlighter.tracking.funnel import advance_application
 from moonlighter.tracking.gmail_client import (
     _get_or_create_label,
     archive_message,
@@ -22,285 +24,170 @@ from moonlighter.tracking.gmail_client import (
     parse_message,
     setup_gmail_service,
 )
+from moonlighter.tracking.interview_stages import register_new_stage
+from moonlighter.tracking.sync_report import make_suggestion, make_update
 
 logger = logging.getLogger(__name__)
 
-# Canonical funnel progression order — the status only ever moves forward, never back.
-_STATUS_ORDER = ["draft", "submitted", "screening", "interviews", "offer", "rejected"]
-_ACTIVE_STATUSES = ["submitted", "screening", "interviews", "offer"]
-
-_TYPE_TO_STATUS = {
-    "screening": "screening",
-    "interview": "interviews",
-    "offer": "offer",
-    "rejection": "rejected",
-    # acknowledgement, info_request and unrelated → keeps the current status
-}
+_DEFAULT_MODEL = "claude-sonnet-4-6"
 
 
-def extract_ref(to_field: str, base_address: str) -> str | None:
-    """Extracts the ref from a Gmail (+ref) alias in the To field.
+@dataclass(frozen=True)
+class _SyncSettings:
+    """What one sync reads from the config, with the one stage list every message shares."""
 
-    "you+x7k2mp@gmail.com" → "x7k2mp"
-    None if there's no alias or it doesn't match base_address."""
-    if not to_field:
-        return None
+    email_config: dict[str, Any]
+    base_address: str
+    stages: list[str]
+    model: str
+    archive_all: bool
+    archive_reference_matched: bool
 
-    local, _, domain = base_address.partition("@")
-    for part in re.split(r",\s*", to_field):  # the To field can have multiple addresses
-        match = re.search(r"<([^>]+)>", part)  # "Name <email>" → "email"
-        address = match.group(1).strip() if match else part.strip()
 
-        address_local, _, address_domain = address.partition("@")
-        if address_domain.lower() != domain.lower() or "+" not in address_local:
-            continue
-        base_local, _, reference = address_local.partition("+")
-        if base_local.lower() == local.lower() and reference:
-            return reference
+@dataclass(frozen=True)
+class _GmailHandles:
+    """The Gmail resource, and the processed label when the operator opted into writes."""
 
-    return None
+    service: Any
+    mutate_gmail: bool
+    label_id: str | None
+
+
+class _SpendLimitReachedError(Exception):
+    """Stops the sync: the quota is spent, so the rest of the batch waits for the next run."""
 
 
 # ── Sync: reads, classifies, and updates the pipeline ───────────────────────
 
 
 async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[dict[str, Any]]:
-    """Orchestrates the full flow: reads recent emails, classifies them, and updates
-    the database. Returns the list of updates made."""
-    from moonlighter.core.db import ProcessedEmail
+    """Orchestrates the full flow: reads recent emails, classifies them, and updates the database.
 
+    Returns the list of updates made.
+    """
     service = setup_gmail_service(config)
     email_config = config["email"]
-    base_address = email_config["address"]
-    stages = list(email_config.get("interview_stages", []))
-    model = config.get("llm_model", "claude-sonnet-4-6")
-
-    # The sync is 100% READ-ONLY on Gmail by default: dedup lives in a local table
-    # (ProcessedEmail). Only writes to Gmail (read + label) if mark_processed=True.
-    mutate_gmail = bool(email_config.get("mark_processed", False))
-    archive_all = bool(email_config.get("archive_all_classified", False))
-    # Layer two is a superset of layer one by design.
-    archive_reference_matched = archive_all or bool(email_config.get("archive_ref_matched", False))
-    label_name = email_config.get("processed_label", "moonlighter/processed")
-    label_id = _get_or_create_label(service, label_name) if mutate_gmail else None
-
-    def mark_done(message_id: str) -> None:
-        ProcessedEmail.get_or_create(message_id=message_id)
-        if mutate_gmail and label_id:
-            mark_processed(service, message_id, label_id)
-
-    def maybe_archive(message_id: str, eligible: bool) -> None:
-        """A Gmail archive failure must never cost the pipeline update that
-        already applied — warn and move on."""
-        if not eligible:
-            return
-        try:
-            archive_message(service, message_id)
-        except Exception as error:
-            logger.warning("sync_responses: could not archive %s — %s", message_id, error)
+    settings = _read_settings(config, email_config)
+    gmail = _gmail_handles(service, email_config)
 
     updates = []
-    for message_reference in fetch_recent_messages(
-        service, int(email_config.get("lookback_days", 30))
-    ):
-        message_id = message_reference["id"]
-        if ProcessedEmail.select().where(ProcessedEmail.message_id == message_id).exists():
-            continue  # already processed in a previous run — don't re-call the LLM
-
-        message = parse_message(service, message_id)
-        try:
-            classification = await classify_response(message, stages, llm_caller, model)
-        except Exception as error:
-            if is_spend_limit(error):
-                record_spend_limit_hit()
-                logger.warning(
-                    "sync_responses: spend limit hit while classifying %s — stopping sync "
-                    "early, leaving it and the rest of this batch unprocessed for the next run",
-                    message_id,
-                )
-                break
-            logger.warning(
-                "sync_responses: classification failed for %s — leaving it unprocessed "
-                "for the next run: %s",
-                message_id,
-                error,
+    with suppress(_SpendLimitReachedError):
+        for message_reference in fetch_recent_messages(
+            service, int(email_config.get("lookback_days", 30))
+        ):
+            update = await _sync_message(
+                message_reference["id"], gmail, settings, llm_caller=llm_caller
             )
-            continue  # NOT mark_done: a failed classification must not burn the message
-
-        if classification["type"] == "unrelated":
-            mark_done(message_id)
-            continue
-
-        reference = extract_ref(message["to"], base_address)
-        app, match_type = _resolve_application(reference, classification)
-        if app is not None and match_type == "ref":
-            _register_new_stage(classification.get("new_stage"), stages, email_config)
-            advanced = _advance_application(app, classification, match_type, stages)
-            updates.append(_make_update(classification, match_type, app, status_advanced=advanced))
-            maybe_archive(message_id, archive_reference_matched)
-        elif app is not None:  # match_type == "fuzzy" — suggestion only (S-06)
-            updates.append(_make_suggestion(app, classification, match_type))
-            maybe_archive(message_id, archive_all)
-        else:
-            updates.append(_make_update(classification, "uncertain"))
-            maybe_archive(message_id, archive_all)
-        mark_done(message_id)
+            if update is not None:
+                updates.append(update)
 
     return updates
 
 
-_MAX_STAGE_LEN = 40
-_MAX_STAGES = 40
+def _read_settings(config: dict[str, Any], email_config: dict[str, Any]) -> _SyncSettings:
+    archive_all = bool(email_config.get("archive_all_classified", False))
+    return _SyncSettings(
+        email_config=email_config,
+        base_address=email_config["address"],
+        stages=list(email_config.get("interview_stages", [])),
+        model=config.get("llm_model", _DEFAULT_MODEL),
+        archive_all=archive_all,
+        # Layer two is a superset of layer one by design.
+        archive_reference_matched=archive_all
+        or bool(email_config.get("archive_ref_matched", False)),
+    )
 
-_STAGE_ALLOWED = re.compile(r"[^a-z0-9]+")
+
+def _gmail_handles(service: Any, email_config: dict[str, Any]) -> _GmailHandles:
+    # The sync is 100% READ-ONLY on Gmail by default: dedup lives in a local table
+    # (ProcessedEmail). Only writes to Gmail (read + label) if mark_processed=True.
+    mutate_gmail = bool(email_config.get("mark_processed", False))
+    label_name = email_config.get("processed_label", "moonlighter/processed")
+    label_id = _get_or_create_label(service, label_name) if mutate_gmail else None
+    return _GmailHandles(service=service, mutate_gmail=mutate_gmail, label_id=label_id)
 
 
-def _sanitize_stage(raw: str | None) -> str | None:
-    """Normalize an LLM-proposed stage to a bounded ``[a-z0-9_]`` slug.
+async def _sync_message(
+    message_id: str, gmail: _GmailHandles, settings: _SyncSettings, *, llm_caller: LLMCaller
+) -> dict[str, Any] | None:
+    """Classifies one message and applies it; returns its report entry, or None when it has none."""
+    if ProcessedEmail.select().where(ProcessedEmail.message_id == message_id).exists():
+        return None  # already processed in a previous run — don't re-call the LLM
 
-    An email is untrusted input: a prompt-injected classification can propose an
-    arbitrary ``new_stage``. Reducing it to a lowercase snake_case slug of at most
-    ``_MAX_STAGE_LEN`` chars strips special characters and bounds length, so a
-    persisted stage cannot carry a payload back into a later prompt. Snake_case
-    matches this project's stage naming convention (e.g. ``phone_screening``),
-    so a newly registered stage matches the same email's ``stage`` value. Returns
-    ``None`` when nothing usable remains or the slug is over-length.
-    """
-    if not raw:
+    message = parse_message(gmail.service, message_id)
+    classification = await _classify(message_id, message, settings, llm_caller=llm_caller)
+    if classification is None:
         return None
-    slug = _STAGE_ALLOWED.sub("_", raw.lower()).strip("_")
-    if not slug or len(slug) > _MAX_STAGE_LEN:
+
+    if classification["type"] == "unrelated":
+        _mark_done(gmail, message_id)
         return None
-    return slug
 
-
-def _register_new_stage(
-    new_stage: str | None, stages: list[str], email_config: dict[str, Any]
-) -> None:
-    """Learn a novel stage proposed by the LLM, persisting it to the in-memory config.
-
-    The candidate is sanitized to a bounded slug (untrusted email input) and only
-    registered while the stage list is below ``_MAX_STAGES``, so a hostile email
-    cannot inject arbitrary text or grow the config without bound.
-    """
-    slug = _sanitize_stage(new_stage)
-    if slug is None or slug in stages or len(stages) >= _MAX_STAGES:
-        return
-    stages.append(slug)
-    email_config["interview_stages"] = stages
-
-
-def _advance_application(
-    app: Any, classification: dict[str, Any], match_type: str, stages: list[str]
-) -> bool:
-    """Advances the Application through the funnel (forward only) and notes
-    the event. Returns whether the status actually moved forward.
-
-    current_stage is only written if the value is in the list of known stages
-    (which already includes any new_stage legitimately registered by
-    _register_new_stage BEFORE this call) — a stage outside that list is
-    hallucination/injection and is silently discarded (S-05)."""
-    new_status = _TYPE_TO_STATUS.get(classification["type"])
-    advanced = new_status is not None and _status_rank(new_status) > _status_rank(app.status)
-    if advanced:
-        app.status = new_status
-    stage = classification.get("stage")
-    if stage and stage in stages:
-        app.current_stage = stage
-
-    today = datetime.date.today().strftime("%Y-%m-%d")
-    summary = classification.get("summary", "")
-    note = f"[{today}] {classification['type']}: {summary} (match: {match_type})"
-    app.notes = f"{app.notes}\n{note}" if app.notes else note
-    from moonlighter.core.db import sync_job_status
-
-    app.updated_at = datetime.datetime.now()
-    app.save()
-    sync_job_status(app)
-    return advanced
-
-
-def _make_update(
-    classification: dict[str, Any],
-    match_type: str,
-    app: Any = None,
-    status_advanced: bool = False,
-) -> dict[str, Any]:
-    # A ref match already knows the exact Job; the classifier's reading of the
-    # email (which rarely repeats the title) is only the fallback.
-    #
-    # job_id/status_advanced exist for the composition root: this package may
-    # not import the answer bank (moonlighter-email depends on core alone), so
-    # promotion happens in server.py and this is all it has to go on.
-    job = getattr(app, "job", None)
-    return {
-        "job_id": getattr(app, "job_id", None),
-        "status_advanced": status_advanced,
-        "company": (job.company if job else None) or classification.get("company"),
-        "title": (job.title if job else None) or classification.get("job_title"),
-        "type": classification["type"],
-        "stage": classification.get("stage"),
-        "match_type": match_type,
-        "summary": classification.get("summary", ""),
-    }
-
-
-def _make_suggestion(app: Any, classification: dict[str, Any], match_type: str) -> dict[str, Any]:
-    """Fuzzy-match suggestion — never mutates the Application, only signals
-    for human review via update_status (S-06)."""
-    update = _make_update(classification, match_type)
-    update["suggested_job_id"] = app.job_id
-    update["needs_confirmation"] = True
+    update, archivable = _apply_reply(message, classification, settings)
+    _archive(gmail, message_id, eligible=archivable)
+    _mark_done(gmail, message_id)
     return update
 
 
-def _status_rank(status: str) -> int:
+async def _classify(
+    message_id: str, message: dict[str, Any], settings: _SyncSettings, *, llm_caller: LLMCaller
+) -> dict[str, Any] | None:
+    """The classification, or None to leave the message for the next run.
+
+    Raises _SpendLimitReachedError when the quota is spent, which stops the sync.
+    """
     try:
-        return _STATUS_ORDER.index(status)
-    except ValueError:
-        return -1
+        return await classify_response(message, settings.stages, llm_caller, model=settings.model)
+    except Exception as error:  # any classification failure leaves the message for the next run
+        if is_spend_limit(error):
+            record_spend_limit_hit()
+            logger.warning(
+                "sync_responses: spend limit hit while classifying %s — stopping sync "
+                "early, leaving it and the rest of this batch unprocessed for the next run",
+                message_id,
+            )
+            raise _SpendLimitReachedError from error
+        logger.warning(
+            "sync_responses: classification failed for %s — leaving it unprocessed "
+            "for the next run: %s",
+            message_id,
+            error,
+        )
+        return None  # NOT mark_done: a failed classification must not burn the message
 
 
-def _resolve_application(reference: str | None, classification: dict[str, Any]) -> tuple[Any, str]:
-    """Finds the matching Application, by ref (exact) or company+title
-    (fuzzy). Returns (Application | None, 'ref' | 'fuzzy' | 'uncertain')."""
-    if reference:
-        app = _match_by_ref(reference)
-        if app is not None:
-            return app, "ref"
-
-    app = _match_by_company_title(classification.get("company"), classification.get("job_title"))
-    if app is not None:
-        return app, "fuzzy"
-    return None, "uncertain"
-
-
-def _match_by_ref(reference: str) -> Any:
-    from moonlighter.core.db import Application
-    from peewee import fn
-
-    # Refs minted before 2026-08-06 are mixed case, and providers lowercase the local
-    # part on the way back, so both sides are folded rather than the column migrated.
-    return Application.get_or_none(fn.LOWER(Application.email_ref) == reference.lower())
+def _apply_reply(
+    message: dict[str, Any], classification: dict[str, Any], settings: _SyncSettings
+) -> tuple[dict[str, Any], bool]:
+    """Applies a classified reply to its application; returns its entry and whether to archive."""
+    reference = extract_ref(message["to"], settings.base_address)
+    application, match_type = resolve_application(reference, classification)
+    if application is not None and match_type == "ref":
+        register_new_stage(classification.get("new_stage"), settings.stages, settings.email_config)
+        advanced = advance_application(
+            application, classification, match_type, stages=settings.stages
+        )
+        update = make_update(classification, match_type, application, status_advanced=advanced)
+        return update, settings.archive_reference_matched
+    if application is not None:  # match_type == "fuzzy" — suggestion only (S-06)
+        return make_suggestion(application, classification, match_type), settings.archive_all
+    return make_update(classification, "uncertain"), settings.archive_all
 
 
-def _match_by_company_title(company: str | None, job_title: str | None) -> Any:
-    """Fuzzy match among active applications. Returns the single Application, or None
-    when there's no candidate or it's ambiguous (>1 — can't decide)."""
-    if not (company or job_title):
-        return None
+def _archive(gmail: _GmailHandles, message_id: str, *, eligible: bool) -> None:
+    """A Gmail archive failure must never cost the pipeline update that already applied.
 
-    from moonlighter.core.db import Application, Job
+    Warn and move on.
+    """
+    if not eligible:
+        return
+    try:
+        archive_message(gmail.service, message_id)
+    except Exception as error:  # noqa: BLE001 - an archive failure must not stop the sync; the message is still recorded
+        logger.warning("sync_responses: could not archive %s — %s", message_id, error)
 
-    query = (
-        Application.select(Application, Job)
-        .join(Job)
-        .where(Application.status.in_(_ACTIVE_STATUSES))
-    )
-    if company:
-        query = query.where(Job.company ** f"%{company}%")
-    if job_title:
-        query = query.where(Job.title ** f"%{job_title}%")
 
-    results = list(query)
-    return results[0] if len(results) == 1 else None
+def _mark_done(gmail: _GmailHandles, message_id: str) -> None:
+    ProcessedEmail.get_or_create(message_id=message_id)
+    if gmail.mutate_gmail and gmail.label_id:
+        mark_processed(gmail.service, message_id, gmail.label_id)

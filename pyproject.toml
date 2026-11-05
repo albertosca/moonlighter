@@ -111,9 +111,7 @@ strict-checking = true
 # Files not yet migrated to the profile above (plan 2026-11-04, showcase quality).
 # Each task deletes its files' lines; the block is empty and removed at the end.
 "packages/email/moonlighter/tracking/__init__.py" = ["D104"]
-"packages/email/moonlighter/tracking/classification.py" = ["D200", "D205", "D209", "D212", "PLR0917"]
 "packages/email/moonlighter/tracking/cli.py" = ["PLC0415"]
-"packages/email/moonlighter/tracking/email_monitor.py" = ["BLE001", "C901", "D205", "D209", "D212", "DTZ005", "DTZ011", "FBT001", "FBT002", "I001", "ICN001", "PLC0415", "PLR0915", "PLR0917"]
 "packages/email/moonlighter/tracking/gmail_client.py" = ["BLE001", "C901", "D200", "D205", "D209", "D212"]
 "packages/email/moonlighter/tracking/register.py" = ["D205", "DTZ005", "ICN001"]
 "packages/full/moonlighter/_tool_logging.py" = ["D205"]

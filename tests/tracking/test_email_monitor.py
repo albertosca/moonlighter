@@ -104,14 +104,14 @@ def test_a_stored_mixed_case_ref_matches_whatever_case_the_reply_carries(
 ):
     # The refs already in the database were minted in mixed case; a reply arriving
     # lowercased must still find them, or the alias mechanism is decorative.
-    from moonlighter.tracking.email_monitor import _match_by_ref
+    from moonlighter.tracking.application_matching import _match_by_ref
 
     app = application_factory(email_ref="Nt7eig")
     assert _match_by_ref(looked_up).id == app.id
 
 
 def test_an_unknown_ref_still_matches_nothing(application_factory):
-    from moonlighter.tracking.email_monitor import _match_by_ref
+    from moonlighter.tracking.application_matching import _match_by_ref
 
     application_factory(email_ref="Nt7eig")
     assert _match_by_ref("zzzzzz") is None
@@ -122,52 +122,52 @@ def test_an_unknown_ref_still_matches_nothing(application_factory):
 
 class TestExtractRef:
     def test_alias_with_ref_returns_ref(self):
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "candidaturas+x7k2mp@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) == "x7k2mp"
 
     def test_no_alias_returns_none(self):
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         assert extract_ref(BASE_EMAIL, BASE_EMAIL) is None
 
     def test_empty_string_returns_none(self):
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         assert extract_ref("", BASE_EMAIL) is None
 
     def test_unrelated_address_returns_none(self):
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         assert extract_ref("other@example.com", BASE_EMAIL) is None
 
     def test_strips_display_name(self):
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "Alberto <candidaturas+abc123@gmail.com>"
         assert extract_ref(to_header, BASE_EMAIL) == "abc123"
 
     def test_multiple_recipients_finds_alias(self):
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "hr@acme.com, candidaturas+zz9900@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) == "zz9900"
 
     def test_base_address_without_plus_returns_none(self):
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "candidaturas@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) is None
 
     def test_different_domain_returns_none(self):
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "candidaturas+ref123@hotmail.com"
         assert extract_ref(to_header, BASE_EMAIL) is None
 
     def test_ref_with_special_chars_in_urlsafe_b64(self):
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "candidaturas+Ab-_12@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) == "Ab-_12"
@@ -176,25 +176,25 @@ class TestExtractRef:
         """Documents the actual partition behavior: only the FIRST '+' splits
         local-part from ref, so a second '+' becomes part of the ref value
         itself rather than being treated as a delimiter."""
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "candidaturas+ref+extra@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) == "ref+extra"
 
     def test_uppercase_local_and_domain_still_matches(self):
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "CANDIDATURAS+REF123@GMAIL.COM"
         assert extract_ref(to_header, BASE_EMAIL) == "REF123"
 
     def test_leading_trailing_whitespace_around_address_is_tolerated(self):
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "   candidaturas+ws001@gmail.com   "
         assert extract_ref(to_header, BASE_EMAIL) == "ws001"
 
     def test_whitespace_inside_angle_brackets_is_tolerated(self):
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "Alberto < candidaturas+ab001@gmail.com >"
         assert extract_ref(to_header, BASE_EMAIL) == "ab001"
@@ -205,7 +205,7 @@ class TestExtractRef:
         callers only ever use it for an EXACT equality lookup against
         Application.email_ref (see _match_by_ref) — never interpolated into a
         query or command, so there is no injection surface here."""
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "candidaturas+'; DROP TABLE apps;--@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) == "'; DROP TABLE apps;--"
@@ -215,7 +215,7 @@ class TestExtractRef:
         security property extract_ref exists for (S-06: unspoofable +ref
         signal) requires the domain comparison to_header be an exact match, not a
         suffix/substring check."""
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "candidaturas+ref@gmail.com.evil.com"
         assert extract_ref(to_header, BASE_EMAIL) is None
@@ -224,13 +224,13 @@ class TestExtractRef:
         """An attacker-chosen local part that merely CONTAINS the real local
         part is not a match — comparison is on the full local part before '+',
         not a substring/suffix check."""
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "evilcandidaturas+ref@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) is None
 
     def test_none_to_field_returns_none(self):
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         assert extract_ref(None, BASE_EMAIL) is None  # type: ignore[arg-type]
 
@@ -238,7 +238,7 @@ class TestExtractRef:
         """Multiple recipients could, in principle, both match the base
         address with different refs (e.g. forwarded/CC'd copies) — the first
         one found in iteration order is returned, deterministically."""
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = "candidaturas+first@gmail.com, candidaturas+second@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) == "first"
@@ -259,7 +259,7 @@ class TestExtractRef:
         """Property: for any To-field that does not contain a genuine alias of
         base_address, extract_ref must return None — never fabricate a ref
         from an unrelated address. This is the core anti-spoofing guarantee."""
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         assert extract_ref(to_header, BASE_EMAIL) is None
 
@@ -268,7 +268,7 @@ class TestExtractRef:
         """Property: for a well-formed alias of base_address, extract_ref
         recovers exactly the ref that was embedded — no truncation, no
         mangling, for a range of ref shapes."""
-        from moonlighter.tracking.email_monitor import extract_ref
+        from moonlighter.tracking.application_matching import extract_ref
 
         to_header = f"candidaturas+{reference}@gmail.com"
         assert extract_ref(to_header, BASE_EMAIL) == reference
@@ -626,80 +626,80 @@ class TestPromptInjectionHardening:
 
 class TestSanitizeStage:
     def test_none_and_empty_return_none(self):
-        from moonlighter.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.interview_stages import _sanitize_stage
 
         assert _sanitize_stage(None) is None
         assert _sanitize_stage("") is None
         assert _sanitize_stage("   ") is None
 
     def test_normalizes_to_slug(self):
-        from moonlighter.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.interview_stages import _sanitize_stage
 
         assert _sanitize_stage("Technical Screen") == "technical_screen"
         assert _sanitize_stage("  Final   Round  ") == "final_round"
 
     def test_strips_disallowed_chars(self):
-        from moonlighter.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.interview_stages import _sanitize_stage
 
         # Injection payload collapses to an inert bounded slug.
         # Special chars like <>, {}, : are replaced with underscores; alphanumeric chars survive.
         assert _sanitize_stage("IGNORE ALL: <b>{instructions}</b>") == "ignore_all_b_instructions_b"
 
     def test_collapses_and_trims_underscores(self):
-        from moonlighter.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.interview_stages import _sanitize_stage
 
         assert _sanitize_stage("--a__b!!c--") == "a_b_c"
 
     def test_over_length_rejected(self):
-        from moonlighter.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.interview_stages import _sanitize_stage
 
         assert _sanitize_stage("x" * 41) is None
 
     def test_at_length_limit_accepted(self):
-        from moonlighter.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.interview_stages import _sanitize_stage
 
         assert _sanitize_stage("x" * 40) == "x" * 40
 
     def test_all_disallowed_returns_none(self):
-        from moonlighter.tracking.email_monitor import _sanitize_stage
+        from moonlighter.tracking.interview_stages import _sanitize_stage
 
         assert _sanitize_stage("!@#$%^&*()") is None
 
 
 class TestRegisterNewStageBounds:
     def test_registers_sanitized_slug_not_raw(self):
-        from moonlighter.tracking.email_monitor import _register_new_stage
+        from moonlighter.tracking.interview_stages import register_new_stage
 
         stages = ["applied"]
         email_config: dict = {}
-        _register_new_stage("Technical Screen", stages, email_config)
+        register_new_stage("Technical Screen", stages, email_config)
         assert stages == ["applied", "technical_screen"]
         assert email_config["interview_stages"] == ["applied", "technical_screen"]
 
     def test_rejects_unsanitizable(self):
-        from moonlighter.tracking.email_monitor import _register_new_stage
+        from moonlighter.tracking.interview_stages import register_new_stage
 
         stages = ["applied"]
         email_config: dict = {}
-        _register_new_stage("!@#$", stages, email_config)
+        register_new_stage("!@#$", stages, email_config)
         assert stages == ["applied"]
         assert "interview_stages" not in email_config
 
     def test_does_not_duplicate_after_sanitize(self):
-        from moonlighter.tracking.email_monitor import _register_new_stage
+        from moonlighter.tracking.interview_stages import register_new_stage
 
         stages = ["technical_screen"]
         email_config: dict = {}
-        _register_new_stage("Technical  Screen", stages, email_config)
+        register_new_stage("Technical  Screen", stages, email_config)
         assert stages == ["technical_screen"]
 
     def test_count_cap_blocks_further_growth(self):
-        from moonlighter.tracking.email_monitor import _MAX_STAGES, _register_new_stage
+        from moonlighter.tracking.interview_stages import _MAXIMUM_STAGES, register_new_stage
 
-        stages = [f"s{index}" for index in range(_MAX_STAGES)]
+        stages = [f"s{index}" for index in range(_MAXIMUM_STAGES)]
         email_config: dict = {}
-        _register_new_stage("new-one", stages, email_config)
-        assert len(stages) == _MAX_STAGES
+        register_new_stage("new-one", stages, email_config)
+        assert len(stages) == _MAXIMUM_STAGES
         assert "new-one" not in stages
 
 
@@ -2133,7 +2133,7 @@ class TestSyncResponses:
         assert app_refreshed.current_stage is None  # the made-up stage is discarded
 
     async def test_legitimately_registered_new_stage_is_accepted(self, temporary_database):
-        """A declared new_stage (registered via _register_new_stage BEFORE
+        """A declared new_stage (registered via register_new_stage BEFORE
         _advance_application runs) must be accepted — it's not hallucination,
         it's a deliberate feature."""
         init_db()
@@ -2468,9 +2468,9 @@ class TestSyncResponses:
         even when the LLM volunteers a stage/new_stage alongside
         'acknowledgement', which real ATS receipts sometimes do. This holds
         only because classify_response's _classification_from strips
-        stage/new_stage for acknowledgement BEFORE _register_new_stage and
+        stage/new_stage for acknowledgement BEFORE register_new_stage and
         _advance_application run in sync_responses; if that stripping ever
-        regressed, _register_new_stage would register the volunteered stage as
+        regressed, register_new_stage would register the volunteered stage as
         legitimately new, and _advance_application would then find it 'known'
         and write it to current_stage. That coupling was previously untested —
         this is the test that would catch a regression in it."""
@@ -2631,7 +2631,7 @@ class TestSyncResponses:
 
 def test_extract_ref_skips_wrong_base_with_plus():
     """Address with +ref but a different base → continues and returns None (84->loop)."""
-    from moonlighter.tracking.email_monitor import extract_ref
+    from moonlighter.tracking.application_matching import extract_ref
 
     assert extract_ref("someoneelse+abc@gmail.com", BASE_EMAIL) is None
 
@@ -2731,7 +2731,7 @@ def test_get_or_create_label_creates_when_missing():
 
 
 def test_an_acknowledgement_maps_to_no_status_change():
-    from moonlighter.tracking.email_monitor import _TYPE_TO_STATUS
+    from moonlighter.tracking.funnel import _TYPE_TO_STATUS
 
     # Absence here is the behaviour, so it gets a test — otherwise someone "completes"
     # the dict later and receipts start advancing applications again.
@@ -2743,7 +2743,7 @@ def test_an_acknowledgement_maps_to_no_status_change():
 
 
 def test_status_rank_unknown_returns_minus_one():
-    from moonlighter.tracking.email_monitor import _status_rank
+    from moonlighter.tracking.funnel import _status_rank
 
     assert _status_rank("status_inexistente") == -1
 
@@ -2759,7 +2759,7 @@ class TestMatchByCompanyTitle:
 
     def test_exact_single_match_returns_application(self, temporary_database):
         init_db()
-        from moonlighter.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.application_matching import _match_by_company_title
 
         job = _make_job(temporary_database, company="Anthropic", title="Senior Engineer")
         app = _make_application(job, status="submitted")
@@ -2770,7 +2770,7 @@ class TestMatchByCompanyTitle:
 
     def test_no_match_returns_none(self, temporary_database):
         init_db()
-        from moonlighter.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.application_matching import _match_by_company_title
 
         job = _make_job(temporary_database, company="Anthropic", title="Senior Engineer")
         _make_application(job, status="submitted")
@@ -2783,7 +2783,7 @@ class TestMatchByCompanyTitle:
         picking either one at random would risk mutating the WRONG
         application's status/notes."""
         init_db()
-        from moonlighter.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.application_matching import _match_by_company_title
 
         job1 = _make_job(
             temporary_database, company="Stripe", title="Engineer", url="https://x.com/a"
@@ -2798,7 +2798,7 @@ class TestMatchByCompanyTitle:
 
     def test_both_none_returns_none_without_querying(self, temporary_database):
         init_db()
-        from moonlighter.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.application_matching import _match_by_company_title
 
         job = _make_job(temporary_database, company="Anthropic", title="Senior Engineer")
         _make_application(job, status="submitted")
@@ -2807,7 +2807,7 @@ class TestMatchByCompanyTitle:
 
     def test_case_insensitive_company_match(self, temporary_database):
         init_db()
-        from moonlighter.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.application_matching import _match_by_company_title
 
         job = _make_job(temporary_database, company="Anthropic", title="Senior Engineer")
         app = _make_application(job, status="submitted")
@@ -2819,7 +2819,7 @@ class TestMatchByCompanyTitle:
     def test_partial_substring_match(self, temporary_database):
         """Matching uses LIKE %term% — a partial title still matches."""
         init_db()
-        from moonlighter.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.application_matching import _match_by_company_title
 
         job = _make_job(temporary_database, company="Anthropic", title="Senior Backend Engineer")
         app = _make_application(job, status="submitted")
@@ -2830,7 +2830,7 @@ class TestMatchByCompanyTitle:
 
     def test_only_company_given_filters_by_company_alone(self, temporary_database):
         init_db()
-        from moonlighter.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.application_matching import _match_by_company_title
 
         job = _make_job(temporary_database, company="Anthropic", title="Senior Engineer")
         app = _make_application(job, status="submitted")
@@ -2841,7 +2841,7 @@ class TestMatchByCompanyTitle:
 
     def test_only_title_given_filters_by_title_alone(self, temporary_database):
         init_db()
-        from moonlighter.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.application_matching import _match_by_company_title
 
         job = _make_job(temporary_database, company="Anthropic", title="Staff Platform Engineer")
         app = _make_application(job, status="submitted")
@@ -2855,7 +2855,7 @@ class TestMatchByCompanyTitle:
         match target — only _ACTIVE_STATUSES are eligible, so a stale/closed
         application can't get reopened by a coincidental company+title hit."""
         init_db()
-        from moonlighter.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.application_matching import _match_by_company_title
 
         job = _make_job(temporary_database, company="Anthropic", title="Senior Engineer")
         _make_application(job, status="rejected")
@@ -2867,7 +2867,7 @@ class TestMatchByCompanyTitle:
         """A rejected duplicate for the same company+title must not make an
         otherwise-unique active match look ambiguous."""
         init_db()
-        from moonlighter.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.application_matching import _match_by_company_title
 
         job = _make_job(temporary_database, company="Anthropic", title="Senior Engineer")
         _make_application(job, status="rejected")
@@ -2881,7 +2881,7 @@ class TestMatchByCompanyTitle:
         """Same company, two different active roles, no job_title given to
         disambiguate → None, not an arbitrary pick."""
         init_db()
-        from moonlighter.tracking.email_monitor import _match_by_company_title
+        from moonlighter.tracking.application_matching import _match_by_company_title
 
         job1 = _make_job(
             temporary_database, company="Anthropic", title="Backend Engineer", url="https://x/1"
@@ -2901,9 +2901,9 @@ class TestMatchByCompanyTitle:
 def test_resolve_application_ref_no_match_falls_through(temporary_database):
     """ref given but no Application → DoesNotExist swallowed, falls through to fuzzy (422-423)."""
     init_db()
-    from moonlighter.tracking.email_monitor import _resolve_application
+    from moonlighter.tracking.application_matching import resolve_application
 
-    app, match = _resolve_application("nonexistent_ref", {"company": None, "job_title": None})
+    app, match = resolve_application("nonexistent_ref", {"company": None, "job_title": None})
     assert app is None
     assert match == "uncertain"
 
@@ -2911,11 +2911,11 @@ def test_resolve_application_ref_no_match_falls_through(temporary_database):
 def test_resolve_application_fuzzy_by_title_only(temporary_database):
     """No company, only job_title → filters by title only (436->438) and matches 1 (fuzzy)."""
     init_db()
-    from moonlighter.tracking.email_monitor import _resolve_application
+    from moonlighter.tracking.application_matching import resolve_application
 
     job = _make_job(temporary_database, title="Staff Backend Engineer")
     _make_application(job, status="submitted")
-    app, match = _resolve_application(None, {"company": None, "job_title": "Staff Backend"})
+    app, match = resolve_application(None, {"company": None, "job_title": "Staff Backend"})
     assert match == "fuzzy"
     assert app is not None
 
@@ -2923,11 +2923,11 @@ def test_resolve_application_fuzzy_by_title_only(temporary_database):
 def test_resolve_application_fuzzy_by_company_only(temporary_database):
     """Only company, no job_title → filters by company only (438->441)."""
     init_db()
-    from moonlighter.tracking.email_monitor import _resolve_application
+    from moonlighter.tracking.application_matching import resolve_application
 
     job = _make_job(temporary_database, company="Anthropic")
     _make_application(job, status="submitted")
-    app, match = _resolve_application(None, {"company": "Anthropic", "job_title": None})
+    app, match = resolve_application(None, {"company": "Anthropic", "job_title": None})
     assert match == "fuzzy"
     assert app is not None
 
@@ -2935,9 +2935,9 @@ def test_resolve_application_fuzzy_by_company_only(temporary_database):
 def test_resolve_application_no_company_no_title_is_uncertain(temporary_database):
     """No ref, no company, and no job_title → uncertain (448)."""
     init_db()
-    from moonlighter.tracking.email_monitor import _resolve_application
+    from moonlighter.tracking.application_matching import resolve_application
 
-    app, match = _resolve_application(None, {"company": None, "job_title": None})
+    app, match = resolve_application(None, {"company": None, "job_title": None})
     assert app is None
     assert match == "uncertain"
 
@@ -2979,9 +2979,9 @@ def test_get_or_create_label_skips_non_matching_then_creates():
 def test_resolve_application_fuzzy_zero_matches_is_uncertain(temporary_database):
     """company with no matching Application → 0 results → uncertain (444->448)."""
     init_db()
-    from moonlighter.tracking.email_monitor import _resolve_application
+    from moonlighter.tracking.application_matching import resolve_application
 
-    app, match = _resolve_application(None, {"company": "NonexistentCompany", "job_title": None})
+    app, match = resolve_application(None, {"company": "NonexistentCompany", "job_title": None})
     assert app is None
     assert match == "uncertain"
 
@@ -3226,17 +3226,17 @@ def test_advance_application_syncs_job_status(temporary_database, application_fa
     applications, and sync_email_responses was one of the writers that never
     told the Job."""
     from moonlighter.core.db import Job
-    from moonlighter.tracking.email_monitor import _advance_application
+    from moonlighter.tracking.funnel import advance_application
 
     app = application_factory(status="submitted")
     job = app.job
     job.status = "new"  # simulate the drift seen live
     job.save()
 
-    _advance_application(
+    advance_application(
         app,
         {"type": "interview_invite", "summary": "let's chat"},
         "ref",
-        ["Screening"],
+        stages=["Screening"],
     )
     assert Job.get_by_id(job.id).status == "applied"
