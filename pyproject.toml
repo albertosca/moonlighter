@@ -113,7 +113,6 @@ strict-checking = true
 "packages/full/moonlighter/_tool_logging.py" = ["D205"]
 "packages/full/moonlighter/init.py" = ["I001", "PLC0415", "T201"]
 "packages/full/moonlighter/priority.py" = ["D205", "D209", "DTZ005", "ICN001"]
-"packages/full/moonlighter/server.py" = ["A002", "ARG001", "ASYNC240", "BLE001", "C901", "D100", "D205", "D209", "D212", "D415", "D417", "DTZ005", "I001", "PLC0415", "PLR0917", "T201", "TRY300"]
 "packages/full/moonlighter/startup.py" = ["C901", "D100", "D205", "D209", "PLR0911"]
 "scripts/build_blocklist.py" = ["BLE001", "C901", "D205", "D209", "FBT001", "FBT003", "PLR0912", "PLR0913", "PLR0915", "PLR0917"]
 "scripts/check_built_site.py" = ["C901", "D205", "D209", "FBT001", "PERF401", "PLR0912"]
@@ -138,8 +137,6 @@ strict-checking = true
 "tests/test_package_boundaries.py" = ["C901"]
 "tests/test_performance.py" = ["N806", "PLC0415", "PLR0917"]
 "tests/test_priority.py" = ["DTZ001", "ICN001"]
-"tests/test_server.py" = ["DTZ001", "DTZ005", "ICN001", "N806", "PIE804", "PLC0415", "PLR0402", "PLR0917", "PT018"]
-"tests/test_server_lifespan.py" = ["PLC0415", "PLR0402", "PLR0913", "PLR0917"]
 "tests/test_startup.py" = ["PT018"]
 "tests/test_tool_logging.py" = ["PLC0415"]
 # END ratchet

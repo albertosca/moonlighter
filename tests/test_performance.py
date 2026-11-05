@@ -241,16 +241,13 @@ async def test_list_jobs_returns_one_page_with_a_query_count_independent_of_tabl
 ):
     """100 or 1000 rows in the table: the same number of queries, and only `limit` rows out."""
     from moonlighter.core.db import init_db
-    from moonlighter.server import list_jobs
-
-    from tests._context import make_test_context
+    from moonlighter.mcp_tools.jobs import list_jobs
 
     init_db()
-    context = make_test_context()
 
     async def call_and_count():
         with _count_queries() as spy:
-            result = await list_jobs(status="new", limit=20, context=context)
+            result = await list_jobs(status="new", limit=20)
         return result, spy.call_count
 
     _insert_jobs(0, 100)

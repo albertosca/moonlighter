@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
-from moonlighter.server import AppContext
+from moonlighter.app_context import AppContext
 
 
 def make_test_context(
