@@ -32,7 +32,7 @@ def test_full_name():
 def test_full_name_variants():
     for label in ["Full Name *", "full name", "Your full name", "Nome completo"]:
         result = pre_populate_answers([label], PROFILE)
-        assert result.get(label) == "Maria de Souza Pereira", f"{label!r} não preencheu"
+        assert result.get(label) == "Maria de Souza Pereira", f"{label!r} was not filled"
 
 
 def test_a_bare_name_label_is_the_full_name():

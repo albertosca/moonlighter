@@ -105,8 +105,8 @@ async def test_greenhouse_partial_failure_continues():
 
 
 async def test_greenhouse_invalid_top_level_schema_returns_empty():
-    """API retorna lista em vez de dict com 'jobs' → retorna [] sem crash."""
-    mock_client = make_mock_client([{"title": "Eng"}])  # lista em vez de dict
+    """API returns a list instead of a dict with 'jobs' → returns [] without crashing."""
+    mock_client = make_mock_client([{"title": "Eng"}])  # a list instead of a dict
     with patch(
         "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
         return_value=mock_client,
@@ -116,8 +116,8 @@ async def test_greenhouse_invalid_top_level_schema_returns_empty():
 
 
 async def test_greenhouse_jobs_key_missing_returns_empty():
-    """API retorna dict mas sem chave 'jobs' → retorna [] sem crash."""
-    mock_client = make_mock_client({"data": []})  # sem 'jobs'
+    """API returns a dict without a 'jobs' key → returns [] without crashing."""
+    mock_client = make_mock_client({"data": []})  # no 'jobs'
     with patch(
         "moonlighter.discovery.sources.company_boards.greenhouse.httpx.AsyncClient",
         return_value=mock_client,

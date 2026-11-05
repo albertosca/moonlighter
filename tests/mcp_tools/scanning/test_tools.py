@@ -26,7 +26,7 @@ async def test_scan_company_tool_delegates_to_service(temporary_database):
 
 
 async def test_add_job_tool_delegates_to_service(temporary_database):
-    """O wrapper MCP add_job delega ao manual_jobs.add_job e devolve o resultado."""
+    """The MCP add_job wrapper delegates to manual_jobs.add_job and returns its result."""
     init_db()
 
     with patch(

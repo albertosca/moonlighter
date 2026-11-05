@@ -39,7 +39,7 @@ def test_load_config_partial_override(tmp_path):
 
 def test_load_config_default_path_uses_moonlighter_home(monkeypatch, tmp_path):
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
-    config = load_config()  # sem config.yaml → usa defaults
+    config = load_config()  # no config.yaml → uses the defaults
     assert config["score_threshold"] == 6.5
 
 

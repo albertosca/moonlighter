@@ -147,7 +147,7 @@ def main() -> None:
         profile = load_profile()
     except FileNotFoundError:
         profile = {}
-    init_db()  # resolve o path via moonlighter_home() / MOONLIGHTER_DB_PATH (fonte única em db.py)
+    init_db()  # resolves the path via moonlighter_home() / MOONLIGHTER_DB_PATH (single source in db.py)
 
     model = config.get("eval_model", "claude-haiku-4-5-20251001")
     print(f"Model: {model}  |  blocklist_learned: {learned_path()}")

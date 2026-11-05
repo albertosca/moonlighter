@@ -106,7 +106,7 @@ def test_refreshed_token_is_not_written_back_to_a_foreign_file(tmp_path, monkeyp
         setup_gmail_service(config)
 
     mock_credentials.refresh.assert_called_once()
-    assert foreign.read_text() == original, "arquivo de outro projeto foi alterado"
+    assert foreign.read_text() == original, "another project's file was changed"
 
 
 def test_raises_gmail_auth_error_when_token_missing(tmp_path):

@@ -135,7 +135,7 @@ async def test_evaluate_job_passes_cache_prefix():
 
 
 async def test_evaluate_job_builds_default_caller_when_none():
-    """_caller=None → usa make_api_caller() como fallback (single.py)."""
+    """_caller=None → uses make_api_caller() as the fallback (single.py)."""
     fake = make_caller(MOCK_LLM_RESPONSE)
     with patch(
         "moonlighter.discovery.evaluation.single.make_api_caller", return_value=fake

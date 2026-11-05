@@ -115,7 +115,7 @@ async def test_scan_spend_limit_releases_scan_log_claim(temporary_database):
     assert "spend limit" in result.lower() or "interrompido" in result.lower()
     # Claim released — empty ScanLog so the next scan can retry the URL.
     assert ScanLog.select().where(ScanLog.job_url == url).count() == 0
-    # Nenhum Job criado.
+    # No Job created.
     assert Job.select().where(Job.url == url).count() == 0
 
 

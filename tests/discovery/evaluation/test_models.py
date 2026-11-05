@@ -15,7 +15,7 @@ def test_eval_input_is_frozen():
 
 
 def test_eval_input_fields():
-    """EvalInput tem os campos esperados."""
+    """EvalInput has the expected fields."""
     inp = EvalInput(company="Acme", title="Sr Engineer", description="Build stuff.")
     assert inp.company == "Acme"
     assert inp.title == "Sr Engineer"

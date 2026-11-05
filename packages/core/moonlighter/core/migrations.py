@@ -160,7 +160,7 @@ def _run_locked(db: Any, name: str, action: Callable[[], None]) -> None:
     `sqlite3.OperationalError`, which is a distinct, unrelated type). Any other OperationalError, or
     the last attempt, re-raises immediately.
     """
-    for attempt in range(_LOCK_RETRIES):  # pragma: no branch - always breaks or raises
+    for attempt in range(_LOCK_RETRIES):  # pragma: no branch - returns, raises or retries
         try:
             with db.atomic():
                 action()

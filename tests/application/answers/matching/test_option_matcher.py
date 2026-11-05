@@ -10,7 +10,7 @@ CEFR = [
 ]
 
 
-# ---- match_option_locally (puro, sem LLM) ----
+# ---- match_option_locally (pure, no LLM) ----
 
 
 def test_exact_match():

@@ -61,7 +61,7 @@ async def test_lever_multiple_companies_returns_all():
 
 
 async def test_lever_non_list_response_returns_empty():
-    """API retorna dict (ex: erro) em vez de lista → retorna [] sem crash."""
+    """API returns a dict (e.g. an error) instead of a list → returns [] without crashing."""
     mock_client = make_mock_client({"error": "rate limited"})
     with patch(
         "moonlighter.discovery.sources.company_boards.lever.httpx.AsyncClient",

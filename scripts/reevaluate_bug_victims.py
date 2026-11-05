@@ -68,7 +68,7 @@ def main() -> None:
     setup_logging()
     config = load_config()
     profile = load_profile()
-    init_db()  # resolve o path via moonlighter_home() / MOONLIGHTER_DB_PATH (fonte única em db.py)
+    init_db()  # resolves the path via moonlighter_home() / MOONLIGHTER_DB_PATH (single source in db.py)
 
     model = arguments.model or config.get(
         "eval_model", config.get("llm_model", "claude-haiku-4-5-20251001")

@@ -67,7 +67,7 @@ class TestIneligible:
         )
 
     def test_onsite_brazil_outside_bh(self):
-        # "Brasil onsite só conta se for Belo Horizonte."
+        # "Onsite in Brazil only counts if it is Belo Horizonte."
         assert (
             classify_location("São Paulo, Brazil", "onsite", home_city="Belo Horizonte")
             is Eligibility.INELIGIBLE

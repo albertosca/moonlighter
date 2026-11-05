@@ -59,9 +59,13 @@ try:
     from rich.highlighter import ReprHighlighter as _ReprHighlighter
 
     class MetricsHighlighter(_ReprHighlighter):
-        """Highlights the op= observability summary lines emitted by core/metrics.py.
+        """Rich's repr highlights plus the vocabulary of moonlighter's log lines.
 
-        Key=value pairs get their own styles instead of blending into ordinary log text.
+        Adds a style each for the `op=` name and the `calls=`, `total_seconds=`, `input_tokens=`,
+        `output_tokens=` and `spend_limit_hits=` pairs of the summary lines core/metrics.py emits;
+        for an outcome word (green for filled, submitted and applied, red for `failed` and
+        `failed:<reason>`, gold for skipped, needs_review and unverified); and for a `#<id>` job
+        id. They stand out instead of blending into ordinary log text.
         """
 
         highlights: ClassVar[Sequence[str]] = [

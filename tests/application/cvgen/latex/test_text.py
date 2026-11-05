@@ -56,8 +56,8 @@ class TestTypesettable:
             assert is_typesettable(text), text
 
     def test_anything_outside_the_latin_allow_list_fails(self):
-        # Alberto: "não queremos glifo nenhum no latex, ele tem que ser bem
-        # sério". Emoji, CJK, Greek, arrows, check marks, bullets: rejected.
+        # Alberto: "we want no glyph at all in the latex, it has to be very
+        # serious" (originally in Portuguese). Emoji, CJK, Greek, arrows, check marks, bullets: rejected.
         for character in ("\U0001f680", "日", "Σ", "→", "✓", "•", "Ł"):
             assert not is_typesettable(f"ok {character} ok"), repr(character)
 
@@ -65,7 +65,7 @@ class TestTypesettable:
         # Tightened 2026-09-04: Latin-1 Supplement admits every accented letter
         # PT/EN need, but the SAME range also carries non-letter symbols (°, ±,
         # §, ×, ÷, ¤, ¦, µ, ¶) that slipped through the earlier "whole block"
-        # version. Alberto's bar is "bem sério" — a symbol is no more welcome
+        # version. Alberto's bar is "very serious" — a symbol is no more welcome
         # here than an emoji. € (outside the block entirely) is checked too:
         # rejected, same as before.
         for character in "°±§×÷¤¦µ¶€":
