@@ -148,9 +148,9 @@ def _curated_or_base(field: str, text: str, base: str) -> str | None:
     from a sentence is a rewrite of what the model said, and the candidate
     signs it.
     """
-    from moonlighter.application.assisted.composer import _operator_directed
+    from moonlighter.application.answers.operator_guard import find_operator_marker
 
-    if _operator_directed(text) is not None:
+    if find_operator_marker(text) is not None:
         logger.warning("cv %s addressed the operator — using default CV", field)
         return None
     if text.strip() and is_typesettable(text):
@@ -204,7 +204,7 @@ async def decide_cv(
     # Translations are prose in the same dialect now, so they answer to it too —
     # per-field, since one operator-directed bullet degrades that bullet while
     # an operator-directed summary degrades the whole CV.
-    from moonlighter.application.assisted.composer import _operator_directed
+    from moonlighter.application.answers.operator_guard import find_operator_marker
 
     summary = _curated_or_base("summary", str(data.get("summary") or ""), base_summary)
     expertise = _curated_or_base(
@@ -220,7 +220,7 @@ async def decide_cv(
             if key not in known:
                 continue
             text = str(value)
-            if _operator_directed(text) is not None:
+            if find_operator_marker(text) is not None:
                 logger.warning(
                     "translation for %s addressed the operator — keeping the pool bullet", key
                 )

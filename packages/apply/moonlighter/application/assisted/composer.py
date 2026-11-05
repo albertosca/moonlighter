@@ -18,6 +18,7 @@ from moonlighter.application.answers.compliance import is_compliance_question
 from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.application.answers.field_map import demographic_answer, pre_populate_answers
 from moonlighter.application.answers.needs_review import NEEDS_REVIEW_SENTINEL
+from moonlighter.application.answers.operator_guard import find_operator_marker
 from moonlighter.application.answers.option_matcher import match_option_locally
 from moonlighter.application.answers.profile import profile_for_answers
 from moonlighter.application.assisted.composed_answer import ComposedAnswer
@@ -61,34 +62,6 @@ UNKNOWN
 Answer with the answer text only. No preamble, no explanation, no quotes.
 If the profile gives you no basis to answer, reply with exactly: UNKNOWN
 """
-
-# Markers of prose addressed to the tool's operator instead of the employer.
-# Provenance: two live incidents — a references answer (2026-08-04) and an
-# address answer (2026-08-05) written ABOUT the candidate in the third person,
-# instructing whoever drives the tool. A prompt-only fix failed twice; this
-# guard is deterministic. False positives are acceptable by construction: the
-# failure direction is a human answering one more question by hand.
-_OPERATOR_MARKERS = (
-    "the candidate",
-    "the applicant",
-    "cannot attach",
-    "unable to attach",
-    "please supply",
-    "please provide",
-    "please upload",
-    "material provided",
-    "before submitting",
-)
-
-
-def _operator_directed(answer: str) -> str | None:
-    """The first operator-directed marker found in the answer, or None."""
-    lowered = answer.lower()
-    for marker in _OPERATOR_MARKERS:
-        if marker in lowered:
-            return marker
-    return None
-
 
 _SPEND_LIMIT_REASON = "the LLM spend limit was hit — generation aborted, answer this yourself"
 
@@ -332,7 +305,7 @@ async def compose_answers(
             composed.append(ComposedAnswer(question, None, "no basis in your profile to answer"))
             continue
 
-        if not question.is_choice and (marker := _operator_directed(answer)) is not None:
+        if not question.is_choice and (marker := find_operator_marker(answer)) is not None:
             composed.append(
                 ComposedAnswer(
                     question,
