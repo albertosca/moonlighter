@@ -1,7 +1,9 @@
 """Rendering the scan counts line: location-ineligible jobs and the order of the notes."""
 
-from moonlighter.core.db import Job, init_db
+from moonlighter.core.db import init_db
 from moonlighter.discovery.results import ScanKind, ScanReport, _render_counts
+
+from tests.discovery.results.saved_jobs import saved_job
 
 SPEND_NOTE = (
     "\n\n⚠️  Spend limit reached — scan stopped (remaining jobs are left for the next scan)."
@@ -12,26 +14,14 @@ VERIFY_NOTE = (
 )
 
 
-def _saved_job(url, *, status="new", score=8.0, score_notes="match"):
-    return Job.create(
-        source="greenhouse",
-        company="Acme",
-        title="Engineer",
-        url=url,
-        status=status,
-        score=score,
-        score_notes=score_notes,
-    )
-
-
 def _ineligible_job(url):
-    return _saved_job(
+    return saved_job(
         url, status="archived", score=0.0, score_notes="location ineligible: 'Bangalore, India'"
     )
 
 
 def _needs_review_job(url):
-    return _saved_job(url, status="needs_review", score=None, score_notes="unscored")
+    return saved_job(url, status="needs_review", score=None, score_notes="unscored")
 
 
 async def test_render_counts_names_location_ineligible_jobs_when_none_pass(temporary_database):
@@ -46,7 +36,7 @@ async def test_render_counts_names_location_ineligible_jobs_when_none_pass(tempo
 
 async def test_render_counts_names_location_ineligible_jobs_in_the_footer(temporary_database):
     init_db()
-    saved = [_saved_job("https://x.com/loc/3"), _ineligible_job("https://x.com/loc/4")]
+    saved = [saved_job("https://x.com/loc/3"), _ineligible_job("https://x.com/loc/4")]
     report = _render_counts(ScanReport(kind=ScanKind.EVALUATED, saved=saved, threshold=6.5))
     assert report.startswith("2 jobs processed. 1 above threshold:\n\n")
     assert report.endswith(
@@ -72,7 +62,7 @@ async def test_render_counts_puts_the_spend_note_before_the_verify_note_after_th
     temporary_database,
 ):
     init_db()
-    saved = [_saved_job("https://x.com/loc/6"), _needs_review_job("https://x.com/loc/7")]
+    saved = [saved_job("https://x.com/loc/6"), _needs_review_job("https://x.com/loc/7")]
     report = _render_counts(
         ScanReport(kind=ScanKind.EVALUATED, saved=saved, spend_hit=True, threshold=6.5)
     )

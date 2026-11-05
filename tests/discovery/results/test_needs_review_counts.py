@@ -1,26 +1,16 @@
 """Rendering the scan counts line, including the needs-review verify note."""
 
-from moonlighter.core.db import Job, init_db
+from moonlighter.core.db import init_db
 from moonlighter.discovery.results import ScanKind, ScanReport, _render_counts
 
-
-def _saved_job(url, *, status="new", score=8.0, score_notes="match"):
-    return Job.create(
-        source="greenhouse",
-        company="Acme",
-        title="Engineer",
-        url=url,
-        status=status,
-        score=score,
-        score_notes=score_notes,
-    )
+from tests.discovery.results.saved_jobs import saved_job
 
 
 async def test_render_counts_needs_review_separately_from_below(temporary_database):
     init_db()
-    above = _saved_job("https://x.com/fr/1", status="new", score=8.0)
-    below = _saved_job("https://x.com/fr/2", status="archived", score=3.0)
-    pending = _saved_job(
+    above = saved_job("https://x.com/fr/1", status="new", score=8.0)
+    below = saved_job("https://x.com/fr/2", status="archived", score=3.0)
+    pending = saved_job(
         "https://x.com/fr/3",
         status="needs_review",
         score=None,
@@ -39,7 +29,7 @@ async def test_render_counts_needs_review_separately_from_below(temporary_databa
 
 async def test_render_counts_no_verify_line_when_nothing_pending(temporary_database):
     init_db()
-    above = _saved_job("https://x.com/fr/4", status="new", score=8.0)
+    above = saved_job("https://x.com/fr/4", status="new", score=8.0)
     report = _render_counts(
         ScanReport(kind=ScanKind.EVALUATED, saved=[above], spend_hit=False, threshold=6.5)
     )
@@ -50,7 +40,7 @@ async def test_render_counts_verify_line_shown_even_with_nothing_above_threshold
     temporary_database,
 ):
     init_db()
-    pending = _saved_job(
+    pending = saved_job(
         "https://x.com/fr/5",
         status="needs_review",
         score=None,
@@ -65,7 +55,7 @@ async def test_render_counts_verify_line_shown_even_with_nothing_above_threshold
 
 async def test_render_counts_verify_note_is_pinned_exactly(temporary_database):
     init_db()
-    pending = _saved_job(
+    pending = saved_job(
         "https://x.com/fr/5",
         status="needs_review",
         score=None,

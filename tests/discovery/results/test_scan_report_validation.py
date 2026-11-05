@@ -44,3 +44,32 @@ def test_the_company_check_runs_before_the_found_but_known_check():
 def test_the_found_but_known_check_runs_before_the_results_check():
     with pytest.raises(ValueError, match="found_but_known"):
         ScanReport(kind=ScanKind.NO_NEW_JOBS, found_but_known=1, spend_hit=True)
+
+
+def test_scan_report_all_known_requires_a_company_and_a_count(three_jobs):
+    with pytest.raises(ValueError, match="all_known"):
+        ScanReport(kind=ScanKind.ALL_KNOWN, found_but_known=3)
+    with pytest.raises(ValueError, match="all_known"):
+        ScanReport(kind=ScanKind.ALL_KNOWN, company="acme")
+
+
+def test_scan_report_no_open_jobs_requires_a_company():
+    with pytest.raises(ValueError, match="no_open_jobs"):
+        ScanReport(kind=ScanKind.NO_OPEN_JOBS)
+
+
+def test_scan_report_error_is_the_unknown_source_message_and_nothing_else(three_jobs):
+    with pytest.raises(ValueError, match="unknown_source"):
+        ScanReport(kind=ScanKind.UNKNOWN_SOURCE)
+    with pytest.raises(ValueError, match="unknown_source"):
+        ScanReport(kind=ScanKind.EVALUATED, saved=three_jobs, error="boom")
+
+
+def test_scan_report_only_an_evaluated_scan_carries_results(three_jobs):
+    # The old dataclass used `company` and `no_new_jobs` as renderer mode
+    # switches that silently discarded saved/spend_hit. The kind is explicit
+    # now, and carrying results under any other kind is a producer bug.
+    with pytest.raises(ValueError, match="evaluated"):
+        ScanReport(kind=ScanKind.NO_NEW_JOBS, saved=three_jobs)
+    with pytest.raises(ValueError, match="evaluated"):
+        ScanReport(kind=ScanKind.NO_OPEN_JOBS, company="acme", spend_hit=True)
