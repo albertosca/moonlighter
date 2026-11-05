@@ -18,7 +18,7 @@ from moonlighter.application.answers.answer_bank import (
 from moonlighter.application.answers.bank_eligibility import normalize_question
 from moonlighter.application.assisted import service as assisted_service
 from moonlighter.application.assisted.results import render_sheet_result
-from moonlighter.application.cvgen.bootstrap import BootstrapError
+from moonlighter.application.cvgen.bootstrap_error import BootstrapError
 from moonlighter.application.cvgen.bootstrap import bootstrap_cv_pool as bootstrap_cv_pool_service
 from moonlighter.application.cvgen.compile import latex_available
 from moonlighter.core.config.company_list import load_company_list

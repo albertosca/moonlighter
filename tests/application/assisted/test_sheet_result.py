@@ -9,7 +9,7 @@ from moonlighter.application.assisted.service import (
     prepare_application,
     prepare_application_from_paste,
 )
-from moonlighter.application.cvgen.service import TailoredCV
+from moonlighter.application.cvgen.page_fit import TailoredCV
 from moonlighter.core.db import init_db
 
 from tests.application.assisted.sheet_inputs import CONFIG, PAGE, PROFILE, QUESTIONS, create_job

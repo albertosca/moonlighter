@@ -24,7 +24,8 @@ from moonlighter.application.assisted.sources.pasted import (
     ExtractionError,
     extract_questions_from_page,
 )
-from moonlighter.application.cvgen.service import ensure_tailored_cv, resolved_pool_path
+from moonlighter.application.cvgen.paths import resolved_pool_path
+from moonlighter.application.cvgen.service import ensure_tailored_cv
 from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.db import Application, Job, cv_bootstrap_declined
 from moonlighter.core.email_alias import build_email_alias, new_email_ref
@@ -91,7 +92,7 @@ async def _sheet(
         {"id": job.id, "title": job.title, "company": job.company, "description": job.description},
         config,
         profile,
-        caller,
+        caller=caller,
     )
     composed = await compose_answers(
         questions,

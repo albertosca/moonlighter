@@ -335,7 +335,7 @@ def test_bootstrap_cv_subcommand_reports_a_bootstrap_error_as_expected_failure(m
     # `await cli._run(...)`, which would let the BootstrapError propagate
     # uncaught instead of returning a (payload, code) tuple.
     from moonlighter.application import cli
-    from moonlighter.application.cvgen.bootstrap import BootstrapError
+    from moonlighter.application.cvgen.bootstrap_error import BootstrapError
     from moonlighter.core.cli import run
 
     monkeypatch.setattr(cli, "bootstrap", lambda: ({}, {"name": "Jane"}))

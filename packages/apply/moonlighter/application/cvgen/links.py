@@ -1,8 +1,8 @@
-"""The CV header's links, checked over HTTP by `moonlighter-apply doctor --online`.
+r"""The CV header's links, checked over HTTP by `moonlighter-apply doctor --online`.
 
 2026-09-24: the templates linked a GitHub account that 404s, and every tailored
 CV carried it to employers. The links live in the templates, not in
-profile.yaml (moderncv's \\social[github]{user} builds the URL itself), so the
+profile.yaml (moderncv's \social[github]{user} builds the URL itself), so the
 templates are what gets read. Offline by default: only the --online flag makes
 network calls.
 """
@@ -11,7 +11,8 @@ import re
 from typing import Any
 
 import httpx
-from moonlighter.application.cvgen.service import resolved_template_dir
+
+from moonlighter.application.cvgen.paths import resolved_template_dir
 from moonlighter.core.http_fetch import HEADERS
 
 _TEMPLATE_NAMES = ("cv-template.en.tex", "cv-template.pt.tex")
@@ -27,8 +28,11 @@ _BOT_WALL_STATUS = 999
 
 
 def _strip_comment(line: str) -> str:
-    """Drop a LaTeX comment, mid-line too. A % is escaped only by an odd run of
-    backslashes: after a line break (two) it starts a comment."""
+    """Drop a LaTeX comment, mid-line too.
+
+    A % is escaped only by an odd run of backslashes: after a line break (two)
+    it starts a comment.
+    """
     for position, character in enumerate(line):
         if character != "%":
             continue
@@ -39,34 +43,43 @@ def _strip_comment(line: str) -> str:
 
 
 def _is_marker(value: str) -> bool:
-    """An unfilled template marker ({{LINKEDIN_USERNAME}}, %%BASE_SUMMARY%%). A
-    lone % stays: "%20" is part of a real URL."""
+    """An unfilled template marker ({{LINKEDIN_USERNAME}}, %%BASE_SUMMARY%%).
+
+    A lone % stays: "%20" is part of a real URL.
+    """
     return "{" in value or "%%" in value
 
 
+def _line_links(line: str) -> list[str]:
+    found = [
+        (match.start(), _SOCIAL_URL[match[1]].format(match[2]))
+        for match in _SOCIAL_COMMAND.finditer(line)
+        if not _is_marker(match[2])
+    ]
+    found += [
+        (match.start(), match[1] if "://" in match[1] else f"https://{match[1]}")
+        for match in _URL_COMMAND.finditer(line)
+        if not _is_marker(match[1])
+    ]
+    return [url for _, url in sorted(found)]
+
+
 def template_links(text: str) -> list[str]:
-    """Every header link a template renders, in order, each once. Commented-out
-    lines and unfilled markers ({{LINKEDIN_USERNAME}}) are skipped."""
+    """Every header link a template renders, in order, each once.
+
+    Commented-out lines and unfilled markers ({{LINKEDIN_USERNAME}}) are skipped.
+    """
     links: list[str] = []
     for line in text.splitlines():
-        line = _strip_comment(line)
-        found = [
-            (match.start(), _SOCIAL_URL[match[1]].format(match[2]))
-            for match in _SOCIAL_COMMAND.finditer(line)
-            if not _is_marker(match[2])
-        ]
-        found += [
-            (match.start(), match[1] if "://" in match[1] else f"https://{match[1]}")
-            for match in _URL_COMMAND.finditer(line)
-            if not _is_marker(match[1])
-        ]
-        links.extend(url for _, url in sorted(found))
+        links.extend(_line_links(_strip_comment(line)))
     return list(dict.fromkeys(links))
 
 
 async def check_links(urls: list[str], client: httpx.AsyncClient) -> list[dict[str, Any]]:
-    """One entry per URL: the HTTP status and whether the link works. `ok` is
-    None when the site refuses automated checks, so a person has to look."""
+    """One entry per URL: the HTTP status and whether the link works.
+
+    `ok` is None when the site refuses automated checks, so a person has to look.
+    """
     report: list[dict[str, Any]] = []
     for url in urls:
         try:
@@ -78,7 +91,7 @@ async def check_links(urls: list[str], client: httpx.AsyncClient) -> list[dict[s
             note = "the site refuses automated checks — open it in a browser"
             report.append({"url": url, "status": response.status_code, "ok": None, "note": note})
             continue
-        works = response.status_code < 400
+        works = response.status_code < httpx.codes.BAD_REQUEST
         report.append({"url": url, "status": response.status_code, "ok": works, "note": None})
     return report
 

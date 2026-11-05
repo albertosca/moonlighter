@@ -6,6 +6,7 @@ from typing import Any
 
 from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.application.assisted.questions import FormQuestion
+from moonlighter.application.cvgen.paths import generated_dir_for
 
 # File fields whose label asks for a CV/resume — the only ones whose gap should
 # name the configured CV as the file to attach.
@@ -19,12 +20,6 @@ def file_gap_reason(question: FormQuestion, config: dict[str, Any], job: dict[st
     # letter" gap naming the CV instructs the operator to attach the
     # wrong document (found on the GitLab gate sheet, 2026-08-13).
     if _CV_LABEL.search(question.label):
-        # Local import, same cycle-avoidance as answers/cv.py's resolve_cv_path:
-        # answers/assisted must not import cvgen at module level.
-        from moonlighter.application.cvgen.service import (  # noqa: PLC0415 - answers/assisted must not import cvgen at module level
-            generated_dir_for,
-        )
-
         try:
             path = resolve_cv_path(str(job.get("company") or ""), config, job_id=job.get("id"))
             reason = f"upload this file yourself: {path}"

@@ -2,7 +2,8 @@
 
 Two passes (moderncv references), run in the .tex's own directory, bounded by
 a timeout. No pdflatex on the machine, or a failed run: the caller keeps the
-.tex and tells the operator how to compile it themselves."""
+.tex and tells the operator how to compile it themselves.
+"""
 
 import re
 import shutil
@@ -47,16 +48,20 @@ def _discard_partial(tex_path: Path) -> None:
     tex_path.with_suffix(".pdf").unlink(missing_ok=True)
 
 
-def compile_pdf(tex_path: Path, timeout_s: int = 120) -> Path | None:
+def compile_pdf(tex_path: Path, timeout_seconds: int = 120) -> Path | None:
     pdflatex = shutil.which(_PDFLATEX)
     if pdflatex is None:
         logger.warning("pdflatex not found — keeping %s uncompiled", tex_path)
         return None
-    cmd = [pdflatex, "-interaction=nonstopmode", "-halt-on-error", tex_path.name]
+    command = [pdflatex, "-interaction=nonstopmode", "-halt-on-error", tex_path.name]
     try:
         for _ in range(2):  # moderncv needs two passes for internal references
-            result = subprocess.run(  # noqa: S603
-                cmd, cwd=tex_path.parent, capture_output=True, timeout=timeout_s
+            result = subprocess.run(  # noqa: S603 - command is the pdflatex found on PATH plus fixed flags and a bare file name
+                command,
+                cwd=tex_path.parent,
+                capture_output=True,
+                timeout=timeout_seconds,
+                check=False,
             )
             if result.returncode != 0:
                 logger.warning("pdflatex failed for %s (rc=%s)", tex_path, result.returncode)
@@ -74,8 +79,9 @@ _TAIL_BYTES = 1024
 
 
 def looks_like_a_compiled_pdf(path: Path) -> bool:
-    """Whether `path` is a real, complete PDF — not a directory, not missing,
-    not a compile that died mid-write.
+    """Whether `path` is a real, complete PDF.
+
+    Not a directory, not missing, not a compile that died mid-write.
 
     A cache trusts this file for however long the job stays in the pipeline —
     a KeyboardInterrupt or an external SIGKILL of the moonlighter process
@@ -89,11 +95,11 @@ def looks_like_a_compiled_pdf(path: Path) -> bool:
     if not path.is_file():
         return False
     try:
-        with path.open("rb") as f:
-            f.seek(0, 2)
-            size = f.tell()
-            f.seek(max(0, size - _TAIL_BYTES))
-            tail = f.read()
+        with path.open("rb") as pdf_file:
+            pdf_file.seek(0, 2)
+            size = pdf_file.tell()
+            pdf_file.seek(max(0, size - _TAIL_BYTES))
+            tail = pdf_file.read()
     except OSError:
         return False
     return b"%%EOF" in tail
@@ -109,5 +115,5 @@ def page_count(tex_path: Path) -> int | None:
     log = tex_path.with_suffix(".log")
     if not log.exists():
         return None
-    m = _PAGES.search(log.read_text(errors="replace"))
-    return int(m.group(1)) if m else None
+    match = _PAGES.search(log.read_text(errors="replace"))
+    return int(match.group(1)) if match else None

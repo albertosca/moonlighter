@@ -58,9 +58,7 @@ async def test_the_collaborators_receive_exactly_the_job_fields_they_read(job_fa
     )
     seen: dict[str, Any] = {}
 
-    async def spy_ensure(  # noqa: PLR0917 - mirrors ensure_tailored_cv's positional signature
-        job_details: Any, config: Any, profile: Any, cv_caller: Any
-    ) -> Any:
+    async def spy_ensure(job_details: Any, config: Any, profile: Any, *, caller: Any) -> Any:
         seen["tailoring"] = job_details
         return None
 

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from moonlighter.application.cvgen.compile import looks_like_a_compiled_pdf
+from moonlighter.application.cvgen.paths import generated_dir_for
 from moonlighter.core.config.paths import resolve_under_home
 
 
@@ -42,10 +43,6 @@ def resolve_cv_path(company: str, config: dict[str, Any], job_id: int | None = N
     the wrong CV).
     """
     if job_id is not None:
-        from moonlighter.application.cvgen.service import (  # noqa: PLC0415 - keeps cvgen.service, and core.llm behind it, out of every import of answers.cv
-            generated_dir_for,
-        )
-
         tailored = generated_dir_for(config, job_id) / "cv.pdf"
         # exists() alone would upload a stranded partial-write (round-6
         # finding) or try to upload a directory; degrades the same way a

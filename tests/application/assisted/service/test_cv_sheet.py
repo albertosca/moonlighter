@@ -7,7 +7,7 @@ from moonlighter.application.assisted.questions import FormQuestion, QuestionKin
 from moonlighter.application.assisted.results import render_sheet_result
 from moonlighter.application.assisted.sources import greenhouse as greenhouse_source
 from moonlighter.application.assisted.sources import recruitee as recruitee_source
-from moonlighter.application.cvgen.service import TailoredCV
+from moonlighter.application.cvgen.page_fit import TailoredCV
 
 from tests.application.assisted.service.service_fakes import (
     bypass_cv_bootstrap_offer,
@@ -25,9 +25,7 @@ async def test_sheet_generates_the_tailored_cv_before_composing(job_factory, mon
     async def one_question(board: str, job_id: str, client: Any) -> list[FormQuestion]:
         return [question]
 
-    async def spy_ensure(  # noqa: PLR0917 - mirrors ensure_tailored_cv's positional signature
-        job_details: Any, config: Any, profile: Any, caller: Any
-    ) -> Any:
+    async def spy_ensure(job_details: Any, config: Any, profile: Any, *, caller: Any) -> Any:
         seen["job"] = job_details
         return None
 
@@ -63,10 +61,8 @@ async def test_sheet_builds_one_caller_and_reuses_it_for_both_llm_users(job_fact
             raise AssertionError("make_caller must be called at most once per _sheet")
         return caller
 
-    async def spy_ensure(  # noqa: PLR0917 - mirrors ensure_tailored_cv's positional signature
-        job_details: Any, config: Any, profile: Any, cv_caller: Any
-    ) -> Any:
-        seen["cv_caller"] = cv_caller
+    async def spy_ensure(job_details: Any, config: Any, profile: Any, *, caller: Any) -> Any:
+        seen["cv_caller"] = caller
         return None
 
     async def spy_compose(  # noqa: PLR0913, PLR0917 - mirrors compose_answers' signature
@@ -105,9 +101,7 @@ async def test_sheet_notes_the_uncompiled_tex(job_factory, monkeypatch, tmp_path
     async def one_question(board: str, job_id: str, client: Any) -> list[FormQuestion]:
         return [question]
 
-    async def uncompiled(  # noqa: PLR0917 - mirrors ensure_tailored_cv's positional signature
-        job_details: Any, config: Any, profile: Any, caller: Any
-    ) -> Any:
+    async def uncompiled(job_details: Any, config: Any, profile: Any, *, caller: Any) -> Any:
         return TailoredCV(path=tex, compiled=False)
 
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", one_question)
@@ -141,9 +135,7 @@ async def test_a_compiled_cv_reaches_the_sheet_when_no_cv_question_exists(
     async def one_question(board: str, job_id: str, client: Any) -> list[FormQuestion]:
         return [FormQuestion(label="Favorite language", kind=QuestionKind.TEXT, required=False)]
 
-    async def compiled(  # noqa: PLR0917 - mirrors ensure_tailored_cv's positional signature
-        job_details: Any, config: Any, profile: Any, caller: Any
-    ) -> Any:
+    async def compiled(job_details: Any, config: Any, profile: Any, *, caller: Any) -> Any:
         return TailoredCV(path=pdf, compiled=True)
 
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", one_question)
@@ -172,9 +164,7 @@ async def test_a_compiled_cv_already_named_by_a_cv_gap_is_not_repeated(
     async def one_question(board: str, job_id: str, client: Any) -> list[FormQuestion]:
         return [FormQuestion(label="Resume", kind=QuestionKind.FILE, required=True)]
 
-    async def compiled(  # noqa: PLR0917 - mirrors ensure_tailored_cv's positional signature
-        job_details: Any, config: Any, profile: Any, caller: Any
-    ) -> Any:
+    async def compiled(job_details: Any, config: Any, profile: Any, *, caller: Any) -> Any:
         return TailoredCV(path=pdf, compiled=True)
 
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", one_question)

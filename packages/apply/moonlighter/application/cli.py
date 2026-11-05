@@ -28,7 +28,8 @@ from moonlighter.application.assisted.service import (
     prepare_application,
     prepare_application_from_paste,
 )
-from moonlighter.application.cvgen.bootstrap import BootstrapError, bootstrap_cv_pool
+from moonlighter.application.cvgen.bootstrap import bootstrap_cv_pool
+from moonlighter.application.cvgen.bootstrap_error import BootstrapError
 from moonlighter.application.cvgen.links import link_report
 from moonlighter.core.cli import (
     EXIT_NOTHING,

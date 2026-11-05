@@ -1,10 +1,7 @@
-"""`moonlighter-apply doctor --online`: the CV header's links, read from the
-templates and requested over HTTP. 2026-09-24: the templates linked a GitHub
-account that 404s, and nothing in the product noticed."""
-
 import httpx
 import pytest
-from moonlighter.application.cvgen.links import check_links, template_links
+from moonlighter.application.cvgen import links
+from moonlighter.application.cvgen.links import check_links, link_report, template_links
 
 HEADER = r"""
 \social[linkedin]{albertosca}
@@ -14,6 +11,16 @@ HEADER = r"""
       \githubsocialsymbol~\httplink[albertosca]{github.com/albertosca}%
 \social[linkedin]{{{LINKEDIN_USERNAME}}}
 """
+
+
+def _client(statuses: dict[str, int]) -> httpx.AsyncClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url not in statuses:
+            raise httpx.ConnectError("no route", request=request)
+        return httpx.Response(statuses[url])
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
 
 
 def test_template_links_reads_social_and_http_links_and_skips_comments_and_markers():
@@ -40,16 +47,6 @@ def test_template_links_reads_a_line_break_before_a_comment_as_a_comment():
 def test_template_links_lists_a_repeated_link_once():
     text = r"\social[github]{albertosca}" + "\n" + r"\httplink{https://github.com/albertosca}"
     assert template_links(text) == ["https://github.com/albertosca"]
-
-
-def _client(statuses: dict[str, int]) -> httpx.AsyncClient:
-    def handler(request: httpx.Request) -> httpx.Response:
-        url = str(request.url)
-        if url not in statuses:
-            raise httpx.ConnectError("no route", request=request)
-        return httpx.Response(statuses[url])
-
-    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
 
 
 @pytest.mark.asyncio
@@ -87,7 +84,6 @@ async def test_check_links_reports_an_unreachable_host_as_broken():
 
 @pytest.mark.asyncio
 async def test_link_report_reads_both_templates_from_the_configured_directory(tmp_path):
-    from moonlighter.application.cvgen.links import link_report
 
     (tmp_path / "cv-template.en.tex").write_text(r"\social[github]{albertosca}")
     (tmp_path / "cv-template.pt.tex").write_text(
@@ -106,7 +102,6 @@ async def test_link_report_reads_both_templates_from_the_configured_directory(tm
 
 @pytest.mark.asyncio
 async def test_link_report_is_empty_without_templates(tmp_path):
-    from moonlighter.application.cvgen.links import link_report
 
     report = await link_report({"cv": {"template_dir": str(tmp_path)}})
     assert report == []
@@ -116,7 +111,6 @@ async def test_link_report_is_empty_without_templates(tmp_path):
 async def test_link_report_opens_a_client_that_follows_redirects(tmp_path, monkeypatch):
     """A profile URL commonly redirects (http→https, trailing slash): without
     following redirects every such link would read as a 3xx, not as working."""
-    from moonlighter.application.cvgen import links
 
     (tmp_path / "cv-template.en.tex").write_text(r"\social[github]{albertosca}")
     opened: dict = {}
