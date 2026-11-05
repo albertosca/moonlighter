@@ -97,7 +97,7 @@ class AnswerSources:
         # removed browser-automation tool's flat label->string shape, on
         # which `[...]["answer"]` raises TypeError before _sheet ever gets
         # to rewrite the column — permanently breaking those jobs. Same
-        # defensive pattern as answer_bank.promote_application. An empty
+        # defensive pattern as bank/store.py's promote_application. An empty
         # "answer" counts as absent for the same reason `known`'s "" does
         # above: it is not an answer, and treating it as a hit would paste
         # a blank into a real form.
