@@ -2,9 +2,9 @@
 
 import re
 
+from moonlighter.application.answers.matching.option_matcher import match_option_locally
 from moonlighter.application.answers.needs_review import NEEDS_REVIEW_SENTINEL
 from moonlighter.application.answers.operator_guard import find_operator_marker
-from moonlighter.application.answers.option_matcher import match_option_locally
 from moonlighter.application.assisted.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 

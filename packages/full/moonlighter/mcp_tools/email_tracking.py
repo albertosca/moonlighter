@@ -7,7 +7,7 @@ from mcp.server.mcpserver import Context
 
 from moonlighter._tool_logging import tool_logged
 from moonlighter.app_context import AppContext, refreshed_app_context
-from moonlighter.application.answers.answer_bank import promote_application
+from moonlighter.application.answers.bank.store import promote_application
 from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.config.paths import resolve_under_home
 from moonlighter.core.db import Application

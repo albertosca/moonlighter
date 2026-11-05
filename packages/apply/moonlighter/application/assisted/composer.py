@@ -6,8 +6,8 @@ defensible answer becomes a visible gap. Never an invented answer, never silence
 
 from typing import Any
 
-from moonlighter.application.answers.compliance import is_compliance_question
-from moonlighter.application.answers.field_map import pre_populate_answers
+from moonlighter.application.answers.matching.field_map import pre_populate_answers
+from moonlighter.application.answers.rules.compliance import is_compliance_question
 from moonlighter.application.assisted.answer_screening import screen_answer
 from moonlighter.application.assisted.answer_sources import AnswerSources
 from moonlighter.application.assisted.composed_answer import ComposedAnswer

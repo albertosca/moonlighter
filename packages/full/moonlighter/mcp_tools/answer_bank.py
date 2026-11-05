@@ -6,12 +6,12 @@ from mcp.server.mcpserver import Context
 
 from moonlighter._tool_logging import tool_logged
 from moonlighter.app_context import AppContext, refreshed_app_context
-from moonlighter.application.answers.answer_bank import (
+from moonlighter.application.answers.bank.eligibility import normalize_question
+from moonlighter.application.answers.bank.store import (
     forget,
     list_entries,
     render_answer_bank,
 )
-from moonlighter.application.answers.bank_eligibility import normalize_question
 from moonlighter.core.config.defaults import DEFAULTS
 
 

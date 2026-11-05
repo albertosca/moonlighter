@@ -4,7 +4,7 @@ from typing import Any
 
 import httpx
 
-from moonlighter.application.answers.answer_bank import load_answer_bank
+from moonlighter.application.answers.bank.store import load_answer_bank
 from moonlighter.application.assisted.composer import compose_answers
 from moonlighter.application.assisted.questions import FormQuestion
 from moonlighter.application.assisted.required_labels import mark_required

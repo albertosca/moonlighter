@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from moonlighter.application.answers.cv import configured_cv_path
+from moonlighter.application.answers.rules.cv import configured_cv_path
 from moonlighter.core.config.backends import llm_backend
 from moonlighter.core.config.paths import browser_executable, moonlighter_home
 from moonlighter.core.llm.codex import codex_executable

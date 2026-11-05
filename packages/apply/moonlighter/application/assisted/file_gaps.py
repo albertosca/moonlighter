@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from moonlighter.application.answers.cv import CVNotFoundError, resolve_cv_path
+from moonlighter.application.answers.rules.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.application.assisted.questions import FormQuestion
 from moonlighter.application.cvgen.paths import generated_dir_for
 

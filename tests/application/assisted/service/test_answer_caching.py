@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Any
 
-from moonlighter.application.answers.answer_bank import promote_application
+from moonlighter.application.answers.bank.store import promote_application
 from moonlighter.application.assisted import service
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.results import render_sheet_result

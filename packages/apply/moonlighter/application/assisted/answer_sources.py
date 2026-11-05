@@ -7,12 +7,12 @@ the question into a gap on the spot instead of falling through to the next one.
 from dataclasses import dataclass
 from typing import Any
 
-from moonlighter.application.answers.bank_eligibility import (
+from moonlighter.application.answers.bank.eligibility import (
     is_bank_eligible,
     is_sensitive_label,
     normalize_question,
 )
-from moonlighter.application.answers.demographics import demographic_answer
+from moonlighter.application.answers.rules.demographics import demographic_answer
 from moonlighter.application.assisted.answer_generation import GenerationError, generate_answer
 from moonlighter.application.assisted.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion
