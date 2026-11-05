@@ -7,7 +7,7 @@ the question into a gap on the spot instead of falling through to the next one.
 from dataclasses import dataclass
 from typing import Any
 
-from moonlighter.application.answers.answer_bank import (
+from moonlighter.application.answers.bank_eligibility import (
     is_bank_eligible,
     is_sensitive_label,
     normalize_question,

@@ -112,7 +112,6 @@ strict-checking = true
 # Each task deletes its files' lines; the block is empty and removed at the end.
 "packages/apply/moonlighter/application/__init__.py" = ["D104"]
 "packages/apply/moonlighter/application/answers/__init__.py" = ["D104"]
-"packages/apply/moonlighter/application/answers/answer_bank.py" = ["C901", "D205", "D209", "DTZ005", "PLC0415"]
 "packages/apply/moonlighter/application/answers/compliance.py" = ["D205", "D209"]
 "packages/apply/moonlighter/application/answers/cv.py" = ["D205", "D212", "PLC0415"]
 "packages/apply/moonlighter/application/answers/field_map.py" = ["D205", "D212", "D301", "ERA001", "FURB167", "ISC004", "PLC0415", "PLR0917"]
@@ -150,7 +149,6 @@ strict-checking = true
 "scripts/render_diagrams.py" = ["ARG001", "D205"]
 "scripts/stamp_revision_dates.py" = ["D205"]
 "tests/_context.py" = ["PLC0415", "PLR0917"]
-"tests/application/answers/test_answer_bank.py" = ["DTZ005", "PLC0415", "PT018"]
 "tests/application/answers/test_compliance.py" = ["ISC004"]
 "tests/application/answers/test_cv.py" = ["PLC0415"]
 "tests/application/answers/test_profile.py" = ["PT018"]

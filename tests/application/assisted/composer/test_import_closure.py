@@ -6,10 +6,11 @@ import sys
 
 def test_importing_the_composer_does_not_pull_in_the_db_layer():
     # The plan's Global Constraint: compose_answers does no DB access, directly
-    # or via import. answer_bank.py imports AnswerBankEntry inside the two
-    # functions that need it precisely so that importing this module — which
-    # wants only the pure helpers — does not drag in peewee and the whole DB
-    # layer. Checked in a subprocess: this pytest session imported both long ago.
+    # or via import. The composer's modules take the bank's pure helpers from
+    # bank_eligibility.py, never from answer_bank.py, which imports
+    # AnswerBankEntry at the top: importing it would drag in peewee and the
+    # whole DB layer. Checked in a subprocess: this pytest session imported
+    # both long ago.
     code = (
         "import sys, moonlighter.application.assisted.composer as _;"
         "print('peewee' in sys.modules, 'moonlighter.core.db' in sys.modules)"

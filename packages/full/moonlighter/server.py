@@ -12,10 +12,10 @@ from moonlighter._tool_logging import tool_logged
 from moonlighter.application.answers.answer_bank import (
     forget,
     list_entries,
-    normalize_question,
     promote_application,
     render_answer_bank,
 )
+from moonlighter.application.answers.bank_eligibility import normalize_question
 from moonlighter.application.assisted import service as assisted_service
 from moonlighter.application.assisted.results import render_sheet_result
 from moonlighter.application.cvgen.bootstrap import BootstrapError

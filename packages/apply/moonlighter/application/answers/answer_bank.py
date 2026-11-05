@@ -14,68 +14,22 @@ work_auth.py already states for its own NEEDS_REVIEW sentinel: a cache miss
 over a wrong cache hit.
 """
 
-import re
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from moonlighter.application.answers.bank_eligibility import (
+    is_bank_eligible,
+    is_sensitive_label,
+    normalize_question,
+)
 from moonlighter.application.assisted.questions import QuestionKind
-
-if TYPE_CHECKING:
-    from moonlighter.core.db import AnswerBankEntry
-
-_BANK_ELIGIBLE_KINDS = frozenset(
-    {QuestionKind.TEXT, QuestionKind.BOOLEAN, QuestionKind.SINGLE_SELECT, QuestionKind.MULTI_SELECT}
-)
-_WHITESPACE = re.compile(r"\s+")
-_TRAILING_PUNCTUATION = re.compile(r"[?:*]+$")
-
-# Demographic/EEO categories and third-party references. Over-matching is
-# deliberate and cheap in this direction (PT-BR "preferências" contains
-# "referências", so it matches too): a false positive costs one ordinary LLM
-# call, a false negative persists a hallucinated answer across companies.
-#
-# The second half of this list was added 2026-09-14 after a review measured the
-# full leak path open for every one of them: the question reached the LLM, the
-# model invented an answer, and because promote_application checks the same
-# function, the invention was banked and replayed at the next company.
-# "Ethnicity" is not hypothetical — it is a real Greenhouse label.
-#
-# Two word boundaries here are load-bearing, both measured against real fields:
-# without `\b`, "pronoun" swallows "How do you pronounce your name?" and PT-BR
-# "idade" swallows "Cidade" — which field_map answers today.
-_SENSITIVE_LABEL = re.compile(
-    r"gender|g[êe]nero|\brace\b|ra[çc]a|hispanic|latino|\bveteran\b|veteran[oa]|"
-    r"disabilit|defici[êe]nc|\breferences?\b|refer[êe]ncias?|"
-    r"ethnic|etnia|\bpronouns?\b|\bpronomes?\b|"
-    r"sexual\s+orientation|orienta[çc][ãa]o\s+sexual|"
-    r"\bage\b|\bidade\b|date\s+of\s+birth|nascimento|"
-    r"marital|estado\s+civil|religi|lgbt",
-    re.IGNORECASE,
-)
+from moonlighter.core.db import AnswerBankEntry
 
 
-def is_bank_eligible(kind: QuestionKind) -> bool:
-    return kind in _BANK_ELIGIBLE_KINDS
+def load_answer_bank(maximum_age_days: int | None) -> dict[str, str]:
+    """Every banked answer no older than maximum_age_days, keyed by normalised question.
 
-
-def is_sensitive_label(label: str) -> bool:
-    """A label naming a demographic/EEO category or third-party references —
-    never eligible for the cross-job bank regardless of question kind, because
-    nothing deterministic stops the LLM from guessing an answer to a label
-    like this even though the underlying data is deliberately excluded from
-    its prompt (profile.py's profile_for_answers). A hallucinated answer here
-    must not persist into a table shared across every future company."""
-    return bool(_SENSITIVE_LABEL.search(label))
-
-
-def normalize_question(label: str) -> str:
-    text = _WHITESPACE.sub(" ", label.strip()).lower()
-    return _TRAILING_PUNCTUATION.sub("", text).strip()
-
-
-def load_answer_bank(max_age_days: int | None) -> dict[str, str]:
-    """Every banked answer no older than max_age_days, keyed by normalised
-    question; None disables expiry. The table is small (Alberto's own repeat
+    None disables expiry. The table is small (Alberto's own repeat
     screening questions) — loading it whole is simpler than a per-question
     query and cheap at this scale.
 
@@ -84,19 +38,10 @@ def load_answer_bank(max_age_days: int | None) -> dict[str, str]:
     submitted in that long does. Nothing is deleted: a stale row is skipped
     here and overwritten by the next promotion of the same question.
     """
-    # Local import, same layering reason as composer.py's cvgen import: this
-    # module's pure helpers (normalize_question, is_bank_eligible,
-    # is_sensitive_label) are imported by composer.py, which the plan requires
-    # to do no DB access "directly or via import". A module-level
-    # `from moonlighter.core.db import AnswerBankEntry` made importing the
-    # composer pull in peewee and the whole DB layer.
-    from moonlighter.core.db import AnswerBankEntry
-
     rows = AnswerBankEntry.select()
-    if max_age_days is not None:
-        rows = rows.where(
-            AnswerBankEntry.updated_at >= datetime.now() - timedelta(days=max_age_days)
-        )
+    if maximum_age_days is not None:
+        cutoff = datetime.now() - timedelta(days=maximum_age_days)  # noqa: DTZ005 - the database stores naive local time
+        rows = rows.where(AnswerBankEntry.updated_at >= cutoff)
     return {row.normalized_question: row.answer for row in rows}
 
 
@@ -109,20 +54,9 @@ def promote_application(job_cache: dict[str, Any], source_job_id: int) -> None:
     str} is skipped rather than raising: this is defensive against that
     legacy shape, not validation of untrusted input.
     """
-    from moonlighter.core.db import AnswerBankEntry  # local: see load_answer_bank
-
     for label, entry in job_cache.items():
-        if not isinstance(entry, dict) or "answer" not in entry or "kind" not in entry:
-            continue
-        try:
-            kind = QuestionKind(entry["kind"])
-        except ValueError:
-            continue
-        if not is_bank_eligible(kind):
-            continue
-        if is_sensitive_label(label):
-            # Kind alone does not protect these: a demographic or references
-            # question is usually TEXT or SINGLE_SELECT, i.e. bank-eligible.
+        kind = _bankable_kind(label, entry)
+        if kind is None:
             continue
         normalized = normalize_question(label)
         row, created = AnswerBankEntry.get_or_create(
@@ -137,24 +71,46 @@ def promote_application(job_cache: dict[str, Any], source_job_id: int) -> None:
             row.kind = kind.value
             row.answer = entry["answer"]
             row.source_job_id = source_job_id
-            row.updated_at = datetime.now()
+            row.updated_at = datetime.now()  # noqa: DTZ005 - the database stores naive local time
             row.save()
 
 
-def list_entries() -> list[AnswerBankEntry]:
-    """Every banked answer, most recently used first — the order the operator
-    wants when asking "what would replay right now?"."""
-    from moonlighter.core.db import AnswerBankEntry  # local: see load_answer_bank
+def _bankable_kind(label: str, entry: object) -> QuestionKind | None:
+    """The kind to bank `entry` under, or None when it must stay out of the bank."""
+    kind = _entry_kind(entry)
+    if kind is None or not is_bank_eligible(kind):
+        return None
+    if is_sensitive_label(label):
+        # Kind alone does not protect these: a demographic or references
+        # question is usually TEXT or SINGLE_SELECT, i.e. bank-eligible.
+        return None
+    return kind
 
+
+def _entry_kind(entry: object) -> QuestionKind | None:
+    """The kind of a per-job cache entry shaped {"answer": ..., "kind": ...}, else None."""
+    if not isinstance(entry, dict) or "answer" not in entry or "kind" not in entry:
+        return None
+    try:
+        return QuestionKind(entry["kind"])
+    except ValueError:
+        return None
+
+
+def list_entries() -> list[AnswerBankEntry]:
+    """Every banked answer, most recently used first.
+
+    That is the order the operator wants when asking "what would replay right now?".
+    """
     return list(AnswerBankEntry.select().order_by(AnswerBankEntry.updated_at.desc()))
 
 
 def forget(question: str) -> bool:
-    """Delete the banked answer for `question`, normalised the way the bank
-    keys it. False when nothing matched. The next application that asks it
-    goes to the LLM again and, once submitted, re-banks whatever it answered."""
-    from moonlighter.core.db import AnswerBankEntry  # local: see load_answer_bank
+    """Delete the banked answer for `question`, normalised the way the bank keys it.
 
+    False when nothing matched. The next application that asks it goes to the
+    LLM again and, once submitted, re-banks whatever it answered.
+    """
     deleted: int = (
         AnswerBankEntry.delete()
         .where(AnswerBankEntry.normalized_question == normalize_question(question))
@@ -163,12 +119,17 @@ def forget(question: str) -> bool:
     return deleted > 0
 
 
-def render_answer_bank(rows: list[AnswerBankEntry], max_age_days: int | None) -> str:
-    """One line per entry. An entry past max_age_days is kept but marked, since
-    "why wasn't this replayed?" is the question that brings an operator here."""
+def render_answer_bank(rows: list[AnswerBankEntry], maximum_age_days: int | None) -> str:
+    """One line per entry.
+
+    An entry past maximum_age_days is kept but marked, since "why wasn't this
+    replayed?" is the question that brings an operator here.
+    """
     if not rows:
         return "The answer bank is empty."
-    cutoff = None if max_age_days is None else datetime.now() - timedelta(days=max_age_days)
+    cutoff = (
+        None if maximum_age_days is None else datetime.now() - timedelta(days=maximum_age_days)  # noqa: DTZ005 - the database stores naive local time
+    )
     noun = "entry" if len(rows) == 1 else "entries"
     lines = [f"# Answer bank — {len(rows)} {noun}\n"]
     for row in rows:
