@@ -1,9 +1,10 @@
 """Where the tailored-CV feature keeps its files.
 
-The pool, the templates and each job's generated documents. Every location is resolved from the config at call time, under the operator's
-home, so a test or a second profile that changes the home is honoured. This
-module imports nothing else from the package, which keeps it safe for anything
-that only needs a path (the doctor's link check, the answer layer's CV lookup).
+The pool, the templates and each job's generated documents. Every location is
+resolved from the config at call time, under the operator's home, so a test or
+a second profile that changes the home is honoured. This module imports nothing
+else from the package, which keeps it safe for anything that only needs a path
+(the doctor's link check, the answer layer's CV lookup).
 """
 
 from pathlib import Path

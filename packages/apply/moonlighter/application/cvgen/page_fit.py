@@ -26,9 +26,10 @@ class TailoredCV:
 
 def _discard(tex: Path) -> None:
     tex.unlink(missing_ok=True)
-    # The sibling .pdf goes too (see the round-6 comment): the cache
-    # short-circuits on cv.pdf BEFORE any compile, so a survivor would be
-    # served forever at zero LLM calls with the source .tex already gone.
+    # The sibling .pdf goes too (see the round-6 comment in service.py's
+    # `_cached_answer`): the cache short-circuits on cv.pdf BEFORE any compile,
+    # so a survivor would be served forever at zero LLM calls with the source
+    # .tex already gone.
     tex.with_suffix(".pdf").unlink(missing_ok=True)
     # The .log goes too: page_count (compile.py) reads it, and a stale one
     # left behind after the .tex it describes is gone is a landmine for any

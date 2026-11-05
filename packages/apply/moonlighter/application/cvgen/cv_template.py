@@ -37,7 +37,7 @@ def base_fields(template: str) -> BaseFields:
 
     Public because the bootstrap (cvgen/bootstrap.py) renders a SAMPLE of the
     pool it just drafted through the template it just filled, and that sample
-    needs the same two fields this module feeds the per-job generator. One
+    needs the same two fields service.py feeds the per-job generator. One
     definition, not two regexes drifting apart across modules — an empty
     string for either is a template that simply declares no base, exactly as
     the per-job path already treats it.
