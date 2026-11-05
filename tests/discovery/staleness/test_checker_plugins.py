@@ -5,9 +5,8 @@ from unittest.mock import AsyncMock, patch
 from moonlighter.discovery.sources.base import RawJob
 from moonlighter.discovery.staleness import find_stale_jobs
 
-from tests.discovery.staleness.fake_jobs import CONFIG, make_job, make_scanner
+from tests.discovery.staleness.fake_jobs import CHECKERS, CONFIG, make_job, make_scanner
 
-CHECKERS = "moonlighter.discovery.staleness.discover_entry_points_by_name"
 ACME_URL = "https://acme-ats.example/jobs/1"
 
 

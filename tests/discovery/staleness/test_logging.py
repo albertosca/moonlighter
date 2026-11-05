@@ -6,10 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from moonlighter.discovery.sources.base import SourceStats
 from moonlighter.discovery.staleness import find_stale_jobs
 
-from tests.discovery.staleness.fake_jobs import CONFIG, make_job, make_scanner
+from tests.discovery.staleness.fake_jobs import CHECKERS, CONFIG, make_job, make_scanner
 
 LOGGER = "moonlighter.discovery.staleness"
-CHECKERS = "moonlighter.discovery.staleness.discover_entry_points_by_name"
 
 
 def _staleness_records(caplog):

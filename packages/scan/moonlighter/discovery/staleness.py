@@ -99,7 +99,7 @@ def _portal_notes(portal_counts: dict[str, int]) -> list[str]:
 async def _run_plugin_checker(
     check: Callable[[], Awaitable[None]], source: str, company: str, *, result: StalenessResult
 ) -> None:
-    # Plugin-provided (untrusted, unlike the first-party listing check above) --
+    # Plugin-provided (untrusted, unlike the first-party _check_via_listing) --
     # guard the call so one misbehaving checker can't abort the whole run.
     try:
         await check()

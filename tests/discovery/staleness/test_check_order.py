@@ -7,9 +7,7 @@ import pytest
 from moonlighter.discovery.sources.base import RawJob
 from moonlighter.discovery.staleness import find_stale_jobs
 
-from tests.discovery.staleness.fake_jobs import CONFIG, make_job, make_scanner
-
-CHECKERS = "moonlighter.discovery.staleness.discover_entry_points_by_name"
+from tests.discovery.staleness.fake_jobs import CHECKERS, CONFIG, make_job, make_scanner
 
 
 async def test_a_listing_source_is_checked_by_its_listing_before_any_checker_plugin():

@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 CONFIG: dict = {}
+CHECKERS = "moonlighter.discovery.staleness.discover_entry_points_by_name"
 
 
 def make_job(

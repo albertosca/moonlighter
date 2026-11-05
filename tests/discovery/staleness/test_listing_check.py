@@ -23,7 +23,7 @@ async def test_job_still_in_listing_is_not_stale():
 async def test_stored_normalized_url_matches_raw_apply_suffix_in_listing():
     """CRITICAL regression: stored job.url is normalized, the listing's is not.
 
-    Task 5 strips the Recruitee /c/new apply suffix from the stored url, but the fresh
+    `normalize_job_url` strips the Recruitee /c/new apply suffix from the stored url, but the fresh
     listing still returns the raw careers_apply_url ending in /c/new. Comparing the two forms
     unnormalized would archive every freshly-stored Recruitee job as stale on its first
     re-scan — both sides must be normalized before comparing.
