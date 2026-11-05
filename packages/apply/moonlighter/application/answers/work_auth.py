@@ -1,6 +1,6 @@
-"""
-Country-dependent resolution of work-authorization / visa / sponsorship
-fields. Conservative by design: the job's country is only used when it can
+"""Country-dependent resolution of work-authorization / visa / sponsorship fields.
+
+Conservative by design: the job's country is only used when it can
 be confidently inferred; otherwise the field becomes the manual-review
 sentinel — never a guess (answering wrong about authorization is lying).
 """
@@ -51,8 +51,10 @@ _US_STATE_RE = re.compile(r",\s*(ca|ny|wa|tx)\b")
 
 
 def _canonical_country(value: str) -> str | None:
-    """Normalizes a country name (free-form, any locale) to the canonical form
-    used for comparison. Unknown (neither BR nor US) → None (becomes review)."""
+    """Normalizes a country name (free-form, any locale) to the canonical form used for comparison.
+
+    Unknown (neither BR nor US) → None (becomes review).
+    """
     text = value.strip().lower()
     if text in ("brazil", "brasil", "br"):
         return "brazil"
@@ -73,7 +75,10 @@ _SPONSORSHIP_RE = re.compile(
 )
 
 
-def infer_country(location: str | None, remote_type: str | None) -> str | None:
+def infer_country(
+    location: str | None,
+    remote_type: str | None,  # noqa: ARG001 - kept for the call contract; the job's remote type cannot yet change the inferred country
+) -> str | None:
     """Returns 'brazil', 'united states', or None (when it can't be asserted)."""
     text = (location or "").lower()
     if any(marker in text for marker in _BRAZIL_MARKERS):
@@ -88,9 +93,9 @@ def infer_country(location: str | None, remote_type: str | None) -> str | None:
 
 
 def resolve_work_auth(field_label: str, country: str | None, config: dict[str, Any]) -> str | None:
-    """
-    For authorization/sponsorship fields returns the correct answer for the country,
-    or the review sentinel when the country is unknown. Returns None if the field
+    """Returns the correct answer for the country on an authorization/sponsorship field.
+
+    Returns the review sentinel when the country is unknown, and None if the field
     is not authorization-related (then the LLM handles it).
     """
     work_authorization = config.get("work_authorization", {}) or {}

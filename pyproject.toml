@@ -114,7 +114,6 @@ strict-checking = true
 "packages/apply/moonlighter/application/answers/__init__.py" = ["D104"]
 "packages/apply/moonlighter/application/answers/compliance.py" = ["D205", "D209"]
 "packages/apply/moonlighter/application/answers/cv.py" = ["D205", "D212", "PLC0415"]
-"packages/apply/moonlighter/application/answers/work_auth.py" = ["ARG001", "D205", "D209", "D212"]
 "packages/apply/moonlighter/application/cli.py" = ["C901", "I001", "PLC0415", "PLR0912", "PLR0915"]
 "packages/apply/moonlighter/application/cvgen/__init__.py" = ["D104"]
 "packages/apply/moonlighter/application/cvgen/bootstrap.py" = ["C901", "D205", "D209", "PLR2004"]
