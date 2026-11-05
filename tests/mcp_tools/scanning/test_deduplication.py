@@ -42,7 +42,7 @@ def _scan_patches(raw_jobs, eval_mock):
         )
     )
 
-    async def _batch(jobs, profile, model, caller):  # noqa: PLR0917 - stands in for evaluate_jobs_batch, the code under test calls positionally
+    async def _batch(jobs, profile, model, *, caller):
         # Calls eval_mock per job; errors (spend limit) propagate to evaluate_chunk.
         return [
             await eval_mock(job.company, job.title, job.description, profile, model, caller)

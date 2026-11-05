@@ -53,7 +53,7 @@ def make_eval_result(score=8.0):
 def batch_of(result):
     """Mock of evaluate_jobs_batch that returns [result] for each job in the batch."""
 
-    async def _batch(jobs, profile, model, caller):  # noqa: PLR0917 - stands in for evaluate_jobs_batch, the code under test calls positionally
+    async def _batch(jobs, profile, model, *, caller):
         return [result for _ in jobs]
 
     return _batch

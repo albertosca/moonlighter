@@ -1,6 +1,6 @@
 """reopen_job brings back only an archived job."""
 
-import datetime as dt
+from datetime import datetime
 
 from moonlighter.core.db import Job, init_db
 from moonlighter.mcp_tools.jobs import reopen_job
@@ -17,7 +17,7 @@ async def test_reopen_job_brings_an_archived_job_back_to_reviewed(temporary_data
         temporary_database,
         url="https://x.com/reopen1",
         status="archived",
-        closed_at=dt.datetime(2026, 9, 1),  # noqa: DTZ001 - the models store naive local timestamps, so the test builds one the same way
+        closed_at=datetime(2026, 9, 1),  # noqa: DTZ001 - the models store naive local timestamps, so the test builds one the same way
     )
 
     result = await reopen_job(job_id=job.id)

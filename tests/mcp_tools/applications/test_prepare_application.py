@@ -31,7 +31,7 @@ async def test_prepare_application_tool_delegates_to_assisted_service(monkeypatc
 async def test_prepare_application_from_paste_tool_delegates_to_assisted_service(monkeypatch):
     called = {}
 
-    async def fake_prepare_from_paste(job_id, page_text, config, profile):  # noqa: PLR0917 - stands in for the assisted service, the code under test calls positionally
+    async def fake_prepare_from_paste(job_id, page_text, config, *, profile):
         called["args"] = (job_id, page_text)
         return SheetResult(
             kind=SheetKind.JOB_NOT_FOUND,

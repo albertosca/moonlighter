@@ -1,5 +1,8 @@
+"""Startup checks: configuration problems reported once at boot, not per call mid-scan."""
+
 import os
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -23,10 +26,12 @@ def validate_startup(
     profile: dict[str, Any],
     cv_path: str | None = None,
 ) -> list[StartupWarning]:
-    """Inspects the environment and returns configuration warnings/errors. Empty list =
-    everything ok. 'error' = critical functionality unavailable.
-    cv_path: if None, resolves the CV through config exactly as the applier does,
-    falling back to <MOONLIGHTER_HOME>/cv.pdf when config maps nothing."""
+    """Inspect the environment and return configuration warnings and errors.
+
+    An empty list means everything is ok; 'error' means critical functionality is
+    unavailable. `cv_path`, when None, resolves the CV through config exactly as the
+    applier does, falling back to <MOONLIGHTER_HOME>/cv.pdf when config maps nothing.
+    """
     configured = configured_cv_path(config)
     resume_path = cv_path or str(configured or moonlighter_home() / "cv.pdf")
     checks = [
@@ -63,55 +68,60 @@ def _check_location_precedence(profile: dict[str, Any]) -> StartupWarning | None
     )
 
 
-def _check_llm_backend(config: dict[str, Any]) -> StartupWarning | None:
-    """Whichever backend is configured needs its own credential to exist.
-
-    Every arm is checked, from the same resolved backend: guarding only the
-    api arm left `llm_backend: cli` without an installed `claude` to fail per
-    job, mid-scan, instead of once at startup.
-    """
-    backend = llm_backend(config)
-    if backend == "api":
-        if os.environ.get("ANTHROPIC_API_KEY"):
-            return None
-        return StartupWarning(
-            "error",
+_BACKEND_CREDENTIALS: dict[str, tuple[Callable[[], bool], str]] = {
+    "api": (
+        lambda: bool(os.environ.get("ANTHROPIC_API_KEY")),
+        (
             "llm_backend is 'api' but ANTHROPIC_API_KEY is not in the environment "
             "nor in ~/.config/anthropic/api.env. "
             "scan_and_evaluate and prepare_application will not work. Set the key, or switch to "
-            "llm_backend: cli in config.yaml to use your Claude subscription instead.",
-        )
-    if backend == "cursor":
-        if cursor_executable() is not None:
-            return None
-        return StartupWarning(
-            "error",
+            "llm_backend: cli in config.yaml to use your Claude subscription instead."
+        ),
+    ),
+    "cursor": (
+        lambda: cursor_executable() is not None,
+        (
             "llm_backend is 'cursor' but the `agent` CLI was not found on PATH. "
             "scan_and_evaluate and prepare_application will not work. "
-            "Install the Cursor CLI and run `agent login`.",
-        )
-    if backend == "codex":
-        if codex_executable() is not None:
-            return None
-        return StartupWarning(
-            "error",
+            "Install the Cursor CLI and run `agent login`."
+        ),
+    ),
+    "codex": (
+        lambda: codex_executable() is not None,
+        (
             "llm_backend is 'codex' but the `codex` CLI was not found on PATH. "
             "scan_and_evaluate and prepare_application will not work. "
-            "Install the Codex CLI and run `codex login` with your ChatGPT account.",
-        )
-    if shutil.which("claude") is not None:
+            "Install the Codex CLI and run `codex login` with your ChatGPT account."
+        ),
+    ),
+    "cli": (
+        lambda: shutil.which("claude") is not None,
+        (
+            "llm_backend is 'cli' but the `claude` CLI was not found on PATH. "
+            "scan_and_evaluate and prepare_application will not work. Install Claude Code, or switch to "
+            "llm_backend: api in config.yaml and set ANTHROPIC_API_KEY."
+        ),
+    ),
+}
+
+
+def _check_llm_backend(config: dict[str, Any]) -> StartupWarning | None:
+    """Whichever backend is configured needs its own credential to exist.
+
+    Every backend is checked, from the same resolved backend: guarding only the
+    api one left `llm_backend: cli` without an installed `claude` to fail per
+    job, mid-scan, instead of once at startup. Each check looks its function up
+    when it runs, so a test that patches `cursor_executable` or `shutil.which`
+    in this module still reaches it.
+    """
+    is_available, message = _BACKEND_CREDENTIALS[llm_backend(config)]
+    if is_available():
         return None
-    return StartupWarning(
-        "error",
-        "llm_backend is 'cli' but the `claude` CLI was not found on PATH. "
-        "scan_and_evaluate and prepare_application will not work. Install Claude Code, or switch to "
-        "llm_backend: api in config.yaml and set ANTHROPIC_API_KEY.",
-    )
+    return StartupWarning("error", message)
 
 
 def _check_cv(cv_path: str) -> StartupWarning | None:
-    """Missing CV → prepare_application can't name a file to attach for the form's
-    upload question."""
+    """Missing CV: prepare_application can't name a file to attach for the form's upload question."""
     if Path(cv_path).exists():
         return None
     return StartupWarning(
@@ -123,8 +133,10 @@ def _check_cv(cv_path: str) -> StartupWarning | None:
 
 
 def _check_browser(config: dict[str, Any]) -> StartupWarning | None:
-    """Missing browser → a browser-based scan extension (e.g. LinkedIn), if installed,
-    won't work. moonlighter itself never opens a browser (see DISCLAIMER.md)."""
+    """Missing browser: a browser-based scan extension (e.g. LinkedIn) won't work.
+
+    moonlighter itself never opens a browser (see DISCLAIMER.md).
+    """
     browser_path = browser_executable(config)
     if not browser_path or Path(browser_path).exists():
         return None

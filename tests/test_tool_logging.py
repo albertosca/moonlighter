@@ -1,4 +1,5 @@
 import inspect
+import logging
 
 from moonlighter._tool_logging import tool_logged
 
@@ -12,8 +13,6 @@ async def test_returns_value_unchanged():
 
 
 async def test_logs_start_and_end(caplog):
-    import logging
-
     @tool_logged
     async def sample() -> str:
         return "ok"
@@ -26,8 +25,6 @@ async def test_logs_start_and_end(caplog):
 
 
 async def test_unexpected_exception_returns_uniform_line_and_logs(caplog):
-    import logging
-
     @tool_logged
     async def sample() -> str:
         raise RuntimeError("boom")

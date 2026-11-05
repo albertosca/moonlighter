@@ -10,28 +10,35 @@ toward the end, and never hides a job. Incremental by design — two recent
 rejections weigh more than one.
 """
 
-import datetime
+from datetime import datetime
 
 from moonlighter.core.db import Application, Job
 
 REJECTION_WINDOW_DAYS = 90
 
 
-def company_rejection_ages(now: datetime.datetime | None = None) -> dict[str, list[float]]:
-    """Ages (in days) of every rejected Application, keyed by lowercased
-    company — 'Holepunch' and 'holepunch' are the same employer."""
-    now = now or datetime.datetime.now()
+def company_rejection_ages(now: datetime | None = None) -> dict[str, list[float]]:
+    """Ages, in days, of every rejected Application, keyed by lowercased company.
+
+    'Holepunch' and 'holepunch' are the same employer.
+    """
+    now = now or datetime.now()  # noqa: DTZ005 - the database stores naive local time
     ages: dict[str, list[float]] = {}
     query = Application.select(Application, Job).join(Job).where(Application.status == "rejected")
-    for app in query:
-        when = app.updated_at or now
-        ages.setdefault(app.job.company.lower(), []).append((now - when).total_seconds() / 86400)
+    for application in query:
+        when = application.updated_at or now  # type: ignore[truthy-bool]  # a datetime is always truthy; the fallback guards NULL rows the column type does not admit
+        ages.setdefault(application.job.company.lower(), []).append(
+            (now - when).total_seconds() / 86400
+        )
     return ages
 
 
 def rejection_penalty(ages: list[float]) -> float:
-    """Score points to subtract at sort time: each rejection inside the window
-    contributes linearly from 1.0 (today) down to 0.0 (window edge)."""
+    """Score points to subtract at sort time.
+
+    Each rejection inside the window contributes linearly from 1.0 (today) down to
+    0.0 (window edge).
+    """
     return sum(max(0.0, 1.0 - age / REJECTION_WINDOW_DAYS) for age in ages)
 
 

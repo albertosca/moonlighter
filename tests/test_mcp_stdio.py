@@ -23,7 +23,7 @@ def _request(request_id: int, method: str, params: dict | None = None) -> bytes:
     return (json.dumps(message) + "\n").encode()
 
 
-def _read_answers(stdout, answers: dict, wanted: set, done: threading.Event) -> None:
+def _read_answers(stdout, answers: dict, wanted: set, *, done: threading.Event) -> None:
     for line in stdout:
         message = json.loads(line)
         if message.get("id") in wanted:
@@ -45,7 +45,10 @@ def test_server_answers_initialize_and_lists_its_tools(tmp_path: Path):
     answers: dict = {}
     done = threading.Event()
     reader = threading.Thread(
-        target=_read_answers, args=(server.stdout, answers, {1, 2}, done), daemon=True
+        target=_read_answers,
+        args=(server.stdout, answers, {1, 2}),
+        kwargs={"done": done},
+        daemon=True,
     )
     reader.start()
     try:

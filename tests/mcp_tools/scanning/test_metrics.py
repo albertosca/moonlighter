@@ -31,7 +31,7 @@ async def test_scan_and_evaluate_logs_one_metrics_summary(temporary_database, ca
         for index in range(3)
     ]
 
-    async def _batch_records_calls(jobs, profile, model, caller):  # noqa: PLR0917 - stands in for evaluate_jobs_batch, the code under test calls positionally
+    async def _batch_records_calls(jobs, profile, model, *, caller):
         result = make_eval_result(score=8.0)
         out = []
         for _ in jobs:
@@ -83,7 +83,7 @@ async def test_scan_and_evaluate_spend_limit_abort_increments_hits(temporary_dat
         )
     ]
 
-    async def _batch_raises_spend_limit(jobs, profile, model, caller):  # noqa: PLR0917 - stands in for evaluate_jobs_batch, the code under test calls positionally
+    async def _batch_raises_spend_limit(jobs, profile, model, *, caller):
         # Deliberately does NOT call record_spend_limit_hit() itself — the
         # production `except is_spend_limit(e)` catch site in
         # moonlighter.discovery.pipeline is what must record the hit, exactly

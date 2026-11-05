@@ -1,3 +1,5 @@
+"""The wrapper every MCP tool goes through: timing, logging and one uniform failure line."""
+
 import functools
 import time
 from collections.abc import Awaitable, Callable
@@ -8,25 +10,27 @@ from moonlighter.core.log import get_logger
 logger = get_logger(__name__)
 
 
-def tool_logged(func: Callable[..., Awaitable[str]]) -> Callable[..., Awaitable[str]]:
-    """Wrap an MCP tool coroutine: log start/end/elapsed, and turn any *unexpected*
-    exception into a uniform client-facing line while logging the full traceback.
+def tool_logged(tool: Callable[..., Awaitable[str]]) -> Callable[..., Awaitable[str]]:
+    """Wrap an MCP tool coroutine to log start, end and elapsed time.
+
+    Any *unexpected* exception becomes a uniform client-facing line, and the full
+    traceback goes to the log.
 
     Expected domain errors (a tool returning a friendly 'not found' string) never reach
     the catch — the tool returns first. Only a raised exception is caught here.
     """
-    name = func.__name__
+    name = tool.__name__
 
-    @functools.wraps(func)
-    async def wrapper(*args: Any, **kwargs: Any) -> str:
+    @functools.wraps(tool)
+    async def wrapper(*positional_arguments: Any, **keyword_arguments: Any) -> str:
         logger.info("tool=%s start", name)
-        t0 = time.monotonic()
+        started_at = time.monotonic()
         try:
-            return await func(*args, **kwargs)
-        except Exception as exc:
+            return await tool(*positional_arguments, **keyword_arguments)
+        except Exception as error:
             logger.exception("tool=%s failed", name)
-            return f"⚠️ tool '{name}' failed: {exc}"
+            return f"⚠️ tool '{name}' failed: {error}"
         finally:
-            logger.info("tool=%s end elapsed=%.1fs", name, time.monotonic() - t0)
+            logger.info("tool=%s end elapsed=%.1fs", name, time.monotonic() - started_at)
 
     return wrapper

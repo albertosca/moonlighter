@@ -1,6 +1,6 @@
 """What list_jobs shows: filters, ordering, badges and salary marks."""
 
-import datetime as dt
+from datetime import datetime, timedelta
 
 from moonlighter.core.db import init_db
 from moonlighter.mcp_tools.jobs import list_jobs
@@ -33,7 +33,7 @@ async def test_list_jobs_reorders_and_badges_recently_rejected_companies(tempora
     create_application(
         rejected_job,
         status="rejected",
-        updated_at=dt.datetime.now() - dt.timedelta(days=8),  # noqa: DTZ005 - the models store naive local timestamps, so the test builds one the same way
+        updated_at=datetime.now() - timedelta(days=8),  # noqa: DTZ005 - the models store naive local timestamps, so the test builds one the same way
     )
     create_job(temporary_database, company="Holepunch", url="https://x.com/lj/new", score=8.0)
 
