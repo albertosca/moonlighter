@@ -62,3 +62,49 @@ def test_format_archive_result_lists_jobs_to_confirm_by_hand():
     assert "#42 | 7.5 | reviewed | 12d | Flywheel — Backend Engineer" in formatted
     assert "https://hiring.example/jobs/7" in formatted
     assert "#43 | — | needs_review | ?d | Acme — Engineer" in formatted
+
+
+def test_format_archive_result_orders_its_sections_with_blank_lines_between_them():
+    result = ArchiveResult(
+        archived=[{"company": "acme", "title": "Engineer", "url": "https://x.com/1"}],
+        aged=[{"company": "globex", "title": "Designer", "url": "https://x.com/2"}],
+        max_age_days=30,
+        to_confirm=[
+            {
+                "id": 42,
+                "score": 8,
+                "status": "reviewed",
+                "age_days": 12,
+                "company": "Flywheel",
+                "title": "Backend Engineer",
+                "url": "https://hiring.example/jobs/7",
+            }
+        ],
+        failed_companies=["beta", "gamma"],
+    )
+    assert format_archive_result(result) == (
+        "1 job(s) archived (closed at source):\n"
+        "  - acme / Engineer — https://x.com/1\n"
+        "1 portal job(s) archived by age "
+        "(older than 30 days; a portal feed cannot be re-checked):\n"
+        "  - globex / Designer — https://x.com/2\n"
+        "\n"
+        "1 job(s) have no listing to check against — open each link and say which are closed:\n"
+        "  #42 | 8.0 | reviewed | 12d | Flywheel — Backend Engineer\n"
+        "    https://hiring.example/jobs/7\n"
+        "\n"
+        "⚠️  Could not check: beta, gamma"
+    )
+
+
+def test_format_archive_result_with_only_aged_jobs_still_opens_with_no_closed_jobs():
+    result = ArchiveResult(
+        aged=[{"company": "globex", "title": "Designer", "url": "https://x.com/2"}],
+        max_age_days=14,
+    )
+    assert format_archive_result(result) == (
+        "No closed jobs found.\n"
+        "1 portal job(s) archived by age "
+        "(older than 14 days; a portal feed cannot be re-checked):\n"
+        "  - globex / Designer — https://x.com/2"
+    )

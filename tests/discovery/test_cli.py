@@ -129,3 +129,18 @@ def test_scan_help_carries_the_slice_epilog(capsys):
         parse_args(["--help"])
     assert exit_info.value.code == 0
     assert "installed:" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("kind", "extra"),
+    [
+        (ScanKind.ALL_KNOWN, {"company": "acme", "found_but_known": 2}),
+        (ScanKind.NO_OPEN_JOBS, {"company": "acme"}),
+    ],
+)
+async def test_run_with_nothing_to_report_for_a_company_exits_1(temporary_database, kind, extra):
+    from moonlighter.discovery.cli import _run, parse_args
+
+    with _patched(ScanReport(kind=kind, threshold=6.5, **extra)):
+        payload, code = await _run(parse_args(["--company", "greenhouse", "acme"]))
+    assert (payload["kind"], code) == (kind.value, 1)
