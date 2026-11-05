@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from moonlighter.discovery.portals import scan_portals
+from moonlighter.discovery.scan.portals import scan_portals
 from moonlighter.discovery.sources.job_feeds.weworkremotely import WeWorkRemotelyScanner
 
 
@@ -36,7 +36,7 @@ async def test_wwr_reads_the_all_jobs_feed_unless_a_category_is_configured():
 
 
 async def test_wwr_dispatch_passes_the_configured_category():
-    with patch("moonlighter.discovery.portals.WeWorkRemotelyScanner") as mock_scanner:
+    with patch("moonlighter.discovery.scan.portals.WeWorkRemotelyScanner") as mock_scanner:
         mock_scanner.return_value.scan = AsyncMock(return_value=[])
         await scan_portals({"scan_wwr": True, "wwr_category": "design"}, {}, "")
     mock_scanner.return_value.scan.assert_awaited_once_with(category="design", stats={})

@@ -30,11 +30,12 @@ async def test_scan_status_archived_if_below_threshold(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
+            "moonlighter.discovery.scan.pipeline.evaluate_jobs_batch",
             new=batch_of(make_eval_result(score=3.0)),
         ),
         patch(
-            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scan.scanning.load_company_list",
+            return_value={"greenhouse": ["co"]},
         ),
     ):
         mock_greenhouse.return_value.scan = AsyncMock(return_value=[raw])
@@ -74,11 +75,11 @@ async def test_scan_saves_salary_fields(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
+            "moonlighter.discovery.scan.pipeline.evaluate_jobs_batch",
             new=batch_of(eval_result),
         ),
         patch(
-            "moonlighter.discovery.scanning.load_company_list",
+            "moonlighter.discovery.scan.scanning.load_company_list",
             return_value={"greenhouse": ["stripe"]},
         ),
     ):
@@ -114,11 +115,12 @@ async def test_scan_saves_caveats_as_json(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
+            "moonlighter.discovery.scan.pipeline.evaluate_jobs_batch",
             new=batch_of(eval_result),
         ),
         patch(
-            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scan.scanning.load_company_list",
+            return_value={"greenhouse": ["co"]},
         ),
     ):
         mock_greenhouse.return_value.scan = AsyncMock(return_value=[raw])

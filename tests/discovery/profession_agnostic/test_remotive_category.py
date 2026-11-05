@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock, patch
 
-from moonlighter.discovery.portals import scan_portals
+from moonlighter.discovery.scan.portals import scan_portals
 from moonlighter.discovery.sources.job_feeds.remotive import RemotiveScanner
 
 
@@ -39,7 +39,7 @@ async def test_remotive_asks_for_no_category_unless_configured():
 
 
 async def test_remotive_dispatch_passes_the_configured_category():
-    with patch("moonlighter.discovery.portals.RemotiveScanner") as mock_scanner:
+    with patch("moonlighter.discovery.scan.portals.RemotiveScanner") as mock_scanner:
         mock_scanner.return_value.scan = AsyncMock(return_value=[])
         await scan_portals({"scan_remotive": True, "remotive_category": "design"}, {}, "")
     mock_scanner.return_value.scan.assert_awaited_once_with(category="design", stats={})

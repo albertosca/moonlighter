@@ -10,7 +10,7 @@ class ScannerSessionExpiredError(Exception):
     """Raised by a browser-based scanner (see BaseScanner) when its session needs re-authentication.
 
     The page it's driving redirects to a login/checkpoint wall instead of
-    showing results. The generic dispatcher in discovery/collection.py catches
+    showing results. The generic dispatcher in discovery/scan/collection.py catches
     this by base type, so any scanner (public or a privately-registered plugin)
     can signal it without the dispatcher needing to import that scanner's own
     exception type.

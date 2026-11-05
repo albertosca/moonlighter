@@ -21,7 +21,7 @@ def make_test_context(
 
     llm_caller defaults to a MagicMock, never None: the real server (server.lifespan)
     always hands the scan a real caller from make_caller(config), and --no-eval is
-    the NO_EVAL marker of moonlighter.discovery.no_eval, not None. A test that does
+    the NO_EVAL marker of moonlighter.discovery.screening.no_eval, not None. A test that does
     not care about the caller (it patches evaluate_job / evaluate_jobs_batch directly)
     must still exercise the evaluated path.
     """

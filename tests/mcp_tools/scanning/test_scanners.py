@@ -49,11 +49,12 @@ async def test_scan_linkedin_failure_doesnt_block(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
+            "moonlighter.discovery.scan.pipeline.evaluate_jobs_batch",
             new=batch_of(make_eval_result(score=8.0)),
         ),
         patch(
-            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scan.scanning.load_company_list",
+            return_value={"greenhouse": ["co"]},
         ),
     ):
         mock_greenhouse.return_value.scan = AsyncMock(return_value=[raw])
@@ -79,7 +80,7 @@ async def test_scan_registered_scanner_session_expired_shows_warning(temporary_d
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.collection.discover_entry_points",
+            "moonlighter.discovery.scan.collection.discover_entry_points",
             return_value=[_FakeSessionExpiredSource],
         ),
     ):
@@ -117,15 +118,15 @@ async def test_scan_registered_scanner_session_expired_does_not_block_http_resul
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.collection.discover_entry_points",
+            "moonlighter.discovery.scan.collection.discover_entry_points",
             return_value=[_FakeSessionExpiredSource],
         ),
         patch(
-            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
+            "moonlighter.discovery.scan.pipeline.evaluate_jobs_batch",
             new=batch_of(make_eval_result(score=8.0)),
         ),
         patch(
-            "moonlighter.discovery.scanning.load_company_list",
+            "moonlighter.discovery.scan.scanning.load_company_list",
             return_value={"greenhouse": ["stripe"]},
         ),
     ):

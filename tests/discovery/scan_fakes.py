@@ -4,8 +4,8 @@ from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.discovery.evaluation.models import EvaluationResult
-from moonlighter.discovery.results import render_scan_report
-from moonlighter.discovery.scanning import scan_and_evaluate
+from moonlighter.discovery.scan.results import render_scan_report
+from moonlighter.discovery.scan.scanning import scan_and_evaluate
 from moonlighter.discovery.sources.base import RawJob
 
 CONFIG = {
@@ -95,10 +95,13 @@ async def run_scan(  # noqa: PLR0913 - every knob a scan test turns, all keyword
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as mock_lever,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=_batch),
-        patch("moonlighter.discovery.collection.discover_entry_points", return_value=registered),
+        patch("moonlighter.discovery.scan.pipeline.evaluate_jobs_batch", new=_batch),
         patch(
-            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scan.collection.discover_entry_points", return_value=registered
+        ),
+        patch(
+            "moonlighter.discovery.scan.scanning.load_company_list",
+            return_value={"greenhouse": ["co"]},
         ),
     ):
         mock_greenhouse.return_value.scan = AsyncMock(return_value=raws)

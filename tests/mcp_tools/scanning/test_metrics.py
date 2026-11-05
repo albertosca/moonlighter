@@ -48,9 +48,10 @@ async def test_scan_and_evaluate_logs_one_metrics_summary(temporary_database, ca
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as mock_lever,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=_batch_records_calls),
+        patch("moonlighter.discovery.scan.pipeline.evaluate_jobs_batch", new=_batch_records_calls),
         patch(
-            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scan.scanning.load_company_list",
+            return_value={"greenhouse": ["co"]},
         ),
     ):
         mock_greenhouse.return_value.scan = AsyncMock(return_value=raws)
@@ -88,7 +89,7 @@ async def test_scan_and_evaluate_spend_limit_abort_increments_hits(temporary_dat
     async def _batch_raises_spend_limit(jobs, profile, model, *, caller):
         # Deliberately does NOT call record_spend_limit_hit() itself — the
         # production `except is_spend_limit(e)` catch site in
-        # moonlighter.discovery.pipeline is what must record the hit, exactly
+        # moonlighter.discovery.scan.pipeline is what must record the hit, exactly
         # once, before propagating.
         raise RuntimeError("spend limit reached")
 
@@ -100,9 +101,12 @@ async def test_scan_and_evaluate_spend_limit_abort_increments_hits(temporary_dat
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as mock_lever,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=_batch_raises_spend_limit),
         patch(
-            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scan.pipeline.evaluate_jobs_batch", new=_batch_raises_spend_limit
+        ),
+        patch(
+            "moonlighter.discovery.scan.scanning.load_company_list",
+            return_value={"greenhouse": ["co"]},
         ),
     ):
         mock_greenhouse.return_value.scan = AsyncMock(return_value=raws)

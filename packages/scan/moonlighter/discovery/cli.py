@@ -32,9 +32,9 @@ from moonlighter.core.cli import (
 from moonlighter.core.doctor import doctor_payload
 from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.slices import slice_epilog
-from moonlighter.discovery.no_eval import NO_EVAL
-from moonlighter.discovery.results import ScanKind, ScanReport, scan_report_to_dict
-from moonlighter.discovery.scanning import scan_and_evaluate, scan_company
+from moonlighter.discovery.scan.results import ScanKind, ScanReport, scan_report_to_dict
+from moonlighter.discovery.scan.scanning import scan_and_evaluate, scan_company
+from moonlighter.discovery.screening.no_eval import NO_EVAL
 
 _EXIT_BY_KIND = {
     ScanKind.EVALUATED: EXIT_OK,

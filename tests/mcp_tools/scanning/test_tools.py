@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.archive import ArchiveResult, ArchiveStaleJobsError
-from moonlighter.discovery.results import ScanKind, ScanReport
+from moonlighter.discovery.scan.results import ScanKind, ScanReport
 from moonlighter.mcp_tools.scanning import add_job, archive_stale_jobs, scan_company, verify_job
 
 from tests._context import make_test_context
@@ -16,7 +16,7 @@ async def test_scan_company_tool_delegates_to_service(temporary_database):
 
     fake_report = ScanReport(kind=ScanKind.UNKNOWN_SOURCE, threshold=6.5, error="report")
     with patch(
-        "moonlighter.discovery.scanning.scan_company", new=AsyncMock(return_value=fake_report)
+        "moonlighter.discovery.scan.scanning.scan_company", new=AsyncMock(return_value=fake_report)
     ) as mock_scan_company:
         result = await scan_company("greenhouse", "stripe", context=make_test_context())
     assert result == "report"
@@ -31,7 +31,7 @@ async def test_add_job_tool_delegates_to_service(temporary_database):
     init_db()
 
     with patch(
-        "moonlighter.discovery.manual_jobs.evaluate_job",
+        "moonlighter.discovery.manual.jobs.evaluate_job",
         new=AsyncMock(return_value=make_eval_result(8.0)),
     ):
         result = await add_job(
@@ -57,7 +57,7 @@ async def test_verify_job_tool_delegates_to_service(temporary_database):
         score=None,
     )
     with patch(
-        "moonlighter.discovery.manual_jobs.evaluate_job",
+        "moonlighter.discovery.manual.jobs.evaluate_job",
         new=AsyncMock(return_value=make_eval_result(8.0)),
     ):
         result = await verify_job(

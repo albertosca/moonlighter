@@ -48,10 +48,12 @@ def _scan_patches(raw_jobs, eval_mock):
             for job in jobs
         ]
 
-    stack.enter_context(patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=_batch))
+    stack.enter_context(
+        patch("moonlighter.discovery.scan.pipeline.evaluate_jobs_batch", new=_batch)
+    )
     stack.enter_context(
         patch(
-            "moonlighter.discovery.scanning.load_company_list",
+            "moonlighter.discovery.scan.scanning.load_company_list",
             return_value={"greenhouse": ["co"]},
         )
     )
@@ -144,9 +146,10 @@ async def test_scan_dedup_against_scan_log(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as mock_lever,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch") as mock_batch,
+        patch("moonlighter.discovery.scan.pipeline.evaluate_jobs_batch") as mock_batch,
         patch(
-            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scan.scanning.load_company_list",
+            return_value={"greenhouse": ["co"]},
         ),
     ):
         mock_greenhouse.return_value.scan = AsyncMock(return_value=[raw])

@@ -32,9 +32,10 @@ async def test_scan_concurrent_batch_all_processed(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as mock_lever,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=mock_batch),
+        patch("moonlighter.discovery.scan.pipeline.evaluate_jobs_batch", new=mock_batch),
         patch(
-            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scan.scanning.load_company_list",
+            return_value={"greenhouse": ["co"]},
         ),
     ):
         mock_greenhouse.return_value.scan = AsyncMock(return_value=raws)
@@ -82,9 +83,10 @@ async def test_scan_non_spend_error_keeps_title_filtered_in_report(temporary_dat
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as mock_lever,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=mock_batch),
+        patch("moonlighter.discovery.scan.pipeline.evaluate_jobs_batch", new=mock_batch),
         patch(
-            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scan.scanning.load_company_list",
+            return_value={"greenhouse": ["co"]},
         ),
     ):
         mock_greenhouse.return_value.scan = AsyncMock(return_value=raws)
@@ -138,9 +140,12 @@ async def test_scan_chunk_crash_outside_try_except_does_not_break_whole_scan(tem
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as mock_lever,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.screening.claim", side_effect=Exception("db corrupted")),
         patch(
-            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.screening.prefilter.claim", side_effect=Exception("db corrupted")
+        ),
+        patch(
+            "moonlighter.discovery.scan.scanning.load_company_list",
+            return_value={"greenhouse": ["co"]},
         ),
     ):
         mock_greenhouse.return_value.scan = AsyncMock(return_value=raws)

@@ -103,11 +103,12 @@ async def test_scan_all_below_threshold(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
+            "moonlighter.discovery.scan.pipeline.evaluate_jobs_batch",
             new=batch_of(make_eval_result(score=4.0)),
         ),
         patch(
-            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scan.scanning.load_company_list",
+            return_value={"greenhouse": ["co"]},
         ),
     ):
         mock_greenhouse.return_value.scan = AsyncMock(return_value=[raw])
@@ -139,11 +140,11 @@ async def test_scan_above_threshold_shows_table(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
         patch(
-            "moonlighter.discovery.pipeline.evaluate_jobs_batch",
+            "moonlighter.discovery.scan.pipeline.evaluate_jobs_batch",
             new=batch_of(make_eval_result(score=8.0)),
         ),
         patch(
-            "moonlighter.discovery.scanning.load_company_list",
+            "moonlighter.discovery.scan.scanning.load_company_list",
             return_value={"greenhouse": ["stripe"]},
         ),
     ):

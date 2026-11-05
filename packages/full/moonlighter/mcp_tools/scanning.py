@@ -7,10 +7,11 @@ from mcp.server.mcpserver import Context
 from moonlighter._tool_logging import tool_logged
 from moonlighter.app_context import AppContext, refreshed_app_context
 from moonlighter.core.metrics import operation_metrics
-from moonlighter.discovery import archive, manual_jobs
-from moonlighter.discovery import scanning as discovery_scanning
+from moonlighter.discovery import archive
 from moonlighter.discovery.archive import ArchiveStaleJobsError, format_archive_result
-from moonlighter.discovery.results import render_scan_report
+from moonlighter.discovery.manual import jobs as manual_jobs
+from moonlighter.discovery.scan import scanning as discovery_scanning
+from moonlighter.discovery.scan.results import render_scan_report
 
 
 @tool_logged

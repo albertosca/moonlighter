@@ -44,9 +44,10 @@ async def test_scan_spend_limit_midbatch_leaves_no_orphan_claims(temporary_datab
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as mock_lever,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=mock_batch),
+        patch("moonlighter.discovery.scan.pipeline.evaluate_jobs_batch", new=mock_batch),
         patch(
-            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scan.scanning.load_company_list",
+            return_value={"greenhouse": ["co"]},
         ),
     ):
         mock_greenhouse.return_value.scan = AsyncMock(return_value=raws)
@@ -103,9 +104,10 @@ async def test_scan_spend_limit_stops_further_batches(temporary_database):
         patch("moonlighter.discovery.sources.company_boards.lever.LeverScanner") as mock_lever,
         patch("moonlighter.discovery.sources.company_boards.ashby.AshbyScanner") as mock_ashby,
         patch("moonlighter.core.browser", create=True) as mock_browser,
-        patch("moonlighter.discovery.pipeline.evaluate_jobs_batch", new=mock_batch),
+        patch("moonlighter.discovery.scan.pipeline.evaluate_jobs_batch", new=mock_batch),
         patch(
-            "moonlighter.discovery.scanning.load_company_list", return_value={"greenhouse": ["co"]}
+            "moonlighter.discovery.scan.scanning.load_company_list",
+            return_value={"greenhouse": ["co"]},
         ),
     ):
         mock_greenhouse.return_value.scan = AsyncMock(return_value=raws)
