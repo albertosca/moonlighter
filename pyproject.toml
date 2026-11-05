@@ -114,7 +114,6 @@ strict-checking = true
 # BEGIN ratchet
 # Files not yet migrated to the profile above (plan 2026-11-04, showcase quality).
 # Each task deletes its files' lines; the block is empty and removed at the end.
-"tests/test_performance.py" = ["N806", "PLC0415", "PLR0917"]
 # END ratchet
 
 [tool.moonlighter.file-length]
