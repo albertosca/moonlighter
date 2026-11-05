@@ -77,7 +77,7 @@ def test_normalize_us_only_string():
 
 
 def test_rawjob_with_all_fields():
-    now = datetime.now()
+    now = datetime.now()  # noqa: DTZ005 - the database stores naive local time
     job = RawJob(
         source="greenhouse",
         company="Stripe",
@@ -104,7 +104,7 @@ def test_rawjob_source_values():
 
 
 def test_rawjob_posted_at_is_datetime():
-    now = datetime.now()
+    now = datetime.now()  # noqa: DTZ005 - the database stores naive local time
     job = RawJob(source="greenhouse", company="Co", title="Eng", url="https://x.com", posted_at=now)
     assert isinstance(job.posted_at, datetime)
 
