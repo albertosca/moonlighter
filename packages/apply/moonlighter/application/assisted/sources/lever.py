@@ -17,15 +17,16 @@ that disagrees with the questions read from the cards is markup drift (a renamed
 on its own. jobs.eu.lever.co was never observed and does not match.
 """
 
-import json
 import logging
 import re
 from html.parser import HTMLParser
-from typing import Any
+from typing import override
 
 import httpx
+
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sources.base import UUID_PATTERN, SourceMatch
+from moonlighter.application.assisted.sources.lever_cards import card_questions
 from moonlighter.core.db import Job
 
 APPLY_PAGE = "https://jobs.lever.co/{company}/{posting_id}/apply"
@@ -35,14 +36,6 @@ logger = logging.getLogger(__name__)
 
 _URL = re.compile(rf"https?://jobs\.lever\.co/(?P<company>[^/]+)/(?P<posting_id>{UUID_PATTERN})")
 
-_CARD_KINDS = {
-    "text": QuestionKind.TEXT,
-    "textarea": QuestionKind.LONG_TEXT,
-    "dropdown": QuestionKind.SINGLE_SELECT,
-    "multiple-choice": QuestionKind.SINGLE_SELECT,
-    "multiple-select": QuestionKind.MULTI_SELECT,
-}
-_CHOICE_KINDS = (QuestionKind.SINGLE_SELECT, QuestionKind.MULTI_SELECT)
 _REQUIRED_MARK = "✱"
 _ADDITIONAL_INFORMATION = FormQuestion(
     label="Additional information", kind=QuestionKind.LONG_TEXT, required=False
@@ -66,16 +59,23 @@ class _LeverFormParser(HTMLParser):
         self._label_parts: list[str] = []
         self._label_required = False
 
+    @override
     def handle_starttag(self, tag: str, attribute_pairs: list[tuple[str, str | None]]) -> None:
         attributes = dict(attribute_pairs)
         classes = (attributes.get("class") or "").split()
+        self._note_markup(tag, attributes, classes)
+        self._track_label(tag, classes)
+
+    def _note_markup(self, tag: str, attributes: dict[str, str | None], classes: list[str]) -> None:
         if tag == "li" and "custom-question" in classes:
             self.custom_question_count += 1
         if tag == "textarea" and attributes.get("name") == "comments":
             self.has_comments = True
         if tag == "input" and "[baseTemplate]" in (attributes.get("name") or ""):
             self.card_templates.append(attributes.get("value") or "")
-        elif tag == "li" and "application-question" in classes:
+
+    def _track_label(self, tag: str, classes: list[str]) -> None:
+        if tag == "li" and "application-question" in classes:
             self._question_classes = classes
         elif tag == "div" and "application-label" in classes and self._question_classes is not None:
             self._in_label = True
@@ -84,6 +84,7 @@ class _LeverFormParser(HTMLParser):
         elif tag == "span" and self._in_label and "required" in classes:
             self._label_required = True
 
+    @override
     def handle_endtag(self, tag: str) -> None:
         if tag != "div" or not self._in_label or self._question_classes is None:
             return
@@ -96,43 +97,10 @@ class _LeverFormParser(HTMLParser):
                 )
         self._question_classes = None
 
+    @override
     def handle_data(self, data: str) -> None:
         if self._in_label:
             self._label_parts.append(data)
-
-
-def _card_questions(template: str) -> list[FormQuestion]:
-    card = json.loads(template)
-    if not isinstance(card, dict):
-        raise ValueError("a Lever card template is not a JSON object")
-    fields = card.get("fields")
-    if not isinstance(fields, list):
-        raise ValueError("a Lever card template has no list of fields")
-    questions: list[FormQuestion] = []
-    for field in fields:
-        if not isinstance(field, dict) or not field.get("text"):
-            continue
-        kind = _CARD_KINDS.get(str(field.get("type")), QuestionKind.LONG_TEXT)
-        options = _options(field) if kind in _CHOICE_KINDS else ()
-        if kind in _CHOICE_KINDS and not options:
-            kind = QuestionKind.LONG_TEXT
-        questions.append(
-            FormQuestion(
-                label=str(field["text"]),
-                kind=kind,
-                required=bool(field.get("required")),
-                options=options,
-            )
-        )
-    return questions
-
-
-def _options(field: dict[str, Any]) -> tuple[str, ...]:
-    return tuple(
-        str(option["text"])
-        for option in field.get("options") or []
-        if isinstance(option, dict) and option.get("text")
-    )
 
 
 def parse_lever_form(page: str) -> list[FormQuestion]:
@@ -146,16 +114,16 @@ def parse_lever_form(page: str) -> list[FormQuestion]:
         )
         for label, required, is_file in parser.standard_fields
     ]
-    card_questions = [
-        question for template in parser.card_templates for question in _card_questions(template)
+    questions_from_cards = [
+        question for template in parser.card_templates for question in card_questions(template)
     ]
-    if len(card_questions) != parser.custom_question_count:
+    if len(questions_from_cards) != parser.custom_question_count:
         raise ValueError(
             f"Lever form has {parser.custom_question_count} custom questions in the markup "
-            f"but {len(card_questions)} were read from card templates"
+            f"but {len(questions_from_cards)} were read from card templates"
         )
     additional = [_ADDITIONAL_INFORMATION] if parser.has_comments else []
-    return questions + card_questions + additional
+    return questions + questions_from_cards + additional
 
 
 async def fetch_lever_questions(
@@ -164,7 +132,7 @@ async def fetch_lever_questions(
     response = await client.get(
         APPLY_PAGE.format(company=company, posting_id=posting_id), headers=HEADERS
     )
-    if response.status_code != 200:
+    if response.status_code != httpx.codes.OK:
         logger.warning(
             "lever apply page for %s/%s unavailable: HTTP %s",
             company,
@@ -187,6 +155,8 @@ class LeverSource:
         return await fetch_lever_questions(company, posting_id, client)
 
     async def required_fields(
-        self, match: SourceMatch, client: httpx.AsyncClient
+        self,
+        match: SourceMatch,  # noqa: ARG002 - QuestionSource's signature; the apply page is read through questions
+        client: httpx.AsyncClient,  # noqa: ARG002 - QuestionSource's signature; the apply page is read through questions
     ) -> tuple[str, ...]:
         return ()

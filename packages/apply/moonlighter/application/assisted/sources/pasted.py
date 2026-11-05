@@ -10,10 +10,13 @@ from typing import Any
 
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sources.base import is_question, yes_no_for
-from moonlighter.core.llm import LLMCaller
+from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
+from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.parsing import parse_llm_json, wrap_untrusted
 
 _CHOICE_KINDS = frozenset({QuestionKind.SINGLE_SELECT, QuestionKind.MULTI_SELECT})
+
+DEFAULT_MODEL = DEFAULT_LLM_MODEL
 
 PROMPT = """You are reading the text of a job application page that a candidate copied.
 
@@ -90,13 +93,15 @@ def _clean_label(raw: Any) -> str:
 
 
 class ExtractionError(RuntimeError):
-    """The model's reading of the page could not be used. Distinct from an empty
-    list, which means the page has no questions: returning [] here told the
-    person to re-copy a page that was fine (forge run, 2026-09-29)."""
+    """The model's reading of the page could not be used.
+
+    Distinct from an empty list, which means the page has no questions: returning
+    [] here told the person to re-copy a page that was fine (forge run, 2026-09-29).
+    """
 
 
 def _kind(raw: Any, options: tuple[str, ...]) -> QuestionKind:
-    """LONG_TEXT, not TEXT, is the fallback for a kind we could not read.
+    """Read the kind, falling back to LONG_TEXT, not TEXT, for one we could not read.
 
     The two render identically on the sheet and are prompted identically; the
     only behavioural difference is that TEXT is eligible for the cross-job
@@ -113,40 +118,43 @@ def _kind(raw: Any, options: tuple[str, ...]) -> QuestionKind:
     return kind
 
 
-async def extract_questions_from_page(
-    page_text: str,
-    llm_caller: LLMCaller,
-    model: str = "claude-sonnet-4-6",
-) -> list[FormQuestion]:
-    prompt = PROMPT.format(page=wrap_untrusted("page", page_text, cap=20000))
-    raw = await llm_caller(prompt, model)
+def _parse_reply(raw: str) -> dict[str, Any]:
     try:
         payload = parse_llm_json(raw)
     except Exception as error:
         raise ExtractionError(f"the model's reply was not JSON: {raw[:300]!r}") from error
     if not isinstance(payload, dict):
         raise ExtractionError(f"the model's reply was not a JSON object: {raw[:300]!r}")
+    return payload
 
-    questions: list[FormQuestion] = []
-    for item in payload.get("questions") or []:
-        if not isinstance(item, dict):
-            continue
-        label = _clean_label(item.get("label") or "")
-        if not label:
-            continue
-        options = tuple(str(option) for option in item.get("options") or [])
-        if str(item.get("kind")) == QuestionKind.BOOLEAN.value and is_question(label):
-            item_kind: Any = QuestionKind.SINGLE_SELECT.value
-            options = options or yes_no_for(label)
-        else:
-            item_kind = item.get("kind")
-        kind = _kind(item_kind, options)
-        questions.append(
-            FormQuestion(
-                label=label,
-                kind=kind,
-                required=bool(item.get("required")),
-                options=options if kind in _CHOICE_KINDS else (),
-            )
-        )
-    return questions
+
+def _kind_and_options(item: dict[str, Any], label: str) -> tuple[QuestionKind, tuple[str, ...]]:
+    options = tuple(str(option) for option in item.get("options") or [])
+    if str(item.get("kind")) == QuestionKind.BOOLEAN.value and is_question(label):
+        return QuestionKind.SINGLE_SELECT, options or yes_no_for(label)
+    kind = _kind(item.get("kind"), options)
+    return kind, options if kind in _CHOICE_KINDS else ()
+
+
+def _question(item: Any) -> FormQuestion | None:
+    if not isinstance(item, dict):
+        return None
+    label = _clean_label(item.get("label") or "")
+    if not label:
+        return None
+    kind, options = _kind_and_options(item, label)
+    return FormQuestion(
+        label=label, kind=kind, required=bool(item.get("required")), options=options
+    )
+
+
+async def extract_questions_from_page(
+    page_text: str,
+    llm_caller: LLMCaller,
+    model: str = DEFAULT_MODEL,
+) -> list[FormQuestion]:
+    prompt = PROMPT.format(page=wrap_untrusted("page", page_text, cap=20000))
+    raw = await llm_caller(prompt, model)
+    payload = _parse_reply(raw)
+    questions = (_question(item) for item in payload.get("questions") or [])
+    return [question for question in questions if question is not None]

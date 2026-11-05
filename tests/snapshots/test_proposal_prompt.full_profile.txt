@@ -1,0 +1,110 @@
+You are building a job title blocklist for Ana, a staff engineer specializing in Elixir, Phoenix, PostgreSQL, Rust.
+
+The following job titles at **Acme** were evaluated and scored 3.0 or below out of 10 — meaning they are clearly irrelevant for them:
+
+- Title 00
+- Title 01
+- Title 02
+- Title 03
+- Title 04
+- Title 05
+- Title 06
+- Title 07
+- Title 08
+- Title 09
+- Title 10
+- Title 11
+- Title 12
+- Title 13
+- Title 14
+- Title 15
+- Title 16
+- Title 17
+- Title 18
+- Title 19
+- Title 20
+- Title 21
+- Title 22
+- Title 23
+- Title 24
+- Title 25
+- Title 26
+- Title 27
+- Title 28
+- Title 29
+- Title 30
+- Title 31
+- Title 32
+- Title 33
+- Title 34
+- Title 35
+- Title 36
+- Title 37
+- Title 38
+- Title 39
+- Title 40
+- Title 41
+- Title 42
+- Title 43
+- Title 44
+- Title 45
+- Title 46
+- Title 47
+- Title 48
+- Title 49
+- Title 50
+- Title 51
+- Title 52
+- Title 53
+- Title 54
+- Title 55
+- Title 56
+- Title 57
+- Title 58
+- Title 59
+- Title 60
+- Title 61
+- Title 62
+- Title 63
+- Title 64
+- Title 65
+- Title 66
+- Title 67
+- Title 68
+- Title 69
+- Title 70
+- Title 71
+- Title 72
+- Title 73
+- Title 74
+- Title 75
+- Title 76
+- Title 77
+- Title 78
+- Title 79
+
+Your task: propose minimal, safe **substring patterns** (lowercase) to block future titles like these before they reach the LLM evaluator.
+
+A pattern is SAFE only if you are confident that **every possible job title containing it** would be irrelevant for a senior software engineer. When in doubt, mark safe=false.
+
+Examples of UNSAFE patterns (too broad):
+- "analista" alone → "analista de segurança" could be relevant
+- "gerente" alone → "Engineering Manager" might appear in PT-BR as "Gerente de Engenharia"
+- "especialista" alone → "Especialista de Plataforma" could be a tech role
+
+Examples of SAFE patterns:
+- "gerente de relacionamento" → always a banking relationship manager, never engineering
+- "banco de talentos" → always a talent pool post, not a real opening
+- "estagiár" → always an intern position
+
+Return a JSON array (no markdown):
+[
+  {
+    "pattern": "lowercase substring to match",
+    "examples": ["example title 1", "example title 2"],
+    "safe": true,
+    "reasoning": "one sentence explaining why all matching titles would be irrelevant"
+  }
+]
+
+Return [] if no safe patterns can be identified.

@@ -15,29 +15,13 @@ could not be read; 2 on an invalid config.
 
 import argparse
 import sys
-from pathlib import Path
 from typing import Any
 
-import yaml
-from moonlighter.application.assisted.results import SheetKind, sheet_result_to_dict
-from moonlighter.application.assisted.service import (
-    failed_sheet,
-    prepare_application,
-    prepare_application_from_paste,
-)
-from moonlighter.application.cvgen.bootstrap import BootstrapError, bootstrap_cv_pool
-from moonlighter.application.cvgen.links import link_report
-from moonlighter.core.cli import (
-    EXIT_NOTHING,
-    EXIT_OK,
-    JsonArgumentParser,
-    bootstrap,
-    doctor_payload,
-    run,
-)
-from moonlighter.core.config import ConfigError, load_config
-from moonlighter.core.ingest import job_from_url
-from moonlighter.core.llm import make_caller
+from moonlighter.application.commands.bootstrap_cv import run_bootstrap_cv
+from moonlighter.application.commands.doctor import run_doctor
+from moonlighter.application.commands.prepare import run_prepare
+from moonlighter.application.cvgen.pool.bootstrap_error import BootstrapError
+from moonlighter.core.cli import JsonArgumentParser, bootstrap, run
 from moonlighter.core.slices import slice_epilog
 
 # A missing --paste path is a bad argument, not a crash -- run() maps it to
@@ -46,7 +30,7 @@ from moonlighter.core.slices import slice_epilog
 USAGE_ERRORS = (FileNotFoundError,)
 
 # An existing CV pool without --force is not a bug -- the CLI's own equivalent
-# of the MCP tool's conversational "overwrite?" offer (Task 7), just without
+# of the MCP tool's conversational "overwrite?" offer, just without
 # anyone to ask: bootstrap_cv_pool refuses, and that refusal is an expected
 # failure (exit 1), never a crash (exit 3).
 EXPECTED_ERRORS = (BootstrapError,)
@@ -97,71 +81,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return arguments
 
 
-def _read_paste(source: str) -> str:
-    return sys.stdin.read() if source == "-" else Path(source).read_text()
-
-
 async def _run(arguments: argparse.Namespace) -> tuple[dict[str, Any], int]:
     if arguments.command == "doctor":
-        payload, code = doctor_payload()
-        if arguments.online:
-            try:
-                config = load_config()
-            except (ConfigError, OSError, yaml.YAMLError) as error:
-                # The payload above already reports the broken config; --online
-                # adds why the links were not checked, never a crash (exit 3).
-                payload["links"] = None
-                payload["links_error"] = f"config does not load: {error}"
-                return payload, code
-            payload["links"] = await link_report(config)
-            if not payload["links"]:
-                # An empty list read the same as "every link works".
-                payload["links_note"] = (
-                    "no CV template with header links found in cv.template_dir; nothing checked"
-                )
-            if code == EXIT_OK and any(link["ok"] is False for link in payload["links"]):
-                code = EXIT_NOTHING
-        return payload, code
+        return await run_doctor(arguments)
     config, profile = bootstrap()
     if arguments.command == "bootstrap-cv":
-        if arguments.skip:
-            from moonlighter.core.db import record_cv_bootstrap_decline
-
-            record_cv_bootstrap_decline()
-            return {"kind": "cv_bootstrap_skipped"}, EXIT_OK
-        outcome = await bootstrap_cv_pool(
-            profile, config, make_caller(config), force=arguments.force
-        )
-        return (
-            {
-                "kind": "cv_bootstrap",
-                "pool_path": str(outcome.pool_path),
-                "template_path": str(outcome.template_path),
-                "pdf_path": str(outcome.pdf_path) if outcome.pdf_path else None,
-                "bullet_count": outcome.bullet_count,
-            },
-            EXIT_OK,
-        )
-    job_id = arguments.job_id
-    if arguments.url is not None:
-        job = await job_from_url(arguments.url, company=arguments.company, title=arguments.title)
-        if job is None:
-            failed = failed_sheet(
-                SheetKind.POSTING_UNREADABLE,
-                f"The posting at {arguments.url} is not on a known ATS or could not be read. "
-                "Pass --company and --title to ingest it anyway, or give a job id.",
-                apply_url=arguments.url,
-            )
-            return sheet_result_to_dict(failed), EXIT_NOTHING
-        job_id = job.id
-    if arguments.paste is not None:
-        result = await prepare_application_from_paste(
-            job_id, _read_paste(arguments.paste), config, profile
-        )
-    else:
-        result = await prepare_application(job_id, config, profile)
-    code = EXIT_OK if result.kind is SheetKind.SHEET else EXIT_NOTHING
-    return sheet_result_to_dict(result), code
+        return await run_bootstrap_cv(arguments, config, profile)
+    return await run_prepare(arguments, config, profile)
 
 
 def main() -> None:  # pragma: no cover - entry point (boundary)

@@ -1,3 +1,5 @@
+"""What every scanner shares: the scanner contract, the raw job and scan stats, and the location and remote-type helpers."""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -5,12 +7,14 @@ from typing import Any
 
 
 class ScannerSessionExpiredError(Exception):
-    """Raised by a browser-based scanner (see BaseScanner) when the page it's
-    driving redirects to a login/checkpoint wall instead of showing results --
-    the operator's session needs re-authentication. The generic dispatcher in
-    discovery/service.py catches this by base type, so any scanner (public or a
-    privately-registered plugin) can signal it without the dispatcher needing to
-    import that scanner's own exception type."""
+    """Raised by a browser-based scanner (see BaseScanner) when its session needs re-authentication.
+
+    The page it's driving redirects to a login/checkpoint wall instead of
+    showing results. The generic dispatcher in discovery/scan/collection.py catches
+    this by base type, so any scanner (public or a privately-registered plugin)
+    can signal it without the dispatcher needing to import that scanner's own
+    exception type.
+    """
 
 
 @dataclass
@@ -31,7 +35,7 @@ class RawJob:
 
 @dataclass
 class SourceStats:
-    """Per-source fetch accounting for one scan run (see _gather_jobs)."""
+    """Per-source fetch accounting for one scan run (see gather_jobs)."""
 
     companies: int = 0  # 0 means a portal feed, not a per-company board
     jobs: int = 0
@@ -71,7 +75,8 @@ def normalize_remote_type(location: str | None) -> str | None:
     regional eligibility filter began cutting onsite/hybrid outside the home
     city deterministically, an invented 'onsite' became an invented
     archive. Unknown stays unknown and the evaluator decides, seeing both
-    fields."""
+    fields.
+    """
     mentioned = remote_types_mentioned(location)
     for kind in ("hybrid", "remote", "onsite"):
         if kind in mentioned:
@@ -89,7 +94,8 @@ def join_locations(primary: object, extras: object) -> str | None:
     a primary place plus others; keeping only the primary hid a "Remote" option
     that sat among them (116 Ashby and 7 Lever postings, measured 2026-10-24).
     Primary first, repeats and blanks dropped, capped so the evaluator prompt
-    stays small. The text stays literal: no region enum, the evaluator reads it."""
+    stays small. The text stays literal: no region enum, the evaluator reads it.
+    """
     candidates = [primary, *(extras if isinstance(extras, list) else [])]
     places: list[str] = []
     for candidate in candidates:
@@ -102,12 +108,13 @@ def join_locations(primary: object, extras: object) -> str | None:
 
 
 def remote_type_from_workplace(workplace_type: object) -> str | None:
-    """Map a board API's structured workplace field (Lever `workplaceType`:
-    onsite/hybrid/remote/unspecified; Ashby: OnSite/Hybrid/Remote) to remote_type.
+    """Map a board API's structured workplace field to remote_type.
 
-    Callers use it only when the location TEXT is silent: a live Lever board
+    The field is Lever's `workplaceType` (onsite/hybrid/remote/unspecified) or
+    Ashby's (OnSite/Hybrid/Remote). Callers use it only when the location TEXT is silent: a live Lever board
     (shieldai) says "Remote" in the location and `onsite` in the field, and an
-    API-derived 'onsite' outside the home city is a hard archive."""
+    API-derived 'onsite' outside the home city is a hard archive.
+    """
     if not isinstance(workplace_type, str):
         return None
     return normalize_remote_type(workplace_type.replace("_", "-"))

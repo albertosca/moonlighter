@@ -13,7 +13,7 @@ import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PACKAGES_DIR = REPO_ROOT / "packages"
+PACKAGES_DIRECTORY = REPO_ROOT / "packages"
 
 # The distribution that pins the others. Its four `==` pins are what a partial
 # bump breaks.
@@ -25,7 +25,7 @@ PIN_PATTERN = re.compile(r"^(?P<name>moonlighter[a-z-]*)\s*==\s*(?P<version>.+)$
 def _distributions() -> dict[str, dict]:
     """Map distribution name -> parsed pyproject, for every workspace package."""
     found = {}
-    for pyproject in sorted(PACKAGES_DIR.glob("*/pyproject.toml")):
+    for pyproject in sorted(PACKAGES_DIRECTORY.glob("*/pyproject.toml")):
         data = tomllib.loads(pyproject.read_text())
         found[data["project"]["name"]] = data
     return found

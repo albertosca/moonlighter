@@ -22,6 +22,7 @@ standalone email install. Exit 0 (kind "registered") when the job exists,
 """
 
 import argparse
+import sys
 from typing import Any
 
 from moonlighter.core.cli import (
@@ -29,14 +30,14 @@ from moonlighter.core.cli import (
     EXIT_OK,
     JsonArgumentParser,
     bootstrap,
-    doctor_payload,
     run,
 )
-from moonlighter.core.llm import make_caller
+from moonlighter.core.doctor import doctor_payload
+from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.slices import slice_epilog
-from moonlighter.tracking.email_monitor import sync_responses
-from moonlighter.tracking.gmail_client import GmailAuthError
+from moonlighter.tracking.gmail.client import GmailAuthError
 from moonlighter.tracking.register import RegisterKind, register_application, register_to_dict
+from moonlighter.tracking.sync.monitor import sync_responses
 
 # No Gmail token/credentials yet is a routine, anticipated failure -- not a
 # bug -- so run() maps it to exit 1 (expected_failure) instead of exit 3
@@ -61,19 +62,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
-    if args.command == "doctor":
+async def _run(arguments: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    if arguments.command == "doctor":
         return doctor_payload()
     config, _profile = bootstrap()
-    if args.command == "register":
-        r = register_application(args.job_id, config)
-        return register_to_dict(r), (EXIT_OK if r.kind is RegisterKind.REGISTERED else EXIT_NOTHING)
+    if arguments.command == "register":
+        result = register_application(arguments.job_id, config)
+        return register_to_dict(result), (
+            EXIT_OK if result.kind is RegisterKind.REGISTERED else EXIT_NOTHING
+        )
     updates = await sync_responses(config, make_caller(config))
     return {"kind": "synced", "updates": updates}, (EXIT_OK if updates else EXIT_NOTHING)
 
 
 def main() -> None:  # pragma: no cover - entry point (boundary)
-    import sys
-
-    args = parse_args()
-    sys.exit(run(lambda: _run(args), expected=EXPECTED_FAILURES))
+    arguments = parse_args()
+    sys.exit(run(lambda: _run(arguments), expected=EXPECTED_FAILURES))

@@ -9,6 +9,7 @@ import re
 from typing import Any
 
 import httpx
+
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sources.base import SourceMatch, yes_no_question
 from moonlighter.core.db import Job
@@ -60,7 +61,9 @@ def parse_greenhouse_questions(payload: dict[str, Any]) -> list[FormQuestion]:
         # live: 80 postings over 10 boards (2026-10-05) asked Yes/No questions as
         # multi_value_single_select.
         if kind is QuestionKind.BOOLEAN:
-            questions.append(yes_no_question(str(label), bool(item.get("required")), options))
+            questions.append(
+                yes_no_question(str(label), required=bool(item.get("required")), options=options)
+            )
             continue
         # A select whose options did not come through cannot be answered as a
         # select; degrade to free text so the question still reaches the human —
@@ -83,7 +86,7 @@ async def fetch_greenhouse_questions(
     board: str, job_id: str, client: httpx.AsyncClient
 ) -> list[FormQuestion]:
     response = await client.get(API.format(board=board, job_id=job_id), headers=HEADERS)
-    if response.status_code != 200:
+    if response.status_code != httpx.codes.OK:
         return []
     payload = response.json()
     return parse_greenhouse_questions(payload) if isinstance(payload, dict) else []
@@ -104,6 +107,8 @@ class GreenhouseSource:
         return await fetch_greenhouse_questions(board, job_id, client)
 
     async def required_fields(
-        self, match: SourceMatch, client: httpx.AsyncClient
+        self,
+        match: SourceMatch,  # noqa: ARG002 - QuestionSource's signature; the form itself is read, not a required-field list
+        client: httpx.AsyncClient,  # noqa: ARG002 - QuestionSource's signature; the form itself is read, not a required-field list
     ) -> tuple[str, ...]:
         return ()

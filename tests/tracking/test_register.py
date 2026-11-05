@@ -1,4 +1,7 @@
+"""Registering an application by hand: the submitted row, its ref and its alias."""
+
 from moonlighter.core.db import Application, Job, init_db
+from moonlighter.tracking.register import RegisterKind, register_application, register_to_dict
 
 CONFIG = {"email": {"address": "jane@example.com"}}
 
@@ -11,25 +14,22 @@ def _job():
 
 
 def test_register_creates_a_submitted_application_with_a_tracking_ref(temporary_database):
-    from moonlighter.tracking.register import RegisterKind, register_application, register_to_dict
-
     job = _job()
     register_result = register_application(job.id, CONFIG)
-    app = Application.get(Application.job == job)
+    application = Application.get(Application.job == job)
     assert register_result.kind is RegisterKind.REGISTERED
-    assert (register_result.application_id, register_result.status) == (app.id, "submitted")
-    assert app.applied_at is not None
-    assert register_result.email_ref == app.email_ref and len(register_result.email_ref) == 8
+    assert (register_result.application_id, register_result.status) == (application.id, "submitted")
+    assert application.applied_at is not None
+    assert register_result.email_ref == application.email_ref
+    assert len(register_result.email_ref) == 8
     assert register_result.alias == f"jane+{register_result.email_ref}@example.com"
     assert (
         Job.get_by_id(job.id).status == "applied"
-    )  # sync_job_status ran: app "submitted" -> job "applied"
+    )  # sync_job_status ran: application "submitted" -> job "applied"
     assert register_to_dict(register_result)["kind"] == "registered"
 
 
 def test_register_promotes_an_existing_draft_and_keeps_its_ref(temporary_database):
-    from moonlighter.tracking.register import register_application
-
     job = _job()
     Application.create(job=job, status="draft", email_ref="ab12cd34")
     register_result = register_application(job.id, CONFIG)
@@ -37,8 +37,6 @@ def test_register_promotes_an_existing_draft_and_keeps_its_ref(temporary_databas
 
 
 def test_register_leaves_an_already_advanced_application_alone(temporary_database):
-    from moonlighter.tracking.register import register_application
-
     job = _job()
     Application.create(job=job, status="interviews", email_ref="ab12cd34")
     register_result = register_application(job.id, CONFIG)
@@ -46,17 +44,14 @@ def test_register_leaves_an_already_advanced_application_alone(temporary_databas
 
 
 def test_register_without_a_configured_address_has_no_alias(temporary_database):
-    from moonlighter.tracking.register import RegisterKind, register_application
-
     job = _job()
     register_result = register_application(job.id, {})
     assert register_result.kind is RegisterKind.REGISTERED
-    assert register_result.alias is None and register_result.email_ref is not None
+    assert register_result.alias is None
+    assert register_result.email_ref is not None
 
 
 def test_register_unknown_job(temporary_database):
-    from moonlighter.tracking.register import RegisterKind, register_application, register_to_dict
-
     init_db()
     register_result = register_application(4242, CONFIG)
     assert register_result.kind is RegisterKind.JOB_NOT_FOUND

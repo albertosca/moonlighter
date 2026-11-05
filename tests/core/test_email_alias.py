@@ -9,8 +9,8 @@ from moonlighter.core.email_alias import (
 
 def test_a_ref_carries_no_case_so_a_provider_cannot_change_it():
     for _ in range(200):
-        ref = new_email_ref()
-        assert ref == ref.lower()
+        email_reference = new_email_ref()
+        assert email_reference == email_reference.lower()
 
 
 def test_a_ref_avoids_characters_a_human_would_misread():
@@ -39,7 +39,8 @@ def test_build_email_alias_different_refs():
 
 def test_is_email_label_matches_ptbr_hyphenated_required_label():
     """'E-mail*' (PT, hyphen, required asterisk) is the live shape that once
-    needed a normalization fix — it must keep matching."""
+    needed a normalization fix — it must keep matching.
+    """
     assert is_email_label("E-mail*")
 
 
@@ -54,4 +55,4 @@ def test_is_email_label_rejects_labels_that_merely_start_with_the_word():
 
 def test_is_email_label_rejects_unrelated_labels():
     assert not is_email_label("Nome*")
-    assert not is_email_label("Your email")  # anchored, like field_map's own rule
+    assert not is_email_label("Your email")  # anchored, like static_rules' own rule

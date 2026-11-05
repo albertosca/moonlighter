@@ -12,6 +12,7 @@ import re
 from typing import Any
 
 import httpx
+
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sources.base import SourceMatch, yes_no_question
 from moonlighter.core.db import Job
@@ -65,41 +66,37 @@ def _options(field: dict[str, Any]) -> tuple[str, ...]:
     )
 
 
-def parse_workable_form(payload: object) -> list[FormQuestion]:
+def _labelled_fields(payload: object) -> list[dict[str, Any]]:
     if not isinstance(payload, list):
         return []
-    questions: list[FormQuestion] = []
-    for section in payload:
-        if not isinstance(section, dict):
-            continue
-        for field in section.get("fields") or []:
-            if not isinstance(field, dict) or not field.get("label"):
-                continue
-            kind = _kind(field)
-            if kind is QuestionKind.BOOLEAN:
-                questions.append(
-                    yes_no_question(
-                        str(field["label"]), bool(field.get("required")), _options(field)
-                    )
-                )
-                continue
-            options = _options(field) if kind in _CHOICE_KINDS else ()
-            if kind in _CHOICE_KINDS and not options:
-                kind = QuestionKind.LONG_TEXT
-            questions.append(
-                FormQuestion(
-                    label=str(field["label"]),
-                    kind=kind,
-                    required=bool(field.get("required")),
-                    options=options,
-                )
-            )
-    return questions
+    return [
+        field
+        for section in payload
+        if isinstance(section, dict)
+        for field in section.get("fields") or []
+        if isinstance(field, dict) and field.get("label")
+    ]
+
+
+def _question(field: dict[str, Any]) -> FormQuestion:
+    label = str(field["label"])
+    required = bool(field.get("required"))
+    kind = _kind(field)
+    if kind is QuestionKind.BOOLEAN:
+        return yes_no_question(label, required=required, options=_options(field))
+    options = _options(field) if kind in _CHOICE_KINDS else ()
+    if kind in _CHOICE_KINDS and not options:
+        kind = QuestionKind.LONG_TEXT
+    return FormQuestion(label=label, kind=kind, required=required, options=options)
+
+
+def parse_workable_form(payload: object) -> list[FormQuestion]:
+    return [_question(field) for field in _labelled_fields(payload)]
 
 
 async def fetch_workable_questions(shortcode: str, client: httpx.AsyncClient) -> list[FormQuestion]:
     response = await client.get(API.format(shortcode=shortcode), headers=HEADERS)
-    if response.status_code != 200:
+    if response.status_code != httpx.codes.OK:
         logger.warning("workable form for %s unavailable: HTTP %s", shortcode, response.status_code)
         return []
     return parse_workable_form(response.json())
@@ -117,6 +114,8 @@ class WorkableSource:
         return await fetch_workable_questions(shortcode, client)
 
     async def required_fields(
-        self, match: SourceMatch, client: httpx.AsyncClient
+        self,
+        match: SourceMatch,  # noqa: ARG002 - QuestionSource's signature; the form itself is read, not a required-field list
+        client: httpx.AsyncClient,  # noqa: ARG002 - QuestionSource's signature; the form itself is read, not a required-field list
     ) -> tuple[str, ...]:
         return ()

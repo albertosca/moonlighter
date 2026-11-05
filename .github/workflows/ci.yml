@@ -34,6 +34,12 @@ jobs:
           uv run ruff check .
           uv run ruff format --check .
 
+      - name: File length gate
+        run: uv run python scripts/check_file_length.py
+
+      - name: Cognitive complexity gate
+        run: uv run complexipy packages scripts tests --max-complexity-allowed 10
+
       - name: Type check (mypy)
         run: |
           uv run mypy \
@@ -42,6 +48,9 @@ jobs:
             --package moonlighter.application \
             --package moonlighter.tracking \
             --package moonlighter.server \
+            --package moonlighter.app_context \
+            --package moonlighter.mcp_tools \
+            --package moonlighter.priority \
             --package moonlighter.startup \
             --package moonlighter.views \
             --package moonlighter._tool_logging \

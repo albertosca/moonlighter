@@ -6,6 +6,7 @@ so it does not rot as postings close. A skipped e2e counts as a failure here.
 
 import httpx
 import pytest
+
 from moonlighter.application.assisted.questions import QuestionKind
 from moonlighter.application.assisted.sources.base import (
     SourceMatch,

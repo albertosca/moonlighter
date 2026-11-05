@@ -15,24 +15,21 @@ Flags:
     --title-only    Send only the title to LLM (without full description). Much cheaper.
     --concurrency N How many evaluations to run in parallel (default: 5).
                     On first spend limit, stop everything immediately.
-"""
+"""  # noqa: D205 - argparse prints this docstring verbatim as the --help description
 
 import argparse
 import asyncio
-import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from typing import Any
-
-from moonlighter.core.config import load_config, load_profile
+from moonlighter.core.config.defaults import DEFAULT_EVAL_MODEL
+from moonlighter.core.config.loading import load_config, load_profile
 from moonlighter.core.db import Job, init_db
-from moonlighter.core.llm import is_spend_limit, make_caller
 from moonlighter.core.log import setup as setup_logging
-from moonlighter.core.metrics import operation_metrics
-from moonlighter.discovery.evaluator import evaluate_job, should_skip_by_title
+
+from reevaluation_batch import ReevaluationSettings, reevaluate
 
 BUG_MARKER = "evaluation error: claude CLI exited with code 1"
 
@@ -49,127 +46,6 @@ def _fetch_victims(company: str | None, limit: int | None) -> list[Job]:
     if limit:
         query = query.limit(limit)
     return list(query)
-
-
-async def _reevaluate(
-    jobs: list[Job],
-    config: dict[str, Any],
-    profile: dict[str, Any],
-    dry_run: bool,
-    model: str,
-    title_only: bool = False,
-    concurrency: int = 5,
-) -> None:
-    with operation_metrics("reevaluate"):
-        caller = make_caller(config)
-        threshold = config.get("score_threshold", 6.5)
-        blocklist: list[str] = config.get("title_blocklist", [])
-
-        total = len(jobs)
-        promoted = 0
-        stayed_archived = 0
-        title_skipped = 0
-        errors = 0
-        quota_hit = False
-
-        semaphore = asyncio.Semaphore(concurrency)
-        stop = asyncio.Event()
-        print_lock = asyncio.Lock()
-
-        async def _process(position: int, job: Job) -> None:
-            nonlocal promoted, stayed_archived, title_skipped, errors, quota_hit
-
-            label = f"[{position:4d}/{total}] [{job.company}] {job.title[:55]:55s}"
-
-            matched_pattern = should_skip_by_title(job.title, blocklist)
-            if matched_pattern:
-                if not dry_run:
-                    Job.update(
-                        score=0.0,
-                        score_notes=f"title filtered: {matched_pattern!r}",
-                        caveats="[]",
-                        status="archived",
-                    ).where(Job.id == job.id).execute()
-                async with print_lock:
-                    print(f"{label} -- skip title ({matched_pattern!r})")
-                    title_skipped += 1
-                return
-
-            if stop.is_set():
-                return
-
-            async with semaphore:
-                if stop.is_set():
-                    return
-
-                try:
-                    description = (
-                        job.title
-                        if title_only
-                        else (job.description or f"{job.title} at {job.company}")
-                    )
-                    result = await evaluate_job(
-                        company=job.company,
-                        title=job.title,
-                        description=description,
-                        profile=profile,
-                        model=model,
-                        _caller=caller,
-                        location=job.location,
-                        remote_type=job.remote_type,
-                    )
-                except Exception as error:
-                    if is_spend_limit(error):
-                        stop.set()
-                        quota_hit = True
-                        async with print_lock:
-                            print(f"{label} 🚫 SPEND LIMIT reached — stopping. Error: {error}")
-                        return
-                    async with print_lock:
-                        print(f"{label} ✗ ERROR: {error}")
-                        errors += 1
-                    if not dry_run:
-                        Job.update(score_notes=f"reevaluate_error: {str(error)[:200]}").where(
-                            Job.id == job.id
-                        ).execute()
-                    return
-
-                new_status = "new" if result.score >= threshold else "archived"
-                icon = "↑ NEW" if new_status == "new" else "  arq"
-                async with print_lock:
-                    print(f"{label} {icon} score={result.score:.1f}")
-
-                if not dry_run:
-                    Job.update(
-                        score=result.score,
-                        score_notes=result.score_notes,
-                        caveats=json.dumps(result.caveats),
-                        salary_min=result.salary_min,
-                        salary_max=result.salary_max,
-                        salary_currency=result.salary_currency,
-                        salary_source=result.salary_source,
-                        status=new_status,
-                    ).where(Job.id == job.id).execute()
-
-                if new_status == "new":
-                    promoted += 1
-                else:
-                    stayed_archived += 1
-
-        await asyncio.gather(*[_process(position, job) for position, job in enumerate(jobs, 1)])
-
-        if quota_hit:
-            print("\n🚫 Re-evaluation interrupted by spend limit.")
-
-        llm_attempted = total - title_skipped
-        mode = "title-only" if title_only else "full description"
-        prefix = "[DRY RUN] " if dry_run else ""
-        print(f"\n{prefix}Result: {total} jobs found  [{mode}] concurrency={concurrency}")
-        print(f"  -- skipped by title:       {title_skipped}")
-        print(f"  ↑ promoted to 'new':       {promoted}")
-        print(f"     remain archived:        {stayed_archived}")
-        print(f"  ✗ errors:                  {errors}")
-        print(f"  LLM calls ({model}):      {llm_attempted}")
 
 
 def main() -> None:
@@ -193,11 +69,9 @@ def main() -> None:
     setup_logging()
     config = load_config()
     profile = load_profile()
-    init_db()  # resolve o path via moonlighter_home() / MOONLIGHTER_DB_PATH (fonte única em db.py)
+    init_db()  # resolves the path via moonlighter_home() / MOONLIGHTER_DB_PATH (single source in db.py)
 
-    model = arguments.model or config.get(
-        "eval_model", config.get("llm_model", "claude-haiku-4-5-20251001")
-    )
+    model = arguments.model or config.get("eval_model", config.get("llm_model", DEFAULT_EVAL_MODEL))
 
     victims = _fetch_victims(arguments.company, arguments.limit)
     if not victims:
@@ -214,17 +88,16 @@ def main() -> None:
     if arguments.dry_run:
         print("\n⚠️  DRY RUN — no changes will be saved.\n")
 
-    asyncio.run(
-        _reevaluate(
-            victims,
-            config,
-            profile,
-            dry_run=arguments.dry_run,
-            model=model,
-            title_only=arguments.title_only,
-            concurrency=arguments.concurrency,
-        )
+    settings = ReevaluationSettings(
+        model=model,
+        profile=profile,
+        threshold=config.get("score_threshold", 6.5),
+        title_blocklist=config.get("title_blocklist", []),
+        dry_run=arguments.dry_run,
+        title_only=arguments.title_only,
+        concurrency=arguments.concurrency,
     )
+    asyncio.run(reevaluate(victims, config, settings))
 
 
 if __name__ == "__main__":

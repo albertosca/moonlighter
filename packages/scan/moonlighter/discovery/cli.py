@@ -27,13 +27,14 @@ from moonlighter.core.cli import (
     EXIT_USAGE,
     JsonArgumentParser,
     bootstrap,
-    doctor_payload,
     run,
 )
-from moonlighter.core.llm import make_caller
+from moonlighter.core.doctor import doctor_payload
+from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.slices import slice_epilog
-from moonlighter.discovery.results import ScanKind, ScanReport, scan_report_to_dict
-from moonlighter.discovery.service import NO_EVAL, scan_and_evaluate, scan_company
+from moonlighter.discovery.scan.results import ScanKind, ScanReport, scan_report_to_dict
+from moonlighter.discovery.scan.scanning import scan_and_evaluate, scan_company
+from moonlighter.discovery.screening.no_eval import NO_EVAL
 
 _EXIT_BY_KIND = {
     ScanKind.EVALUATED: EXIT_OK,
@@ -81,20 +82,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-async def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
-    if args.command == "doctor":
+async def _run(arguments: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    if arguments.command == "doctor":
         return doctor_payload()
     config, profile = bootstrap()
-    caller = NO_EVAL if args.no_eval else make_caller(config)
+    caller = NO_EVAL if arguments.no_eval else make_caller(config)
     report: ScanReport
-    if args.company:
-        source, slug = args.company
-        report = await scan_company(source, slug, config, profile, caller)
+    if arguments.company:
+        source, slug = arguments.company
+        report = await scan_company(source, slug, config, profile=profile, caller=caller)
     else:
-        report = await scan_and_evaluate(args.keywords, args.phase, config, profile, caller)
+        report = await scan_and_evaluate(
+            arguments.keywords, arguments.phase, config, profile, caller
+        )
     return scan_report_to_dict(report), _EXIT_BY_KIND[report.kind]
 
 
 def main() -> None:  # pragma: no cover - entry point (boundary)
-    args = parse_args()
-    sys.exit(run(lambda: _run(args)))
+    arguments = parse_args()
+    sys.exit(run(lambda: _run(arguments)))

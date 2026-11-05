@@ -1,3 +1,5 @@
+"""Session-wide pytest setup: the e2e guard, the isolated home and the shared fixtures."""
+
 import os
 import shutil
 import tempfile
@@ -5,14 +7,17 @@ from pathlib import Path
 
 import pytest
 
+from moonlighter.core.config import api_key
+from tests import _e2e_guard
+
 _SNAPSHOTS = Path(__file__).parent / "snapshots"
 
-_session_home: str | None = None
+_SESSION_HOME = pytest.StashKey[str]()
 
 
 def pytest_configure(config: pytest.Config) -> None:
     _register_e2e_guard(config)
-    _isolate_moonlighter_home()
+    _isolate_moonlighter_home(config)
 
 
 def _register_e2e_guard(config: pytest.Config) -> None:
@@ -22,48 +27,46 @@ def _register_e2e_guard(config: pytest.Config) -> None:
     plugin before the rootdir is on sys.path, so ``tests._e2e_guard`` would not
     resolve.
     """
-    from tests import _e2e_guard
-
     if not config.pluginmanager.is_registered(_e2e_guard):
         config.pluginmanager.register(_e2e_guard, "tests._e2e_guard")
 
 
-def _isolate_moonlighter_home() -> None:
-    """Point MOONLIGHTER_HOME at a session-scoped temp dir BEFORE pytest imports
-    any test module.
+def _isolate_moonlighter_home(config: pytest.Config) -> None:
+    """Point MOONLIGHTER_HOME at a session temp directory before any test module is imported.
 
-    moonlighter.server calls harden_permissions() and init_db() at *module import
-    time*, and moonlighter_home() defaults to the real ~/.moonlighter when
-    MOONLIGHTER_HOME is unset. Test modules get imported during collection, which
-    happens before ordinary (even session-scoped) fixtures run — so a fixture
-    is too late to prevent that first import from touching real user data.
-    pytest_configure runs before collection/import and is the standard hook
-    for environment setup that must precede it.
+    A fixture runs only after the test modules are imported, and moonlighter_home()
+    falls back to the real ~/.moonlighter when the variable is unset, so anything
+    that reads it at import or collection time would reach real user data.
+    pytest_configure runs before collection and is the standard hook for
+    environment setup that must precede it.
 
-    Only MOONLIGHTER_HOME is set here: moonlighter.core.db._db_path() already falls
-    back to moonlighter_home() / "moonlighter.db" when MOONLIGHTER_DB_PATH is unset, so
-    this alone keeps init_db() out of the real directory too. The per-test
-    temporary_database fixture below still overrides MOONLIGHTER_DB_PATH with a fresh path
-    per test via monkeypatch, which takes precedence over this session-wide
-    default since it's set later and per-test.
+    MOONLIGHTER_DB_PATH is removed for the same reason: moonlighter.core.db.db_path()
+    prefers it over moonlighter_home() / "moonlighter.db", so a developer shell that
+    exports it would send init_db() to that developer's own database. The per-test
+    temporary_database fixture below still sets it through monkeypatch, which takes
+    precedence because it runs later.
+
+    One write escapes: moonlighter.core.log hardcodes ~/.moonlighter/app.log
+    (_DEFAULT_LOG_PATH) whatever MOONLIGHTER_HOME says, so importing a module that
+    calls get_logger appends to the developer's real log.
     """
-    global _session_home
-    _session_home = tempfile.mkdtemp(prefix="moonlighter-test-home-")
-    os.environ["MOONLIGHTER_HOME"] = _session_home
+    session_home = tempfile.mkdtemp(prefix="moonlighter-test-home-")
+    config.stash[_SESSION_HOME] = session_home
+    os.environ["MOONLIGHTER_HOME"] = session_home
+    os.environ.pop("MOONLIGHTER_DB_PATH", None)
 
 
 def pytest_unconfigure(config: pytest.Config) -> None:
-    """Best-effort cleanup of the session temp dir; not strictly required
-    since it lives under the OS temp dir, but tidy."""
-    global _session_home
-    if _session_home is not None:
-        shutil.rmtree(_session_home, ignore_errors=True)
-        _session_home = None
+    """Remove the session temp directory, best-effort: it lives under the OS temp directory anyway."""
+    session_home = config.stash.get(_SESSION_HOME, None)
+    if session_home is not None:
+        shutil.rmtree(session_home, ignore_errors=True)
+        del config.stash[_SESSION_HOME]
 
 
 @pytest.fixture
 def temporary_database(monkeypatch, tmp_path):
-    """Replace DB_PATH with a temp file for each test."""
+    """Point MOONLIGHTER_DB_PATH at a fresh temp file for each test."""
     db_path = str(tmp_path / "test.db")
     monkeypatch.setenv("MOONLIGHTER_DB_PATH", db_path)
     return db_path
@@ -87,7 +90,5 @@ def _no_real_api_env_file(tmp_path_factory, monkeypatch):
     # load_config fills ANTHROPIC_API_KEY from ~/.config/anthropic/api.env on the
     # api backend; without this, any test loading an api config would read the
     # developer's real key into the test process.
-    import moonlighter.core.config as config_module
-
     missing_file = tmp_path_factory.mktemp("no-api-env") / "api.env"
-    monkeypatch.setattr(config_module, "anthropic_api_env_file", lambda: missing_file)
+    monkeypatch.setattr(api_key, "anthropic_api_env_file", lambda: missing_file)

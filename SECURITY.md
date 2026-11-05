@@ -47,7 +47,7 @@ valid range; salary source is checked against a fixed whitelist; the dropdown pi
 index, so its choice is always a real on-page option; and the keys of the form-answer map resolve
 against the fields actually present on the page — a key the model invents cannot enter. The
 email-tracking pipeline is a partial exception: the *status* an email can move an application to
-(`_TYPE_TO_STATUS` in `email_monitor.py`) is a genuine closed set, but the *interview-stage label*
+(`_TYPE_TO_STATUS` in `funnel.py`) is a genuine closed set, but the *interview-stage label*
 attached to that status is operator-configured and LLM-extensible — the classifier can append a
 new stage name to the known list and use it in the same pass. That stage name is only ever stored
 and displayed, never executed or used to gate anything, so the impact of a hostile stage name is

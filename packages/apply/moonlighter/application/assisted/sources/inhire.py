@@ -12,6 +12,7 @@ import logging
 import re
 
 import httpx
+
 from moonlighter.application.assisted.questions import FormQuestion
 from moonlighter.application.assisted.sources.base import UUID_PATTERN, SourceMatch
 from moonlighter.core.db import Job
@@ -58,7 +59,7 @@ async def fetch_inhire_required_fields(
     tenant: str, job_id: str, client: httpx.AsyncClient
 ) -> tuple[str, ...]:
     response = await client.get(API.format(job_id=job_id), headers={**HEADERS, "X-Tenant": tenant})
-    if response.status_code != 200:
+    if response.status_code != httpx.codes.OK:
         logger.warning(
             "inhire job page for %s/%s unavailable: HTTP %s", tenant, job_id, response.status_code
         )
@@ -73,7 +74,11 @@ class InHireSource:
         found = tenant_and_job_from_url(job.url)
         return SourceMatch(self, found) if found else None
 
-    async def questions(self, match: SourceMatch, client: httpx.AsyncClient) -> list[FormQuestion]:
+    async def questions(
+        self,
+        match: SourceMatch,  # noqa: ARG002 - QuestionSource's signature; InHire publishes no questions, so nothing is read
+        client: httpx.AsyncClient,  # noqa: ARG002 - QuestionSource's signature; InHire publishes no questions, so nothing is read
+    ) -> list[FormQuestion]:
         return []
 
     async def required_fields(

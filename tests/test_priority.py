@@ -7,7 +7,7 @@ the penalty is derived on read (so it decays as rejections age with no
 re-scoring), reorders toward the end, and never hides a job.
 """
 
-import datetime
+from datetime import datetime, timedelta
 
 from moonlighter.core.db import Application, Job, init_db
 from moonlighter.priority import (
@@ -17,7 +17,7 @@ from moonlighter.priority import (
     rejection_penalty,
 )
 
-NOW = datetime.datetime(2026, 8, 24, 12, 0, 0)
+NOW = datetime(2026, 8, 24, 12, 0, 0)  # noqa: DTZ001 - the database stores naive local time
 
 
 class TestPenalty:
@@ -50,9 +50,7 @@ class TestBadge:
 
 def _rejected_pair(company, days_ago, url):
     job = Job.create(source="greenhouse", company=company, title="Eng", url=url, status="rejected")
-    Application.create(
-        job=job, status="rejected", updated_at=NOW - datetime.timedelta(days=days_ago)
-    )
+    Application.create(job=job, status="rejected", updated_at=NOW - timedelta(days=days_ago))
     return job
 
 

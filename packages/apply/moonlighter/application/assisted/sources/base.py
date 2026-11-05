@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import httpx
+
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.core.db import Job
 
@@ -98,14 +99,20 @@ def yes_no_for(label: str) -> tuple[str, str]:
 
 
 def is_question(label: str) -> bool:
-    """The rule for a `boolean` whose widget was never observed: a label ending
-    in "?" asks something; anything else is a statement to tick."""
+    """Whether a `boolean` label asks something rather than stating something to tick.
+
+    The rule for a `boolean` whose widget was never observed: a label ending
+    in "?" asks something; anything else is a statement to tick.
+    """
     return label.rstrip().endswith("?")
 
 
-def yes_no_question(label: str, required: bool, options: tuple[str, ...] = ()) -> FormQuestion:
-    """A Yes/No question as a single_select: the source's own option labels when
-    its payload carries them, else yes and no in the question's language."""
+def yes_no_question(label: str, *, required: bool, options: tuple[str, ...] = ()) -> FormQuestion:
+    """A Yes/No question as a single_select.
+
+    The options are the source's own labels when its payload carries them, else
+    yes and no in the question's language.
+    """
     return FormQuestion(
         label=label,
         kind=QuestionKind.SINGLE_SELECT,
@@ -139,7 +146,8 @@ async def questions_or_empty(match: SourceMatch, client: httpx.AsyncClient) -> l
 
     Any exception, not just transport and decoding errors: a payload whose shape the
     parser never anticipated raises TypeError/AttributeError, and that must reach the
-    person as the paste hint, never as a crashed `prepare_application`."""
+    person as the paste hint, never as a crashed `prepare_application`.
+    """
     try:
         return await match.source.questions(match, client)
     except Exception as error:

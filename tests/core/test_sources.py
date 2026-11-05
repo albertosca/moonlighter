@@ -14,7 +14,7 @@ def test_str_and_fstring_yield_plain_value():
 
 
 def test_is_iterable_over_all_sources():
-    assert {s.value for s in Source} == {
+    assert {source.value for source in Source} == {
         "greenhouse",
         "lever",
         "ashby",
@@ -33,13 +33,11 @@ def test_is_iterable_over_all_sources():
 
 def test_str_key_lookup_matches_member_key():
     # StrEnum members hash-equal their str value, so dict lookups interop.
-    d = {Source.GREENHOUSE: 1}
-    assert d["greenhouse"] == 1
+    by_source = {Source.GREENHOUSE: 1}
+    assert by_source["greenhouse"] == 1
 
 
 def test_source_has_remote_board_members():
-    from moonlighter.core.sources import Source
-
     assert Source.REMOTEOK == "remoteok"
     assert Source.REMOTIVE == "remotive"
     assert Source.WEWORKREMOTELY == "weworkremotely"

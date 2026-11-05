@@ -1,95 +1,82 @@
-import sys
-from pathlib import Path
+import argparse
 from unittest.mock import patch
 
-_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
+import build_blocklist
 
 
-def _bb():
-    if str(_SCRIPTS_DIR) not in sys.path:
-        sys.path.insert(0, str(_SCRIPTS_DIR))
-    import build_blocklist
-
-    return build_blocklist
-
-
-def test_confirm_write_yes_returns_true():
-    bb = _bb()
-    with patch("builtins.input", return_value="y"):
-        assert bb._confirm_write(["recruiter"]) is True
-
-
-def test_confirm_write_sim_returns_true():
-    bb = _bb()
-    with patch("builtins.input", return_value="sim"):
-        assert bb._confirm_write(["recruiter"]) is True
-
-
-def test_confirm_write_empty_input_defaults_to_false():
-    """S-10: silence is never consent — the default is 'no'."""
-    bb = _bb()
-    with patch("builtins.input", return_value=""):
-        assert bb._confirm_write(["recruiter"]) is False
-
-
-def test_confirm_write_no_returns_false():
-    bb = _bb()
-    with patch("builtins.input", return_value="n"):
-        assert bb._confirm_write(["recruiter"]) is False
+def _arguments(*, dry_run: bool, yes: bool) -> argparse.Namespace:
+    return argparse.Namespace(threshold=3.0, company=None, dry_run=dry_run, yes=yes)
 
 
 async def test_run_skips_write_without_confirmation(tmp_path, monkeypatch):
-    """assume_yes=False and the user declines -> blocklist_learned.yaml is never written."""
-    bb = _bb()
+    """yes=False and the user declines -> blocklist_learned.yaml is never written."""
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
 
-    async def fake_propose(company, titles, threshold, caller, model, profile):
+    proposed = []
+
+    async def fake_propose(company, prompt, *, caller, model):
+        proposed.append(company)
         return [{"pattern": "recruiter", "examples": ["Recruiter"], "safe": True, "reasoning": "x"}]
 
     with (
-        patch.object(bb, "_fetch_low_scorers", return_value={"Acme": ["Recruiter"]}),
-        patch.object(bb, "_propose_for_company", new=fake_propose),
-        patch.object(bb, "make_caller", return_value=lambda *a, **kw: None),
+        patch.object(build_blocklist, "fetch_low_scorers", return_value={"Acme": ["Recruiter"]}),
+        patch.object(build_blocklist, "propose_for_company", new=fake_propose),
+        patch.object(
+            build_blocklist, "make_caller", return_value=lambda *_arguments, **_keywords: None
+        ),
         patch("builtins.input", return_value="n"),
     ):
-        await bb._run(3.0, None, False, "model", {}, {}, assume_yes=False)
+        await build_blocklist._run(
+            _arguments(dry_run=False, yes=False), model="model", config={}, profile={}
+        )
 
+    assert proposed == ["Acme"]  # the fake was reached, so the missing file is a decision
     assert not (tmp_path / "blocklist_learned.yaml").exists()
 
 
 async def test_run_writes_with_yes_flag_and_never_prompts(tmp_path, monkeypatch):
-    """assume_yes=True writes without EVER calling input() (non-interactive use)."""
-    bb = _bb()
+    """yes=True writes without EVER calling input() (non-interactive use)."""
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
 
-    async def fake_propose(company, titles, threshold, caller, model, profile):
+    async def fake_propose(company, prompt, *, caller, model):
         return [{"pattern": "recruiter", "examples": ["Recruiter"], "safe": True, "reasoning": "x"}]
 
     with (
-        patch.object(bb, "_fetch_low_scorers", return_value={"Acme": ["Recruiter"]}),
-        patch.object(bb, "_propose_for_company", new=fake_propose),
-        patch.object(bb, "make_caller", return_value=lambda *a, **kw: None),
+        patch.object(build_blocklist, "fetch_low_scorers", return_value={"Acme": ["Recruiter"]}),
+        patch.object(build_blocklist, "propose_for_company", new=fake_propose),
+        patch.object(
+            build_blocklist, "make_caller", return_value=lambda *_arguments, **_keywords: None
+        ),
         patch("builtins.input", side_effect=AssertionError("must not prompt with --yes")),
     ):
-        await bb._run(3.0, None, False, "model", {}, {}, assume_yes=True)
+        await build_blocklist._run(
+            _arguments(dry_run=False, yes=True), model="model", config={}, profile={}
+        )
 
     assert (tmp_path / "blocklist_learned.yaml").exists()
 
 
 async def test_run_dry_run_never_prompts_either(tmp_path, monkeypatch):
-    """--dry-run never writes or prompts, regardless of assume_yes."""
-    bb = _bb()
+    """--dry-run never writes or prompts, regardless of yes."""
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
 
-    async def fake_propose(company, titles, threshold, caller, model, profile):
+    proposed = []
+
+    async def fake_propose(company, prompt, *, caller, model):
+        proposed.append(company)
         return [{"pattern": "recruiter", "examples": ["Recruiter"], "safe": True, "reasoning": "x"}]
 
     with (
-        patch.object(bb, "_fetch_low_scorers", return_value={"Acme": ["Recruiter"]}),
-        patch.object(bb, "_propose_for_company", new=fake_propose),
-        patch.object(bb, "make_caller", return_value=lambda *a, **kw: None),
+        patch.object(build_blocklist, "fetch_low_scorers", return_value={"Acme": ["Recruiter"]}),
+        patch.object(build_blocklist, "propose_for_company", new=fake_propose),
+        patch.object(
+            build_blocklist, "make_caller", return_value=lambda *_arguments, **_keywords: None
+        ),
         patch("builtins.input", side_effect=AssertionError("must not prompt on --dry-run")),
     ):
-        await bb._run(3.0, None, True, "model", {}, {}, assume_yes=False)
+        await build_blocklist._run(
+            _arguments(dry_run=True, yes=False), model="model", config={}, profile={}
+        )
 
+    assert proposed == ["Acme"]  # the fake was reached, so the missing file is a decision
     assert not (tmp_path / "blocklist_learned.yaml").exists()

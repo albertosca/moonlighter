@@ -2,253 +2,60 @@
 
 Opt-in by existence: no cv.pool in config (or the file missing) means the
 feature is off and this function is a cheap None. Every failure path degrades
-to None so the application always proceeds with the default CV."""
+to None so the application always proceeds with the default CV.
+"""
 
-import re
-from dataclasses import dataclass, replace
+from enum import Enum, auto
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, NamedTuple
 
-from moonlighter.application.cvgen.compile import (
-    compile_pdf,
-    latex_available,
-    looks_like_a_compiled_pdf,
-    page_count,
-)
 from moonlighter.application.cvgen.generate import USE_BASE, decide_cv
-from moonlighter.application.cvgen.pool import CVPool, PoolError, load_pool
-from moonlighter.application.cvgen.render import CVSelection, render_cv
-from moonlighter.core.config import resolve_under_home
-from moonlighter.core.llm import LLMCaller, is_spend_limit
+from moonlighter.application.cvgen.latex.compile import looks_like_a_compiled_pdf
+from moonlighter.application.cvgen.latex.cv_template import (
+    BaseFields,
+    base_fields,
+    relanguage_fallback_fields,
+    template_text,
+)
+from moonlighter.application.cvgen.latex.page_fit import TailoredCV, after_compile, fit_to_one_page
+from moonlighter.application.cvgen.latex.render import CVSelection
+from moonlighter.application.cvgen.paths import generated_dir_for, resolved_pool_path
+from moonlighter.application.cvgen.pool.loader import CVPool, PoolError, load_pool
+from moonlighter.core.llm.caller import LLMCaller
+from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.log import get_logger
 
 logger = get_logger(__name__)
 
-# The captured text is treated as plain model prose (escape_latex + the
-# **bold** dialect, same as everything else generate.py produces) — an
-# operator writing raw LaTeX on one of these two lines (e.g. \textbf{...})
-# gets it printed literally, with the backslash and braces escaped.
-_BASE_SUMMARY = re.compile(r"^%%BASE_SUMMARY: (.+)$", re.MULTILINE)
-_BASE_EXPERTISE = re.compile(r"^%%BASE_EXPERTISE: (.+)$", re.MULTILINE)
-_MARKER_LINES = re.compile(r"^%%BASE_(SUMMARY|EXPERTISE): .+\n", re.MULTILINE)
 
+class _Cache(Enum):
+    """The cache lookup's third answer: nothing is cached, go and generate.
 
-def base_fields(template: str) -> tuple[str, str]:
-    """The (summary, expertise) base text a template declares for itself.
-
-    Public because the bootstrap (cvgen/bootstrap.py) renders a SAMPLE of the
-    pool it just drafted through the template it just filled, and that sample
-    needs the same two fields this module feeds the per-job generator. One
-    definition, not two regexes drifting apart across modules — an empty
-    string for either is a template that simply declares no base, exactly as
-    the per-job path already treats it.
+    A cached PDF or a recompiled .tex is a TailoredCV, and the USE_BASE marker
+    is a final None, so a bare None cannot also mean "nothing cached".
     """
-    summary = m.group(1) if (m := _BASE_SUMMARY.search(template)) else ""
-    expertise = m.group(1) if (m := _BASE_EXPERTISE.search(template)) else ""
-    return summary, expertise
+
+    MISS = auto()
 
 
-def strip_marker_lines(rendered: str) -> str:
-    """Drops the BASE_SUMMARY/BASE_EXPERTISE declaration lines from a rendered
-    document. They are metadata for the generator, never content: pdflatex
-    reads them as ordinary comments, but leaving them in a finished .tex means
-    the next reader cannot tell a declaration from the summary it describes.
-    Shared with the bootstrap's sample render for the same reason."""
-    return _MARKER_LINES.sub("", rendered)
+class _Generation(NamedTuple):
+    config: dict[str, Any]
+    pool: CVPool
+    english_template: str
+    base: BaseFields
 
 
-@dataclass(frozen=True)
-class TailoredCV:
-    path: Path
-    compiled: bool
-
-
-def _discard(tex: Path) -> None:
-    tex.unlink(missing_ok=True)
-    # The sibling .pdf goes too (see the round-6 comment): the cache
-    # short-circuits on cv.pdf BEFORE any compile, so a survivor would be
-    # served forever at zero LLM calls with the source .tex already gone.
-    tex.with_suffix(".pdf").unlink(missing_ok=True)
-    # The .log goes too: page_count (compile.py) reads it, and a stale one
-    # left behind after the .tex it describes is gone is a landmine for any
-    # future caller that reads the log without a fresh compile_pdf call first.
-    tex.with_suffix(".log").unlink(missing_ok=True)
-
-
-def _after_compile_failure(tex: Path) -> TailoredCV | None:
-    """compile_pdf returned None. No pdflatex: keep the .tex, retry later at
-    no LLM cost. pdflatex present: the DOCUMENT is broken and will fail
-    identically forever — discard, regenerate next time."""
-    if not latex_available():
-        return TailoredCV(tex, False)
-    logger.warning("the generated CV does not compile — discarding %s, using default CV", tex)
-    _discard(tex)
-    return None
-
-
-def _after_compile(tex: Path) -> TailoredCV | None:
-    """The cached-.tex path (a machine that gained latex): compile, and enforce
-    the one-page rule with nothing left to shrink — an overflowing cached
-    document is discarded so the next prepare regenerates under the budget."""
-    pdf = compile_pdf(tex)
-    if pdf is None:
-        return _after_compile_failure(tex)
-    pages = page_count(tex)
-    if pages is not None and pages > 1:
-        logger.warning("the cached CV does not fit one page — discarding %s, using default CV", tex)
-        _discard(tex)
-        return None
-    return TailoredCV(pdf, True)
-
-
-def _shrunk(selection: CVSelection, pool: CVPool) -> CVSelection | None:
-    """The same selection with one less thing on the page, or None when nothing
-    can go: the last experience bullet whose experience keeps at least one other
-    selected bullet, then the last open-source id."""
-    # Only EXPERIENCE bullets are droppable: prose ids only carry a
-    # translation, and an open-source id the model misfiled under "bullets"
-    # (both pass _known_ids) owns no experience — `bid in owner` skips it.
-    # Keyed on the experience's INDEX, not company+title: two stints at the
-    # same company with the same title (a gap between them) would otherwise
-    # collapse into one counter and let the "keeps another selected bullet"
-    # guard pass when it should not.
-    owner = {b.id: i for i, e in enumerate(pool.experiences) for b in e.bullets}
-    selected_per_exp: dict[int, int] = {}
-    for bid in selection.bullets:
-        if bid in owner:
-            selected_per_exp[owner[bid]] = selected_per_exp.get(owner[bid], 0) + 1
-    for i in range(len(selection.bullets) - 1, -1, -1):
-        bid = selection.bullets[i]
-        if bid in owner and selected_per_exp[owner[bid]] > 1:
-            return replace(selection, bullets=selection.bullets[:i] + selection.bullets[i + 1 :])
-    if selection.open_source:
-        return replace(selection, open_source=selection.open_source[:-1])
-    return None
-
-
-def _fit_to_one_page(
-    out: Path, template: str, selection: CVSelection, pool: CVPool
-) -> TailoredCV | None:
-    """Render, compile, and drop content from the end until pdflatex reports
-    one page. Deterministic and LLM-free: the model already ordered every list
-    most-relevant-first, so the tail is what goes."""
-    tex = out / "cv.tex"
-    current: CVSelection | None = selection
-    while current is not None:
-        tex.write_text(strip_marker_lines(render_cv(template, current, pool)))
-        pdf = compile_pdf(tex)
-        if pdf is None:
-            return _after_compile_failure(tex)
-        pages = page_count(tex)
-        if pages is None or pages == 1:
-            return TailoredCV(pdf, True)
-        current = _shrunk(current, pool)
-    logger.warning(
-        "the generated CV does not fit one page even at minimum — discarding %s, using default CV",
-        tex,
-    )
-    _discard(tex)
-    return None
-
-
-def generated_dir_for(config: dict[str, Any], job_id: int) -> Path:
-    base = (config.get("cv") or {}).get("generated_dir")
-    root = resolve_under_home(base) if base else resolve_under_home("cv-generated")
-    return root / str(job_id)
-
-
-# Conventional defaults used whenever cv.pool/cv.template_dir is absent from
-# config -- the feature still turns on purely by the file existing (opt-in
-# by existence, unchanged), it just has somewhere to exist without the user
-# hand-writing the config key first. Only the bootstrap (cvgen/bootstrap.py)
-# ever writes here; nothing conjures a file at this path on its own.
-_DEFAULT_POOL_NAME = "cv-pool.yaml"
-_DEFAULT_TEMPLATE_DIR_NAME = "cv-templates"
-
-
-# KNOWN LIMITATION (found by review, 2026-09-21; ruled: park, not fix): an
-# `or` fallback cannot distinguish cv.pool being ABSENT from cv.pool being
-# explicitly set to null/"" -- both fall through to the default path below.
-# A coincidental file at that default path would then override an explicit
-# `cv: {pool: null}`. Not fixed because no config in this project (not
-# config.example.yaml, not DEFAULTS) ever sets cv.pool at all, let alone
-# explicitly nulls it -- simply omitting the key already means "off," so
-# there is no realistic config that hits this path -- and a correct fix
-# needs Path | None through every caller, which is real design surface the
-# original brainstorm never covered. Revisit if a real config ever needs to
-# explicitly null cv.pool.
-def resolved_pool_path(config: dict[str, Any]) -> Path:
-    pool_path = (config.get("cv") or {}).get("pool") or _DEFAULT_POOL_NAME
-    return resolve_under_home(pool_path)
-
-
-def resolved_template_dir(config: dict[str, Any]) -> Path:
-    tdir = (config.get("cv") or {}).get("template_dir") or _DEFAULT_TEMPLATE_DIR_NAME
-    return resolve_under_home(tdir)
-
-
-def _template(config: dict[str, Any], language: str) -> str | None:
-    tdir = resolved_template_dir(config)
-    en = tdir / "cv-template.en.tex"
-    pt = tdir / "cv-template.pt.tex"
-    if language == "pt":
-        if pt.exists():
-            return pt.read_text()
-        logger.warning("no PT template — rendering the tailored CV in English")
-    return en.read_text() if en.exists() else None
-
-
-def _relanguage_fallback_fields(
-    selection: CVSelection, template: str, en_base_summary: str, en_base_expertise: str
-) -> CVSelection | None:
-    """decide_cv parses %%BASE_SUMMARY%%/%%BASE_EXPERTISE%% out of en_template
-    before it can know the posting's language (the model reveals it only in
-    its own response), so a field it rejects as non-typesettable falls back to
-    the ENGLISH base there — harmless while that base only fed the prompt, but
-    Task 3 made it land in the rendered CV. A field equal to the English base
-    is exactly the fallback's signature: re-point it at the base text of the
-    template actually selected for rendering, or degrade the whole CV to None
-    when that language has no base of its own to offer.
-    """
-    used_en_summary = selection.summary == en_base_summary
-    used_en_expertise = selection.technical_expertise == en_base_expertise
-    if not used_en_summary and not used_en_expertise:
-        return selection
-    lang_base_summary, lang_base_expertise = base_fields(template)
-    if (used_en_summary and not lang_base_summary) or (
-        used_en_expertise and not lang_base_expertise
-    ):
-        logger.warning(
-            "cv summary/expertise fell back to English base with no %s base to replace it — "
-            "using default CV",
-            selection.language,
-        )
-        return None
-    return replace(
-        selection,
-        summary=lang_base_summary if used_en_summary else selection.summary,
-        technical_expertise=lang_base_expertise
-        if used_en_expertise
-        else selection.technical_expertise,
-    )
-
-
-async def ensure_tailored_cv(
-    job: dict[str, Any],
-    config: dict[str, Any],
-    profile: dict[str, Any],
-    caller: LLMCaller,
-) -> TailoredCV | None:
-    pool_path = resolved_pool_path(config)
-    if not pool_path.exists():
-        return None
+def _output_directory(job: dict[str, Any], config: dict[str, Any]) -> Path | None:
     raw_id = job.get("id")
     if raw_id is None:
         # "never raises" is only total if an id-less job dict degrades too:
         # the cache is keyed on the job id, so there is nothing to generate.
         logger.warning("job has no id — using default CV")
         return None
-    out = generated_dir_for(config, int(raw_id))
+    return generated_dir_for(config, int(raw_id))
+
+
+def _cached_answer(out: Path) -> TailoredCV | _Cache | None:
     # Nothing here is revalidated, and nothing needs to be: a cached cv.tex can
     # only contain escaped model text (render._bullet_text), so recompiling one
     # cannot produce anything its generation did not already produce.
@@ -257,39 +64,74 @@ async def ensure_tailored_cv(
     # check, can strand a truncated cv.pdf that would then be served forever —
     # looks_like_a_compiled_pdf sniffs for %%EOF and also rejects a directory.
     if looks_like_a_compiled_pdf(out / "cv.pdf"):
-        return TailoredCV(out / "cv.pdf", True)
+        return TailoredCV(out / "cv.pdf", compiled=True)
     if (out / "USE_BASE").exists():
         return None
     if (out / "cv.tex").exists():
-        return _after_compile(out / "cv.tex")  # a machine that gained latex since
+        return after_compile(out / "cv.tex")  # a machine that gained latex since
+    return _Cache.MISS
 
+
+def _generation_inputs(pool_path: Path, config: dict[str, Any]) -> _Generation | None:
     try:
         pool = load_pool(pool_path)
-    except PoolError as e:
-        logger.warning("cv pool unusable, using default CV — %s", e)
+    except PoolError as error:
+        logger.warning("cv pool unusable, using default CV — %s", error)
         return None
-    en_template = _template(config, "en")
-    if en_template is None:
+    english_template = template_text(config, "en")
+    if english_template is None:
         logger.warning("cv.template_dir has no cv-template.en.tex — using default CV")
         return None
-    base_summary, base_expertise = base_fields(en_template)
+    return _Generation(config, pool, english_template, base_fields(english_template))
 
+
+async def _decision(
+    job: dict[str, Any], profile: dict[str, Any], generation: _Generation, *, caller: LLMCaller
+) -> CVSelection | Literal["use_base"] | None:
     try:
-        selection = await decide_cv(job, pool, profile, base_summary, base_expertise, caller)
-    except Exception as e:
-        if is_spend_limit(e):
+        return await decide_cv(job, generation.pool, profile, base=generation.base, caller=caller)
+    except Exception as error:
+        if is_spend_limit(error):
             logger.warning("spend limit during cv generation — using default CV")
             return None
         raise
-    if selection is None:
-        return None  # degraded generation — nothing written, next prepare retries
+
+
+def _materialised(
+    selection: CVSelection | Literal["use_base"], generation: _Generation, out: Path
+) -> TailoredCV | None:
     out.mkdir(parents=True, exist_ok=True)
     if selection == USE_BASE:
         (out / "USE_BASE").write_text("decided by the generation call\n")
         return None
 
-    template = _template(config, selection.language) or en_template
-    selection = _relanguage_fallback_fields(selection, template, base_summary, base_expertise)
-    if selection is None:
+    template = template_text(generation.config, selection.language) or generation.english_template
+    final_selection = relanguage_fallback_fields(selection, template, generation.base)
+    if final_selection is None:
         return None
-    return _fit_to_one_page(out, template, selection, pool)
+    return fit_to_one_page(out, template, final_selection, pool=generation.pool)
+
+
+async def ensure_tailored_cv(
+    job: dict[str, Any],
+    config: dict[str, Any],
+    profile: dict[str, Any],
+    *,
+    caller: LLMCaller,
+) -> TailoredCV | None:
+    pool_path = resolved_pool_path(config)
+    if not pool_path.exists():
+        return None
+    out = _output_directory(job, config)
+    if out is None:
+        return None
+    cached = _cached_answer(out)
+    if cached is not _Cache.MISS:
+        return cached
+    generation = _generation_inputs(pool_path, config)
+    if generation is None:
+        return None
+    selection = await _decision(job, profile, generation, caller=caller)
+    if selection is None:
+        return None  # degraded generation — nothing written, next prepare retries
+    return _materialised(selection, generation, out)

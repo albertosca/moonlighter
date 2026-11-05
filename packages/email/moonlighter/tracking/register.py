@@ -1,15 +1,18 @@
-"""Register an application by hand: the bridge that lets `moonlighter-email
-register` mark a job as applied — and mint its +ref tracking alias — without
-the apply slice installed. Only core models are touched.
+"""Register an application by hand.
+
+The bridge that lets `moonlighter-email register` mark a job as applied — and mint
+its +ref tracking alias — without the apply slice installed. Only core models are
+touched.
 """
 
-import datetime
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from moonlighter.core.db import Application, Job, sync_job_status
+from moonlighter.core.db import Application, Job
 from moonlighter.core.email_alias import build_email_alias, new_email_ref
+from moonlighter.core.job_status import sync_job_status
 
 
 class RegisterKind(StrEnum):
@@ -32,7 +35,7 @@ def register_application(job_id: int, config: dict[str, Any]) -> RegisterResult:
     job = Job.get_or_none(Job.id == job_id)
     if job is None:
         return RegisterResult(RegisterKind.JOB_NOT_FOUND, job_id, error=f"Job {job_id} not found.")
-    now = datetime.datetime.now()
+    now = datetime.now()  # noqa: DTZ005 - the database stores naive local time
     application, _ = Application.get_or_create(
         job=job, defaults={"status": "submitted", "applied_at": now}
     )

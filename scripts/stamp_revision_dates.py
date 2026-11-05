@@ -1,10 +1,8 @@
-"""Writes each guide page's last-commit date into its `revision_date` frontmatter,
-which the Zensical theme renders as the page's "last updated" date. Runs on the CI
-working copy only — the stamped files are never committed.
+"""Writes each guide page's last-commit date into its `revision_date` frontmatter.
 
-Refuses a shallow clone: measured 2026-09-23, in a `--depth 1` checkout every file's
-`git log -1` answers the newest commit, so every page would silently claim the same
-date. The docs workflow checks out with `fetch-depth: 0`.
+The Zensical theme renders that field as the page's "last updated" date. It runs on the CI working copy only, and the stamped files are never committed.
+
+It refuses a shallow clone: measured 2026-09-23, in a `--depth 1` checkout every file's `git log -1` answers the newest commit, so every page would silently claim the same date. The docs workflow checks out with `fetch-depth: 0`.
 
 Usage:
     python scripts/stamp_revision_dates.py guide
@@ -23,9 +21,9 @@ class StampError(Exception):
     """A condition under which stamping would write wrong dates."""
 
 
-def _git(cwd: Path, *args: str) -> str:
+def _git(directory: Path, *arguments: str) -> str:
     result = subprocess.run(  # noqa: S603 - literal argv, git on PATH
-        ["git", "-C", str(cwd), *args],  # noqa: S607 - literal argv, git on PATH
+        ["git", "-C", str(directory), *arguments],  # noqa: S607 - literal argv, git on PATH
         check=True,
         capture_output=True,
         text=True,

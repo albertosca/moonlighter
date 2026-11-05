@@ -18,6 +18,7 @@ import re
 from typing import Any
 
 import httpx
+
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sources.base import (
     SourceMatch,
@@ -84,6 +85,15 @@ def _choice_options(item: dict[str, Any]) -> tuple[str, ...]:
     return tuple(str(entry["body"]) for entry in entries)
 
 
+def _kind_and_options(item: dict[str, Any], kind_name: str) -> tuple[QuestionKind, tuple[str, ...]]:
+    if kind_name == "multi_choice":
+        options = _choice_options(item)
+        return (QuestionKind.SINGLE_SELECT, options) if options else (QuestionKind.LONG_TEXT, ())
+    # An unrecognised kind, or no kind info at all (a plain open question answered
+    # in free text), is LONG_TEXT for the reason given above _SIMPLE_KINDS.
+    return _SIMPLE_KINDS.get(kind_name, QuestionKind.LONG_TEXT), ()
+
+
 def _question(item: dict[str, Any]) -> FormQuestion | None:
     label = item.get("body") or item.get("label")
     if not label:
@@ -93,23 +103,13 @@ def _question(item: dict[str, Any]) -> FormQuestion | None:
     # path's rule decides: a question becomes the Yes/No single_select every
     # source gives (2026-09-29), a statement to tick (consent) stays boolean.
     if kind_name == "boolean" and is_question(str(label)):
-        return yes_no_question(str(label), bool(item.get("required")))
-    options: tuple[str, ...] = ()
-    if kind_name == "multi_choice":
-        options = _choice_options(item)
-        kind = QuestionKind.SINGLE_SELECT if options else QuestionKind.LONG_TEXT
-    elif kind_name in _SIMPLE_KINDS:
-        kind = _SIMPLE_KINDS[kind_name]
-    elif kind_name:
-        kind = QuestionKind.LONG_TEXT
-    else:
-        # No kind info at all: a plain open question, answered in free text.
-        kind = QuestionKind.LONG_TEXT
+        return yes_no_question(str(label), required=bool(item.get("required")))
+    kind, options = _kind_and_options(item, kind_name)
     return FormQuestion(
         label=str(label),
         kind=kind,
         required=bool(item.get("required")),
-        options=options if kind is QuestionKind.SINGLE_SELECT else (),
+        options=options,
     )
 
 
@@ -122,9 +122,11 @@ def parse_recruitee_questions(payload: dict[str, Any]) -> list[FormQuestion]:
         return []
     questions: list[FormQuestion] = _standard_fields(offer)
 
-    for item in [*(offer.get("open_questions") or []), *(offer.get("dynamic_fields") or [])]:
-        if isinstance(item, dict) and (question := _question(item)) is not None:
-            questions.append(question)
+    questions.extend(
+        question
+        for item in [*(offer.get("open_questions") or []), *(offer.get("dynamic_fields") or [])]
+        if isinstance(item, dict) and (question := _question(item)) is not None
+    )
 
     location_label = offer.get("locations_question")
     if location_label:
@@ -142,7 +144,7 @@ async def fetch_recruitee_questions(
     host: str, offer: str, client: httpx.AsyncClient
 ) -> list[FormQuestion]:
     response = await client.get(API.format(host=host, offer=offer), headers=HEADERS)
-    if response.status_code != 200:
+    if response.status_code != httpx.codes.OK:
         return []
     payload = response.json()
     return parse_recruitee_questions(payload) if isinstance(payload, dict) else []
@@ -163,6 +165,8 @@ class RecruiteeSource:
         return await fetch_recruitee_questions(host, offer, client)
 
     async def required_fields(
-        self, match: SourceMatch, client: httpx.AsyncClient
+        self,
+        match: SourceMatch,  # noqa: ARG002 - QuestionSource's signature; the offer's flags declare the standard fields, which questions already carries
+        client: httpx.AsyncClient,  # noqa: ARG002 - QuestionSource's signature; the offer's flags declare the standard fields, which questions already carries
     ) -> tuple[str, ...]:
         return ()
