@@ -250,12 +250,12 @@ async def test_http_404_on_the_real_greenhouse_scanner_marks_company_failed_not_
     # gather_jobs: only the HTTP client is faked, and it answers 404.
     from moonlighter.discovery.sources.company_boards.greenhouse import GreenhouseScanner
 
-    from tests.discovery.sources.test_http import _make_simple_client
+    from tests.discovery.sources.fake_http_clients import make_simple_client
 
     job = _job(url="https://boards.greenhouse.io/acme/jobs/1")
     with patch(
         "moonlighter.discovery.sources.company_boards.gathering.httpx.AsyncClient",
-        return_value=_make_simple_client({}, status=404),
+        return_value=make_simple_client({}, status=404),
     ):
         result = await find_stale_jobs(
             {("greenhouse", "acme"): [job]}, {"greenhouse": GreenhouseScanner()}, CONFIG

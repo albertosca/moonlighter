@@ -1,3 +1,7 @@
+"""The source registry: which HTTP sources exist, which support listing, and how scanners are built."""
+
+from unittest.mock import patch
+
 from moonlighter.core.sources import Source
 from moonlighter.discovery.sources.company_boards.ashby import AshbyScanner
 from moonlighter.discovery.sources.company_boards.greenhouse import GreenhouseScanner
@@ -61,3 +65,15 @@ def test_listing_sources_is_derived_not_hardcoded():
 
 def test_all_six_http_specs_support_listing():
     assert all(spec.supports_listing for spec in SOURCES.values())
+
+
+def test_inhire_is_a_listing_source_for_staleness():
+    assert "inhire" in LISTING_SOURCES
+
+
+def test_build_http_scanners_looks_each_class_up_on_its_module_at_call_time():
+    with patch(
+        "moonlighter.discovery.sources.company_boards.greenhouse.GreenhouseScanner"
+    ) as patched_scanner:
+        scanners = build_http_scanners()
+    assert scanners["greenhouse"] is patched_scanner.return_value
