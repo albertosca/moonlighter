@@ -7,6 +7,7 @@ import pytest
 from peewee import IntegrityError
 
 from moonlighter.core.db import Job, init_db
+from moonlighter.core.dedup import description_hash
 from tests.core.db.sample_job import make_job
 
 
@@ -109,3 +110,26 @@ def test_job_closed_at_stored_and_retrieved(temporary_database):
     saved = Job.get_by_id(job.id)
     assert saved.status == "archived"
     assert saved.closed_at == when
+
+
+def test_saving_a_job_stores_the_hash_of_its_description(temporary_database):
+    init_db()
+    job = make_job(description="Same  TEXT")
+    assert Job.get_by_id(job.id).description_hash == description_hash("same text")
+
+
+def test_changing_the_description_recomputes_the_hash(temporary_database):
+    init_db()
+    job = make_job(description="")
+    assert job.description_hash is None
+    job.description = "Real page text"
+    job.save()
+    assert Job.get_by_id(job.id).description_hash == description_hash("Real page text")
+
+
+def test_a_copy_points_at_its_original(temporary_database):
+    init_db()
+    original = make_job(url="https://x/3")
+    copy = make_job(url="https://x/4", duplicate_of=original)
+    assert Job.get_by_id(copy.id).duplicate_of_id == original.id
+    assert [job.id for job in original.copies] == [copy.id]

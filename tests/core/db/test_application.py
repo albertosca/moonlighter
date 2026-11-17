@@ -134,3 +134,8 @@ def test_application_email_ref_lookup_by_ref(temporary_database):
     Application.create(job=job, email_ref="lkp001")
     found = Application.get(Application.email_ref == "lkp001")
     assert found.email_ref == "lkp001"
+
+
+def test_reply_mailbox_unswept_defaults_to_false(temporary_database):
+    init_db()
+    assert Application.create(job=make_job()).reply_mailbox_unswept is False

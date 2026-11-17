@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Self, override
 
 from peewee import (
     AutoField,
+    BooleanField,
     CharField,
     DateTimeField,
     FloatField,
@@ -19,6 +20,7 @@ from peewee import (
 )
 
 from moonlighter.core.config.paths import moonlighter_home
+from moonlighter.core.dedup import description_hash
 
 
 def db_path() -> str:
@@ -82,6 +84,16 @@ class Job(BaseModel):
     status = CharField(default="new")
     found_at = DateTimeField(default=datetime.now)
     closed_at = DateTimeField(null=True)
+    # sha256 of the normalized description (core/dedup.py); None for an empty one.
+    description_hash = CharField(null=True, index=True)
+    # Set on a copy of the same posting under another URL; the original keeps None.
+    duplicate_of = ForeignKeyField("self", null=True, backref="copies")
+
+    @override
+    def save(self, *positional_arguments: Any, **keyword_arguments: Any) -> int:
+        # Every writer goes through save() (create() included), so the hash never lags the text.
+        self.description_hash = description_hash(self.description)
+        return int(super().save(*positional_arguments, **keyword_arguments))
 
     def get_caveats(self) -> list[str]:
         return json.loads(self.caveats) if self.caveats else []
@@ -93,11 +105,14 @@ class Application(BaseModel):
     form_data = TextField(null=True)  # JSON dict: field_name -> answer
     notes = TextField(null=True)
     # 'draft'|'filled'|'submitted'|'needs_review'|'screening'|'interviews'|'offer'|'rejected'
+    # |'no_response'
     status = CharField(default="draft")
     next_action = TextField(null=True)
     updated_at = DateTimeField(default=datetime.now)
     email_ref = CharField(max_length=8, null=True, unique=True)
     current_stage = CharField(null=True)
+    # True: replies may land in a mailbox the sync does not read; the 45-day rule skips the row.
+    reply_mailbox_unswept = BooleanField(default=False)
 
     def get_form_data(self) -> dict[str, Any]:
         return json.loads(self.form_data) if self.form_data else {}
@@ -118,6 +133,12 @@ class ProcessedEmail(BaseModel):
 
     message_id = CharField(unique=True)
     processed_at = DateTimeField(default=datetime.now)
+
+
+class EmailSyncRun(BaseModel):
+    """One row per sync that read its whole lookback window; the 45-day rule trusts only a recent one."""
+
+    finished_at = DateTimeField(default=datetime.now)
 
 
 class AnswerBankEntry(BaseModel):
@@ -156,7 +177,15 @@ def init_db() -> None:
     db.init(path)
     db.connect(reuse_if_open=True)
     db.create_tables(
-        [Job, Application, ScanLog, ProcessedEmail, AnswerBankEntry, CVBootstrapDecline],
+        [
+            Job,
+            Application,
+            ScanLog,
+            ProcessedEmail,
+            EmailSyncRun,
+            AnswerBankEntry,
+            CVBootstrapDecline,
+        ],
         safe=True,
     )
     from moonlighter.core.migration_runner import run_migrations  # noqa: PLC0415 - migration_runner calls get_logger() at import, which configures logging; keep that out of import moonlighter.core.db

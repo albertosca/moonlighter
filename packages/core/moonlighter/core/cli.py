@@ -53,6 +53,8 @@ _JOB_COLUMNS = (
     "status",
     "found_at",
     "closed_at",
+    "description_hash",
+    "duplicate_of_id",
 )
 
 
