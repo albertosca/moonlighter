@@ -1,5 +1,6 @@
 """How get_pipeline groups, orders and counts the applications."""
 
+import re
 from datetime import timedelta
 
 from moonlighter.core.db import Application, init_db
@@ -143,3 +144,20 @@ async def test_get_pipeline_empty_has_zero_total_and_no_bucket_headers(temporary
     result = await get_pipeline(context=make_test_context())
     assert "## " not in result
     assert "**Total applications:** 0" in result
+
+
+async def test_pipeline_sections_add_up_to_the_total(temporary_database):
+    # 2026-11-17: 7 archived and 9 no_response applications were counted in the
+    # total but listed in no section.
+    init_db()
+    statuses = ("draft", "filled", "submitted", "no_response", "rejected", "archived")
+    for number, status in enumerate(statuses):
+        create_application(
+            create_job(temporary_database, url=f"https://x.com/pipe{number}"), status=status
+        )
+    text = await get_pipeline(context=make_test_context())
+    counted = sum(
+        int(match) for match in re.findall(r"^## \w+ \((\d+)\)$", text, flags=re.MULTILINE)
+    )
+    assert counted == len(statuses)
+    assert f"**Total applications:** {len(statuses)}" in text

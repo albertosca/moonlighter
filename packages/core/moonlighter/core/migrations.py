@@ -1,9 +1,12 @@
 """The numbered schema migration steps for the local SQLite store; migration_runner applies them."""
 
+import re
 import sqlite3
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from typing import Any, Protocol
+
+from moonlighter.core.dedup import description_hash
 
 
 class MigrationDatabase(Protocol):
@@ -99,6 +102,70 @@ def _m006_fix_invented_onsite_remote_types(db: MigrationDatabase) -> None:
     )
 
 
+def _m007_application_reply_mailbox_unswept(db: MigrationDatabase) -> None:
+    if not _has_column(db, "application", "reply_mailbox_unswept"):
+        db.execute_sql(
+            "ALTER TABLE application ADD COLUMN reply_mailbox_unswept INTEGER NOT NULL DEFAULT 0"
+        )
+
+
+def _m008_job_dedup_columns(db: MigrationDatabase) -> None:
+    if not _has_column(db, "job", "description_hash"):
+        db.execute_sql("ALTER TABLE job ADD COLUMN description_hash VARCHAR(255) NULL")
+    if not _has_column(db, "job", "duplicate_of_id"):
+        db.execute_sql(
+            "ALTER TABLE job ADD COLUMN duplicate_of_id INTEGER NULL REFERENCES job (id)"
+        )
+    db.execute_sql("CREATE INDEX IF NOT EXISTS job_description_hash ON job (description_hash)")
+    db.execute_sql("CREATE INDEX IF NOT EXISTS job_duplicate_of_id ON job (duplicate_of_id)")
+
+
+def _m009_backfill_job_description_hash(db: MigrationDatabase) -> None:
+    if not _has_column(db, "job", "description"):
+        return
+    rows = db.execute_sql("SELECT id, description FROM job").fetchall()
+    for job_id, description in rows:
+        db.execute_sql(
+            "UPDATE job SET description_hash = ? WHERE id = ?",
+            (description_hash(description), job_id),
+        )
+
+
+_HAND_MARK = re.compile(r"duplicate_of:#(\d+)")
+
+
+def _m010_duplicate_of_from_hand_marks(db: MigrationDatabase) -> None:
+    # 2026-11-16: copies were archived by hand with "duplicate_of:#<id>" in score_notes.
+    if not _has_column(db, "job", "score_notes"):
+        return
+    rows = db.execute_sql(
+        "SELECT id, score_notes FROM job WHERE score_notes LIKE '%duplicate_of:#%'"
+    ).fetchall()
+    for job_id, score_notes in rows:
+        match = _HAND_MARK.search(score_notes)
+        if match is None:
+            continue
+        original_id = int(match.group(1))
+        db.execute_sql(
+            "UPDATE job SET duplicate_of_id = ? WHERE id = ? AND id != ? "
+            "AND EXISTS (SELECT 1 FROM job WHERE id = ?)",
+            (original_id, job_id, original_id, original_id),
+        )
+
+
+def _m011_email_sync_run_window_start(db: MigrationDatabase) -> None:
+    # 2026-11-17: a pre-release build created emailsyncrun without window_start. A run with no
+    # recorded window proves no coverage, so its rows go; the table gets the fresh-database DDL.
+    tables = db.execute_sql("SELECT name FROM sqlite_master WHERE name = 'emailsyncrun'")
+    if tables.fetchone() is None or _has_column(db, "emailsyncrun", "window_start"):
+        return
+    db.execute_sql("DROP TABLE emailsyncrun")
+    db.execute_sql(
+        'CREATE TABLE "emailsyncrun" ("id" INTEGER NOT NULL PRIMARY KEY, '
+        '"finished_at" DATETIME NOT NULL, "window_start" DATETIME NOT NULL)'
+    )
+
+
 MIGRATIONS: list[tuple[int, str, Callable[[MigrationDatabase], None]]] = [
     (1, "application_email_ref", _m001_application_email_ref),
     (2, "application_current_stage", _m002_application_current_stage),
@@ -106,4 +173,9 @@ MIGRATIONS: list[tuple[int, str, Callable[[MigrationDatabase], None]]] = [
     (4, "unify_closed_into_archived", _m004_unify_closed_into_archived),
     (5, "backfill_job_status_from_applications", _m005_backfill_job_status_from_applications),
     (6, "fix_invented_onsite_remote_types", _m006_fix_invented_onsite_remote_types),
+    (7, "application_reply_mailbox_unswept", _m007_application_reply_mailbox_unswept),
+    (8, "job_dedup_columns", _m008_job_dedup_columns),
+    (9, "backfill_job_description_hash", _m009_backfill_job_description_hash),
+    (10, "duplicate_of_from_hand_marks", _m010_duplicate_of_from_hand_marks),
+    (11, "email_sync_run_window_start", _m011_email_sync_run_window_start),
 ]

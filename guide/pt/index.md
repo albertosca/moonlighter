@@ -31,7 +31,7 @@ O modelo ainda pode errar uma resposta — e é por isso que toda folha passa pe
 - [CV sob medida](guides/tailored-cv.md) — um CV LaTeX de uma página por vaga, montado a partir dos bullets que você curou
 - [Banco de respostas](guides/answer-bank.md) — respostas de triagem que você aprovou, reaproveitadas na próxima candidatura
 - [Linha de comando](reference/cli.md) — uma CLI em JSON por pacote, para shells e cron jobs
-- [Ferramentas MCP](reference/mcp-tools.md) — as 18 ferramentas que o Claude chama por você
+- [Ferramentas MCP](reference/mcp-tools.md) — as 19 ferramentas que o Claude chama por você
 - [Extensões](guides/extensions.md) — adicione uma fonte de vagas como um pacote separado
 
 As decisões por trás do design, e o que cada uma custou, estão na página de [Engenharia](engineering.md). Objeções e soluções estão nas [Perguntas frequentes](faq.md).

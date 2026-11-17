@@ -5,6 +5,7 @@ import json
 from moonlighter.discovery.archive import ArchiveResult
 from moonlighter.discovery.scan.results import ScanKind, ScanResult, scan_report_to_dict
 from moonlighter.discovery.sources.base import SourceStats
+from moonlighter.discovery.unanswered import UnansweredResult
 
 EXPECTED_KEYS = [
     "kind",
@@ -14,6 +15,7 @@ EXPECTED_KEYS = [
     "found_but_known",
     "saved",
     "archive",
+    "unanswered",
     "stats",
     "warning",
     "tip",
@@ -81,3 +83,18 @@ def test_scan_report_to_dict_pins_the_found_but_known_key_on_all_known(three_job
     payload = scan_report_to_dict(report)
     assert "found_but_known" in payload
     assert payload["found_but_known"] == 3
+
+
+def test_a_report_with_the_unanswered_outcome_serialises():
+    report = ScanResult(
+        kind=ScanKind.NO_NEW_JOBS,
+        unanswered=UnansweredResult(
+            ran=True,
+            last_sync="2026-11-16T10:00:00",
+            marked=[{"job_id": 1, "company": "A", "title": "Eng", "days": 50}],
+            after_days=45,
+        ),
+    )
+    payload = json.loads(json.dumps(scan_report_to_dict(report)))
+    assert payload["unanswered"]["last_sync"] == "2026-11-16T10:00:00"
+    assert payload["unanswered"]["marked"][0]["job_id"] == 1

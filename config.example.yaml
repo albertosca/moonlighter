@@ -124,3 +124,11 @@ email:
 # never be staleness-checked at their source; archive_stale_jobs archives them
 # once they age past this many days. 0 disables age-based archiving.
 # portal_max_age_days: 30
+
+# An application still 'submitted' with no sign of life for this many days
+# becomes 'no_response' at the end of every scan.
+# no_response_after_days: 45
+
+# The rule above runs only when a complete email sync is younger than this
+# many days: an unswept mailbox could hold the reply.
+# email_sync_max_age_days: 7

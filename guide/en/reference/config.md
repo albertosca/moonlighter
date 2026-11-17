@@ -14,6 +14,8 @@
 | `title_blocklist` | `[]` | Title substrings (case-insensitive) discarded before any LLM call |
 | `answer_bank_max_age_days` | `90` | Days after its last submission that a banked answer stops being replayed; `null` disables expiry — see [Answer bank](../guides/answer-bank.md) |
 | `portal_max_age_days` | `30` | Age at which portal-feed jobs (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring, Gupy), which can't be checked at their source, are archived; `0` disables it |
+| `no_response_after_days` | `45` | Days without a sign of life after which a `submitted` application becomes `no_response`, at the end of each scan — see [MCP tools](mcp-tools.md#the-no-response-rule) |
+| `email_sync_max_age_days` | `7` | The no-response rule runs only when a complete email sync finished within this many days |
 
 ## cv
 

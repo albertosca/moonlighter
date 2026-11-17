@@ -1,5 +1,6 @@
 """The two scans: every configured company (`scan_and_evaluate`) and one company (`scan_company`)."""
 
+from datetime import datetime
 from typing import Any
 
 from moonlighter.core.config.company_list import load_company_list
@@ -8,12 +9,14 @@ from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.discovery.archive import archive_stale_jobs
 from moonlighter.discovery.scan.claims import drop_already_seen
 from moonlighter.discovery.scan.collection import collect_raw_jobs, normalize_urls
+from moonlighter.discovery.scan.duplicates import collapse_duplicates
 from moonlighter.discovery.scan.pipeline import evaluate_and_store
 from moonlighter.discovery.scan.results import ScanKind, ScanResult
 from moonlighter.discovery.scan.source_warnings import stats_warnings
 from moonlighter.discovery.screening.no_eval import NoEval
 from moonlighter.discovery.sources.base import BaseScanner, ScanStats
 from moonlighter.discovery.sources.registry import build_http_scanners
+from moonlighter.discovery.unanswered import mark_unanswered_applications
 
 
 async def scan_and_evaluate(  # noqa: PLR0917 - test_run_no_eval_passes_no_caller_to_the_service reads the caller as the last positional argument
@@ -27,7 +30,7 @@ async def scan_and_evaluate(  # noqa: PLR0917 - test_run_no_eval_passes_no_calle
     companies = load_company_list(phase=None if phase == "all" else phase)
     stats: ScanStats = {}
     raw_jobs, warning = await collect_raw_jobs(keywords, config, companies, stats=stats)
-    new_jobs = drop_already_seen(raw_jobs)
+    new_jobs = collapse_duplicates(drop_already_seen(raw_jobs))
     saved: list[Job] = []
     spend_hit = False
     if new_jobs:
@@ -38,6 +41,10 @@ async def scan_and_evaluate(  # noqa: PLR0917 - test_run_no_eval_passes_no_calle
         spend_hit=spend_hit,
         threshold=config["score_threshold"],
         archive=await archive_stale_jobs(None, None, config),
+        unanswered=mark_unanswered_applications(
+            config,
+            datetime.now(),  # noqa: DTZ005 - the database stores naive local time
+        ),
         warning=warning,
         stats=stats,
     )
@@ -75,7 +82,7 @@ async def scan_company(
         return _unknown_source_report(source, threshold, scanners)
     stats: ScanStats = {}
     raw_jobs = normalize_urls(await scanners[source].scan([company], stats=stats))
-    new_jobs = drop_already_seen(raw_jobs)
+    new_jobs = collapse_duplicates(drop_already_seen(raw_jobs))
     tip = (
         f"Tip: add {company!r} under '{source}:' in company_list.yaml "
         "to include it in recurring scans."

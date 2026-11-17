@@ -105,7 +105,7 @@ Você precisa do [uv](https://docs.astral.sh/uv/) (ele baixa o Python 3.14 para 
 - [CV sob medida](https://albertosca.github.io/moonlighter/pt/guides/tailored-cv/) — um CV LaTeX de uma página por vaga, montado a partir dos bullets que você curou
 - [Banco de respostas](https://albertosca.github.io/moonlighter/pt/guides/answer-bank/) — respostas de triagem que você aprovou, reaproveitadas na próxima candidatura
 - [Linha de comando](https://albertosca.github.io/moonlighter/pt/reference/cli/) — uma CLI em JSON por fatia, códigos de saída, o que cada instalação oferece
-- [Ferramentas MCP](https://albertosca.github.io/moonlighter/pt/reference/mcp-tools/) — as 18 ferramentas que o Claude chama por você
+- [Ferramentas MCP](https://albertosca.github.io/moonlighter/pt/reference/mcp-tools/) — as 19 ferramentas que o Claude chama por você
 - [Extensões](https://albertosca.github.io/moonlighter/pt/guides/extensions/) — adicione uma fonte de vagas como um pacote separado
 
 Dúvidas e solução de problemas: [Perguntas frequentes](https://albertosca.github.io/moonlighter/pt/faq/). Para mexer no código: [CONTRIBUTING.md](CONTRIBUTING.md) (em inglês).

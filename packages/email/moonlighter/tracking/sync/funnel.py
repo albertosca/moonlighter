@@ -6,7 +6,16 @@ from typing import Any
 from moonlighter.core.job_status import sync_job_status
 
 # Canonical funnel progression order — the status only ever moves forward, never back.
-_STATUS_ORDER = ["draft", "submitted", "screening", "interviews", "offer", "rejected"]
+# no_response sits right after submitted: a late reply still moves it forward.
+_STATUS_ORDER = [
+    "draft",
+    "submitted",
+    "no_response",
+    "screening",
+    "interviews",
+    "offer",
+    "rejected",
+]
 
 _TYPE_TO_STATUS = {
     "screening": "screening",

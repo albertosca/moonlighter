@@ -41,6 +41,8 @@ def test_job_to_dict_projects_every_column_with_iso_datetimes(temporary_database
         "salary_notes",
         "status",
         "found_at",
+        "description_hash",
+        "duplicate_of_id",
     ):
         assert column in payload
 

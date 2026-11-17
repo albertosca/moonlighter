@@ -53,6 +53,11 @@ def archived_fields(score_notes: str) -> dict[str, Any]:
     return {"score": 0.0, "score_notes": score_notes, "caveats": "[]", "status": "archived"}
 
 
+def duplicate_fields(original_id: int) -> dict[str, Any]:
+    """The fields of a copy of a stored job: archived against it, without an LLM call."""
+    return {**archived_fields(f"duplicate of #{original_id}"), "duplicate_of": original_id}
+
+
 def needs_review_fields(score_notes: str) -> dict[str, Any]:
     """The fields of a job that waits for a human to paste the real page."""
     return {"score": None, "score_notes": score_notes, "caveats": "[]", "status": "needs_review"}

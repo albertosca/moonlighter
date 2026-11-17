@@ -44,7 +44,7 @@ async def test_add_job_tool_delegates_to_service(temporary_database):
 
 
 async def test_verify_job_tool_delegates_to_service(temporary_database):
-    """The verify_job MCP wrapper delegates to manual_jobs.verify_job and returns the result."""
+    """The verify_job MCP wrapper delegates to verification.verify_job and returns the result."""
     init_db()
 
     job = Job.create(
@@ -56,7 +56,7 @@ async def test_verify_job_tool_delegates_to_service(temporary_database):
         score=None,
     )
     with patch(
-        "moonlighter.discovery.manual.jobs.evaluate_job",
+        "moonlighter.discovery.manual.verification.evaluate_job",
         new=AsyncMock(return_value=make_eval_result(8.0)),
     ):
         result = await verify_job(
@@ -107,3 +107,21 @@ async def test_tool_archive_stale_jobs_rejects_both_filters(temporary_database):
         result = await archive_stale_jobs(job_id=1, company="acme", context=make_test_context())
 
     assert "OR company" in result
+
+
+async def test_add_job_tool_passes_track_through(temporary_database):
+    init_db()
+    with patch(
+        "moonlighter.discovery.manual.jobs.evaluate_job",
+        new=AsyncMock(return_value=make_eval_result(2.0)),
+    ):
+        result = await add_job(
+            url="https://x.com/manual/tool/track",
+            company="Stripe",
+            title="Eng",
+            description="A detailed job description that goes on.",
+            track=True,
+            context=make_test_context(),
+        )
+    assert "Kept on purpose (track=True)" in result
+    assert Job.get(Job.url == "https://x.com/manual/tool/track").status == "reviewed"

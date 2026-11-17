@@ -1,9 +1,10 @@
-"""Jobs a person hands over by hand: `add_job` for a URL, `verify_job` for a pasted page."""
+"""Jobs a person hands over by hand: `add_job` scores and saves a posting from its URL."""
 
 from dataclasses import dataclass, replace
 from typing import Any
 
 from moonlighter.core.db import Job
+from moonlighter.core.duplicates import find_original
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.web.posting import fetch_description, fetch_posting_via_ats
 from moonlighter.core.web.urls import normalize_job_url
@@ -11,12 +12,13 @@ from moonlighter.discovery.evaluation.single import evaluate_job
 from moonlighter.discovery.evaluation.title_filter import should_skip_by_title
 from moonlighter.discovery.manual.messages import existing_job_message, format_add_result
 from moonlighter.discovery.scan.claims import claim_url
-from moonlighter.discovery.scan.persistence import archived_fields, create_job, scored_fields
-from moonlighter.discovery.screening.evaluator_inputs import (
-    MINIMUM_DESCRIPTION_LENGTH,
-    is_description_insufficient,
-    model_for,
+from moonlighter.discovery.scan.persistence import (
+    archived_fields,
+    create_job,
+    duplicate_fields,
+    scored_fields,
 )
+from moonlighter.discovery.screening.evaluator_inputs import model_for
 from moonlighter.discovery.sources.base import normalize_remote_type
 
 
@@ -70,13 +72,20 @@ def _persist_manual(posting: _Posting, **scoring: Any) -> Job | None:
     return job
 
 
-def _answer_without_scoring(posting: _Posting, config: dict[str, Any]) -> str | None:
-    """The answer when no evaluation is needed, else None."""
+def _answer_without_scoring(
+    posting: _Posting, config: dict[str, Any], *, track: bool
+) -> str | None:
+    """The answer when no evaluation is needed, else None. A tracked job skips the title filter."""
     if not posting.company or not posting.title:
         return "Provide at least 'company' and 'title' along with the URL."
     already = existing_job_message(posting.url)
     if already:
         return already
+    original = find_original(posting.company, posting.title, posting.description)
+    if original is not None:
+        return _store_copy(posting, original, track=track)
+    if track:
+        return None
     matched = should_skip_by_title(posting.title, config.get("title_blocklist", []))
     if matched:
         _persist_manual(posting, **archived_fields(f"title filtered: {matched!r}"))
@@ -84,8 +93,24 @@ def _answer_without_scoring(posting: _Posting, config: dict[str, Any]) -> str | 
     return None
 
 
+def _store_copy(posting: _Posting, original: Job, *, track: bool) -> str:
+    _persist_manual(posting, **duplicate_fields(original.id))
+    answer = (
+        f"Copy of job #{original.id} ({original.company}/{original.title}): "
+        "saved as an archived duplicate, not scored."
+    )
+    if track:
+        answer += f" Track the original instead: register_application(job_id={original.id})."
+    return answer
+
+
 async def _score_and_store(
-    posting: _Posting, config: dict[str, Any], profile: dict[str, Any], *, caller: LLMCaller
+    posting: _Posting,
+    config: dict[str, Any],
+    profile: dict[str, Any],
+    *,
+    caller: LLMCaller,
+    track: bool,
 ) -> str:
     threshold = config["score_threshold"]
     result = await evaluate_job(
@@ -99,10 +124,15 @@ async def _score_and_store(
         remote_type=posting.remote_type,
     )
     fields = scored_fields(result, threshold)
+    if track:
+        # The person already chose this job: the score is kept for the record, never acted on.
+        fields["status"] = "reviewed"
     job = _persist_manual(posting, **fields)
     if job is None:
         return "Job already in the database (URL conflict)."
-    return format_add_result(job, result, threshold=threshold, status=fields["status"])
+    return format_add_result(
+        job, result, threshold=threshold, status=fields["status"], tracked=track
+    )
 
 
 async def add_job(  # noqa: PLR0913, PLR0917 - the MCP tool takes these seven fields as its public arguments
@@ -113,6 +143,8 @@ async def add_job(  # noqa: PLR0913, PLR0917 - the MCP tool takes these seven fi
     config: dict[str, Any],
     profile: dict[str, Any],
     caller: LLMCaller,
+    *,
+    track: bool = False,
 ) -> str:
     """Score and save one posting from its URL, filling what is missing from the ATS or the page."""
     url = normalize_job_url(url)
@@ -122,52 +154,7 @@ async def add_job(  # noqa: PLR0913, PLR0917 - the MCP tool takes these seven fi
         if error:
             return error
         posting = replace(posting, description=fetched or "")
-    answer = _answer_without_scoring(posting, config)
+    answer = _answer_without_scoring(posting, config, track=track)
     if answer:
         return answer
-    return await _score_and_store(posting, config, profile, caller=caller)
-
-
-async def verify_job(
-    job_id: int,
-    page_text: str,
-    config: dict[str, Any],
-    *,
-    profile: dict[str, Any],
-    caller: LLMCaller,
-) -> str:
-    """Re-score a job flagged needs_review (empty description) using text pasted from its page.
-
-    Updates the same row in place.
-    """
-    try:
-        job = Job.get_by_id(job_id)
-    except Job.DoesNotExist:
-        return f"Job #{job_id} not found."
-    if job.status != "needs_review":
-        return f"Job #{job_id} is not pending verification (status: {job.status!r})."
-
-    if is_description_insufficient(page_text):
-        return (
-            f"That paste is too short to score ({len(page_text.strip())} chars — need at least "
-            f"{MINIMUM_DESCRIPTION_LENGTH}). Job #{job_id} stays pending — open {job.url} "
-            "and copy the whole page."
-        )
-
-    threshold = config["score_threshold"]
-    result = await evaluate_job(
-        company=job.company,
-        title=job.title,
-        description=page_text,
-        profile=profile,
-        model=model_for(config),
-        _caller=caller,
-        location=job.location,
-        remote_type=job.remote_type,
-    )
-    fields = scored_fields(result, threshold)
-    job.description = page_text
-    for name, value in fields.items():
-        setattr(job, name, value)
-    job.save()
-    return format_add_result(job, result, threshold=threshold, status=fields["status"])
+    return await _score_and_store(posting, config, profile, caller=caller, track=track)

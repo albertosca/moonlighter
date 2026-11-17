@@ -75,4 +75,10 @@ DEFAULTS: dict[str, Any] = {
     # staleness-checked at their source; past this age they archive as aged
     # out. 0 disables age-based archiving.
     "portal_max_age_days": 30,
+    # An application still 'submitted' with no sign of life for this many days
+    # becomes 'no_response' at the end of every scan (Alberto, 2026-11-16).
+    "no_response_after_days": 45,
+    # The rule above runs only when a complete email sync is younger than this
+    # many days: an unswept mailbox could hold the reply.
+    "email_sync_max_age_days": 7,
 }
