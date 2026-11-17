@@ -7,13 +7,21 @@ from moonlighter.core.dedup import PostingKey, normalize_text, posting_key
 
 
 def find_original(company: str | None, title: str | None, description: str | None) -> Job | None:
-    """The lowest-id stored job with the same key that is not itself a copy; None without a key."""
+    """The lowest-id stored job with the same key that is not itself a copy; None without a key.
+
+    A job whose posting is known to be gone (closed_at set) is no original: the same text
+    posted again is a live repost, scored on its own and the original of later copies.
+    """
     key = posting_key(company, title, description)
     if key is None:
         return None
     candidates = (
         Job.select()
-        .where(Job.description_hash == key.description_hash, Job.duplicate_of.is_null())
+        .where(
+            Job.description_hash == key.description_hash,
+            Job.duplicate_of.is_null(),
+            Job.closed_at.is_null(),
+        )
         .order_by(Job.id)
     )
     for candidate in candidates:

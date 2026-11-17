@@ -1,5 +1,7 @@
 """find_original: the stored job a new posting is a copy of."""
 
+from datetime import datetime
+
 from moonlighter.core.db import Job, init_db
 from moonlighter.core.duplicates import find_original, group_duplicates
 
@@ -98,3 +100,22 @@ def test_singletons_rows_without_text_and_existing_copies_form_no_group(temporar
     empty_two = _job(3, description="", title="Other")
     already = _job(4, duplicate_of=alone)
     assert group_duplicates([alone, empty_one, empty_two, already], applied_job_ids=set()) == []
+
+
+def test_a_posting_known_to_be_gone_is_no_original(temporary_database):
+    init_db()
+    _job(1, status="archived", closed_at=datetime(2026, 5, 1))  # noqa: DTZ001 - naive local time
+    assert find_original("Tether", "Eng", TEXT) is None
+
+
+def test_a_repost_after_a_gone_original_becomes_the_original(temporary_database):
+    init_db()
+    _job(1, status="archived", closed_at=datetime(2026, 5, 1))  # noqa: DTZ001 - naive local time
+    repost = _job(2)
+    assert find_original("Tether", "Eng", TEXT).id == repost.id
+
+
+def test_an_original_archived_by_its_score_still_counts(temporary_database):
+    init_db()
+    original = _job(1, status="archived", score=2.0)
+    assert find_original("Tether", "Eng", TEXT).id == original.id
