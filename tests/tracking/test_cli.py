@@ -1,11 +1,13 @@
 """The moonlighter-email command line: its grammar, exit codes and JSON payloads."""
 
 import json
+from datetime import date, datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from moonlighter.core.cli import run
+from moonlighter.core.db import Application, Job, init_db
 from moonlighter.tracking import cli
 from moonlighter.tracking.cli import parse_args
 from moonlighter.tracking.gmail.client import GmailAuthError
@@ -127,3 +129,70 @@ def test_email_help_carries_the_slice_epilog(capsys):
         parse_args(["--help"])
     assert exit_info.value.code == 0
     assert "installed:" in capsys.readouterr().out
+
+
+def test_register_parses_every_flag():
+    arguments = parse_args(
+        [
+            "register",
+            "7",
+            "--status",
+            "rejected",
+            "--applied-at",
+            "2026-11-10",
+            "--notes",
+            "by email",
+            "--reply-mailbox-unswept",
+        ]
+    )
+    assert (
+        arguments.status,
+        arguments.applied_at,
+        arguments.notes,
+        arguments.reply_mailbox_unswept,
+    ) == ("rejected", date(2026, 11, 10), "by email", True)
+
+
+def test_register_flag_defaults_to_none_and_swept_is_false():
+    assert parse_args(["register", "7"]).reply_mailbox_unswept is None
+    assert parse_args(["register", "7", "--reply-mailbox-swept"]).reply_mailbox_unswept is False
+
+
+async def test_register_command_passes_the_request_to_the_service(temporary_database):
+    init_db()
+    job = Job.create(source="manual", company="Acme", title="Eng", url="https://x/1")
+    arguments = parse_args(
+        [
+            "register",
+            str(job.id),
+            "--status",
+            "rejected",
+            "--applied-at",
+            "2026-11-10",
+            "--notes",
+            "by email",
+            "--reply-mailbox-unswept",
+        ]
+    )
+    with patch.object(cli, "bootstrap", return_value=({}, {})):
+        payload, code = await cli._run(arguments)
+    application = Application.get(Application.job == job)
+    assert (payload["kind"], payload["status"], payload["created"], code) == (
+        "registered",
+        "rejected",
+        True,
+        0,
+    )
+    assert application.applied_at == datetime(2026, 11, 10)  # noqa: DTZ001 - the database stores naive local time
+    assert application.reply_mailbox_unswept is True
+    assert application.notes.endswith("] by email")
+
+
+@pytest.mark.parametrize(
+    "flags", [["--status", "hired"], ["--applied-at", "10/11/2026"]], ids=["status", "date"]
+)
+def test_register_rejects_a_bad_status_or_date_as_a_usage_error(capsys, flags):
+    with pytest.raises(SystemExit) as exit_info:
+        parse_args(["register", "7", *flags])
+    assert exit_info.value.code == 2
+    assert json.loads(capsys.readouterr().out)["kind"] == "usage_error"

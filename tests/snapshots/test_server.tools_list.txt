@@ -482,6 +482,68 @@
   {
     "_meta": null,
     "annotations": null,
+    "description": "\nRecord an application you made outside the tool (a form you filled by hand,\nan email you sent, a job below the score threshold you applied to anyway).\nCreates the application if it is missing, moves an archived job out of the\narchive, and never overwrites an application that already exists: it only\nappends the note and fills a missing date.\njob_id: ID of the job (add_job first if it is not in the database)\nstatus: 'submitted' | 'screening' | 'interviews' | 'offer' | 'rejected' | 'no_response'\napplied_at: YYYY-MM-DD, defaults to today for a new application\nnotes: appended to the history with today's date\nreply_mailbox_unswept: true when replies may land in a mailbox the email sync\n    does not read; the 45-day no-response rule then leaves it alone\n",
+    "execution": null,
+    "icons": null,
+    "inputSchema": {
+      "properties": {
+        "applied_at": {
+          "default": "",
+          "title": "Applied At",
+          "type": "string"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "integer"
+        },
+        "notes": {
+          "default": "",
+          "title": "Notes",
+          "type": "string"
+        },
+        "reply_mailbox_unswept": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply Mailbox Unswept"
+        },
+        "status": {
+          "default": "submitted",
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id"
+      ],
+      "title": "register_applicationArguments",
+      "type": "object"
+    },
+    "name": "register_application",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "register_applicationOutput",
+      "type": "object"
+    },
+    "title": null
+  },
+  {
+    "_meta": null,
+    "annotations": null,
     "description": "\nEvery banked screening answer, most recently used first. Entries older than\nanswer_bank_max_age_days are marked expired: kept, but no longer replayed\non a sheet until a new submission refreshes them.\n",
     "execution": null,
     "icons": null,

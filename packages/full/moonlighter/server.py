@@ -24,6 +24,7 @@ from moonlighter.mcp_tools import (
     cv_pool,
     email_tracking,
     jobs,
+    registration,
     scanning,
 )
 from moonlighter.startup import validate_startup
@@ -84,6 +85,7 @@ _TOOLS = (
     applications.get_pipeline,
     jobs.reopen_job,
     applications.update_status,
+    registration.register_application,
     answer_bank.list_answer_bank,
     answer_bank.forget_answer,
     email_tracking.setup_email,
