@@ -3,15 +3,31 @@
 from typing import Any
 
 from moonlighter.core.db import Job
+from moonlighter.core.duplicates import find_original
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.discovery.evaluation.single import evaluate_job
 from moonlighter.discovery.manual.messages import format_add_result
-from moonlighter.discovery.scan.persistence import scored_fields
+from moonlighter.discovery.scan.persistence import duplicate_fields, scored_fields
 from moonlighter.discovery.screening.evaluator_inputs import (
     MINIMUM_DESCRIPTION_LENGTH,
     is_description_insufficient,
     model_for,
 )
+
+
+def _archive_if_copy(job: Job, page_text: str) -> str | None:
+    """Archive the job against a stored twin of the pasted text, without an LLM call."""
+    original = find_original(job.company, job.title, page_text)
+    if original is None or original.id == job.id:
+        return None
+    job.description = page_text
+    for name, value in duplicate_fields(original.id).items():
+        setattr(job, name, value)
+    job.save()
+    return (
+        f"Job #{job.id} is a copy of job #{original.id} ({original.company}/{original.title}): "
+        "archived as a duplicate, not scored."
+    )
 
 
 async def verify_job(
@@ -40,6 +56,9 @@ async def verify_job(
             "and copy the whole page."
         )
 
+    copy_answer = _archive_if_copy(job, page_text)
+    if copy_answer is not None:
+        return copy_answer
     threshold = config["score_threshold"]
     result = await evaluate_job(
         company=job.company,
