@@ -60,3 +60,18 @@ def test_only_one_block_has_no_stray_blank_lines():
 
 def test_nothing_to_report_is_empty():
     assert format_unanswered_result(UnansweredResult(ran=True, last_sync=LAST_SYNC)) == ""
+
+
+def test_lists_the_unswept_with_what_to_do():
+    text = format_unanswered_result(
+        UnansweredResult(
+            ran=True,
+            last_sync=LAST_SYNC,
+            unswept=[{"job_id": 4, "company": "D", "title": "Eng", "days": 90}],
+        )
+    )
+    assert text == (
+        "1 application(s) waiting for an email sync that reaches back to their last sign of life:\n"
+        "  #4 D/Eng (90 days)\n"
+        "Run sync_email_responses once with lookback_days covering them (email.lookback_days)."
+    )

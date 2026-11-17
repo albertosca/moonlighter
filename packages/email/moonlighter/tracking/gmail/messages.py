@@ -8,10 +8,12 @@ from moonlighter.tracking.gmail.message_body import extract_body
 logger = logging.getLogger(__name__)
 
 _MAXIMUM_PAGES = 10  # hard upper bound: 10 pages × 50/page = 500 messages per sync, max
+_PAGE_SIZE = 50
+MAXIMUM_MESSAGES_PER_SYNC = _MAXIMUM_PAGES * _PAGE_SIZE
 
 
 def fetch_recent_messages(
-    service: Any, lookback_days: int = 30, maximum_results: int = 50
+    service: Any, lookback_days: int = 30, maximum_results: int = _PAGE_SIZE
 ) -> list[dict[str, Any]]:
     """Recent messages, whether or not they have been read.
 

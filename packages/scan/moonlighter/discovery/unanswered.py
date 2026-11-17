@@ -24,6 +24,7 @@ class UnansweredResult:
     marked: list[dict[str, Any]] = field(default_factory=list)
     to_review: list[dict[str, Any]] = field(default_factory=list)
     held: list[dict[str, Any]] = field(default_factory=list)
+    unswept: list[dict[str, Any]] = field(default_factory=list)
     after_days: int = 0  # the configured silence, named in the report
 
 
@@ -51,21 +52,44 @@ def _mark(application: Application, days: int, now: datetime) -> None:
     sync_job_status(application)
 
 
+def _swept_since(runs: list[EmailSyncRun]) -> datetime:
+    """The start of the unbroken stretch the sweeps read, walking back from the newest.
+
+    `runs` is newest first; a run that finished before the stretch begins leaves a gap,
+    and nothing older than the gap counts.
+    """
+    covered_from: datetime = runs[0].window_start
+    for run in runs[1:]:
+        if run.finished_at < covered_from:
+            break
+        covered_from = min(covered_from, run.window_start)
+    return covered_from
+
+
+@dataclass(frozen=True)
+class _Sweep:
+    swept_since: datetime  # replies before this moment were never read
+    now: datetime
+
+
 def _classify(
-    application: Application, days: int, *, result: UnansweredResult, now: datetime
+    application: Application, days: int, *, result: UnansweredResult, sweep: _Sweep
 ) -> None:
     if application.status in _LATER_STAGES:
         result.to_review.append({**_summary(application, days), "status": application.status})
     elif application.reply_mailbox_unswept:
         result.held.append(_summary(application, days))
+    elif _last_signal(application, sweep.now) < sweep.swept_since:
+        result.unswept.append(_summary(application, days))
     else:
-        _mark(application, days, now)
+        _mark(application, days, sweep.now)
         result.marked.append(_summary(application, days))
 
 
 def mark_unanswered_applications(config: dict[str, Any], now: datetime) -> UnansweredResult:
     """Mark the silent submitted applications, list the silent later stages, hold the flagged."""
-    newest = EmailSyncRun.select().order_by(EmailSyncRun.finished_at.desc()).first()
+    runs = list(EmailSyncRun.select().order_by(EmailSyncRun.finished_at.desc()))
+    newest = runs[0] if runs else None
     last_sync = newest.finished_at.isoformat() if newest is not None else None
     after_days = int(config.get("no_response_after_days", DEFAULTS["no_response_after_days"]))
     oldest_trusted_sync_days = int(
@@ -74,11 +98,12 @@ def mark_unanswered_applications(config: dict[str, Any], now: datetime) -> Unans
     if newest is None or (now - newest.finished_at).days >= oldest_trusted_sync_days:
         return UnansweredResult(ran=False, last_sync=last_sync, after_days=after_days)
     result = UnansweredResult(ran=True, last_sync=last_sync, after_days=after_days)
+    sweep = _Sweep(swept_since=_swept_since(runs), now=now)
     candidates = Application.select().where(Application.status.in_(("submitted", *_LATER_STAGES)))
     for application in candidates:
         days = (now.date() - _last_signal(application, now).date()).days
         if days >= after_days:
-            _classify(application, days, result=result, now=now)
+            _classify(application, days, result=result, sweep=sweep)
     return result
 
 
@@ -126,6 +151,23 @@ def _held_block(result: UnansweredResult) -> str:
     return "\n".join([f"{len(result.held)} application(s) left alone:", *lines])
 
 
+def _unswept_block(result: UnansweredResult) -> str:
+    lines = [
+        f"  #{entry['job_id']} {entry['company']}/{entry['title']} ({entry['days']} days)"
+        for entry in result.unswept
+    ]
+    return "\n".join(
+        [
+            (
+                f"{len(result.unswept)} application(s) waiting for an email sync that reaches "
+                "back to their last sign of life:"
+            ),
+            *lines,
+            "Run sync_email_responses once with lookback_days covering them (email.lookback_days).",
+        ]
+    )
+
+
 def format_unanswered_result(result: UnansweredResult) -> str:
     """The report section: empty when the rule ran and found nothing."""
     if not result.ran:
@@ -136,6 +178,7 @@ def format_unanswered_result(result: UnansweredResult) -> str:
             (result.marked, _marked_block),
             (result.to_review, _review_block),
             (result.held, _held_block),
+            (result.unswept, _unswept_block),
         )
         if entries
     ]

@@ -9,12 +9,13 @@ from moonlighter.discovery.unanswered import mark_unanswered_applications
 
 NOW = datetime(2026, 11, 17, 10, 0)  # noqa: DTZ001 - the database stores naive local time
 CONFIG = {"no_response_after_days": 45, "email_sync_max_age_days": 7}
+ONE_YEAR_AGO = NOW - timedelta(days=365)
 
 
 @pytest.fixture
 def make_application(temporary_database):
     init_db()
-    EmailSyncRun.create(finished_at=NOW - timedelta(days=1))
+    EmailSyncRun.create(finished_at=NOW - timedelta(days=1), window_start=ONE_YEAR_AGO)
     count = 0
 
     def _make(days_silent, status="submitted", notes=None, **fields):
@@ -105,7 +106,7 @@ def test_other_statuses_are_out_of_scope(make_application, status):
 
 def test_no_recent_sync_marks_nothing(make_application):
     EmailSyncRun.delete().execute()
-    EmailSyncRun.create(finished_at=NOW - timedelta(days=8))
+    EmailSyncRun.create(finished_at=NOW - timedelta(days=8), window_start=ONE_YEAR_AGO)
     application = make_application(90)
     result = mark_unanswered_applications(CONFIG, NOW)
     assert Application.get_by_id(application.id).status == "submitted"
@@ -114,20 +115,20 @@ def test_no_recent_sync_marks_nothing(make_application):
 
 def test_a_sync_exactly_at_the_max_age_is_too_old(make_application):
     EmailSyncRun.delete().execute()
-    EmailSyncRun.create(finished_at=NOW - timedelta(days=7))
+    EmailSyncRun.create(finished_at=NOW - timedelta(days=7), window_start=ONE_YEAR_AGO)
     make_application(90)
     assert mark_unanswered_applications(CONFIG, NOW).ran is False
 
 
 def test_a_sync_just_inside_the_max_age_runs(make_application):
     EmailSyncRun.delete().execute()
-    EmailSyncRun.create(finished_at=NOW - timedelta(days=6, hours=23))
+    EmailSyncRun.create(finished_at=NOW - timedelta(days=6, hours=23), window_start=ONE_YEAR_AGO)
     make_application(90)
     assert mark_unanswered_applications(CONFIG, NOW).ran is True
 
 
 def test_the_newest_sync_decides(make_application):
-    EmailSyncRun.create(finished_at=NOW - timedelta(days=30))
+    EmailSyncRun.create(finished_at=NOW - timedelta(days=30), window_start=ONE_YEAR_AGO)
     result = mark_unanswered_applications(CONFIG, NOW)
     assert (result.ran, result.last_sync) == (True, (NOW - timedelta(days=1)).isoformat())
 
@@ -143,3 +144,45 @@ def test_a_second_run_does_not_mark_again(make_application):
     make_application(90)
     mark_unanswered_applications(CONFIG, NOW)
     assert mark_unanswered_applications(CONFIG, NOW).marked == []
+
+
+def _sweeps(*windows):
+    """Replace the fixture's sweep with these (finished days ago, window start days ago)."""
+    EmailSyncRun.delete().execute()
+    for finished, start in windows:
+        EmailSyncRun.create(
+            finished_at=NOW - timedelta(days=finished), window_start=NOW - timedelta(days=start)
+        )
+
+
+def test_a_signal_older_than_the_swept_window_is_left_unswept(make_application):
+    _sweeps((1, 31))
+    application = make_application(60)
+    result = mark_unanswered_applications(CONFIG, NOW)
+    assert Application.get_by_id(application.id).status == "submitted"
+    assert result.unswept == [
+        {"job_id": application.job_id, "company": "Company1", "title": "Eng", "days": 60}
+    ]
+    assert result.marked == []
+
+
+def test_overlapping_sweeps_chain_back_to_the_oldest_start(make_application):
+    _sweeps((1, 31), (25, 55), (50, 80))
+    application = make_application(70)
+    mark_unanswered_applications(CONFIG, NOW)
+    assert Application.get_by_id(application.id).status == "no_response"
+
+
+def test_a_gap_between_sweeps_ends_the_coverage(make_application):
+    _sweeps((1, 31), (40, 120))
+    application = make_application(60)
+    result = mark_unanswered_applications(CONFIG, NOW)
+    assert Application.get_by_id(application.id).status == "submitted"
+    assert [entry["job_id"] for entry in result.unswept] == [application.job_id]
+
+
+def test_a_signal_exactly_at_the_window_start_is_covered(make_application):
+    _sweeps((1, 50))
+    application = make_application(50)
+    mark_unanswered_applications(CONFIG, NOW)
+    assert Application.get_by_id(application.id).status == "no_response"

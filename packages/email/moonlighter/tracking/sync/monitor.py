@@ -6,10 +6,11 @@ and automatically update the applications pipeline.
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
-from moonlighter.core.db import EmailSyncRun, ProcessedEmail
+from moonlighter.core.db import ProcessedEmail
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.metrics import record_spend_limit_hit
@@ -21,6 +22,7 @@ from moonlighter.tracking.sync.classification import classify_response
 from moonlighter.tracking.sync.funnel import advance_application
 from moonlighter.tracking.sync.interview_stages import register_new_stage
 from moonlighter.tracking.sync.report import make_suggestion, make_update
+from moonlighter.tracking.sync.sweep import record_sweep_if_complete
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +54,10 @@ class _SpendLimitReachedError(Exception):
     """Stops the sync: the quota is spent, so the rest of the batch waits for the next run."""
 
 
+class _ClassificationSkippedError(Exception):
+    """One message could not be classified; it waits for the next run, and this run is no sweep."""
+
+
 async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[dict[str, Any]]:
     """Run the full flow: read recent emails, classify them, and update the database.
 
@@ -62,19 +68,27 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
     settings = _read_settings(config, email_config)
     gmail = _gmail_handles(service, email_config)
 
+    lookback_days = int(email_config.get("lookback_days", 30))
+    started = datetime.now()  # noqa: DTZ005 - the database stores naive local time
+    references = fetch_recent_messages(service, lookback_days)
     updates: list[dict[str, Any]] = []
+    skipped = 0
     try:
-        for message_reference in fetch_recent_messages(
-            service, int(email_config.get("lookback_days", 30))
-        ):
-            update = await _sync_message(
-                message_reference["id"], gmail, settings, llm_caller=llm_caller
-            )
+        for message_reference in references:
+            try:
+                update = await _sync_message(
+                    message_reference["id"], gmail, settings, llm_caller=llm_caller
+                )
+            except _ClassificationSkippedError:
+                skipped += 1
+                continue
             if update is not None:
                 updates.append(update)
     except _SpendLimitReachedError:
         return updates  # messages were left unread: not a sweep the no-response rule may trust
-    EmailSyncRun.create()
+    record_sweep_if_complete(
+        started, lookback_days=lookback_days, fetched=len(references), skipped=skipped
+    )
     return updates
 
 
@@ -110,9 +124,6 @@ async def _sync_message(
 
     message = parse_message(gmail.service, message_id)
     classification = await _classify(message_id, message, settings, llm_caller=llm_caller)
-    if classification is None:
-        return None
-
     if classification["type"] == "unrelated":
         _mark_done(gmail, message_id)
         return None
@@ -125,10 +136,11 @@ async def _sync_message(
 
 async def _classify(
     message_id: str, message: dict[str, Any], settings: _SyncSettings, *, llm_caller: LLMCaller
-) -> dict[str, Any] | None:
-    """The classification, or None to leave the message for the next run.
+) -> dict[str, Any]:
+    """The classification of one message.
 
-    Raises _SpendLimitReachedError when the quota is spent, which stops the sync.
+    Raises _SpendLimitReachedError when the quota is spent, which stops the sync, and
+    _ClassificationSkippedError on any other failure, which leaves the message for the next run.
     """
     try:
         return await classify_response(message, settings.stages, llm_caller, model=settings.model)
@@ -147,7 +159,8 @@ async def _classify(
             message_id,
             error,
         )
-        return None  # NOT mark_done: a failed classification must not burn the message
+        # NOT mark_done: a failed classification must not burn the message
+        raise _ClassificationSkippedError from error
 
 
 def _apply_reply(

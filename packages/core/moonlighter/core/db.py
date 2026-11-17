@@ -84,9 +84,8 @@ class Job(BaseModel):
     status = CharField(default="new")
     found_at = DateTimeField(default=datetime.now)
     closed_at = DateTimeField(null=True)
-    # sha256 of the normalized description (core/dedup.py); None for an empty one.
-    # Both indexes live in m008, not here: create_tables(safe=True) on an existing
-    # job table would index the column before m008 adds it, and corrupt the file.
+    # sha256 of the normalized description (core/dedup.py); None for an empty one. Both indexes
+    # live in m008: create_tables on an old job table would index columns m008 has yet to add.
     description_hash = CharField(null=True)
     # Set on a copy of the same posting under another URL; the original keeps None.
     duplicate_of = ForeignKeyField("self", null=True, backref="copies", index=False)
@@ -146,6 +145,7 @@ class EmailSyncRun(BaseModel):
     """One row per sync that read its whole lookback window; the 45-day rule trusts only a recent one."""
 
     finished_at = DateTimeField(default=datetime.now)
+    window_start = DateTimeField()  # the oldest moment the sweep read: start time - lookback_days
 
 
 class AnswerBankEntry(BaseModel):
