@@ -1,7 +1,9 @@
 """Finding the stored job a posting is a copy of (the key lives in core/dedup.py)."""
 
+from dataclasses import dataclass
+
 from moonlighter.core.db import Job
-from moonlighter.core.dedup import normalize_text, posting_key
+from moonlighter.core.dedup import PostingKey, normalize_text, posting_key
 
 
 def find_original(company: str | None, title: str | None, description: str | None) -> Job | None:
@@ -21,3 +23,38 @@ def find_original(company: str | None, title: str | None, description: str | Non
         ):
             return candidate
     return None
+
+
+@dataclass(frozen=True)
+class DuplicateGroup:
+    """Stored rows of one posting: the one kept, and the ones to archive against it."""
+
+    kept: Job
+    copies: list[Job]
+
+
+def _rank(job: Job, applied_job_ids: set[int]) -> tuple[bool, float, int]:
+    # sorted() ascending: applied first, then the highest score, then the lowest id.
+    score = job.score if job.score is not None else float("-inf")
+    return (job.id not in applied_job_ids, -score, job.id)
+
+
+def _by_key(jobs: list[Job]) -> list[list[Job]]:
+    """The rows of each key, leaving out rows without text and rows already marked as copies."""
+    by_key: dict[PostingKey, list[Job]] = {}
+    for job in jobs:
+        key = posting_key(job.company, job.title, job.description)
+        if key is not None and job.duplicate_of_id is None:
+            by_key.setdefault(key, []).append(job)
+    return list(by_key.values())
+
+
+def group_duplicates(jobs: list[Job], applied_job_ids: set[int]) -> list[DuplicateGroup]:
+    """Groups of two or more rows with one key; an applied row is never a copy."""
+    groups = []
+    for members in _by_key(jobs):
+        kept, *rest = sorted(members, key=lambda job: _rank(job, applied_job_ids))
+        copies = [job for job in rest if job.id not in applied_job_ids]
+        if copies:
+            groups.append(DuplicateGroup(kept, copies))
+    return groups

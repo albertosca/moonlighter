@@ -88,6 +88,9 @@ class Job(BaseModel):
     description_hash = CharField(null=True, index=True)
     # Set on a copy of the same posting under another URL; the original keeps None.
     duplicate_of = ForeignKeyField("self", null=True, backref="copies")
+    if TYPE_CHECKING:
+        # The raw column peewee synthesizes for the foreign key; reading it costs no query.
+        duplicate_of_id: int | None
 
     @override
     def save(self, *positional_arguments: Any, **keyword_arguments: Any) -> int:
@@ -101,6 +104,8 @@ class Job(BaseModel):
 
 class Application(BaseModel):
     job = ForeignKeyField(Job, backref="applications")
+    if TYPE_CHECKING:
+        job_id: int  # the raw column peewee synthesizes for the foreign key
     applied_at = DateTimeField(null=True)
     form_data = TextField(null=True)  # JSON dict: field_name -> answer
     notes = TextField(null=True)

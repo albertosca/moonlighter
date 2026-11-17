@@ -1,7 +1,7 @@
 """find_original: the stored job a new posting is a copy of."""
 
 from moonlighter.core.db import Job, init_db
-from moonlighter.core.duplicates import find_original
+from moonlighter.core.duplicates import find_original, group_duplicates
 
 TEXT = "We build Rails apps. Remote in Brazil."
 
@@ -55,3 +55,46 @@ def test_a_lower_id_copy_never_wins(temporary_database):
     later_original = _job(2)
     _job(1, duplicate_of=later_original)
     assert find_original("Tether", "Eng", TEXT).id == later_original.id
+
+
+def test_the_applied_row_is_kept_over_a_higher_score(temporary_database):
+    init_db()
+    high = _job(1, score=9.0)
+    applied = _job(2, score=4.0)
+    groups = group_duplicates([high, applied], applied_job_ids={applied.id})
+    assert [(group.kept.id, [copy.id for copy in group.copies]) for group in groups] == [
+        (applied.id, [high.id])
+    ]
+
+
+def test_without_applications_the_highest_score_then_the_lowest_id(temporary_database):
+    init_db()
+    low = _job(1, score=5.0)
+    high = _job(2, score=8.0)
+    tie = _job(3, score=8.0)
+    unscored = _job(4, score=None)
+    groups = group_duplicates([unscored, low, tie, high], applied_job_ids=set())
+    assert groups[0].kept.id == high.id
+    assert sorted(copy.id for copy in groups[0].copies) == [low.id, tie.id, unscored.id]
+
+
+def test_two_applied_rows_are_never_copies(temporary_database):
+    init_db()
+    first, second, third = _job(1), _job(2), _job(3)
+    groups = group_duplicates([first, second, third], applied_job_ids={first.id, second.id})
+    assert [copy.id for copy in groups[0].copies] == [third.id]
+
+
+def test_a_group_of_applied_rows_only_is_left_alone(temporary_database):
+    init_db()
+    first, second = _job(1), _job(2)
+    assert group_duplicates([first, second], applied_job_ids={first.id, second.id}) == []
+
+
+def test_singletons_rows_without_text_and_existing_copies_form_no_group(temporary_database):
+    init_db()
+    alone = _job(1)
+    empty_one = _job(2, description="", title="Other")
+    empty_two = _job(3, description="", title="Other")
+    already = _job(4, duplicate_of=alone)
+    assert group_duplicates([alone, empty_one, empty_two, already], applied_job_ids=set()) == []
