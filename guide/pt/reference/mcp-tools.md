@@ -23,7 +23,7 @@ O servidor MCP `moonlighter` expõe 19 ferramentas. Você raramente as chama pel
 | `get_pipeline` | Resumo completo do pipeline, uma seção por status (`no_response` e `archived` incluídos, para que as seções somem o total) — e problemas de configuração, como perfil ou CV ausentes |
 | `reopen_job` | Traz uma vaga arquivada de volta para `reviewed`, para você se candidatar mesmo assim |
 | `update_status` | Move pelo pipeline uma candidatura que já existe (`submitted`, `screening`, `interviews`, `offer`, `rejected`, `draft`, `no_response`) |
-| `register_application` | Registra numa etapa só uma candidatura feita fora da ferramenta: cria se faltar, tira do arquivo uma vaga arquivada e nunca sobrescreve uma que já existe. Candidatou-se à vaga 12638 à mão em 10/11 → `register_application(12638, applied_at="2026-11-10")` |
+| `register_application` | Registra numa etapa só uma candidatura feita fora da ferramenta: cria se faltar, tira do arquivo uma vaga arquivada e nunca sobrescreve uma que já existe. Candidatou-se à vaga 42 à mão em 10/11 → `register_application(42, applied_at="2026-11-10")` |
 
 ## Preparar candidaturas
 
@@ -45,7 +45,13 @@ O servidor MCP `moonlighter` expõe 19 ferramentas. Você raramente as chama pel
 
 ## A regra de sem resposta
 
-Ao fim de todo `scan_and_evaluate`, uma candidatura `submitted` sem sinal de vida (nenhuma mudança de status, nenhuma nota datada) por `no_response_after_days` (45 por padrão) vira `no_response`, um status próprio, separado de `rejected`. Candidaturas em `screening`, `interviews` ou `offer` além dessa idade são só listadas, para você decidir. A regra só roda quando uma sincronização completa de e-mail terminou dentro de `email_sync_max_age_days` (7 por padrão); senão o relatório do scan diz que ela não rodou. Uma candidatura cujas respostas podem cair numa caixa que a sincronização não lê fica de fora: passe `reply_mailbox_unswept=true` ao `register_application`.
+Ao fim de todo `scan_and_evaluate`, uma candidatura `submitted` sem sinal de vida (nenhuma mudança de status, nenhuma nota datada) por `no_response_after_days` (45 por padrão) vira `no_response`, um status próprio, separado de `rejected`. Candidaturas em `screening`, `interviews` ou `offer` além dessa idade são só listadas, para você decidir.
+
+A regra só roda quando uma sincronização completa de e-mail terminou dentro de `email_sync_max_age_days` (7 por padrão); senão o relatório do scan diz que ela não rodou. Uma sincronização é completa quando classificou toda mensagem da sua janela e ficou abaixo do teto de 500 mensagens.
+
+Cada sincronização completa grava o início da janela que leu, `email.lookback_days` para trás. Uma candidatura só é marcada quando uma cadeia contínua dessas janelas alcança o seu último sinal de vida; as demais são listadas, esperando: aumente `email.lookback_days` na config e rode `sync_email_responses`.
+
+Uma candidatura cujas respostas podem cair numa caixa que a sincronização não lê fica de fora: passe `reply_mailbox_unswept=true` ao `register_application`.
 
 Guias para os fluxos por trás dessas ferramentas: [Primeiro scan](../getting-started/first-scan.md), [Banco de respostas](../guides/answer-bank.md), [CV sob medida](../guides/tailored-cv.md), [Acompanhamento pelo Gmail](../getting-started/gmail.md).
 

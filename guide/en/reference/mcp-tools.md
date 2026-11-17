@@ -23,7 +23,7 @@ The `moonlighter` MCP server exposes 19 tools. You rarely call them by name: ask
 | `get_pipeline` | Full pipeline summary, one section per status (`no_response` and `archived` included, so the sections add up to the total) — and setup problems, such as a missing profile or CV |
 | `reopen_job` | Bring an archived job back to `reviewed`, to apply to it anyway |
 | `update_status` | Move an application that already exists through the pipeline (`submitted`, `screening`, `interviews`, `offer`, `rejected`, `draft`, `no_response`) |
-| `register_application` | Record an application you made outside the tool, in one step: creates it if missing, takes an archived job out of the archive, and never overwrites one that exists. Applied to job 12638 by hand on Nov 10 → `register_application(12638, applied_at="2026-11-10")` |
+| `register_application` | Record an application you made outside the tool, in one step: creates it if missing, takes an archived job out of the archive, and never overwrites one that exists. Applied to job 42 by hand on Nov 10 → `register_application(42, applied_at="2026-11-10")` |
 
 ## Prepare applications
 
@@ -45,7 +45,13 @@ The `moonlighter` MCP server exposes 19 tools. You rarely call them by name: ask
 
 ## The no-response rule
 
-At the end of every `scan_and_evaluate`, a `submitted` application with no sign of life (no status change, no dated note) for `no_response_after_days` (45 by default) becomes `no_response`, a status of its own, apart from `rejected`. Applications in `screening`, `interviews` or `offer` past that age are only listed, for you to decide. The rule runs only when a complete email sync finished within `email_sync_max_age_days` (7 by default); otherwise the scan report says it did not run. An application whose replies may land in a mailbox the sync does not read is left alone: pass `reply_mailbox_unswept=true` to `register_application`.
+At the end of every `scan_and_evaluate`, a `submitted` application with no sign of life (no status change, no dated note) for `no_response_after_days` (45 by default) becomes `no_response`, a status of its own, apart from `rejected`. Applications in `screening`, `interviews` or `offer` past that age are only listed, for you to decide.
+
+The rule runs only when a complete email sync finished within `email_sync_max_age_days` (7 by default); otherwise the scan report says it did not run. A sync is complete when it classified every message in its window and stayed under its 500-message cap.
+
+Each complete sync records the start of the window it read, `email.lookback_days` back. An application is marked only when an unbroken chain of those windows reaches back to its last sign of life; the others are listed as waiting: raise `email.lookback_days` in the config and run `sync_email_responses`.
+
+An application whose replies may land in a mailbox the sync does not read is left alone: pass `reply_mailbox_unswept=true` to `register_application`.
 
 Guides for the flows behind these tools: [First scan](../getting-started/first-scan.md), [Answer bank](../guides/answer-bank.md), [Tailored CV](../guides/tailored-cv.md), [Gmail tracking](../getting-started/gmail.md).
 
