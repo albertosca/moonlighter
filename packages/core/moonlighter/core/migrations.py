@@ -117,6 +117,7 @@ def _m008_job_dedup_columns(db: MigrationDatabase) -> None:
             "ALTER TABLE job ADD COLUMN duplicate_of_id INTEGER NULL REFERENCES job (id)"
         )
     db.execute_sql("CREATE INDEX IF NOT EXISTS job_description_hash ON job (description_hash)")
+    db.execute_sql("CREATE INDEX IF NOT EXISTS job_duplicate_of_id ON job (duplicate_of_id)")
 
 
 def _m009_backfill_job_description_hash(db: MigrationDatabase) -> None:

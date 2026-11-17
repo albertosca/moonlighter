@@ -85,9 +85,11 @@ class Job(BaseModel):
     found_at = DateTimeField(default=datetime.now)
     closed_at = DateTimeField(null=True)
     # sha256 of the normalized description (core/dedup.py); None for an empty one.
-    description_hash = CharField(null=True, index=True)
+    # Both indexes live in m008, not here: create_tables(safe=True) on an existing
+    # job table would index the column before m008 adds it, and corrupt the file.
+    description_hash = CharField(null=True)
     # Set on a copy of the same posting under another URL; the original keeps None.
-    duplicate_of = ForeignKeyField("self", null=True, backref="copies")
+    duplicate_of = ForeignKeyField("self", null=True, backref="copies", index=False)
     if TYPE_CHECKING:
         # The raw column peewee synthesizes for the foreign key; reading it costs no query.
         duplicate_of_id: int | None
