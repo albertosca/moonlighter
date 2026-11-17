@@ -35,7 +35,9 @@ Outside `packages/`: `guide/en|pt` (docs site source) · `scripts/` (CI checks, 
 
 ## Quick DB access
 
-`uv run python -c "from moonlighter.core.db import init_db, Job, Application; init_db(); ..."` — peewee models against the DB under `MOONLIGHTER_HOME` (default `~/.moonlighter`).
+Read with `sqlite3 "file:$HOME/.moonlighter/moonlighter.db?mode=ro" "SELECT ..."` (the DB under `MOONLIGHTER_HOME`, default `~/.moonlighter`).
+
+`init_db()` runs every pending migration on the database it opens. Called from a checkout on a branch with a new migration, it migrates the live DB to a schema `main` has never seen (2026-11-17: a one-liner here moved it from v6 to v10 mid-branch). Use the peewee models (`uv run python -c "from moonlighter.core.db import init_db, Job; init_db(); ..."`) only from `main`.
 
 Peewee's metaclass-injected attrs (`.id`, `.DoesNotExist`, `.get_or_create`) are declared once on `BaseModel` in `core/db.py`. `get_or_create` is peewee `Model`'s own classmethod (the stubs declare it untyped); `.id` and `.DoesNotExist` are synthesized by its metaclass. peewee has vendored stubs since 4.1.1 (the lock has 4.5.3), so mypy sees a real class and these stopped being implicit — fix at that shared base, never with per-call-site `type: ignore`.
 
