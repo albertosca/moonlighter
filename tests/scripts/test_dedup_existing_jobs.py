@@ -57,6 +57,14 @@ def test_apply_refuses_to_overwrite_a_backup(temporary_database, tmp_path, capsy
     assert "refusing to overwrite" in capsys.readouterr().err
 
 
+def test_apply_refuses_a_backup_in_a_missing_directory(temporary_database, tmp_path, capsys):
+    _two_copies()
+    target = tmp_path / "missing" / "backup.db"
+    assert dedup_existing_jobs.main(["--apply", "--backup", str(target)]) == 2
+    assert f"backup directory does not exist: {target.parent}" in capsys.readouterr().err
+    assert Job.select().where(Job.duplicate_of.is_null(is_null=False)).count() == 0
+
+
 def test_apply_writes_the_backup_then_archives_the_copies(temporary_database, tmp_path):
     first, second = _two_copies()
     Application.create(job=second, status="submitted")

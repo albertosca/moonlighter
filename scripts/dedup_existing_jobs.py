@@ -69,6 +69,8 @@ def _usage_error(arguments: argparse.Namespace) -> str | None:
         return "--apply requires --backup PATH"
     if arguments.backup.exists():
         return f"refusing to overwrite {arguments.backup}"
+    if not arguments.backup.parent.is_dir():
+        return f"backup directory does not exist: {arguments.backup.parent}"
     return None
 
 
