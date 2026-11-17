@@ -70,12 +70,13 @@ async def scan_company(  # noqa: D417 - context is injected by FastMCP; the docs
 
 
 @tool_logged
-async def add_job(  # noqa: D417 - context is injected by FastMCP; the docstring is the served description
+async def add_job(  # noqa: D417, PLR0913 - context is injected by FastMCP and the rest are the tool's public arguments; the docstring is the served description
     url: str,
     company: str = "",
     title: str = "",
     *,
     description: str = "",
+    track: bool = False,
     context: Context[AppContext, Any],
 ) -> str:
     """Evaluates a manually provided job and saves it to the database.
@@ -94,6 +95,9 @@ async def add_job(  # noqa: D417 - context is injected by FastMCP; the docstring
         title: job title (e.g. "Senior Software Engineer"). Optional for routed ATSes;
             required otherwise.
         description: job description text. If empty, tries to fetch it automatically.
+        track: true when you already decided to pursue this job (e.g. applied against
+            the recommendation): it is scored for the record but never archived by the
+            score. Follow with register_application once you have applied.
     """
     app_context = refreshed_app_context(context)
     return await manual_jobs.add_job(
@@ -104,6 +108,7 @@ async def add_job(  # noqa: D417 - context is injected by FastMCP; the docstring
         app_context.config,
         app_context.profile,
         app_context.llm_caller,
+        track=track,
     )
 
 

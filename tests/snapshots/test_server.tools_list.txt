@@ -80,7 +80,7 @@
   {
     "_meta": null,
     "annotations": null,
-    "description": "Evaluates a manually provided job and saves it to the database.\n\nUseful for LinkedIn postings, job posts, or any source not supported by\nthe automatic scanner. For Greenhouse and Recruitee URLs, any missing\n'company', 'title', or 'description' is auto-filled from the ATS's own API.\nFor everything else, if 'description' is not provided, tries to fetch the\nURL via HTTP (doesn't work for pages requiring authentication, like LinkedIn) —\n'company' and 'title' are still required in that case.\n\nArgs:\n    url: job URL (required, used as unique identifier)\n    company: company name (e.g. \"ifood\"). Optional for routed ATSes (Greenhouse,\n        Recruitee); required otherwise.\n    title: job title (e.g. \"Senior Software Engineer\"). Optional for routed ATSes;\n        required otherwise.\n    description: job description text. If empty, tries to fetch it automatically.\n",
+    "description": "Evaluates a manually provided job and saves it to the database.\n\nUseful for LinkedIn postings, job posts, or any source not supported by\nthe automatic scanner. For Greenhouse and Recruitee URLs, any missing\n'company', 'title', or 'description' is auto-filled from the ATS's own API.\nFor everything else, if 'description' is not provided, tries to fetch the\nURL via HTTP (doesn't work for pages requiring authentication, like LinkedIn) —\n'company' and 'title' are still required in that case.\n\nArgs:\n    url: job URL (required, used as unique identifier)\n    company: company name (e.g. \"ifood\"). Optional for routed ATSes (Greenhouse,\n        Recruitee); required otherwise.\n    title: job title (e.g. \"Senior Software Engineer\"). Optional for routed ATSes;\n        required otherwise.\n    description: job description text. If empty, tries to fetch it automatically.\n    track: true when you already decided to pursue this job (e.g. applied against\n        the recommendation): it is scored for the record but never archived by the\n        score. Follow with register_application once you have applied.\n",
     "execution": null,
     "icons": null,
     "inputSchema": {
@@ -99,6 +99,11 @@
           "default": "",
           "title": "Title",
           "type": "string"
+        },
+        "track": {
+          "default": false,
+          "title": "Track",
+          "type": "boolean"
         },
         "url": {
           "title": "Url",

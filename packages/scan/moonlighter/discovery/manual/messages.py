@@ -23,9 +23,17 @@ def existing_job_message(url: str) -> str | None:
     )
 
 
-def format_add_result(job: Job, result: EvaluationResult, *, threshold: float, status: str) -> str:
+_TRACKED_LINE = (
+    "Kept on purpose (track=True): stored as reviewed whatever the score, "
+    "so the archive does not hide it."
+)
+
+
+def format_add_result(
+    job: Job, result: EvaluationResult, *, threshold: float, status: str, tracked: bool = False
+) -> str:
     """The scored-job answer: verdict, score, notes, caveats and the job id."""
-    icon = "✓ NEW" if status == "new" else "archived"
+    icon = "✓ KEPT" if tracked else {"new": "✓ NEW"}.get(status, "archived")
     caveats_text = (
         "\n".join(f"  ⚠ {caveat}" for caveat in result.caveats) if result.caveats else "  none"
     )
@@ -35,4 +43,4 @@ def format_add_result(job: Job, result: EvaluationResult, *, threshold: float, s
         f"Notes: {result.score_notes}\n"
         f"Caveats:\n{caveats_text}\n"
         f"id={job.id}"
-    )
+    ) + (f"\n{_TRACKED_LINE}" if tracked else "")

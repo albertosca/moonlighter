@@ -66,13 +66,17 @@ def _persist_manual(posting: _Posting, **scoring: Any) -> Job | None:
     return job
 
 
-def _answer_without_scoring(posting: _Posting, config: dict[str, Any]) -> str | None:
-    """The answer when no evaluation is needed, else None."""
+def _answer_without_scoring(
+    posting: _Posting, config: dict[str, Any], *, track: bool
+) -> str | None:
+    """The answer when no evaluation is needed, else None. A tracked job skips the title filter."""
     if not posting.company or not posting.title:
         return "Provide at least 'company' and 'title' along with the URL."
     already = existing_job_message(posting.url)
     if already:
         return already
+    if track:
+        return None
     matched = should_skip_by_title(posting.title, config.get("title_blocklist", []))
     if matched:
         _persist_manual(posting, **archived_fields(f"title filtered: {matched!r}"))
@@ -81,7 +85,12 @@ def _answer_without_scoring(posting: _Posting, config: dict[str, Any]) -> str | 
 
 
 async def _score_and_store(
-    posting: _Posting, config: dict[str, Any], profile: dict[str, Any], *, caller: LLMCaller
+    posting: _Posting,
+    config: dict[str, Any],
+    profile: dict[str, Any],
+    *,
+    caller: LLMCaller,
+    track: bool,
 ) -> str:
     threshold = config["score_threshold"]
     result = await evaluate_job(
@@ -95,10 +104,15 @@ async def _score_and_store(
         remote_type=posting.remote_type,
     )
     fields = scored_fields(result, threshold)
+    if track:
+        # The person already chose this job: the score is kept for the record, never acted on.
+        fields["status"] = "reviewed"
     job = _persist_manual(posting, **fields)
     if job is None:
         return "Job already in the database (URL conflict)."
-    return format_add_result(job, result, threshold=threshold, status=fields["status"])
+    return format_add_result(
+        job, result, threshold=threshold, status=fields["status"], tracked=track
+    )
 
 
 async def add_job(  # noqa: PLR0913, PLR0917 - the MCP tool takes these seven fields as its public arguments
@@ -109,6 +123,8 @@ async def add_job(  # noqa: PLR0913, PLR0917 - the MCP tool takes these seven fi
     config: dict[str, Any],
     profile: dict[str, Any],
     caller: LLMCaller,
+    *,
+    track: bool = False,
 ) -> str:
     """Score and save one posting from its URL, filling what is missing from the ATS or the page."""
     url = normalize_job_url(url)
@@ -118,7 +134,7 @@ async def add_job(  # noqa: PLR0913, PLR0917 - the MCP tool takes these seven fi
         if error:
             return error
         posting = replace(posting, description=fetched or "")
-    answer = _answer_without_scoring(posting, config)
+    answer = _answer_without_scoring(posting, config, track=track)
     if answer:
         return answer
-    return await _score_and_store(posting, config, profile, caller=caller)
+    return await _score_and_store(posting, config, profile, caller=caller, track=track)
