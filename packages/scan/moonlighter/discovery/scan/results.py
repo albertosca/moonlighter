@@ -126,15 +126,23 @@ def _render_counts(report: ScanResult) -> str:
     above = [job for job in saved if job.status == "new"]
     title_filtered = _notes_starting_with(saved, "title filtered:")
     location_ineligible = _notes_starting_with(saved, "location ineligible:")
+    duplicates = _notes_starting_with(saved, "duplicate of #")
     needs_verification = sum(1 for job in saved if job.status == "needs_review")
-    below = len(saved) - len(above) - title_filtered - location_ineligible - needs_verification
+    below = (
+        len(saved)
+        - len(above)
+        - title_filtered
+        - location_ineligible
+        - duplicates
+        - needs_verification
+    )
     notes = _spend_note(report) + _verify_note(needs_verification)
 
     if not above:
         return (
             f"{len(saved)} jobs processed. None passed the threshold of {report.threshold}. "
             f"({title_filtered} filtered by title, {location_ineligible} location ineligible, "
-            f"{below} below score)"
+            f"{duplicates} duplicates, {below} below score)"
             f"{notes}"
         )
 
@@ -142,7 +150,7 @@ def _render_counts(report: ScanResult) -> str:
     footer = (
         f"\n∗ = salary estimated by the LLM  |  "
         f"{below} below threshold  |  {title_filtered} filtered by title  |  "
-        f"{location_ineligible} location ineligible"
+        f"{location_ineligible} location ineligible  |  {duplicates} duplicates"
     )
     return f"{len(saved)} jobs processed. {len(above)} above threshold:\n\n{table}{footer}{notes}"
 

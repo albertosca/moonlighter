@@ -9,6 +9,7 @@ from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.discovery.archive import archive_stale_jobs
 from moonlighter.discovery.scan.claims import drop_already_seen
 from moonlighter.discovery.scan.collection import collect_raw_jobs, normalize_urls
+from moonlighter.discovery.scan.duplicates import collapse_duplicates
 from moonlighter.discovery.scan.pipeline import evaluate_and_store
 from moonlighter.discovery.scan.results import ScanKind, ScanResult
 from moonlighter.discovery.scan.source_warnings import stats_warnings
@@ -29,7 +30,7 @@ async def scan_and_evaluate(  # noqa: PLR0917 - test_run_no_eval_passes_no_calle
     companies = load_company_list(phase=None if phase == "all" else phase)
     stats: ScanStats = {}
     raw_jobs, warning = await collect_raw_jobs(keywords, config, companies, stats=stats)
-    new_jobs = drop_already_seen(raw_jobs)
+    new_jobs = collapse_duplicates(drop_already_seen(raw_jobs))
     saved: list[Job] = []
     spend_hit = False
     if new_jobs:
@@ -81,7 +82,7 @@ async def scan_company(
         return _unknown_source_report(source, threshold, scanners)
     stats: ScanStats = {}
     raw_jobs = normalize_urls(await scanners[source].scan([company], stats=stats))
-    new_jobs = drop_already_seen(raw_jobs)
+    new_jobs = collapse_duplicates(drop_already_seen(raw_jobs))
     tip = (
         f"Tip: add {company!r} under '{source}:' in company_list.yaml "
         "to include it in recurring scans."

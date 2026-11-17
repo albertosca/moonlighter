@@ -6,7 +6,7 @@
   1      Co1 / Engineer                 8.0       $150–200k *      —             —          —                     
                                                                                                                   
 
-∗ = salary estimated by the LLM  |  0 below threshold  |  0 filtered by title  |  0 location ineligible
+∗ = salary estimated by the LLM  |  0 below threshold  |  0 filtered by title  |  0 location ineligible  |  0 duplicates
 
 No closed jobs found.
 

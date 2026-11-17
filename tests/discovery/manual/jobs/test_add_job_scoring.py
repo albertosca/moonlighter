@@ -125,7 +125,13 @@ async def test_add_job_takes_the_model_from_eval_model_then_llm_model_then_the_d
         ):
             config = {"score_threshold": 7.0, **extra}
             await add_job(
-                f"https://x.com/pin/m{index}", "Acme", "Eng", "desc", config, PROFILE, MagicMock()
+                f"https://x.com/pin/m{index}",
+                "Acme",
+                "Eng",
+                f"desc {index}",  # one text per call: the same text would be a copy
+                config,
+                PROFILE,
+                MagicMock(),
             )
             models.append(evaluator.call_args.kwargs["model"])
     assert models == ["from-eval", "from-llm", "claude-haiku-4-5-20251001"]

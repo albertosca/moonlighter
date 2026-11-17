@@ -65,7 +65,7 @@ async def test_render_counts_verify_note_is_pinned_exactly(temporary_database):
     )
     assert report == (
         "1 jobs processed. None passed the threshold of 6.5. "
-        "(0 filtered by title, 0 location ineligible, 0 below score)\n\n"
+        "(0 filtered by title, 0 location ineligible, 0 duplicates, 0 below score)\n\n"
         "⚠️  1 job(s) need manual verification — "
         "list_jobs(status='needs_review') to see them, verify_job(job_id, page_text) to score one."
     )

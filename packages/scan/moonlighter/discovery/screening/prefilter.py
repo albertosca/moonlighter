@@ -4,9 +4,15 @@ from dataclasses import dataclass
 from typing import Any
 
 from moonlighter.core.db import Job
+from moonlighter.core.duplicates import find_original
 from moonlighter.discovery.evaluation.title_filter import should_skip_by_title
 from moonlighter.discovery.scan.claims import claim
-from moonlighter.discovery.scan.persistence import archived_fields, needs_review_fields, persist
+from moonlighter.discovery.scan.persistence import (
+    archived_fields,
+    duplicate_fields,
+    needs_review_fields,
+    persist,
+)
 from moonlighter.discovery.screening.eligibility import (
     Eligibility,
     classify_location,
@@ -50,6 +56,9 @@ def _fields_without_llm(raw: RawJob, rules: ScreeningRules) -> dict[str, Any] | 
         return archived_fields(f"location ineligible: {raw.location!r}")
     if is_description_insufficient(raw.description):
         return needs_review_fields("description unavailable — needs manual verification")
+    original = find_original(raw.company, raw.title, raw.description)
+    if original is not None:
+        return duplicate_fields(original.id)
     return None
 
 
