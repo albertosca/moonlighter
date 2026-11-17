@@ -33,3 +33,18 @@ def test_advance_application_syncs_job_status(temporary_database, application_fa
         stages=["Screening"],
     )
     assert Job.get_by_id(job.id).status == "applied"
+
+
+def test_a_late_reply_advances_a_no_response_application(temporary_database, application_factory):
+    application = application_factory(status="no_response")
+    advanced = advance_application(
+        application, {"type": "screening", "summary": "call"}, "ref", stages=[]
+    )
+    assert advanced
+    assert application.status == "screening"
+
+
+def test_no_response_ranks_above_submitted():
+    # A reply that would set 'submitted' must never move a presumed-dead row back.
+    assert _status_rank("no_response") > _status_rank("submitted")
+    assert _status_rank("no_response") < _status_rank("screening")

@@ -109,7 +109,17 @@ async def test_update_status_invalid_lists_accepted_values_sorted(temporary_data
 
     result = await update_status(job_id=1, status="not-a-real-status")
     expected_order = ", ".join(
-        sorted({"screening", "interviews", "offer", "rejected", "submitted", "draft"})
+        sorted(
+            {
+                "screening",
+                "interviews",
+                "offer",
+                "rejected",
+                "submitted",
+                "draft",
+                "no_response",
+            }
+        )
     )
     assert expected_order in result
 
@@ -124,3 +134,29 @@ async def test_update_status_job_not_found_does_not_leak_other_jobs(temporary_da
     assert "not found" in result
     app = Application.get(Application.job == job)
     assert app.status == "draft"  # untouched
+
+
+async def test_update_status_accepts_no_response(temporary_database):
+    init_db()
+    job = create_job(temporary_database, url="https://x.com/us-nr")
+    create_application(job, status="submitted")
+    await update_status(job_id=job.id, status="no_response")
+    assert Application.get(Application.job == job).status == "no_response"
+    assert Job.get_by_id(job.id).status == "applied"
+
+
+async def test_update_status_on_a_job_without_application_points_at_register(
+    temporary_database,
+):
+    init_db()
+    job = create_job(temporary_database, url="https://x.com/us-none")
+    result = await update_status(job_id=job.id, status="submitted")
+    assert result == (
+        f"Job #{job.id} has no registered application. To record one you made outside "
+        f"the tool, call register_application(job_id={job.id}, status='submitted')."
+    )
+
+
+async def test_update_status_on_an_unknown_job(temporary_database):
+    init_db()
+    assert await update_status(job_id=4242, status="submitted") == "Job #4242 not found."

@@ -7,7 +7,8 @@ from peewee import fn
 
 from moonlighter.core.db import Application, Job
 
-_ACTIVE_STATUSES = ["submitted", "screening", "interviews", "offer"]
+# no_response is presumed dead, not dead: an alias-less late reply must still find it.
+_ACTIVE_STATUSES = ["submitted", "no_response", "screening", "interviews", "offer"]
 
 
 def extract_ref(to_field: str, base_address: str) -> str | None:

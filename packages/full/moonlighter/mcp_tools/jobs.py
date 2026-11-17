@@ -72,7 +72,9 @@ async def reopen_job(
 
     Use when the person wants to try a job the scan or archive_stale_jobs archived
     (a low score they disagree with, a posting still open). Only an archived job
-    can be reopened; its closed_at is cleared.
+    can be reopened; its closed_at is cleared. Already applied? Use
+    register_application instead: it records the application and moves the job
+    out of the archive in one step.
     """
     try:
         job = Job.get_by_id(job_id)

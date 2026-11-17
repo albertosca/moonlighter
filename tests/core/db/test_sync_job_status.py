@@ -39,3 +39,9 @@ def test_sync_job_status_draft_leaves_job_alone(temporary_database):
     job, app = _sync_pair(temporary_database, "draft")
     sync_job_status(app)
     assert Job.get_by_id(job.id).status == "new"
+
+
+def test_sync_job_status_no_response_marks_job_applied(temporary_database):
+    job, app = _sync_pair(temporary_database, "no_response")
+    sync_job_status(app)
+    assert Job.get_by_id(job.id).status == "applied"

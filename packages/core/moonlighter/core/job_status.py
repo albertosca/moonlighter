@@ -4,6 +4,7 @@ from moonlighter.core.db import Application
 
 _APP_TO_JOB_STATUS = {
     "submitted": "applied",
+    "no_response": "applied",
     "screening": "applied",
     "interviews": "applied",
     "offer": "applied",

@@ -397,7 +397,7 @@
   {
     "_meta": null,
     "annotations": null,
-    "description": "Bring an archived job back to 'reviewed', to apply to it anyway.\n\nUse when the person wants to try a job the scan or archive_stale_jobs archived\n(a low score they disagree with, a posting still open). Only an archived job\ncan be reopened; its closed_at is cleared.\n",
+    "description": "Bring an archived job back to 'reviewed', to apply to it anyway.\n\nUse when the person wants to try a job the scan or archive_stale_jobs archived\n(a low score they disagree with, a posting still open). Only an archived job\ncan be reopened; its closed_at is cleared. Already applied? Use\nregister_application instead: it records the application and moves the job\nout of the archive in one step.\n",
     "execution": null,
     "icons": null,
     "inputSchema": {
@@ -432,7 +432,7 @@
   {
     "_meta": null,
     "annotations": null,
-    "description": "\nUpdate application status manually.\nstatus: 'screening' | 'interviews' | 'offer' | 'rejected' | 'submitted' | 'draft'\nnotes: free text notes appended to history\nnext_action: e.g. 'follow up on 2026-06-01'\n",
+    "description": "\nMove an application that already exists to another status.\nstatus: 'screening' | 'interviews' | 'offer' | 'rejected' | 'submitted' | 'draft' | 'no_response'\nnotes: free text notes appended to history\nnext_action: e.g. 'follow up on 2026-06-01'\nApplied somewhere the tool did not prepare? Use register_application first;\nto reconsider an archived job before applying, use reopen_job.\n",
     "execution": null,
     "icons": null,
     "inputSchema": {

@@ -18,13 +18,24 @@ from moonlighter.startup import StartupWarning, validate_startup
 _PIPELINE_STATUSES = (
     "draft",
     "needs_review",
+    "filled",
     "submitted",
+    "no_response",
     "screening",
     "interviews",
     "offer",
     "rejected",
+    "archived",
 )
-_ACCEPTED_STATUSES = {"screening", "interviews", "offer", "rejected", "submitted", "draft"}
+_ACCEPTED_STATUSES = {
+    "screening",
+    "interviews",
+    "offer",
+    "rejected",
+    "submitted",
+    "draft",
+    "no_response",
+}
 
 
 @tool_logged
@@ -134,18 +145,24 @@ async def update_status(
     next_action: str = "",
 ) -> str:
     """
-    Update application status manually.
-    status: 'screening' | 'interviews' | 'offer' | 'rejected' | 'submitted' | 'draft'
+    Move an application that already exists to another status.
+    status: 'screening' | 'interviews' | 'offer' | 'rejected' | 'submitted' | 'draft' | 'no_response'
     notes: free text notes appended to history
     next_action: e.g. 'follow up on 2026-06-01'
-    """  # noqa: D205, D212, D415 - served verbatim as the MCP tool description
+    Applied somewhere the tool did not prepare? Use register_application first;
+    to reconsider an archived job before applying, use reopen_job.
+    """  # noqa: D205, D212 - served verbatim as the MCP tool description
     if status not in _ACCEPTED_STATUSES:
         return f"Invalid status. Accepted values: {', '.join(sorted(_ACCEPTED_STATUSES))}"
-    try:
-        job = Job.get_by_id(job_id)
-        application = Application.get(Application.job == job)
-    except Job.DoesNotExist, Application.DoesNotExist:
-        return f"Job #{job_id} not found or has no registered application."
+    job = Job.get_or_none(Job.id == job_id)
+    if job is None:
+        return f"Job #{job_id} not found."
+    application = Application.get_or_none(Application.job == job)
+    if application is None:
+        return (
+            f"Job #{job_id} has no registered application. To record one you made outside "
+            f"the tool, call register_application(job_id={job_id}, status={status!r})."
+        )
 
     _apply_update(application, status, notes=notes, next_action=next_action)
     application.save()

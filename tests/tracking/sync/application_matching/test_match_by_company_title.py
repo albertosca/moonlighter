@@ -130,3 +130,13 @@ class TestMatchByCompanyTitle:
         make_application(job2, status="submitted")
 
         assert _match_by_company_title("Anthropic", None) is None
+
+
+def test_a_no_response_application_still_matches_by_company_and_title(temporary_database):
+    # no_response is presumed dead, not dead: an alias-less late reply must still find it.
+    init_db()
+    job = make_job(temporary_database, company="Acme", title="Engineer")
+    application = make_application(job, status="no_response")
+    result = _match_by_company_title("Acme", "Engineer")
+    assert result is not None
+    assert result.id == application.id
