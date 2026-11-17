@@ -5,12 +5,11 @@ and automatically update the applications pipeline.
 """
 
 import logging
-from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
 from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
-from moonlighter.core.db import ProcessedEmail
+from moonlighter.core.db import EmailSyncRun, ProcessedEmail
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.metrics import record_spend_limit_hit
@@ -63,8 +62,8 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
     settings = _read_settings(config, email_config)
     gmail = _gmail_handles(service, email_config)
 
-    updates = []
-    with suppress(_SpendLimitReachedError):
+    updates: list[dict[str, Any]] = []
+    try:
         for message_reference in fetch_recent_messages(
             service, int(email_config.get("lookback_days", 30))
         ):
@@ -73,7 +72,9 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
             )
             if update is not None:
                 updates.append(update)
-
+    except _SpendLimitReachedError:
+        return updates  # messages were left unread: not a sweep the no-response rule may trust
+    EmailSyncRun.create()
     return updates
 
 
