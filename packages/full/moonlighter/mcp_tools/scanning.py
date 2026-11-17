@@ -10,6 +10,7 @@ from moonlighter.core.metrics import operation_metrics
 from moonlighter.discovery import archive
 from moonlighter.discovery.archive import ArchiveStaleJobsError, format_archive_result
 from moonlighter.discovery.manual import jobs as manual_jobs
+from moonlighter.discovery.manual import verification
 from moonlighter.discovery.scan import scanning as discovery_scanning
 from moonlighter.discovery.scan.results import render_scan_report
 
@@ -126,7 +127,7 @@ async def verify_job(  # noqa: D417 - context is injected by FastMCP; the docstr
         page_text: the copied page text — becomes the job's real description
     """  # noqa: D205 - served verbatim as the MCP tool description
     app_context = refreshed_app_context(context)
-    return await manual_jobs.verify_job(
+    return await verification.verify_job(
         job_id,
         page_text,
         app_context.config,

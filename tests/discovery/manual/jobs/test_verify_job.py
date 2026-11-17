@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.core.db import Job, init_db
-from moonlighter.discovery.manual.jobs import verify_job
+from moonlighter.discovery.manual.verification import verify_job
 from moonlighter.discovery.sources.base import RawJob
 from tests.discovery.fake_scan import CONFIG, PROFILE, evaluation_result, run_scan
 
@@ -42,7 +42,7 @@ async def test_verify_job_rejects_a_too_short_paste_and_leaves_job_pending(tempo
         score=None,
     )
     eval_mock = AsyncMock(return_value=evaluation_result(8.0))
-    with patch("moonlighter.discovery.manual.jobs.evaluate_job", new=eval_mock):
+    with patch("moonlighter.discovery.manual.verification.evaluate_job", new=eval_mock):
         result = await verify_job(job.id, "  ", CONFIG, profile=PROFILE, caller=MagicMock())
     eval_mock.assert_not_called()
     assert "too short" in result
@@ -64,7 +64,7 @@ async def test_verify_job_hands_the_stored_location_to_the_evaluator(temporary_d
         score=None,
     )
     eval_mock = AsyncMock(return_value=evaluation_result(8.0))
-    with patch("moonlighter.discovery.manual.jobs.evaluate_job", new=eval_mock):
+    with patch("moonlighter.discovery.manual.verification.evaluate_job", new=eval_mock):
         await verify_job(
             job.id,
             "Full page text with the real job description.",
@@ -88,7 +88,7 @@ async def test_verify_job_updates_the_same_row_and_scores_above_threshold(tempor
         score_notes="description unavailable — needs manual verification",
     )
     with patch(
-        "moonlighter.discovery.manual.jobs.evaluate_job",
+        "moonlighter.discovery.manual.verification.evaluate_job",
         new=AsyncMock(return_value=evaluation_result(8.0)),
     ):
         result = await verify_job(
@@ -127,7 +127,7 @@ async def test_verify_job_scores_a_row_that_scan_actually_produced(temporary_dat
     assert job.caveats == "[]"
 
     with patch(
-        "moonlighter.discovery.manual.jobs.evaluate_job",
+        "moonlighter.discovery.manual.verification.evaluate_job",
         new=AsyncMock(return_value=evaluation_result(8.0)),
     ):
         result = await verify_job(
@@ -154,7 +154,7 @@ async def test_verify_job_below_threshold_archives(temporary_database):
         score=None,
     )
     with patch(
-        "moonlighter.discovery.manual.jobs.evaluate_job",
+        "moonlighter.discovery.manual.verification.evaluate_job",
         new=AsyncMock(return_value=evaluation_result(3.0)),
     ):
         result = await verify_job(

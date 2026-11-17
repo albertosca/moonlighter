@@ -44,7 +44,7 @@ async def test_add_job_tool_delegates_to_service(temporary_database):
 
 
 async def test_verify_job_tool_delegates_to_service(temporary_database):
-    """The verify_job MCP wrapper delegates to manual_jobs.verify_job and returns the result."""
+    """The verify_job MCP wrapper delegates to verification.verify_job and returns the result."""
     init_db()
 
     job = Job.create(
@@ -56,7 +56,7 @@ async def test_verify_job_tool_delegates_to_service(temporary_database):
         score=None,
     )
     with patch(
-        "moonlighter.discovery.manual.jobs.evaluate_job",
+        "moonlighter.discovery.manual.verification.evaluate_job",
         new=AsyncMock(return_value=make_eval_result(8.0)),
     ):
         result = await verify_job(

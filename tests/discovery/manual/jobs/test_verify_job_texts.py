@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.core.db import Job, init_db
-from moonlighter.discovery.manual.jobs import verify_job
+from moonlighter.discovery.manual.verification import verify_job
 from tests.discovery.fake_scan import CONFIG, PROFILE, evaluation_result
 
 
@@ -18,7 +18,7 @@ async def test_verify_job_result_text_and_stored_fields_are_pinned(temporary_dat
         score=None,
     )
     with patch(
-        "moonlighter.discovery.manual.jobs.evaluate_job",
+        "moonlighter.discovery.manual.verification.evaluate_job",
         new=AsyncMock(return_value=evaluation_result(9.0, caveats=["visa"])),
     ):
         result = await verify_job(
