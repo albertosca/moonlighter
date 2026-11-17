@@ -14,6 +14,8 @@ O `config.yaml` fica em `MOONLIGHTER_HOME` (padrão `~/.moonlighter/`); o `uvx m
 | `title_blocklist` | `[]` | Trechos de título (sem diferenciar maiúsculas) descartados antes de qualquer chamada de LLM |
 | `answer_bank_max_age_days` | `90` | Dias, contados do último envio, depois dos quais uma resposta do banco deixa de ser reaproveitada; `null` desliga a expiração — veja [Banco de respostas](../guides/answer-bank.md) |
 | `portal_max_age_days` | `30` | Idade a partir da qual as vagas de feeds de portal (RemoteOK, Remotive, WeWorkRemotely, HN Who's Hiring, Gupy), que não podem ser checadas na fonte, são arquivadas; `0` desliga |
+| `no_response_after_days` | `45` | Dias sem sinal de vida depois dos quais uma candidatura `submitted` vira `no_response`, ao fim de cada scan — veja [Ferramentas MCP](mcp-tools.md#a-regra-de-sem-resposta) |
+| `email_sync_max_age_days` | `7` | A regra de sem resposta só roda quando uma sincronização completa de e-mail terminou dentro desses dias |
 
 ## cv
 

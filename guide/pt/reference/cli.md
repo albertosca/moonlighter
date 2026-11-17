@@ -20,11 +20,12 @@ Todo comando `moonlighter-*`, e o `moonlighter doctor`, imprime exatamente um do
 | Comando | O que faz |
 |---|---|
 | `moonlighter-scan [--phase all] [--keywords ...]` | Roda um scan; `--company SOURCE SLUG` escaneia um portal só. `--no-eval` descobre e grava as vagas como `needs_review` sem chamar o LLM — dê nota depois com `verify_job`. |
+| `moonlighter-scan add URL [--company X --title Y] [--description TEXT] [--track]` | Dá nota e grava uma vaga pela URL, como a ferramenta `add_job`; `--track` mantém como `reviewed` uma vaga que você já escolheu, qualquer que seja a nota. |
 | `moonlighter-apply prepare JOB_ID [--paste FILE]` | Compõe a folha pronta para colar; `--paste -` lê o texto da página do stdin. |
 | `moonlighter-apply prepare --url URL [--company X --title Y] [--paste FILE]` | Ingere a vaga primeiro: pela API do ATS quando a URL tem um formato conhecido, senão a partir da própria página, com `--company` e `--title` informados; grava sem nota e depois prepara. Nenhuma chamada de LLM na ingestão. |
 | `moonlighter-apply bootstrap-cv [--force] [--skip]` | Rascunha um banco de CV e um template a partir do `profile.yaml` — veja [CV sob medida](../guides/tailored-cv.md). |
 | `moonlighter-email sync` | Classifica respostas recentes e avança candidaturas. Sozinho, ele não alimenta o [banco de respostas](../guides/answer-bank.md); quem faz isso é o `sync_email_responses` do servidor MCP. |
-| `moonlighter-email register JOB_ID` | Marca uma vaga como candidatada à mão e gera o alias de rastreio `+ref` dela, para que as respostas a ela sejam casadas pelo `sync`. |
+| `moonlighter-email register JOB_ID [--status S] [--applied-at YYYY-MM-DD] [--notes TEXT] [--reply-mailbox-unswept]` | Marca uma vaga como candidatada à mão e gera o alias de rastreio `+ref` dela, para que as respostas a ela sejam casadas pelo `sync`. Nunca sobrescreve uma candidatura que já existe: acrescenta a nota e preenche a data que falta. `--reply-mailbox-unswept` deixa a regra de sem resposta longe dela (`--reply-mailbox-swept` desfaz). |
 | `moonlighter-scan doctor` · `moonlighter-apply doctor` · `moonlighter-email doctor` · `moonlighter doctor` | Onde o estado mora e se a config carrega, em JSON; sai com `1` quando a config está faltando ou é inválida. |
 | `moonlighter-apply doctor --online` | O mesmo, mais uma requisição a cada link do cabeçalho dos seus templates de CV (GitHub, LinkedIn, site); sai com `1` se algum estiver quebrado. Um site que recusa checagem automática (o LinkedIn costuma recusar) aparece com `"ok": null` para você abrir à mão. |
 

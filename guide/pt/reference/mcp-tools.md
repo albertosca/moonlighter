@@ -2,15 +2,15 @@
 
 # Ferramentas MCP
 
-O servidor MCP `moonlighter` expõe 18 ferramentas. Você raramente as chama pelo nome: peça ao Claude em linguagem natural ("escaneia minhas empresas", "prepara a candidatura da vaga 42") e ele escolhe a ferramenta. Os nomes abaixo são o que aparece nas chamadas de ferramenta do Claude.
+O servidor MCP `moonlighter` expõe 19 ferramentas. Você raramente as chama pelo nome: peça ao Claude em linguagem natural ("escaneia minhas empresas", "prepara a candidatura da vaga 42") e ele escolhe a ferramenta. Os nomes abaixo são o que aparece nas chamadas de ferramenta do Claude.
 
 ## Escanear e dar nota
 
 | Ferramenta | Descrição |
 |------------|-----------|
-| `scan_and_evaluate` | Busca e dá nota às vagas de todas as fontes de ATS configuradas (`phase1` por padrão; peça `all` para cobrir todas as fases) |
+| `scan_and_evaluate` | Busca e dá nota às vagas de todas as fontes de ATS configuradas (`phase1` por padrão; peça `all` para cobrir todas as fases). Uma vaga já gravada sob outra URL (mesma empresa, título e texto) é arquivada como duplicata, sem chamada ao LLM. O scan termina com a regra de sem resposta, abaixo |
 | `scan_company` | Escaneia agora o portal de uma empresa e dá nota às vagas novas, sem editar o `company_list.yaml` |
-| `add_job` | Adiciona uma vaga à mão, pela URL |
+| `add_job` | Adiciona uma vaga à mão, pela URL. `track=true` mantém como `reviewed` uma vaga que você já decidiu seguir, qualquer que seja a nota |
 | `verify_job` | Dá nota a uma vaga deixada como `needs_review` (descrição vazia), a partir do texto que você copia da página da vaga |
 | `archive_stale_jobs` | Arquiva vagas que sumiram da fonte; uma empresa cuja checagem falha é reportada e fica intocada, e uma vaga adicionada por URL (sem listagem para conferir) aparece com o link para você confirmar |
 
@@ -20,9 +20,10 @@ O servidor MCP `moonlighter` expõe 18 ferramentas. Você raramente as chama pel
 |------------|-----------|
 | `list_jobs` | Lista vagas por status (`new`, `needs_review`, `applied`, `rejected`, `archived`, …) |
 | `get_job` | Mostra os detalhes completos e o histórico de pipeline de uma vaga |
-| `get_pipeline` | Resumo completo do pipeline — e problemas de configuração, como perfil ou CV ausentes |
+| `get_pipeline` | Resumo completo do pipeline, uma seção por status (`no_response` e `archived` incluídos, para que as seções somem o total) — e problemas de configuração, como perfil ou CV ausentes |
 | `reopen_job` | Traz uma vaga arquivada de volta para `reviewed`, para você se candidatar mesmo assim |
-| `update_status` | Move à mão a candidatura de uma vaga pelo pipeline (`submitted`, `screening`, `interviews`, `offer`, `rejected`, `draft`) |
+| `update_status` | Move pelo pipeline uma candidatura que já existe (`submitted`, `screening`, `interviews`, `offer`, `rejected`, `draft`, `no_response`) |
+| `register_application` | Registra numa etapa só uma candidatura feita fora da ferramenta: cria se faltar, tira do arquivo uma vaga arquivada e nunca sobrescreve uma que já existe. Candidatou-se à vaga 12638 à mão em 10/11 → `register_application(12638, applied_at="2026-11-10")` |
 
 ## Preparar candidaturas
 
@@ -41,6 +42,10 @@ O servidor MCP `moonlighter` expõe 18 ferramentas. Você raramente as chama pel
 |------------|-----------|
 | `setup_email` | Autoriza o OAuth do Gmail |
 | `sync_email_responses` | Busca as respostas mais recentes e classifica as etapas de entrevista |
+
+## A regra de sem resposta
+
+Ao fim de todo `scan_and_evaluate`, uma candidatura `submitted` sem sinal de vida (nenhuma mudança de status, nenhuma nota datada) por `no_response_after_days` (45 por padrão) vira `no_response`, um status próprio, separado de `rejected`. Candidaturas em `screening`, `interviews` ou `offer` além dessa idade são só listadas, para você decidir. A regra só roda quando uma sincronização completa de e-mail terminou dentro de `email_sync_max_age_days` (7 por padrão); senão o relatório do scan diz que ela não rodou. Uma candidatura cujas respostas podem cair numa caixa que a sincronização não lê fica de fora: passe `reply_mailbox_unswept=true` ao `register_application`.
 
 Guias para os fluxos por trás dessas ferramentas: [Primeiro scan](../getting-started/first-scan.md), [Banco de respostas](../guides/answer-bank.md), [CV sob medida](../guides/tailored-cv.md), [Acompanhamento pelo Gmail](../getting-started/gmail.md).
 

@@ -20,11 +20,12 @@ Every `moonlighter-*` command, and `moonlighter doctor`, prints exactly one JSON
 | Command | What it does |
 |---|---|
 | `moonlighter-scan [--phase all] [--keywords ...]` | Run a scan; `--company SOURCE SLUG` scans one board. `--no-eval` discovers and stores postings as `needs_review` without calling the LLM — score them later with `verify_job`. |
+| `moonlighter-scan add URL [--company X --title Y] [--description TEXT] [--track]` | Score and store one posting by URL, like the `add_job` tool; `--track` keeps a job you already chose as `reviewed`, whatever its score. |
 | `moonlighter-apply prepare JOB_ID [--paste FILE]` | Compose the paste-ready sheet; `--paste -` reads the page text from stdin. |
 | `moonlighter-apply prepare --url URL [--company X --title Y] [--paste FILE]` | Ingest the posting first: through its ATS API when the URL has a known shape, otherwise from the page itself with `--company` and `--title` supplied; stored unscored, then prepared. No LLM call for the ingest. |
 | `moonlighter-apply bootstrap-cv [--force] [--skip]` | Draft a CV pool and template from `profile.yaml` — see [Tailored CV](../guides/tailored-cv.md). |
 | `moonlighter-email sync` | Classify recent replies and advance applications. Standalone it does not feed the [answer bank](../guides/answer-bank.md); the MCP server's `sync_email_responses` does. |
-| `moonlighter-email register JOB_ID` | Mark a job as applied by hand and mint its `+ref` tracking alias, so replies to it are matched by `sync`. |
+| `moonlighter-email register JOB_ID [--status S] [--applied-at YYYY-MM-DD] [--notes TEXT] [--reply-mailbox-unswept]` | Mark a job as applied by hand and mint its `+ref` tracking alias, so replies to it are matched by `sync`. Never overwrites an application that exists: it appends the note and fills a missing date. `--reply-mailbox-unswept` keeps the no-response rule away from it (`--reply-mailbox-swept` clears that). |
 | `moonlighter-scan doctor` · `moonlighter-apply doctor` · `moonlighter-email doctor` · `moonlighter doctor` | Where the state lives and whether the config loads, as JSON; exit `1` when the config is missing or invalid. |
 | `moonlighter-apply doctor --online` | The same, plus a request to every link in your CV templates' header (GitHub, LinkedIn, homepage); exit `1` if one is broken. A site that refuses automated checks (LinkedIn often does) is listed with `"ok": null` for you to open by hand. |
 

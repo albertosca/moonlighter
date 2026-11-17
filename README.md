@@ -105,7 +105,7 @@ You need [uv](https://docs.astral.sh/uv/) (it fetches Python 3.14 for you) and a
 - [Tailored CV](https://albertosca.github.io/moonlighter/guides/tailored-cv/) — a one-page LaTeX CV per posting, built from bullets you curated
 - [Answer bank](https://albertosca.github.io/moonlighter/guides/answer-bank/) — screening answers you approved, reused on the next application
 - [Command line](https://albertosca.github.io/moonlighter/reference/cli/) — a JSON CLI per slice, exit codes, what each install gives you
-- [MCP tools](https://albertosca.github.io/moonlighter/reference/mcp-tools/) — the 18 tools Claude calls on your behalf
+- [MCP tools](https://albertosca.github.io/moonlighter/reference/mcp-tools/) — the 19 tools Claude calls on your behalf
 - [Extensions](https://albertosca.github.io/moonlighter/guides/extensions/) — add a job source as a separate package
 
 Questions and troubleshooting: [FAQ](https://albertosca.github.io/moonlighter/faq/). Working on the code: [CONTRIBUTING.md](CONTRIBUTING.md).

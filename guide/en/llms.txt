@@ -15,7 +15,7 @@ moonlighter scans Greenhouse, Lever, Ashby, Recruitee, Workable, SmartRecruiters
 - [Answer bank](https://albertosca.github.io/moonlighter/guides/answer-bank/): approved screening answers reused across applications, with expiry
 - [Extensions](https://albertosca.github.io/moonlighter/guides/extensions/): add a job source as a separate package through entry points
 - [Command line](https://albertosca.github.io/moonlighter/reference/cli/): one JSON CLI per package, exit codes, what each install gives you
-- [MCP tools](https://albertosca.github.io/moonlighter/reference/mcp-tools/): the 18 tools the MCP server exposes
+- [MCP tools](https://albertosca.github.io/moonlighter/reference/mcp-tools/): the 19 tools the MCP server exposes
 - [Configuration](https://albertosca.github.io/moonlighter/reference/config/): config.yaml keys and defaults
 - [Engineering](https://albertosca.github.io/moonlighter/engineering/): design decisions, trade-offs, architecture, quality gates
 - [FAQ](https://albertosca.github.io/moonlighter/faq/): does it apply for me, can it get an answer wrong, what leaves my machine, troubleshooting
