@@ -1,6 +1,6 @@
 """MCP tool: record an application made outside the tool, in one step."""
 
-from datetime import datetime
+from datetime import date, datetime, time
 from typing import Any
 
 from mcp.server.mcpserver import Context
@@ -37,9 +37,10 @@ async def register_application(  # noqa: PLR0913, PLR0917 - the MCP tool takes t
     """  # noqa: D205, D212, D415 - served verbatim as the MCP tool description
     app_context = refreshed_app_context(context)
     try:
-        date_given = datetime.fromisoformat(applied_at) if applied_at else None
+        day = date.fromisoformat(applied_at) if applied_at else None
     except ValueError:
         return f"Invalid applied_at {applied_at!r}: use YYYY-MM-DD."
+    date_given = datetime.combine(day, time()) if day else None  # the same midnight as the CLI
     request = RegisterRequest(status, date_given, notes, reply_mailbox_unswept)
     return _render(register_service(job_id, app_context.config, request))
 

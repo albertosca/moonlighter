@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+import pytest
+
 from moonlighter.core.db import Application, Job, init_db
 from moonlighter.mcp_tools.registration import register_application
 from tests._context import make_test_context
@@ -64,3 +66,19 @@ async def test_unknown_job_and_invalid_status_return_the_service_error(temporary
         "no_response."
     )
     assert Application.select().count() == 0
+
+
+@pytest.mark.parametrize("given", ["2026-11-10T15:30:00", "2026-11-10 15:30"])
+async def test_a_date_with_a_time_is_refused_like_the_cli(temporary_database, given):
+    job = _job()
+    assert await register_application(job.id, applied_at=given, context=_context()) == (
+        f"Invalid applied_at {given!r}: use YYYY-MM-DD."
+    )
+    assert Application.select().count() == 0
+
+
+async def test_the_date_is_stored_at_midnight(temporary_database):
+    job = _job()
+    await register_application(job.id, applied_at="2026-11-10", context=_context())
+    stored = Application.get(Application.job == job).applied_at
+    assert stored == datetime(2026, 11, 10)  # noqa: DTZ001 - the database stores naive local time
