@@ -119,3 +119,21 @@ def test_an_original_archived_by_its_score_still_counts(temporary_database):
     init_db()
     original = _job(1, status="archived", score=2.0)
     assert find_original("Tether", "Eng", TEXT).id == original.id
+
+
+def test_a_live_row_is_kept_over_a_higher_score_archived_one(temporary_database):
+    init_db()
+    archived = _job(1, score=9.0, status="archived")
+    tracked = _job(2, score=4.0, status="reviewed")
+    groups = group_duplicates([archived, tracked], applied_job_ids=set())
+    assert (groups[0].kept.id, [copy.id for copy in groups[0].copies]) == (
+        tracked.id,
+        [archived.id],
+    )
+
+
+def test_a_row_known_to_be_gone_is_never_kept_over_an_open_one(temporary_database):
+    init_db()
+    gone = _job(1, score=9.0, status="new", closed_at=datetime(2026, 5, 1))  # noqa: DTZ001 - naive local time
+    open_row = _job(2, score=4.0, status="new")
+    assert group_duplicates([gone, open_row], applied_job_ids=set())[0].kept.id == open_row.id

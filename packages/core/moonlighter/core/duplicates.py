@@ -41,10 +41,12 @@ class DuplicateGroup:
     copies: list[Job]
 
 
-def _rank(job: Job, applied_job_ids: set[int]) -> tuple[bool, float, int]:
-    # sorted() ascending: applied first, then the highest score, then the lowest id.
+def _rank(job: Job, applied_job_ids: set[int]) -> tuple[bool, bool, float, int]:
+    # sorted() ascending: applied first, then a live row (neither archived nor known gone),
+    # then the highest score, then the lowest id.
+    live = job.status != "archived" and job.closed_at is None
     score = job.score if job.score is not None else float("-inf")
-    return (job.id not in applied_job_ids, -score, job.id)
+    return (job.id not in applied_job_ids, not live, -score, job.id)
 
 
 def _by_key(jobs: list[Job]) -> list[list[Job]]:
