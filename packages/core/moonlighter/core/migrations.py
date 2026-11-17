@@ -147,9 +147,9 @@ def _m010_duplicate_of_from_hand_marks(db: MigrationDatabase) -> None:
             continue
         original_id = int(match.group(1))
         db.execute_sql(
-            "UPDATE job SET duplicate_of_id = ? WHERE id = ? "
+            "UPDATE job SET duplicate_of_id = ? WHERE id = ? AND id != ? "
             "AND EXISTS (SELECT 1 FROM job WHERE id = ?)",
-            (original_id, job_id, original_id),
+            (original_id, job_id, original_id, original_id),
         )
 
 

@@ -61,3 +61,14 @@ def test_m009_and_m010_skip_a_job_table_without_text_columns(tmp_path, monkeypat
     run_migrations(db)
     columns = {row[1] for row in db.execute_sql("PRAGMA table_info(job)").fetchall()}
     assert {"description_hash", "duplicate_of_id"} <= columns
+
+
+def test_m010_never_points_a_job_at_itself(tmp_path, monkeypatch, open_dbs):
+    db = _prepared(tmp_path, monkeypatch, open_dbs)
+    run_migrations(db)
+    db.execute_sql(
+        "INSERT INTO job (id, description, score_notes) VALUES (5, NULL, 'duplicate_of:#5 typo')"
+    )
+    db.execute_sql("UPDATE schema_version SET version = 9")
+    run_migrations(db)
+    assert db.execute_sql("SELECT duplicate_of_id FROM job WHERE id = 5").fetchone() == (None,)
