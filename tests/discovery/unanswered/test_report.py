@@ -73,5 +73,5 @@ def test_lists_the_unswept_with_what_to_do():
     assert text == (
         "1 application(s) waiting for an email sync that reaches back to their last sign of life:\n"
         "  #4 D/Eng (90 days)\n"
-        "Run sync_email_responses once with lookback_days covering them (email.lookback_days)."
+        "Raise email.lookback_days in the config to cover them, then run sync_email_responses."
     )

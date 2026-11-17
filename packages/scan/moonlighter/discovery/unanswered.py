@@ -42,14 +42,25 @@ def _summary(application: Application, days: int) -> dict[str, Any]:
     return {"job_id": job.id, "company": job.company, "title": job.title, "days": days}
 
 
-def _mark(application: Application, days: int, now: datetime) -> None:
-    application.status = "no_response"
-    application.notes = append_dated_note(
+def _mark(application: Application, days: int, now: datetime) -> bool:
+    """Mark it, unless the row moved since it was read (an email sync running alongside)."""
+    notes = append_dated_note(
         application.notes, f"no_response: no sign of life for {days} days", now.date()
     )
-    application.updated_at = now
-    application.save()
+    changed = (
+        Application.update(status="no_response", notes=notes, updated_at=now)
+        .where(
+            Application.id == application.id,
+            Application.status == application.status,
+            Application.updated_at == application.updated_at,
+        )
+        .execute()
+    )
+    if not changed:
+        return False
+    application.status, application.notes, application.updated_at = "no_response", notes, now
     sync_job_status(application)
+    return True
 
 
 def _swept_since(runs: list[EmailSyncRun]) -> datetime:
@@ -81,8 +92,7 @@ def _classify(
         result.held.append(_summary(application, days))
     elif _last_signal(application, sweep.now) < sweep.swept_since:
         result.unswept.append(_summary(application, days))
-    else:
-        _mark(application, days, sweep.now)
+    elif _mark(application, days, sweep.now):
         result.marked.append(_summary(application, days))
 
 
@@ -163,7 +173,7 @@ def _unswept_block(result: UnansweredResult) -> str:
                 "back to their last sign of life:"
             ),
             *lines,
-            "Run sync_email_responses once with lookback_days covering them (email.lookback_days).",
+            "Raise email.lookback_days in the config to cover them, then run sync_email_responses.",
         ]
     )
 

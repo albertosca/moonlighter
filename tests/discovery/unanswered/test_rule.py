@@ -1,42 +1,12 @@
 """The 45-day rule: who is marked no_response, who is only listed, and when it does not run."""
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 
-from moonlighter.core.db import Application, EmailSyncRun, Job, init_db
+from moonlighter.core.db import Application, EmailSyncRun, Job
 from moonlighter.discovery.unanswered import mark_unanswered_applications
-
-NOW = datetime(2026, 11, 17, 10, 0)  # noqa: DTZ001 - the database stores naive local time
-CONFIG = {"no_response_after_days": 45, "email_sync_max_age_days": 7}
-ONE_YEAR_AGO = NOW - timedelta(days=365)
-
-
-@pytest.fixture
-def make_application(temporary_database):
-    init_db()
-    EmailSyncRun.create(finished_at=NOW - timedelta(days=1), window_start=ONE_YEAR_AGO)
-    count = 0
-
-    def _make(days_silent, status="submitted", notes=None, **fields):
-        nonlocal count
-        count += 1
-        job = Job.create(
-            source="manual",
-            company=f"Company{count}",
-            title="Eng",
-            url=f"https://x/{count}",
-            status="applied",
-        )
-        return Application.create(
-            job=job,
-            status=status,
-            notes=notes,
-            updated_at=NOW - timedelta(days=days_silent),
-            **fields,
-        )
-
-    return _make
+from tests.discovery.unanswered.clock import CONFIG, NOW, ONE_YEAR_AGO
 
 
 def test_44_days_stays_submitted_and_45_becomes_no_response(make_application):
@@ -144,45 +114,3 @@ def test_a_second_run_does_not_mark_again(make_application):
     make_application(90)
     mark_unanswered_applications(CONFIG, NOW)
     assert mark_unanswered_applications(CONFIG, NOW).marked == []
-
-
-def _sweeps(*windows):
-    """Replace the fixture's sweep with these (finished days ago, window start days ago)."""
-    EmailSyncRun.delete().execute()
-    for finished, start in windows:
-        EmailSyncRun.create(
-            finished_at=NOW - timedelta(days=finished), window_start=NOW - timedelta(days=start)
-        )
-
-
-def test_a_signal_older_than_the_swept_window_is_left_unswept(make_application):
-    _sweeps((1, 31))
-    application = make_application(60)
-    result = mark_unanswered_applications(CONFIG, NOW)
-    assert Application.get_by_id(application.id).status == "submitted"
-    assert result.unswept == [
-        {"job_id": application.job_id, "company": "Company1", "title": "Eng", "days": 60}
-    ]
-    assert result.marked == []
-
-
-def test_overlapping_sweeps_chain_back_to_the_oldest_start(make_application):
-    _sweeps((1, 31), (25, 55), (50, 80))
-    application = make_application(70)
-    mark_unanswered_applications(CONFIG, NOW)
-    assert Application.get_by_id(application.id).status == "no_response"
-
-
-def test_a_gap_between_sweeps_ends_the_coverage(make_application):
-    _sweeps((1, 31), (40, 120))
-    application = make_application(60)
-    result = mark_unanswered_applications(CONFIG, NOW)
-    assert Application.get_by_id(application.id).status == "submitted"
-    assert [entry["job_id"] for entry in result.unswept] == [application.job_id]
-
-
-def test_a_signal_exactly_at_the_window_start_is_covered(make_application):
-    _sweeps((1, 50))
-    application = make_application(50)
-    mark_unanswered_applications(CONFIG, NOW)
-    assert Application.get_by_id(application.id).status == "no_response"
