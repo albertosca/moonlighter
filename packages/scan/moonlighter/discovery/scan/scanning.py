@@ -1,5 +1,6 @@
 """The two scans: every configured company (`scan_and_evaluate`) and one company (`scan_company`)."""
 
+from datetime import datetime
 from typing import Any
 
 from moonlighter.core.config.company_list import load_company_list
@@ -14,6 +15,7 @@ from moonlighter.discovery.scan.source_warnings import stats_warnings
 from moonlighter.discovery.screening.no_eval import NoEval
 from moonlighter.discovery.sources.base import BaseScanner, ScanStats
 from moonlighter.discovery.sources.registry import build_http_scanners
+from moonlighter.discovery.unanswered import mark_unanswered_applications
 
 
 async def scan_and_evaluate(  # noqa: PLR0917 - test_run_no_eval_passes_no_caller_to_the_service reads the caller as the last positional argument
@@ -38,6 +40,10 @@ async def scan_and_evaluate(  # noqa: PLR0917 - test_run_no_eval_passes_no_calle
         spend_hit=spend_hit,
         threshold=config["score_threshold"],
         archive=await archive_stale_jobs(None, None, config),
+        unanswered=mark_unanswered_applications(
+            config,
+            datetime.now(),  # noqa: DTZ005 - the database stores naive local time
+        ),
         warning=warning,
         stats=stats,
     )

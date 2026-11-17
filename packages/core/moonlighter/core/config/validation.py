@@ -36,6 +36,8 @@ _CONFIG_SCHEMA: dict[str, tuple[type, ...]] = {
     "wwr_category": (str,),
     "scan_hn_whoishiring": (bool,),
     "portal_max_age_days": _INTEGER,
+    "no_response_after_days": _INTEGER,
+    "email_sync_max_age_days": _INTEGER,
     "answer_bank_max_age_days": (*_INTEGER, type(None)),  # null disables expiry
 }
 

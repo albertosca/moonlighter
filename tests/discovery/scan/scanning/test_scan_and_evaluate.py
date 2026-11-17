@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from moonlighter.core.db import init_db
 from moonlighter.discovery.scan.scanning import scan_and_evaluate
+from moonlighter.discovery.unanswered import UnansweredResult
 from tests.discovery.fake_scan import make_raw_job
 
 
@@ -33,3 +34,20 @@ async def test_scan_and_evaluate_archives_last_and_attaches_the_result(temporary
     assert order == ["evaluate", "archive"]
     assert report.archive == "the-archive-result"
     assert report.warning == "a warning"
+
+
+async def test_scan_and_evaluate_runs_the_no_response_rule(temporary_database):
+    init_db()
+    with (
+        patch("moonlighter.discovery.scan.scanning.load_company_list", return_value={}),
+        patch(
+            "moonlighter.discovery.scan.scanning.collect_raw_jobs",
+            new=AsyncMock(return_value=([], None)),
+        ),
+        patch(
+            "moonlighter.discovery.scan.scanning.archive_stale_jobs",
+            new=AsyncMock(return_value=None),
+        ),
+    ):
+        report = await scan_and_evaluate("", "all", {"score_threshold": 6.5}, {}, MagicMock())
+    assert report.unanswered == UnansweredResult(ran=False, last_sync=None, after_days=45)

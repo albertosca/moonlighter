@@ -13,6 +13,7 @@ from moonlighter.core.cli import job_to_dict
 from moonlighter.core.db import Job
 from moonlighter.discovery.archive import ArchiveResult, format_archive_result
 from moonlighter.discovery.sources.base import ScanStats
+from moonlighter.discovery.unanswered import UnansweredResult, format_unanswered_result
 from moonlighter.views import render_jobs_table
 
 
@@ -37,6 +38,8 @@ class ScanResult:
     spend_hit: bool = False
     threshold: float = 0.0
     archive: ArchiveResult | None = None
+    # scan_and_evaluate only: the no-response rule's outcome.
+    unanswered: UnansweredResult | None = None
     warning: str | None = None
     tip: str | None = None
     error: str | None = None
@@ -74,6 +77,8 @@ def render_scan_report(report: ScanResult) -> str:
         body += f"\n\n{report.tip}"
     if report.archive is not None:
         body += f"\n\n{format_archive_result(report.archive)}"
+    if report.unanswered is not None and (text := format_unanswered_result(report.unanswered)):
+        body += f"\n\n{text}"
     if report.warning is not None:
         body += f"\n\n{report.warning}"
     return body
@@ -156,6 +161,7 @@ def scan_report_to_dict(report: ScanResult) -> dict[str, Any]:
         "found_but_known": report.found_but_known,
         "saved": [job_to_dict(job) for job in report.saved],
         "archive": asdict(report.archive) if report.archive is not None else None,
+        "unanswered": asdict(report.unanswered) if report.unanswered is not None else None,
         "stats": {source: asdict(stat) for source, stat in report.stats.items()}
         if report.stats is not None
         else None,

@@ -7,6 +7,7 @@ from moonlighter.discovery.scan.results import (
     _render_counts,
     render_scan_report,
 )
+from moonlighter.discovery.unanswered import UnansweredResult
 
 
 def test_render_scan_report_appends_the_warning_last(three_jobs):
@@ -61,3 +62,27 @@ def test_render_scan_report_appends_the_tip_before_archive_and_warning(three_job
     archive_at = rendered.index("No closed jobs found.")
     warning_at = rendered.index("⚠️  linkedin: 0 jobs")
     assert tip_at < archive_at < warning_at
+
+
+def test_render_scan_report_appends_the_unanswered_section_after_the_archive():
+    report = ScanResult(
+        kind=ScanKind.NO_NEW_JOBS,
+        archive=ArchiveResult(),
+        unanswered=UnansweredResult(ran=False, last_sync=None),
+    )
+    rendered = render_scan_report(report)
+    assert rendered.endswith(
+        "\n\nNo-response rule did not run: there is no complete email sync yet. "
+        "Run sync_email_responses first."
+    )
+
+
+def test_render_scan_report_skips_an_unanswered_section_with_nothing_to_say():
+    plain = render_scan_report(ScanResult(kind=ScanKind.NO_NEW_JOBS))
+    quiet = render_scan_report(
+        ScanResult(
+            kind=ScanKind.NO_NEW_JOBS,
+            unanswered=UnansweredResult(ran=True, last_sync="2026-11-16T10:00:00"),
+        )
+    )
+    assert quiet == plain
