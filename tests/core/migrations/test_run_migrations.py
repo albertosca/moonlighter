@@ -75,7 +75,7 @@ def test_idempotence_on_real_shaped_db_never_raises(tmp_path, monkeypatch, open_
     applied = run_migrations(db)
 
     assert applied == [name for _, name, _ in MIGRATIONS]
-    assert current_version(db) == len(MIGRATIONS) == 10
+    assert current_version(db) == len(MIGRATIONS) == 11
     assert "email_ref" in _columns(db, "application")
     assert "current_stage" in _columns(db, "application")
     assert "closed_at" in _columns(db, "job")

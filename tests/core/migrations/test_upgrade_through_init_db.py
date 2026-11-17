@@ -48,7 +48,7 @@ def test_init_db_upgrades_a_version_6_database_without_corrupting_it(
 
     with closing(sqlite3.connect(temporary_database)) as connection:
         assert connection.execute("PRAGMA integrity_check").fetchall() == [("ok",)]
-        assert connection.execute("SELECT version FROM schema_version").fetchone() == (10,)
+        assert connection.execute("SELECT version FROM schema_version").fetchone() == (11,)
     assert _dedup_indexes(temporary_database) == {
         "job_description_hash": "description_hash",
         "job_duplicate_of_id": "duplicate_of_id",

@@ -153,6 +153,19 @@ def _m010_duplicate_of_from_hand_marks(db: MigrationDatabase) -> None:
         )
 
 
+def _m011_email_sync_run_window_start(db: MigrationDatabase) -> None:
+    # 2026-11-17: a pre-release build created emailsyncrun without window_start. A run with no
+    # recorded window proves no coverage, so its rows go; the table gets the fresh-database DDL.
+    tables = db.execute_sql("SELECT name FROM sqlite_master WHERE name = 'emailsyncrun'")
+    if tables.fetchone() is None or _has_column(db, "emailsyncrun", "window_start"):
+        return
+    db.execute_sql("DROP TABLE emailsyncrun")
+    db.execute_sql(
+        'CREATE TABLE "emailsyncrun" ("id" INTEGER NOT NULL PRIMARY KEY, '
+        '"finished_at" DATETIME NOT NULL, "window_start" DATETIME NOT NULL)'
+    )
+
+
 MIGRATIONS: list[tuple[int, str, Callable[[MigrationDatabase], None]]] = [
     (1, "application_email_ref", _m001_application_email_ref),
     (2, "application_current_stage", _m002_application_current_stage),
@@ -164,4 +177,5 @@ MIGRATIONS: list[tuple[int, str, Callable[[MigrationDatabase], None]]] = [
     (8, "job_dedup_columns", _m008_job_dedup_columns),
     (9, "backfill_job_description_hash", _m009_backfill_job_description_hash),
     (10, "duplicate_of_from_hand_marks", _m010_duplicate_of_from_hand_marks),
+    (11, "email_sync_run_window_start", _m011_email_sync_run_window_start),
 ]
