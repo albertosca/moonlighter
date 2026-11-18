@@ -19,7 +19,7 @@ dev = [
     "mypy>=2.4.1",
     # Cognitive complexity gate (limit in [tool.complexipy]). Upper bound: a new major
     # may re-score functions, and that re-score should land as its own reviewed change.
-    "complexipy>=8.3,<9",
+    "complexipy>=9.0.0,<10",
 ]
 # Docs site (guide/ → GitHub Pages). Deliberately no upper bound: uv.lock pins the
 # exact version and a Dependabot bump lands only if the strict docs build passes.
