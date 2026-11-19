@@ -167,3 +167,33 @@ def test_setup_gmail_service_raises_without_google_libs():
 def test_setup_gmail_service_without_email_block_raises_config_message():
     with pytest.raises(GmailAuthError, match=r"email.token_path is not configured"):
         setup_gmail_service({})
+
+
+@pytest.mark.parametrize(
+    "credential_state",
+    [
+        {"valid": True, "expired": False, "refresh_token": "r"},
+        {"valid": False, "expired": True, "refresh_token": None},
+        {"valid": False, "expired": False, "refresh_token": "r"},
+    ],
+    ids=["valid", "expired-without-refresh-token", "invalid-but-not-expired"],
+)
+def test_token_is_not_refreshed_unless_expired_with_a_refresh_token(
+    tmp_path, monkeypatch, credential_state
+):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    token_path = tmp_path / "gmail-token.json"
+    token_path.write_text("{}")
+    mock_credentials = MagicMock(**credential_state)
+    config = {"email": {"token_path": str(token_path)}}
+
+    with (
+        patch("moonlighter.tracking.gmail.client.Credentials") as credentials_class,
+        patch("moonlighter.tracking.gmail.client.build"),
+        patch("moonlighter.tracking.gmail.client.Request"),
+    ):
+        credentials_class.from_authorized_user_file.return_value = mock_credentials
+        setup_gmail_service(config)
+
+    mock_credentials.refresh.assert_not_called()
+    assert token_path.read_text() == "{}"

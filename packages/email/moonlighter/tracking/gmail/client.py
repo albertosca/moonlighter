@@ -105,6 +105,37 @@ def _is_ours(token_path: Path) -> bool:
         return False
 
 
+def _existing_token_path(config: dict[str, Any]) -> Path:
+    """The configured token file; GmailAuthError when unset or missing."""
+    token_path_raw = (config.get("email") or {}).get("token_path")
+    if not token_path_raw:
+        raise GmailAuthError(
+            "email.token_path is not configured. Add an 'email:' block to "
+            "config.yaml (see config.example.yaml) and run setup_email() to "
+            "authorize access."
+        )
+    token_path = resolve_under_home(token_path_raw)
+    if not token_path.exists():
+        raise GmailAuthError("Gmail token not found. Run setup_email() first to authorize access.")
+    return token_path
+
+
+def _refresh_if_expired(credentials: Any, token_path: Path) -> None:
+    if credentials.valid or not credentials.expired or not credentials.refresh_token:
+        return
+    credentials.refresh(Request())
+    # Persist only a token file we own. `token_path` may point at another
+    # project's file — that is a supported setup, and how this account's
+    # credential is kept alive today. google-auth's serialisation would
+    # rewrite that file's shape (a `scopes` list where the owner keeps a
+    # `scope` string, plus expiry and universe_domain) and can break the
+    # owner. Refreshing in memory costs one request per sync.
+    if _is_ours(token_path):
+        token_path.write_text(credentials.to_json())
+    else:
+        logger.debug("token at %s belongs to another project — not writing back", token_path)
+
+
 def setup_gmail_service(config: dict[str, Any]) -> Any:
     """Loads credentials + OAuth2 token and returns the Gmail API resource.
 
@@ -118,16 +149,7 @@ def setup_gmail_service(config: dict[str, Any]) -> Any:
             " and then setup_email() to authorize access."
         )
 
-    token_path_raw = (config.get("email") or {}).get("token_path")
-    if not token_path_raw:
-        raise GmailAuthError(
-            "email.token_path is not configured. Add an 'email:' block to "
-            "config.yaml (see config.example.yaml) and run setup_email() to "
-            "authorize access."
-        )
-    token_path = resolve_under_home(token_path_raw)
-    if not token_path.exists():
-        raise GmailAuthError("Gmail token not found. Run setup_email() first to authorize access.")
+    token_path = _existing_token_path(config)
 
     required_scope = _required_scope(config)
     # Send the scopes the grant actually carries; _warn_if_scope_mismatch is what
@@ -135,18 +157,7 @@ def setup_gmail_service(config: dict[str, Any]) -> Any:
     # reduction — it just makes the refresh fail.
     scopes = _token_scopes(token_path) or [required_scope]
     credentials = Credentials.from_authorized_user_file(str(token_path), scopes)  # type: ignore[no-untyped-call]  # google-auth leaves from_authorized_user_file untyped
-    if not credentials.valid and credentials.expired and credentials.refresh_token:
-        credentials.refresh(Request())
-        # Persist only a token file we own. `token_path` may point at another
-        # project's file — that is a supported setup, and how this account's
-        # credential is kept alive today. google-auth's serialisation would
-        # rewrite that file's shape (a `scopes` list where the owner keeps a
-        # `scope` string, plus expiry and universe_domain) and can break the
-        # owner. Refreshing in memory costs one request per sync.
-        if _is_ours(token_path):
-            token_path.write_text(credentials.to_json())
-        else:
-            logger.debug("token at %s belongs to another project — not writing back", token_path)
+    _refresh_if_expired(credentials, token_path)
 
     _warn_if_scope_mismatch(credentials, required_scope)
     return build("gmail", "v1", credentials=credentials)

@@ -43,12 +43,9 @@ async def job_from_url(
     title = title or (posting.title if posting else None) or ""
     if not company or not title:
         return None
-    description = (posting.description if posting else None) or ""
-    if not description:
-        fetched, error = await fetch_description(url)
-        if error:
-            return None
-        description = fetched or ""
+    description = await _description(url, posting.description if posting else None)
+    if description is None:
+        return None
     job = Job.create(
         source="manual",
         company=company,
@@ -63,3 +60,13 @@ async def job_from_url(
     )
     ScanLog.get_or_create(job_url=url, defaults={"source": "manual"})
     return job
+
+
+async def _description(url: str, from_ats: str | None) -> str | None:
+    """The ATS description, else the generic page fetch; None when that fetch fails."""
+    if from_ats:
+        return from_ats
+    fetched, error = await fetch_description(url)
+    if error:
+        return None
+    return fetched or ""
