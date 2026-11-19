@@ -61,7 +61,8 @@ async def call_cli(
     A call that has not answered within timeout_seconds is killed and raises: one
     hung for 300 s on 2026-09-25 and nothing but the test harness ended it.
     """
-    full = f"{cache_prefix}\n\n{prompt}" if cache_prefix is not None else prompt
+    # Encoded before any process or workdir exists: a prompt that cannot be encoded fails here.
+    stdin_bytes = (f"{cache_prefix}\n\n{prompt}" if cache_prefix is not None else prompt).encode()
     # Strip ANTHROPIC_API_KEY so the CLI uses the claude.ai session (subscription)
     # instead of the API key (which requires separate API credits).
     environment = {name: value for name, value in os.environ.items() if name != "ANTHROPIC_API_KEY"}
@@ -89,7 +90,7 @@ async def call_cli(
         )
         try:
             stdout, stderr = await asyncio.wait_for(
-                process.communicate(input=full.encode()), timeout=timeout_seconds
+                process.communicate(input=stdin_bytes), timeout=timeout_seconds
             )
         except TimeoutError:
             kill_process_group(process.pid)

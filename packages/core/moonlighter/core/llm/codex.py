@@ -136,7 +136,8 @@ async def call_codex(
     """
     _refuse_claude_model(model)
     executable = _require_codex()
-    full = f"{cache_prefix}\n\n{prompt}" if cache_prefix is not None else prompt
+    # Encoded before any process or workdir exists: a prompt that cannot be encoded fails here.
+    stdin_bytes = (f"{cache_prefix}\n\n{prompt}" if cache_prefix is not None else prompt).encode()
     environment = {
         name: value for name, value in os.environ.items() if name not in _CODEX_STRIPPED_ENVIRONMENT
     }
@@ -147,7 +148,7 @@ async def call_codex(
         output = workdir / "final-message.txt"
         code, stdout, stderr = await _run_codex(
             codex_exec_argv(executable, model, output),
-            stdin=full.encode(),
+            stdin=stdin_bytes,
             environment=environment,
             workdir=workdir,
             timeout_seconds=timeout_seconds,
@@ -156,6 +157,6 @@ async def call_codex(
         return _read_final_message(output)
     finally:
         try:
-            remove_quietly(workdir)
+            remove_quietly(workdir, backend="codex")
         finally:
             record_call(perf_counter() - start)

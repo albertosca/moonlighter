@@ -48,7 +48,10 @@ def test_scope_starts_fresh_each_time():
 
 
 def test_summary_logged_once_on_exit(caplog):
-    with caplog.at_level(logging.INFO), operation_metrics("scan_and_evaluate"):
+    with (
+        caplog.at_level(logging.INFO, logger="moonlighter.core.metrics"),
+        operation_metrics("scan_and_evaluate"),
+    ):
         record_call(1.25, input_tokens=100, output_tokens=200)
     lines = [record for record in caplog.records if "scan_and_evaluate" in record.getMessage()]
     assert len(lines) == 1
@@ -59,7 +62,7 @@ def test_summary_logged_once_on_exit(caplog):
 
 def test_summary_logged_even_on_exception(caplog):
     with (  # noqa: PT012 - record_call(0.5) cannot raise; the raise must cross the scope's exit
-        caplog.at_level(logging.INFO),
+        caplog.at_level(logging.INFO, logger="moonlighter.core.metrics"),
         pytest.raises(ValueError, match="boom"),
         operation_metrics("apply_jobs"),
     ):

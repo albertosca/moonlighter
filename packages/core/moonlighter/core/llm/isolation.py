@@ -31,8 +31,8 @@ def private_call_workdir(prefix: str) -> Path:
     return workdir
 
 
-def remove_quietly(path: Path) -> None:
-    """Remove a tree.
+def remove_quietly(path: Path, *, backend: str) -> None:
+    """Remove a tree; `backend` names the CLI in the failure log.
 
     An OSError is logged and swallowed so cleanup cannot replace the call's result, including a
     usage-limit error.
@@ -42,4 +42,4 @@ def remove_quietly(path: Path) -> None:
     try:
         shutil.rmtree(path)
     except OSError:
-        logger.exception("cursor cleanup failed for %s", path)
+        logger.exception("%s cleanup failed for %s", backend, path)

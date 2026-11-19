@@ -30,6 +30,11 @@ _CODEX_DISABLED_FEATURES: tuple[str, ...] = (
 )
 
 
+def resolve_executable(executable: str) -> str:
+    """The file a symlinked binary points to. Tests patch this seam, never the shared os.path."""
+    return os.path.realpath(executable)
+
+
 def _codex_permission_args(executable: str) -> list[str]:
     """`-c` overrides for the locked profile.
 
@@ -39,7 +44,7 @@ def _codex_permission_args(executable: str) -> list[str]:
     start fails with `Operation not permitted`.
     """
     binary_directories = dict.fromkeys(
-        [str(Path(executable).parent), str(Path(os.path.realpath(executable)).parent)]
+        [str(Path(executable).parent), str(Path(resolve_executable(executable)).parent)]
     )
     entries = [f'{json.dumps(":minimal")}="read"', f'{json.dumps(":root")}="deny"']
     entries.extend(f'{json.dumps(directory)}="read"' for directory in binary_directories)
