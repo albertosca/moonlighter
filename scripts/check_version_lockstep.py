@@ -1,4 +1,4 @@
-"""Verifies all five package versions and the four ==pins in moonlighter-full stay in lockstep.
+"""Verifies all five package versions, the four ==pins in moonlighter-full and the Claude plugin manifest stay in lockstep.
 
 CLAUDE.md's own release note says this is bumped by hand and "nothing in CI checks this". This is that check. It uses the standard library only, because CI runs it before installing anything.
 
@@ -6,12 +6,14 @@ Usage:
     python scripts/check_version_lockstep.py
 """
 
+import json
 import sys
 import tomllib
 from pathlib import Path
 
 _SLUGS = ("core", "scan", "apply", "email", "full")
 _PINNED_SLUGS = ("core", "scan", "apply", "email")  # full pins these four, not itself
+_PLUGIN_MANIFEST = Path(".claude-plugin") / "plugin.json"
 
 
 def _version_of(repo_root: Path, slug: str) -> str:
@@ -32,6 +34,17 @@ def _pins_in_full(repo_root: Path) -> dict[str, str]:
     return pins
 
 
+def _plugin_manifest_mismatch(repo_root: Path, reference: str) -> list[str]:
+    """Claude Code keys plugin updates by this version; a repo without the manifest has nothing to check."""
+    manifest = repo_root / _PLUGIN_MANIFEST
+    if not manifest.exists():
+        return []
+    version = str(json.loads(manifest.read_text())["version"])
+    if version == reference:
+        return []
+    return [f"{_PLUGIN_MANIFEST} is at {version}, expected {reference} (to match moonlighter-full)"]
+
+
 def check(repo_root: Path) -> list[str]:
     """Every mismatch found, as human-readable one-liners; [] when consistent."""
     versions = {slug: _version_of(repo_root, slug) for slug in _SLUGS}
@@ -47,6 +60,7 @@ def check(repo_root: Path) -> list[str]:
         for slug, pin in pins.items()
         if pin != reference
     ]
+    mismatches += _plugin_manifest_mismatch(repo_root, reference)
     return mismatches
 
 

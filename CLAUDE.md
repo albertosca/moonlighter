@@ -47,4 +47,4 @@ Peewee's metaclass-injected attrs (`.id`, `.DoesNotExist`, `.get_or_create`) are
 
 ## Releases
 
-Versions move in lockstep BY HAND: bump all five `pyproject.toml` AND the four `==` pins in `moonlighter-full` together. `scripts/check_version_lockstep.py` runs as the CI `test` job's first step and fails fast (before installing anything) if any of the five drift from each other.
+Versions move in lockstep BY HAND: bump all five `pyproject.toml`, the four `==` pins in `moonlighter-full` AND `.claude-plugin/plugin.json` together (Claude Code keys plugin updates by that version; it sat at 0.1.0 through 0.1.11). `scripts/check_version_lockstep.py` runs as the CI `test` job's first step and fails fast (before installing anything) if any of them drift from `moonlighter-full`.
