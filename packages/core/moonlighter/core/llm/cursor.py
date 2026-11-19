@@ -68,7 +68,7 @@ def _agent_argv(executable: str, cursor_model: str | None, workdir: Path) -> lis
 
 async def _run_agent(
     argv: list[str],
-    full_prompt: str,
+    stdin_bytes: bytes,
     *,
     environment: dict[str, str],
     workdir: Path,
@@ -89,7 +89,7 @@ async def _run_agent(
     )
     try:
         stdout, stderr = await asyncio.wait_for(
-            process.communicate(input=full_prompt.encode()), timeout=timeout_seconds
+            process.communicate(input=stdin_bytes), timeout=timeout_seconds
         )
     except TimeoutError:
         kill_process_group(process.pid)
@@ -134,7 +134,8 @@ async def call_cursor(
     A call that has not answered within timeout_seconds is killed, process
     group included, the same way `call_cli` ends a hung `claude -p`.
     """
-    full = f"{cache_prefix}\n\n{prompt}" if cache_prefix is not None else prompt
+    # Encoded before any process or workdir exists: a prompt that cannot be encoded fails here.
+    stdin_bytes = (f"{cache_prefix}\n\n{prompt}" if cache_prefix is not None else prompt).encode()
     executable = _require_agent()
     workdir = private_call_workdir("cursor-")
     _write_cursor_permissions(workdir)
@@ -145,7 +146,7 @@ async def call_cursor(
     try:
         return await _run_agent(
             argv,
-            full,
+            stdin_bytes,
             environment=environment,
             workdir=workdir,
             timeout_seconds=timeout_seconds,
