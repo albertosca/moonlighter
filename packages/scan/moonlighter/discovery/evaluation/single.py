@@ -1,20 +1,20 @@
 """Scoring one job posting against the candidate profile with a single LLM call."""
 
 import json
+import logging
 from typing import Any
 
 from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
 from moonlighter.core.llm.anthropic_api import make_api_caller
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
-from moonlighter.core.log import get_logger
 from moonlighter.core.metrics import record_spend_limit_hit
 from moonlighter.core.parsing import parse_llm_json
 from moonlighter.discovery.evaluation.models import EvalInput, EvaluationResult
 from moonlighter.discovery.evaluation.prompts import build_eval_prefix, eval_suffix
 from moonlighter.discovery.evaluation.result_parsing import result_from
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 async def evaluate_job(  # noqa: PLR0913, PLR0917 - public keyword API of service.py, scripts and tests; a parameter object would change every caller

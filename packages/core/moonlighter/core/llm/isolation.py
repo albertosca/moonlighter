@@ -1,6 +1,7 @@
 """What keeps one CLI call apart: its own process group, a private workdir, and its cleanup."""
 
 import contextlib
+import logging
 import os
 import shutil
 import signal
@@ -8,9 +9,8 @@ import tempfile
 from pathlib import Path
 
 from moonlighter.core.config.paths import moonlighter_home
-from moonlighter.core.log import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def kill_process_group(pid: int) -> None:

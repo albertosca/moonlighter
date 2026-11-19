@@ -1,14 +1,14 @@
 """The parallel fetch every company-board scanner shares: one client, all slugs, failures counted."""
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 
 import httpx
 
-from moonlighter.core.log import get_logger
 from moonlighter.discovery.sources.base import RawJob, ScanStats, SourceStats
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 _Fetch = Callable[[httpx.AsyncClient, str], Awaitable[list[RawJob]]]
 

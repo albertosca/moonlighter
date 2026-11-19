@@ -4,13 +4,13 @@ All deterministic substitution, no model call: name, contact and education.
 """
 
 import importlib.resources
+import logging
 import re
 from typing import Any
 
 from moonlighter.application.cvgen.latex.text import escape_latex
-from moonlighter.core.log import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # The ONE substitution fill_template leaves unescaped, on the reasoning that
 # a LinkedIn slug is never free text -- so the pattern has to actually be a

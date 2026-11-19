@@ -1,11 +1,11 @@
 """Gupy's portal-wide keyword search across every company hosted on Gupy."""
 
+import logging
 import re
 from typing import Any, override
 
 import httpx
 
-from moonlighter.core.log import get_logger
 from moonlighter.core.web.http_fetch import FetchError, get_json
 from moonlighter.discovery.sources.base import (
     BaseScanner,
@@ -15,7 +15,7 @@ from moonlighter.discovery.sources.base import (
     normalize_remote_type,
 )
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class GupyScanner(BaseScanner):

@@ -14,14 +14,13 @@ output_tokens=0 and are meaningful only for calls/total_seconds/
 spend_limit_hits. Token counts are real only on the API backend.
 """
 
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 
-from moonlighter.core.log import get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 _current: ContextVar[LLMMetrics | None] = ContextVar("llm_metrics", default=None)
 

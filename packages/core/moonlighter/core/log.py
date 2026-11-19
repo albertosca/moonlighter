@@ -151,6 +151,11 @@ def setup(log_path: str | None = None) -> None:
 
 
 def get_logger(name: str) -> logging.Logger:
+    """Kept for external plugins (moonlighter-linkedin); modules here use logging.getLogger.
+
+    It configures logging on first use, so calling it at import time is a side effect.
+    tests/test_logger_acquisition.py keeps it out of packages/.
+    """
     if not _initialized:
         setup()
     return logging.getLogger(name)

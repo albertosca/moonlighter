@@ -1,5 +1,6 @@
 """Applies the numbered migrations to the local SQLite store, once each and in order, with a backup first."""
 
+import logging
 import sqlite3
 import time
 from collections.abc import Callable
@@ -9,10 +10,9 @@ from pathlib import Path
 import peewee
 
 from moonlighter.core.config.paths import moonlighter_home
-from moonlighter.core.log import get_logger
 from moonlighter.core.migrations import MIGRATIONS, MigrationDatabase
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 _LOCK_RETRIES = 5
 _LOCK_BACKOFF_S = 0.5

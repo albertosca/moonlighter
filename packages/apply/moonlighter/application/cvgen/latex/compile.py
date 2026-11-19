@@ -5,14 +5,13 @@ a timeout. No pdflatex on the machine, or a failed run: the caller keeps the
 .tex and tells the operator how to compile it themselves.
 """
 
+import logging
 import re
 import shutil
 import subprocess
 from pathlib import Path
 
-from moonlighter.core.log import get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 _PDFLATEX = "pdflatex"

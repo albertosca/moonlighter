@@ -1,5 +1,6 @@
 """Turn a job into a sheet the candidate can paste into the form."""
 
+import logging
 from typing import Any
 
 import httpx
@@ -30,9 +31,8 @@ from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.db import Application, Job
 from moonlighter.core.email_alias import build_email_alias, new_email_ref
 from moonlighter.core.llm.dispatch import make_caller
-from moonlighter.core.log import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 PASTE_HINT = (
     "No form questions could be read for this job.\n"

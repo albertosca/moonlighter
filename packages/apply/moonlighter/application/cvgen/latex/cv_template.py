@@ -6,15 +6,15 @@ template for a language, parses those declarations, strips them from a
 rendered document, and re-points a selection at the right language's base.
 """
 
+import logging
 import re
 from dataclasses import replace
 from typing import Any, NamedTuple
 
 from moonlighter.application.cvgen.latex.render import CVSelection
 from moonlighter.application.cvgen.paths import resolved_template_dir
-from moonlighter.core.log import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # The captured text is treated as plain model prose (escape_latex + the
 # **bold** dialect, same as everything else generate.py produces) — an
