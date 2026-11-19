@@ -102,26 +102,37 @@ def _bullet(raw: Any) -> PoolBullet:
     )
 
 
+def _optional_text(raw: dict[str, Any], field: str) -> str | None:
+    value = raw.get(field)
+    return str(value) if value else None
+
+
+def _experience_body(raw: dict[str, Any]) -> tuple[tuple[PoolBullet, ...], str | None]:
+    """The experience's bullets and prose: exactly one of the two is present."""
+    bullets = tuple(_bullet(raw_bullet) for raw_bullet in raw.get("bullets") or ())
+    prose = _optional_text(raw, "prose")
+    if not bullets and not prose:
+        raise PoolError(f"experience '{raw['company']}' has neither bullets or prose")
+    if bullets and prose:
+        raise PoolError(f"experience '{raw['company']}' has both prose and bullets")
+    return bullets, prose
+
+
 def _experience(raw: Any) -> PoolExperience:
     if not isinstance(raw, dict):
         raise PoolError(f"experience is not a mapping: {raw!r}")
     for field in ("company", "title", "period", "location"):
         if not raw.get(field):
             raise PoolError(f"experience missing '{field}': {raw!r}")
-    bullets = tuple(_bullet(raw_bullet) for raw_bullet in raw.get("bullets") or ())
-    prose = raw.get("prose")
-    if not bullets and not prose:
-        raise PoolError(f"experience '{raw['company']}' has neither bullets or prose")
-    if bullets and prose:
-        raise PoolError(f"experience '{raw['company']}' has both prose and bullets")
+    bullets, prose = _experience_body(raw)
     return PoolExperience(
         company=_fixed_field(raw, "company"),
         title=_fixed_field(raw, "title"),
         period=_fixed_field(raw, "period"),
         location=_fixed_field(raw, "location"),
         bullets=bullets,
-        prose=str(prose) if prose else None,
-        prose_id=str(raw["id"]) if raw.get("id") else None,
+        prose=prose,
+        prose_id=_optional_text(raw, "id"),
         angles=tuple(str(angle) for angle in raw.get("angles") or ()),
     )
 
