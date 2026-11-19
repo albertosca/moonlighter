@@ -10,7 +10,7 @@ async def test_call_cursor_empty_prompt_still_calls_subprocess():
     mock_process = cursor_process(b"response")
 
     with patch(
-        "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ):
         result = await call_cursor("", "model")
 
@@ -22,7 +22,7 @@ async def test_cursor_caller_satisfies_llm_caller_contract():
     mock_process = cursor_process(b"result")
 
     with patch(
-        "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ):
         result = await call_cursor("hello", "any-model")
 
@@ -43,7 +43,7 @@ async def test_cursor_concatenates_cache_prefix():
     mock_process.communicate = fake_communicate
 
     with patch(
-        "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ):
         await call_cursor("DYN", "m", cache_prefix="STATIC")
     assert captured["input"] == b"STATIC\n\nDYN"
@@ -63,7 +63,7 @@ async def test_cursor_no_cache_prefix_keeps_prompt_unchanged():
     mock_process.communicate = fake_communicate
 
     with patch(
-        "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ):
         await call_cursor("PROMPT_ONLY", "m")
     assert captured["input"] == b"PROMPT_ONLY"
@@ -80,7 +80,7 @@ async def test_call_cursor_decodes_its_output_strictly(stdout, stderr, code):
     """
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=cursor_process(stdout, stderr, code),
         ),
         pytest.raises(UnicodeDecodeError),

@@ -13,7 +13,8 @@ async def test_call_cursor_raises_on_nonzero_exit():
 
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
         ),
         pytest.raises(RuntimeError) as raised,
     ):
@@ -28,7 +29,8 @@ async def test_call_cursor_stderr_truncated_to_300_chars():
 
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
         ),
         pytest.raises(RuntimeError) as raised,
     ):
@@ -44,7 +46,8 @@ async def test_call_cursor_uses_stdout_when_stderr_is_empty():
 
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
         ),
         pytest.raises(RuntimeError, match="stdout detail"),
     ):
@@ -75,7 +78,8 @@ async def test_call_cursor_kills_a_subprocess_that_does_not_answer_in_time(group
     killpg = MagicMock(side_effect=ProcessLookupError if group_already_gone else None)
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
         ) as mock_exec,
         patch("moonlighter.core.llm.isolation.os.killpg", killpg),
         pytest.raises(RuntimeError, match=r"agent CLI did not answer within 0\.05 s"),
@@ -91,7 +95,8 @@ async def test_cursor_cleanup_failure_does_not_replace_the_result(tmp_path, monk
     mock_process = cursor_process(b"the answer")
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
         ),
         patch("moonlighter.core.llm.isolation.shutil.rmtree", side_effect=OSError("busy")),
         caplog.at_level("ERROR"),
@@ -106,7 +111,8 @@ async def test_cursor_cleanup_failure_does_not_hide_a_usage_limit(tmp_path, monk
     mock_process.communicate = AsyncMock(side_effect=RuntimeError("usage limit reached"))
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
         ),
         patch(
             "moonlighter.core.llm.isolation.shutil.rmtree", side_effect=OSError("busy")
@@ -136,7 +142,8 @@ async def test_call_cursor_timeout_message_is_pinned_word_for_word():
     mock_process.wait = AsyncMock(return_value=-9)
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
         ),
         patch("moonlighter.core.llm.isolation.os.killpg") as killpg,
         pytest.raises(RuntimeError) as raised,
@@ -161,7 +168,7 @@ async def test_call_cursor_timeout_message_is_pinned_word_for_word():
 async def test_call_cursor_exit_message_is_pinned_word_for_word(stdout, stderr, message):
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=cursor_process(stdout, stderr, code=1),
         ),
         pytest.raises(RuntimeError) as raised,

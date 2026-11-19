@@ -1,6 +1,5 @@
 """The Codex backend: `codex exec` on the user's ChatGPT login, in a private workdir per call."""
 
-import asyncio
 import os
 import shutil
 from pathlib import Path
@@ -8,7 +7,12 @@ from time import perf_counter
 
 from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.llm.codex_profile import codex_exec_argv
-from moonlighter.core.llm.isolation import kill_process_group, private_call_workdir, remove_quietly
+from moonlighter.core.llm.isolation import (
+    CliCommand,
+    private_call_workdir,
+    remove_quietly,
+    run_in_own_group,
+)
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.metrics import record_call
 
@@ -33,27 +37,8 @@ async def _run_codex(
     timeout_seconds: float,
 ) -> tuple[int | None, bytes, bytes]:
     """One `codex` process in its own process group, killed whole on timeout."""
-    process = await asyncio.create_subprocess_exec(
-        *argv,
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=environment,
-        cwd=str(workdir),
-        start_new_session=True,
-    )
-    try:
-        stdout, stderr = await asyncio.wait_for(
-            process.communicate(input=stdin), timeout=timeout_seconds
-        )
-    except TimeoutError:
-        kill_process_group(process.pid)
-        await process.wait()
-        raise RuntimeError(
-            f"codex CLI did not answer within {timeout_seconds} s — killed "
-            "(raise llm_timeout_seconds in config.yaml if your calls are legitimately slow)"
-        ) from None
-    return process.returncode, stdout, stderr
+    command = CliCommand("codex", argv, environment, workdir)
+    return await run_in_own_group(command, stdin=stdin, timeout_seconds=timeout_seconds)
 
 
 def _refuse_claude_model(model: str) -> None:

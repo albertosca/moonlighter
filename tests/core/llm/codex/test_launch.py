@@ -12,7 +12,7 @@ _REAL_REALPATH = os.path.realpath
 
 async def test_launch_flags_lock_the_agent_down():
     create, calls, _ = fake_codex("ok")
-    with patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create):
+    with patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create):
         await call_codex("prompt", "gpt-5")
     exec_argv = calls[1][0]
     assert exec_argv[1:4] == ("--ask-for-approval", "never", "exec")
@@ -39,7 +39,7 @@ async def test_launch_flags_lock_the_agent_down():
 
 async def test_the_profile_denies_everything_but_the_workspace_and_the_binary():
     create, calls, _ = fake_codex("ok")
-    with patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create):
+    with patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create):
         await call_codex("prompt", "gpt-5")
     exec_argv = calls[1][0]
     profile = next(
@@ -60,7 +60,7 @@ async def test_the_environment_drops_every_api_credential(monkeypatch):
         monkeypatch.setenv(name, "must-not-reach-the-child")
     monkeypatch.setenv("KEEP_ME", "yes")
     create, calls, _ = fake_codex("ok")
-    with patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create):
+    with patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create):
         await call_codex("prompt", "gpt-5")
     for _, launch_options in calls:
         environment = launch_options["env"]
@@ -73,7 +73,7 @@ async def test_the_environment_drops_every_api_credential(monkeypatch):
 
 async def test_the_login_check_and_the_exec_launch_exactly_these_argvs():
     create, calls, processes = fake_codex("ok")
-    with patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create):
+    with patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create):
         await call_codex("prompt", "gpt-5")
     (login_argv, login_options), (exec_argv, exec_options) = calls
     workdir = login_options["cwd"]

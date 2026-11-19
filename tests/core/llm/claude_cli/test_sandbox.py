@@ -16,7 +16,7 @@ async def test_call_cli_uses_sandbox_argv_and_stdin():
 
     with (
         patch(
-            "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=mock_process,
         ) as mock_exec,
         patch("moonlighter.core.llm.claude_cli.shutil.which", return_value="/usr/local/bin/claude"),
@@ -58,7 +58,7 @@ async def test_call_cli_cwd_is_neutral_workdir(tmp_path, monkeypatch):
     mock_process.communicate = AsyncMock(return_value=(b"ok", b""))
 
     with patch(
-        "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ) as mock_exec:
         await call_cli("prompt", "model")
 
@@ -89,7 +89,7 @@ async def test_call_cli_ignores_model_param():
     mock_process.communicate = AsyncMock(return_value=(b"output", b""))
 
     with patch(
-        "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ) as mock_exec:
         await call_cli("prompt", "claude-opus-99")
 
@@ -110,7 +110,7 @@ async def test_cli_launch_invariants():
 
     with (
         patch(
-            "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=mock_process,
         ) as mock_exec,
         patch("moonlighter.core.llm.claude_cli.shutil.which", return_value="/usr/local/bin/claude"),

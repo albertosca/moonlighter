@@ -10,7 +10,7 @@ from tests.core.llm.codex.fake_codex import fake_codex
 async def test_a_claude_model_id_is_refused_before_anything_runs():
     create, calls, _ = fake_codex("ok")
     with (
-        patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create),
+        patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create),
         pytest.raises(RuntimeError, match=r"llm_model.*eval_model"),
     ):
         await call_codex("prompt", "claude-sonnet-4-6")
@@ -28,7 +28,7 @@ async def test_a_claude_model_id_is_refused_before_anything_runs():
 async def test_anything_but_a_chatgpt_login_is_refused(status, code):
     create, calls, _ = fake_codex("ok", login=status, login_code=code)
     with (
-        patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create),
+        patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create),
         pytest.raises(RuntimeError, match="codex login"),
     ):
         await call_codex("prompt", "gpt-5")
@@ -49,7 +49,7 @@ def test_codex_executable_is_the_one_on_path():
 async def test_a_refused_model_quotes_the_setting_and_the_model_it_got(model):
     create, calls, _ = fake_codex("ok")
     with (
-        patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create),
+        patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create),
         pytest.raises(RuntimeError) as raised,
     ):
         await call_codex("prompt", model)
@@ -73,7 +73,7 @@ async def test_a_missing_binary_message_is_pinned_word_for_word(monkeypatch):
 async def test_a_login_refusal_message_is_pinned_word_for_word():
     create, _, _ = fake_codex("ok", login=b"Not logged in\n", login_code=1)
     with (
-        patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create),
+        patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create),
         pytest.raises(RuntimeError) as raised,
     ):
         await call_codex("prompt", "gpt-5")
@@ -94,7 +94,7 @@ async def test_a_login_refusal_message_is_pinned_word_for_word():
 )
 async def test_a_chatgpt_login_is_recognised_however_it_is_printed(login, login_stderr):
     create, calls, _ = fake_codex("the answer", login=login, login_stderr=login_stderr)
-    with patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create):
+    with patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create):
         result = await call_codex("prompt", "gpt-5")
     assert result == "the answer"
     assert len(calls) == 2

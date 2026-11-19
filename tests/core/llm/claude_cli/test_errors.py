@@ -25,7 +25,7 @@ async def test_call_cli_kills_a_subprocess_that_does_not_answer_in_time(group_al
     killpg = MagicMock(side_effect=ProcessLookupError if group_already_gone else None)
     with (
         patch(
-            "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=mock_process,
         ),
         patch("moonlighter.core.llm.isolation.os.killpg", killpg),
@@ -43,7 +43,7 @@ async def test_call_cli_raises_on_nonzero_exit():
 
     with (
         patch(
-            "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=mock_process,
         ),
         pytest.raises(RuntimeError) as raised,
@@ -63,7 +63,7 @@ async def test_call_cli_stderr_truncated_to_300_chars():
 
     with (
         patch(
-            "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=mock_process,
         ),
         pytest.raises(RuntimeError) as raised,
@@ -102,7 +102,7 @@ async def test_call_cli_timeout_message_is_pinned_word_for_word():
     mock_process.wait = AsyncMock(return_value=-9)
     with (
         patch(
-            "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=mock_process,
         ),
         patch("moonlighter.core.llm.isolation.os.killpg") as killpg,
@@ -131,7 +131,7 @@ async def test_call_cli_exit_message_is_pinned_word_for_word(stdout, stderr, mes
     mock_process.communicate = AsyncMock(return_value=(stdout, stderr))
     with (
         patch(
-            "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=mock_process,
         ),
         pytest.raises(RuntimeError) as raised,

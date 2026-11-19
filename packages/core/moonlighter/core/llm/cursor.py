@@ -1,6 +1,5 @@
 """The Cursor backend: the `agent --print` CLI in ask mode, in a private workspace per call."""
 
-import asyncio
 import os
 import shutil
 from pathlib import Path
@@ -8,7 +7,12 @@ from time import perf_counter
 
 from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.llm.cursor_projects import forget_cursor_call
-from moonlighter.core.llm.isolation import kill_process_group, private_call_workdir
+from moonlighter.core.llm.isolation import (
+    CliCommand,
+    private_call_workdir,
+    run_in_own_group,
+    stdout_or_raise,
+)
 from moonlighter.core.metrics import record_call
 
 # Ask mode blocks shell, web fetch, and MCP tool calls (canary, Cursor CLI
@@ -75,33 +79,9 @@ async def _run_agent(
     timeout_seconds: float,
 ) -> str:
     """One `agent` process in its own process group; its stdout is the answer."""
-    process = await asyncio.create_subprocess_exec(
-        *argv,
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=environment,
-        cwd=str(workdir),
-        # Its own process group, so a timeout can take down whatever the CLI
-        # started too: killing the direct process alone left a child running
-        # as an orphan (2026-09-29 review of the claude CLI).
-        start_new_session=True,
-    )
-    try:
-        stdout, stderr = await asyncio.wait_for(
-            process.communicate(input=stdin_bytes), timeout=timeout_seconds
-        )
-    except TimeoutError:
-        kill_process_group(process.pid)
-        await process.wait()
-        raise RuntimeError(
-            f"agent CLI did not answer within {timeout_seconds} s — killed "
-            "(raise llm_timeout_seconds in config.yaml if your calls are legitimately slow)"
-        ) from None
-    if process.returncode != 0:
-        detail = stderr.decode().strip() or stdout.decode().strip()
-        raise RuntimeError(f"agent CLI exited with code {process.returncode}: {detail[:300]}")
-    return stdout.decode()
+    command = CliCommand("agent", argv, environment, workdir)
+    result = await run_in_own_group(command, stdin=stdin_bytes, timeout_seconds=timeout_seconds)
+    return stdout_or_raise("agent", result)
 
 
 async def call_cursor(
