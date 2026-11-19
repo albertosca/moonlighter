@@ -11,6 +11,6 @@ def home(monkeypatch, tmp_path, temporary_database):
     """The MOONLIGHTER_HOME main() writes blocklist_learned.yaml under, with an initialised database."""
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     init_db()
-    # setup_logging() adds a process-wide file handler on ~/.moonlighter/app.log, once per process.
+    # setup_logging() adds a process-wide file handler on MOONLIGHTER_HOME/app.log, once per process.
     monkeypatch.setattr(build_blocklist, "setup_logging", lambda: None)
     return tmp_path

@@ -46,9 +46,8 @@ def _isolate_moonlighter_home(config: pytest.Config) -> None:
     temporary_database fixture below still sets it through monkeypatch, which takes
     precedence because it runs later.
 
-    One write escapes: moonlighter.core.log hardcodes ~/.moonlighter/app.log
-    (_DEFAULT_LOG_PATH) whatever MOONLIGHTER_HOME says, so importing a module that
-    calls get_logger appends to the developer's real log.
+    The log follows too: moonlighter.core.log resolves app.log under
+    moonlighter_home() when setup() first runs, which is after this hook.
     """
     session_home = tempfile.mkdtemp(prefix="moonlighter-test-home-")
     config.stash[_SESSION_HOME] = session_home
