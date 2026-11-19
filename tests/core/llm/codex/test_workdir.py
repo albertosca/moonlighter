@@ -61,4 +61,4 @@ async def test_a_failed_workdir_cleanup_is_logged_and_the_answer_survives(caplog
     ):
         result = await call_codex("prompt", "gpt-5")
     assert result == "the answer"
-    assert f"cursor cleanup failed for {calls[0][1]['cwd']}" in caplog.messages
+    assert f"codex cleanup failed for {calls[0][1]['cwd']}" in caplog.messages

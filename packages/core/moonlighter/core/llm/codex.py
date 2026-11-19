@@ -157,6 +157,6 @@ async def call_codex(
         return _read_final_message(output)
     finally:
         try:
-            remove_quietly(workdir)
+            remove_quietly(workdir, backend="codex")
         finally:
             record_call(perf_counter() - start)

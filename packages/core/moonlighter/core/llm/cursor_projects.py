@@ -70,5 +70,5 @@ def _cursor_projects_for(workdir: Path) -> list[Path]:
 def forget_cursor_call(workdir: Path) -> None:
     """Remove this call's Cursor project directory and its private workdir."""
     for project in _cursor_projects_for(workdir):
-        remove_quietly(project)
-    remove_quietly(workdir)
+        remove_quietly(project, backend="cursor")
+    remove_quietly(workdir, backend="cursor")
