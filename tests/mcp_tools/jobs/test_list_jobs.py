@@ -67,9 +67,9 @@ async def test_list_jobs_limit(temporary_database):
         )
 
     result = await list_jobs(status="new", limit=3)
-    # Verify it returned without error
-    assert result is not None
-    assert len(result) > 0
+    assert all(f"Co{index}" in result for index in (4, 3, 2))
+    assert "Co1" not in result
+    assert "Co0" not in result
 
 
 async def test_list_jobs_empty(temporary_database):

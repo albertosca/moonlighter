@@ -41,7 +41,7 @@ def test_make_caller_cursor_returns_a_cursor_caller():
     assert inspect.iscoroutinefunction(caller)
 
 
-def test_make_caller_defaults_to_cli_when_backend_omitted():
+async def test_make_caller_defaults_to_cli_when_backend_omitted():
     """No 'llm_backend' key → the CLI backend, matching DEFAULTS.
 
     Deliberate change from the previous 'api' fallback: `moonlighter init`, the
@@ -51,9 +51,8 @@ def test_make_caller_defaults_to_cli_when_backend_omitted():
     """
     delegate = AsyncMock(return_value="answer")
     with patch("moonlighter.core.llm.dispatch.call_cli", delegate):
-        caller = make_caller({})
-    assert inspect.iscoroutinefunction(caller)
-    assert caller is not None
+        assert await make_caller({})("prompt", "model") == "answer"
+    delegate.assert_awaited_once()
 
 
 def test_make_caller_rejects_an_unknown_backend():

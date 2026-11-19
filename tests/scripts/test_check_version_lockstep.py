@@ -116,3 +116,28 @@ def test_a_pin_missing_from_full_is_skipped_without_a_report(tmp_path):
     _write_repo(tmp_path, CONSISTENT, pins)
 
     assert check_version_lockstep.check(tmp_path) == []
+
+
+def _write_plugin_manifest(root: Path, version: str) -> None:
+    (root / ".claude-plugin").mkdir()
+    (root / ".claude-plugin" / "plugin.json").write_text(
+        f'{{"name": "moonlighter", "version": "{version}"}}'
+    )
+
+
+def test_a_plugin_manifest_left_behind_is_reported(tmp_path):
+    # Claude Code keys plugin updates by this version, so a stale one means
+    # installed plugins never hear about a release.
+    _write_repo(tmp_path, CONSISTENT, CONSISTENT_PINS)
+    _write_plugin_manifest(tmp_path, "0.1.0")
+
+    assert check_version_lockstep.check(tmp_path) == [
+        ".claude-plugin/plugin.json is at 0.1.0, expected 0.2.0 (to match moonlighter-full)"
+    ]
+
+
+def test_a_plugin_manifest_in_step_reports_no_mismatch(tmp_path):
+    _write_repo(tmp_path, CONSISTENT, CONSISTENT_PINS)
+    _write_plugin_manifest(tmp_path, "0.2.0")
+
+    assert check_version_lockstep.check(tmp_path) == []

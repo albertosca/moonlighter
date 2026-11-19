@@ -66,7 +66,7 @@ async def test_a_truncated_cached_pdf_is_not_trusted(config):
     # Regenerates instead of serving the truncated file — proves the cache
     # check does not just skip the bad file, it treats it as a real miss.
     assert calls["n"] == 1
-    assert result is not None
+    assert result == TailoredCV(out / "cv.pdf", compiled=True)
 
 
 async def test_a_directory_named_cv_pdf_is_not_trusted(config):
@@ -85,7 +85,7 @@ async def test_a_directory_named_cv_pdf_is_not_trusted(config):
     ):
         result = await ensure_tailored_cv(JOB, config, {}, caller=call)
     assert calls["n"] == 1
-    assert result is not None
+    assert result == TailoredCV(out / "cv.pdf", compiled=True)
 
 
 async def test_ensure_tailored_cv_is_still_off_with_no_config_and_no_bootstrapped_file(

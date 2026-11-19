@@ -80,3 +80,17 @@ def test_setup_uses_rotating_file_handler(tmp_path):
     assert len(handlers) == 1
     assert handlers[0].maxBytes == 10_000_000
     assert handlers[0].backupCount == 3
+
+
+def test_default_log_path_follows_moonlighter_home(tmp_path, monkeypatch):
+    monkeypatch.setattr(log_mod, "_initialized", False)
+    root = logging.getLogger("moonlighter")
+    monkeypatch.setattr(root, "handlers", [])
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+
+    log_mod.setup()
+
+    file_handlers = [
+        handler for handler in root.handlers if isinstance(handler, RotatingFileHandler)
+    ]
+    assert [handler.baseFilename for handler in file_handlers] == [str(tmp_path / "app.log")]
