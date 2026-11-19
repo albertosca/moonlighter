@@ -16,4 +16,4 @@ def _codex_on_path(monkeypatch, tmp_path):
     monkeypatch.setattr(
         codex.shutil, "which", lambda name: "/opt/bin/codex" if name == "codex" else None
     )
-    monkeypatch.setattr(codex_profile.os.path, "realpath", str)
+    monkeypatch.setattr(codex_profile, "resolve_executable", str)

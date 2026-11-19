@@ -1,9 +1,13 @@
 import asyncio
+import os
 from pathlib import Path
 from unittest.mock import patch
 
 from moonlighter.core.llm.codex import call_codex
 from tests.core.llm.codex.fake_codex import fake_codex
+
+# Captured at import, before any fixture runs.
+_REAL_REALPATH = os.path.realpath
 
 
 async def test_launch_flags_lock_the_agent_down():
@@ -126,3 +130,9 @@ async def test_the_login_check_and_the_exec_launch_exactly_these_argvs():
         assert options["stderr"] == asyncio.subprocess.PIPE
         assert options["start_new_session"] is True
         assert options["cwd"] == workdir
+
+
+def test_the_codex_fixtures_leave_the_process_wide_realpath_alone():
+    # The autouse fixture fakes executable resolution; a fake on os.path itself
+    # reached every caller in the process, Path.resolve() included.
+    assert os.path.realpath is _REAL_REALPATH

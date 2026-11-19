@@ -17,8 +17,6 @@ async def test_fetch_description_drops_style_and_script_contents():
         description, error = await fetch_description("https://example.com/job")
     assert error is None
     assert description == "Real text"
-    assert "color" not in description
-    assert "var x" not in description
 
 
 async def test_fetch_description_truncates_at_an_unclosed_style_tag():
@@ -38,7 +36,6 @@ async def test_fetch_description_truncates_at_an_unclosed_style_tag():
         description, error = await fetch_description("https://example.com/job")
     assert error is None
     assert description == "Real desc before"
-    assert "color" not in description
 
 
 async def test_fetch_description_truncates_at_an_unclosed_script_tag():

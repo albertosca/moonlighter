@@ -108,10 +108,13 @@ async def test_cursor_cleanup_failure_does_not_hide_a_usage_limit(tmp_path, monk
         patch(
             "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
         ),
-        patch("moonlighter.core.llm.isolation.shutil.rmtree", side_effect=OSError("busy")),
+        patch(
+            "moonlighter.core.llm.isolation.shutil.rmtree", side_effect=OSError("busy")
+        ) as rmtree,
         pytest.raises(RuntimeError, match="usage limit"),
     ):
         await call_cursor("prompt", "model")
+    rmtree.assert_called()
 
 
 async def test_call_cursor_missing_binary_message_is_pinned_word_for_word():
