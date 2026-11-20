@@ -69,20 +69,26 @@ async def test_cursor_no_cache_prefix_keeps_prompt_unchanged():
     assert captured["input"] == b"PROMPT_ONLY"
 
 
-@pytest.mark.parametrize(
-    ("stdout", "stderr", "code"),
-    [(b"", b"bad \xff byte", 1), (b"bad \xff byte", b"", 0)],
-    ids=["error-output", "answer"],
-)
-async def test_call_cursor_decodes_its_output_strictly(stdout, stderr, code):
-    """Same pin as the claude CLI's: a byte that is not UTF-8 raises
-    UnicodeDecodeError, not the RuntimeError a caller expects.
-    """
+async def test_call_cursor_replaces_bad_bytes_in_its_error_output():
+    """A non-UTF-8 byte in stderr must not hide the CLI's own error behind a UnicodeDecodeError."""
     with (
         patch(
             "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
-            return_value=cursor_process(stdout, stderr, code),
+            return_value=cursor_process(b"", b"bad \xff byte", 1),
         ),
-        pytest.raises(UnicodeDecodeError),
+        pytest.raises(RuntimeError) as raised,
+    ):
+        await call_cursor("prompt", "model")
+    assert str(raised.value) == "agent CLI exited with code 1: bad \ufffd byte"
+
+
+async def test_call_cursor_refuses_an_answer_that_is_not_utf8():
+    """A corrupted answer is an error the caller expects, never half-used text."""
+    with (
+        patch(
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=cursor_process(b"bad \xff byte", b"", 0),
+        ),
+        pytest.raises(RuntimeError, match=r"^agent CLI answered with bytes that are not UTF-8"),
     ):
         await call_cursor("prompt", "model")

@@ -76,23 +76,32 @@ async def test_cli_no_cache_prefix_keeps_prompt_unchanged():
     assert captured["input"] == b"PROMPT_ONLY"
 
 
-@pytest.mark.parametrize(
-    ("stdout", "stderr", "code"),
-    [(b"", b"bad \xff byte", 1), (b"bad \xff byte", b"", 0)],
-    ids=["error-output", "answer"],
-)
-async def test_call_cli_decodes_its_output_strictly(stdout, stderr, code):
-    """Today's behaviour, pinned so the split cannot change it: a byte that is not
-    UTF-8 raises UnicodeDecodeError, not the RuntimeError a caller expects.
-    """
+async def test_call_cli_replaces_bad_bytes_in_its_error_output():
+    """A non-UTF-8 byte in stderr must not hide the CLI's own error behind a UnicodeDecodeError."""
     mock_process = MagicMock()
-    mock_process.returncode = code
-    mock_process.communicate = AsyncMock(return_value=(stdout, stderr))
+    mock_process.returncode = 1
+    mock_process.communicate = AsyncMock(return_value=(b"", b"bad \xff byte"))
     with (
         patch(
             "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=mock_process,
         ),
-        pytest.raises(UnicodeDecodeError),
+        pytest.raises(RuntimeError) as raised,
+    ):
+        await call_cli("prompt", "model")
+    assert str(raised.value) == "claude CLI exited with code 1: bad \ufffd byte"
+
+
+async def test_call_cli_refuses_an_answer_that_is_not_utf8():
+    """A corrupted answer is an error the caller expects, never half-used text."""
+    mock_process = MagicMock()
+    mock_process.returncode = 0
+    mock_process.communicate = AsyncMock(return_value=(b"bad \xff byte", b""))
+    with (
+        patch(
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
+        ),
+        pytest.raises(RuntimeError, match=r"^claude CLI answered with bytes that are not UTF-8"),
     ):
         await call_cli("prompt", "model")

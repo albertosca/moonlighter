@@ -9,6 +9,7 @@ from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.llm.codex_profile import codex_exec_argv
 from moonlighter.core.llm.isolation import (
     CliCommand,
+    decode_answer,
     private_call_workdir,
     remove_quietly,
     run_in_own_group,
@@ -95,7 +96,7 @@ def _read_final_message(output: Path) -> str:
     """The answer `--output-last-message` wrote: a missing or blank file is an error."""
     if not output.is_file():
         raise RuntimeError("codex CLI wrote no final response")
-    answer = output.read_text(encoding="utf-8")
+    answer = decode_answer("codex", output.read_bytes())
     if not answer.strip():
         raise RuntimeError("codex CLI returned an empty final response")
     return answer
