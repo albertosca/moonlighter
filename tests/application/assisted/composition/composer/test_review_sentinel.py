@@ -2,7 +2,10 @@
 
 import pytest
 
-from moonlighter.application.assisted.composition.composer import compose_answers
+from moonlighter.application.assisted.composition.composer import (
+    CompositionContext,
+    compose_answers,
+)
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE, never_called
 
@@ -18,7 +21,7 @@ async def test_a_work_auth_review_sentinel_becomes_a_gap_for_a_text_question():
     question = FormQuestion(
         label="Will you require visa sponsorship?", kind=QuestionKind.TEXT, required=True
     )
-    composed = await compose_answers([question], PROFILE, {}, JOB, never_called)
+    composed = await compose_answers([question], CompositionContext(PROFILE, {}, JOB, never_called))
     assert composed[0].answer is None
     assert composed[0].gap_reason
     assert "NEEDS_REVIEW" not in composed[0].gap_reason
@@ -31,7 +34,7 @@ async def test_a_work_auth_review_sentinel_becomes_a_gap_for_a_long_text_questio
         kind=QuestionKind.LONG_TEXT,
         required=True,
     )
-    composed = await compose_answers([question], PROFILE, {}, JOB, never_called)
+    composed = await compose_answers([question], CompositionContext(PROFILE, {}, JOB, never_called))
     assert composed[0].answer is None
     assert composed[0].gap_reason
     assert "NEEDS_REVIEW" not in composed[0].gap_reason

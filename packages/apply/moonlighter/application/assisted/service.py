@@ -6,7 +6,10 @@ from typing import Any
 import httpx
 
 from moonlighter.application.answers.bank.store import load_answer_bank
-from moonlighter.application.assisted.composition.composer import compose_answers
+from moonlighter.application.assisted.composition.composer import (
+    CompositionContext,
+    compose_answers,
+)
 from moonlighter.application.assisted.questions import FormQuestion
 from moonlighter.application.assisted.sheet.bootstrap_offer import cv_bootstrap_offer
 from moonlighter.application.assisted.sheet.notes import (
@@ -103,8 +106,7 @@ async def _sheet(
         profile,
         caller=caller,
     )
-    composed = await compose_answers(
-        questions,
+    context = CompositionContext(
         profile,
         config,
         {**_job_dict(job), "location": job.location, "remote_type": job.remote_type},
@@ -112,6 +114,7 @@ async def _sheet(
         job_cache=job_cache,
         answer_bank=answer_bank,
     )
+    composed = await compose_answers(questions, context)
     application.form_data = well_shaped_form_data(job_cache)
     application.save()
     alias = _tracking_alias(application, config)

@@ -64,17 +64,8 @@ async def test_sheet_builds_one_caller_and_reuses_it_for_both_llm_users(job_fact
         seen["cv_caller"] = caller
         return None
 
-    async def spy_compose(  # noqa: PLR0913, PLR0917 - mirrors compose_answers' signature
-        questions: Any,
-        profile: Any,
-        config: Any,
-        job_details: Any,
-        compose_caller: Any,
-        *,
-        job_cache: Any = None,
-        answer_bank: Any = None,
-    ) -> list[Any]:
-        seen["compose_caller"] = compose_caller
+    async def spy_compose(questions: Any, context: Any) -> list[Any]:
+        seen["compose_caller"] = context.llm_caller
         return []
 
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", one_question)

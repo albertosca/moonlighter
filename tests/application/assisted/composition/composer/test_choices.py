@@ -2,7 +2,10 @@
 
 import pytest
 
-from moonlighter.application.assisted.composition.composer import compose_answers
+from moonlighter.application.assisted.composition.composer import (
+    CompositionContext,
+    compose_answers,
+)
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE
 
@@ -24,7 +27,9 @@ async def test_a_select_answer_must_be_one_of_the_offered_options():
     async def picks_something_else(prompt: str, model: str, cache_prefix: str | None = None) -> str:
         return "Marketing"
 
-    composed = await compose_answers([question], PROFILE, {}, JOB, picks_something_else)
+    composed = await compose_answers(
+        [question], CompositionContext(PROFILE, {}, JOB, picks_something_else)
+    )
     assert composed[0].answer is None
     assert "option" in composed[0].gap_reason
 
@@ -41,7 +46,9 @@ async def test_a_select_answer_that_matches_an_option_is_kept_verbatim():
     async def picks_an_option(prompt: str, model: str, cache_prefix: str | None = None) -> str:
         return "product"
 
-    composed = await compose_answers([question], PROFILE, {}, JOB, picks_an_option)
+    composed = await compose_answers(
+        [question], CompositionContext(PROFILE, {}, JOB, picks_an_option)
+    )
     assert composed[0].answer == "Product"
 
 
@@ -59,7 +66,7 @@ async def test_multi_select_accepts_several_verbatim_options():
         required=True,
         options=("Ruby", "Elixir", ".NET"),
     )
-    composed = await compose_answers([question], PROFILE, {}, JOB, caller)
+    composed = await compose_answers([question], CompositionContext(PROFILE, {}, JOB, caller))
     assert composed[0].answer == "Ruby\nElixir"
     assert composed[0].gap_reason is None
 
@@ -75,7 +82,7 @@ async def test_multi_select_with_no_matching_option_is_a_gap():
         required=True,
         options=("Ruby", "Elixir"),
     )
-    composed = await compose_answers([question], PROFILE, {}, JOB, caller)
+    composed = await compose_answers([question], CompositionContext(PROFILE, {}, JOB, caller))
     assert composed[0].answer is None
     assert "pick" in composed[0].gap_reason
 
@@ -100,7 +107,9 @@ async def test_a_choice_with_more_than_200_options_is_a_gap_without_the_llm():
         prompts.append(prompt)
         return "Office 1"
 
-    composed = await compose_answers([_select_with(201)], PROFILE, {}, JOB, records_the_call)
+    composed = await compose_answers(
+        [_select_with(201)], CompositionContext(PROFILE, {}, JOB, records_the_call)
+    )
     assert prompts == []
     assert composed[0].answer is None
     assert composed[0].gap_reason == "pick your answer from the 201 options on the form"
@@ -114,6 +123,8 @@ async def test_a_choice_with_200_options_still_goes_to_the_llm():
         prompts.append(prompt)
         return "Office 200"
 
-    composed = await compose_answers([_select_with(200)], PROFILE, {}, JOB, picks_the_last)
+    composed = await compose_answers(
+        [_select_with(200)], CompositionContext(PROFILE, {}, JOB, picks_the_last)
+    )
     assert len(prompts) == 1
     assert composed[0].answer == "Office 200"
