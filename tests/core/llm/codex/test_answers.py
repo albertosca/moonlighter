@@ -69,3 +69,13 @@ async def test_a_missing_answer_message_is_pinned_word_for_word(answer, message)
     ):
         await call_codex("prompt", "gpt-5")
     assert str(raised.value) == message
+
+
+async def test_an_answer_that_is_not_utf8_is_refused():
+    """Same rule as claude and cursor: a corrupted answer raises, it is never half-used."""
+    create, _, _ = fake_codex(b"bad \xff byte")
+    with (
+        patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create),
+        pytest.raises(RuntimeError, match=r"^codex CLI answered with bytes that are not UTF-8"),
+    ):
+        await call_codex("prompt", "gpt-5")

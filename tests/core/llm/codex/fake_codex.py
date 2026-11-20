@@ -13,13 +13,21 @@ def fake_process(stdout: bytes = b"", stderr: bytes = b"", code: int = 0) -> Mag
     return process
 
 
-def write_final_message(argv: tuple[str, ...], answer: str) -> None:
+def write_final_message(argv: tuple[str, ...], answer: str | bytes) -> None:
     """Write `answer` to the `--output-last-message` file, as the real CLI does."""
-    Path(argv[argv.index("--output-last-message") + 1]).write_text(answer)
+    output = Path(argv[argv.index("--output-last-message") + 1])
+    if isinstance(answer, bytes):
+        output.write_bytes(answer)
+    else:
+        output.write_text(answer)
 
 
 def fake_codex(
-    answer: str | None, *, login: bytes = LOGGED_IN, login_code: int = 0, login_stderr: bytes = b""
+    answer: str | bytes | None,
+    *,
+    login: bytes = LOGGED_IN,
+    login_code: int = 0,
+    login_stderr: bytes = b"",
 ):
     """create_subprocess_exec stand-in: `login status` first, then `exec`, which
     writes `answer` to the `--output-last-message` file the way the real CLI does.

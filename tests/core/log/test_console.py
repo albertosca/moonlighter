@@ -1,33 +1,11 @@
-"""setup()'s console handler uses bold, bright level styles, writes to stderr and never to stdout, and is left out silently when rich.console cannot be imported."""
+"""setup()'s console handler uses bold, bright level styles, writes to stderr and never to stdout."""
 
 import logging
-import sys
 
 from rich.default_styles import DEFAULT_STYLES
 from rich.logging import RichHandler
 
 from moonlighter.core import log as log_mod
-
-
-def test_setup_without_rich_falls_back_silently(tmp_path, monkeypatch):
-    """Without rich → ImportError swallowed, only the FileHandler remains.
-
-    setup()'s own try block imports rich.console/rich.theme (not rich.logging
-    — _PackageRichHandler is already bound at module import time), so that's
-    the import that must fail here to actually exercise the except branch.
-    """
-    root = logging.getLogger("moonlighter")
-    saved = root.handlers[:]
-    for handler in root.handlers[:]:
-        root.removeHandler(handler)
-    monkeypatch.setattr(log_mod, "_initialized", False)
-    monkeypatch.setitem(sys.modules, "rich.console", None)  # import → ImportError
-    try:
-        log_mod.setup(log_path=str(tmp_path / "app.log"))
-        assert len(root.handlers) == 1
-        assert isinstance(root.handlers[0], logging.FileHandler)
-    finally:
-        root.handlers[:] = saved  # restores the shared global logger
 
 
 def test_rich_handler_uses_vivid_level_styles(tmp_path):

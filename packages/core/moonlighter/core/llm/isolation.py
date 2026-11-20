@@ -63,13 +63,26 @@ async def run_in_own_group(
     return process.returncode, stdout, stderr
 
 
+def decode_answer(cli_name: str, raw: bytes) -> str:
+    """The answer as text; bytes that are not UTF-8 raise instead of reaching the caller half-read."""
+    try:
+        return raw.decode()
+    except UnicodeDecodeError as error:
+        raise RuntimeError(
+            f"{cli_name} CLI answered with bytes that are not UTF-8 (at byte {error.start})"
+        ) from error
+
+
 def stdout_or_raise(cli_name: str, result: tuple[int | None, bytes, bytes]) -> str:
-    """The decoded stdout of a zero exit; otherwise a RuntimeError with the CLI's own words."""
+    """The decoded stdout of a zero exit; otherwise a RuntimeError with the CLI's own words.
+
+    Error output is decoded leniently, so a stray byte never hides the CLI's message.
+    """
     code, stdout, stderr = result
     if code != 0:
-        detail = stderr.decode().strip() or stdout.decode().strip()
+        detail = stderr.decode(errors="replace").strip() or stdout.decode(errors="replace").strip()
         raise RuntimeError(f"{cli_name} CLI exited with code {code}: {detail[:300]}")
-    return stdout.decode()
+    return decode_answer(cli_name, stdout)
 
 
 def private_call_workdir(prefix: str) -> Path:
