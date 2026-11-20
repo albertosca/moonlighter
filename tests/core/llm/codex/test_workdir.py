@@ -20,7 +20,7 @@ async def test_each_call_gets_a_private_workdir_that_is_gone_afterwards(tmp_path
         write_final_message(argv, "ok")
         return fake_process()
 
-    with patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create):
+    with patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create):
         await call_codex("first", "gpt-5")
         await call_codex("second", "gpt-5")
     assert len(set(seen)) == 2
@@ -35,7 +35,7 @@ async def test_the_workdir_is_removed_when_the_call_fails():
         return fake_process(b"Not logged in", b"", 1)
 
     with (
-        patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create),
+        patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create),
         pytest.raises(RuntimeError),
     ):
         await call_codex("prompt", "gpt-5")
@@ -45,7 +45,7 @@ async def test_the_workdir_is_removed_when_the_call_fails():
 
 async def test_the_private_workdir_is_named_for_codex_under_moonlighter_home(tmp_path):
     create, calls, _ = fake_codex("ok")
-    with patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create):
+    with patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create):
         await call_codex("prompt", "gpt-5")
     workdir = Path(calls[0][1]["cwd"])
     assert workdir.name.startswith("codex-")
@@ -55,7 +55,7 @@ async def test_the_private_workdir_is_named_for_codex_under_moonlighter_home(tmp
 async def test_a_failed_workdir_cleanup_is_logged_and_the_answer_survives(caplog):
     create, calls, _ = fake_codex("the answer")
     with (
-        patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create),
+        patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create),
         patch("moonlighter.core.llm.isolation.shutil.rmtree", side_effect=OSError("busy")),
         caplog.at_level("ERROR"),
     ):

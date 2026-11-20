@@ -89,7 +89,7 @@ async def test_make_caller_cursor_forwards_cursor_model_and_omits_it_when_unset(
     mock_process = cursor_process()
 
     with patch(
-        "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ) as mock_exec:
         await make_caller({"llm_backend": "cursor", "cursor_model": "gpt-5"})(
             "prompt", "claude-haiku-4-5-20251001"
@@ -99,7 +99,7 @@ async def test_make_caller_cursor_forwards_cursor_model_and_omits_it_when_unset(
     assert "claude-haiku-4-5-20251001" not in positional_arguments
 
     with patch(
-        "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ) as mock_exec:
         await make_caller({"llm_backend": "cursor"})("prompt", "claude-sonnet-4-6")
     assert "--model" not in mock_exec.call_args.args

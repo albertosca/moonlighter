@@ -1,6 +1,5 @@
 """The `claude` CLI backend: `claude -p` on the claude.ai session, sandboxed, prompt over stdin."""
 
-import asyncio
 import os
 import shutil
 from pathlib import Path
@@ -8,7 +7,7 @@ from time import perf_counter
 
 from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.config.paths import moonlighter_home
-from moonlighter.core.llm.isolation import kill_process_group
+from moonlighter.core.llm.isolation import CliCommand, run_in_own_group, stdout_or_raise
 from moonlighter.core.metrics import record_call
 
 # Sandbox posture validated empirically (canary experiment, 2026-07-09 —
@@ -74,34 +73,10 @@ async def call_cli(
         )
     start = perf_counter()
     try:
-        process = await asyncio.create_subprocess_exec(
-            executable,
-            *_CLI_SANDBOX_ARGS,
-            "-p",
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=environment,
-            cwd=str(_cli_workdir()),
-            # Its own process group, so a timeout can take down whatever the CLI
-            # started too: killing the direct process alone left a child running
-            # as an orphan (2026-09-29 review).
-            start_new_session=True,
+        command = CliCommand(
+            "claude", [executable, *_CLI_SANDBOX_ARGS, "-p"], environment, _cli_workdir()
         )
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(input=stdin_bytes), timeout=timeout_seconds
-            )
-        except TimeoutError:
-            kill_process_group(process.pid)
-            await process.wait()
-            raise RuntimeError(
-                f"claude CLI did not answer within {timeout_seconds} s — killed "
-                "(raise llm_timeout_seconds in config.yaml if your calls are legitimately slow)"
-            ) from None
-        if process.returncode != 0:
-            detail = stderr.decode().strip() or stdout.decode().strip()
-            raise RuntimeError(f"claude CLI exited with code {process.returncode}: {detail[:300]}")
-        return stdout.decode()
+        result = await run_in_own_group(command, stdin=stdin_bytes, timeout_seconds=timeout_seconds)
+        return stdout_or_raise("claude", result)
     finally:
         record_call(perf_counter() - start)

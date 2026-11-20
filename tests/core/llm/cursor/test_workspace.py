@@ -23,7 +23,7 @@ async def test_call_cursor_workspace_is_a_private_directory_per_call(tmp_path, m
         return cursor_process()
 
     with patch(
-        "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", side_effect=start
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", side_effect=start
     ) as mock_exec:
         await call_cursor("first line\nTOKEN_ONE", "claude-haiku-4-5-20251001")
         await call_cursor("first line\nTOKEN_TWO", "claude-haiku-4-5-20251001")
@@ -55,7 +55,7 @@ async def test_call_cursor_writes_read_denies_before_the_subprocess(tmp_path, mo
         written["path"] = str(workdir)
         return cursor_process()
 
-    with patch("moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", side_effect=start):
+    with patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", side_effect=start):
         await call_cursor("prompt", "model")
 
     assert json.loads(written["text"]) == {
@@ -83,7 +83,7 @@ async def test_parallel_cursor_calls_keep_their_own_permissions_file(tmp_path, m
         process.communicate = communicate
         return process
 
-    with patch("moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", side_effect=start):
+    with patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", side_effect=start):
         await asyncio.gather(
             call_cursor("first line\nTOKEN_ONE", "model"),
             call_cursor("first line\nTOKEN_TWO", "model"),
@@ -114,7 +114,7 @@ async def test_call_cursor_permissions_file_is_pinned_byte_for_byte(tmp_path, mo
         written.append((workdir / ".cursor" / "cli.json").read_text())
         return cursor_process()
 
-    with patch("moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", side_effect=start):
+    with patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", side_effect=start):
         await call_cursor("prompt", "model")
     assert written == ['{"permissions": {"allow": [], "deny": ["Read(/**)", "Read(~/**)"]}}\n']
 
@@ -124,7 +124,8 @@ async def test_call_cursor_workdir_is_named_for_cursor_under_moonlighter_home(
 ):
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     with patch(
-        "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=cursor_process()
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+        return_value=cursor_process(),
     ) as launch:
         await call_cursor("prompt", "model")
     workdir = Path(launch.call_args.kwargs["cwd"])

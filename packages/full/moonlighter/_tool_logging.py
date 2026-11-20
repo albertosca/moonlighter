@@ -1,13 +1,12 @@
 """The wrapper every MCP tool goes through: timing, logging and one uniform failure line."""
 
 import functools
+import logging
 import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from moonlighter.core.log import get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def tool_logged(tool: Callable[..., Awaitable[str]]) -> Callable[..., Awaitable[str]]:

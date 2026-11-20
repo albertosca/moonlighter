@@ -6,6 +6,7 @@ latex) is compiled once with nothing left to shrink. Anything that cannot be
 made to fit is discarded so the next prepare regenerates it.
 """
 
+import logging
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -13,9 +14,8 @@ from moonlighter.application.cvgen.latex.compile import compile_pdf, latex_avail
 from moonlighter.application.cvgen.latex.cv_template import strip_marker_lines
 from moonlighter.application.cvgen.latex.render import CVSelection, render_cv
 from moonlighter.application.cvgen.pool.loader import CVPool
-from moonlighter.core.log import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)

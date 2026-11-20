@@ -94,3 +94,20 @@ def test_default_log_path_follows_moonlighter_home(tmp_path, monkeypatch):
         handler for handler in root.handlers if isinstance(handler, RotatingFileHandler)
     ]
     assert [handler.baseFilename for handler in file_handlers] == [str(tmp_path / "app.log")]
+
+
+def test_get_logger_configures_logging_on_first_use(tmp_path, monkeypatch):
+    # External plugins (moonlighter-linkedin) rely on this: their module-level
+    # get_logger call is what sets the moonlighter handlers up.
+    monkeypatch.setattr(log_mod, "_initialized", False)
+    root = logging.getLogger("moonlighter")
+    monkeypatch.setattr(root, "handlers", [])
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+
+    get_logger("moonlighter.plugin")
+
+    assert [
+        Path(handler.baseFilename)
+        for handler in root.handlers
+        if isinstance(handler, RotatingFileHandler)
+    ] == [tmp_path / "app.log"]

@@ -1,6 +1,7 @@
 """WeWorkRemotely's portal-wide RSS feed, optionally narrowed to one category."""
 
 import contextlib
+import logging
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from typing import Any, override
@@ -9,12 +10,11 @@ from xml.etree.ElementTree import Element, ParseError, fromstring
 
 import httpx
 
-from moonlighter.core.log import get_logger
 from moonlighter.core.web.http_fetch import HEADERS
 from moonlighter.core.web.posting import normalize_feed_description
 from moonlighter.discovery.sources.base import BaseScanner, RawJob, ScanStats, SourceStats
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class WeWorkRemotelyScanner(BaseScanner):

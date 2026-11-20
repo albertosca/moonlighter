@@ -5,6 +5,7 @@ through the same escape_latex/is_typesettable guard real curated content is
 held to before it can reach a .yaml file.
 """
 
+import logging
 from typing import Any
 
 from moonlighter.application.answers.answer_profile import profile_for_answers
@@ -14,10 +15,9 @@ from moonlighter.application.cvgen.pool.loader import CVPool, PoolBullet, PoolEx
 from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
-from moonlighter.core.log import get_logger
 from moonlighter.core.parsing import parse_llm_json
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # pool/loader.py's load_pool requires every experience to carry a non-empty
 # company, title, period AND location (one `not raw.get(field)` check over

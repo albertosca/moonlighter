@@ -5,6 +5,7 @@ feature is off and this function is a cheap None. Every failure path degrades
 to None so the application always proceeds with the default CV.
 """
 
+import logging
 from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Literal, NamedTuple
@@ -23,9 +24,8 @@ from moonlighter.application.cvgen.paths import generated_dir_for, resolved_pool
 from moonlighter.application.cvgen.pool.loader import CVPool, PoolError, load_pool
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
-from moonlighter.core.log import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class _Cache(Enum):

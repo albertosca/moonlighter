@@ -1,5 +1,6 @@
 """The MCP server's state, and the live re-read of config.yaml and profile.yaml on edit."""
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -12,10 +13,9 @@ from moonlighter.core.config.loading import load_config
 from moonlighter.core.config.validation import validate_config
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.dispatch import make_caller
-from moonlighter.core.log import get_logger
 from moonlighter.startup import StartupWarning
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def _modified_at(path: Path) -> int | None:

@@ -12,7 +12,7 @@ async def test_call_cli_empty_prompt_still_calls_subprocess():
     mock_process.communicate = AsyncMock(return_value=(b"response", b""))
 
     with patch(
-        "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ):
         result = await call_cli("", "model")
 
@@ -27,7 +27,7 @@ async def test_cli_caller_satisfies_llm_caller_contract():
     mock_process.communicate = AsyncMock(return_value=(b"result", b""))
 
     with patch(
-        "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ):
         result = await call_cli("hello", "any-model")
 
@@ -49,7 +49,7 @@ async def test_cli_concatenates_cache_prefix():
     mock_process.communicate = fake_communicate
 
     with patch(
-        "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ):
         await call_cli("DYN", "m", cache_prefix="STATIC")
     assert captured["input"] == b"STATIC\n\nDYN"
@@ -70,7 +70,7 @@ async def test_cli_no_cache_prefix_keeps_prompt_unchanged():
     mock_process.communicate = fake_communicate
 
     with patch(
-        "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ):
         await call_cli("PROMPT_ONLY", "m")
     assert captured["input"] == b"PROMPT_ONLY"
@@ -90,7 +90,7 @@ async def test_call_cli_decodes_its_output_strictly(stdout, stderr, code):
     mock_process.communicate = AsyncMock(return_value=(stdout, stderr))
     with (
         patch(
-            "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=mock_process,
         ),
         pytest.raises(UnicodeDecodeError),

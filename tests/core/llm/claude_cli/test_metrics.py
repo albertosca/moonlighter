@@ -20,7 +20,7 @@ async def test_cli_caller_records_a_call():
     with (
         patch("moonlighter.core.llm.claude_cli.shutil.which", return_value="/usr/local/bin/claude"),
         patch(
-            "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=mock_process,
         ),
         operation_metrics("op") as metrics,
@@ -43,7 +43,7 @@ async def test_cli_caller_records_even_on_failure():
     with (
         patch("moonlighter.core.llm.claude_cli.shutil.which", return_value="/usr/local/bin/claude"),
         patch(
-            "moonlighter.core.llm.claude_cli.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=mock_process,
         ),
         operation_metrics("op") as metrics,

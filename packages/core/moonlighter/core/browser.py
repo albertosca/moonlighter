@@ -8,6 +8,7 @@ it. Per-page window state lives in `browser_window`.
 
 import asyncio
 import contextlib
+import logging
 import subprocess
 import urllib.request
 from pathlib import Path
@@ -16,9 +17,8 @@ from typing import Any
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
 from moonlighter.core.config.paths import browser_executable
-from moonlighter.core.log import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 _playwright: Any = None
 _browser: Browser | None = None

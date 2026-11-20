@@ -21,7 +21,8 @@ async def test_cursor_caller_records_a_call():
     with (
         patch("moonlighter.core.llm.cursor.shutil.which", return_value="/usr/local/bin/agent"),
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
         ),
         operation_metrics("op") as metrics,
     ):
@@ -42,7 +43,8 @@ async def test_cursor_caller_records_even_on_failure():
     with (
         patch("moonlighter.core.llm.cursor.shutil.which", return_value="/usr/local/bin/agent"),
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
         ),
         operation_metrics("op") as metrics,
         contextlib.suppress(RuntimeError),
@@ -66,7 +68,7 @@ async def test_call_cursor_records_its_call_even_when_cleanup_raises(tmp_path, m
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             return_value=cursor_process(),
         ),
         patch(

@@ -1,17 +1,17 @@
 """Scoring several job postings in one LLM call, falling back to one call per job."""
 
+import logging
 from typing import Any
 
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
-from moonlighter.core.log import get_logger
 from moonlighter.core.metrics import record_spend_limit_hit
 from moonlighter.discovery.evaluation.models import EvalInput, EvaluationResult
 from moonlighter.discovery.evaluation.prompts import build_batch_prefix, jobs_block
 from moonlighter.discovery.evaluation.result_parsing import parse_batch
 from moonlighter.discovery.evaluation.single import evaluate_job
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 async def _eval_each(

@@ -6,6 +6,7 @@ validation keeps the model inside the pool: an id it invents is dropped,
 never rendered (specs/2026-08-25-tailored-cv-design.md).
 """
 
+import logging
 from typing import Any, Final, Literal
 
 from moonlighter.application.answers.operator_guard import find_operator_marker
@@ -21,10 +22,9 @@ from moonlighter.application.cvgen.pool.selection_prompt import prompt_prefix
 from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
-from moonlighter.core.log import get_logger
 from moonlighter.core.parsing import parse_llm_json, wrap_untrusted
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # Sentinel for a genuine {"decision": "USE_BASE"} answer, distinct from None
 # (degradation — parse failure, unrecognized output, operator-directed prose).

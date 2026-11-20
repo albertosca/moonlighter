@@ -18,7 +18,7 @@ async def test_a_nonzero_exit_names_the_code_and_truncates_the_detail():
         return fake_process(b"", b"E" * 500, code=2)
 
     with (
-        patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create),
+        patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create),
         pytest.raises(RuntimeError, match="exited with code 2") as caught,
     ):
         await call_codex("prompt", "gpt-5")
@@ -33,7 +33,7 @@ async def test_a_usage_limit_error_still_reads_as_a_spend_limit():
         return fake_process(b"", b"usage_limit_reached: try later", code=1)
 
     with (
-        patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create),
+        patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create),
         pytest.raises(RuntimeError) as caught,
     ):
         await call_codex("prompt", "gpt-5")
@@ -50,7 +50,7 @@ async def test_a_call_that_hangs_is_killed_with_its_process_group():
         return hung
 
     with (
-        patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", create),
+        patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", create),
         patch("moonlighter.core.llm.isolation.os.killpg") as killpg,
         pytest.raises(RuntimeError, match="did not answer within 7"),
     ):
@@ -64,7 +64,7 @@ async def test_a_login_check_that_hangs_is_killed_too():
     hung.communicate = AsyncMock(side_effect=TimeoutError)
     with (
         patch(
-            "moonlighter.core.llm.codex.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             AsyncMock(return_value=hung),
         ),
         patch("moonlighter.core.llm.isolation.os.killpg") as killpg,
@@ -106,7 +106,7 @@ async def test_a_hung_login_check_waits_its_own_twenty_seconds_and_kills_the_gro
     hung.communicate = AsyncMock(side_effect=TimeoutError)
     with (
         patch(
-            "moonlighter.core.llm.codex.asyncio.create_subprocess_exec",
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
             AsyncMock(return_value=hung),
         ),
         patch("moonlighter.core.llm.isolation.os.killpg") as killpg,
@@ -126,7 +126,7 @@ async def test_a_hung_exec_message_is_pinned_word_for_word():
     hung.communicate = AsyncMock(side_effect=TimeoutError)
     launch = AsyncMock(side_effect=[fake_process(LOGGED_IN), hung])
     with (
-        patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", launch),
+        patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", launch),
         patch("moonlighter.core.llm.isolation.os.killpg") as killpg,
         pytest.raises(RuntimeError) as raised,
     ):
@@ -165,7 +165,7 @@ async def test_a_hung_exec_message_is_pinned_word_for_word():
 async def test_an_exit_message_is_pinned_word_for_word(*, stdout, stderr, code, message):
     launch = AsyncMock(side_effect=[fake_process(LOGGED_IN), fake_process(stdout, stderr, code)])
     with (
-        patch("moonlighter.core.llm.codex.asyncio.create_subprocess_exec", launch),
+        patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", launch),
         pytest.raises(RuntimeError) as raised,
     ):
         await call_codex("prompt", "gpt-5")

@@ -21,6 +21,7 @@ from peewee import (
 
 from moonlighter.core.config.paths import moonlighter_home
 from moonlighter.core.dedup import description_hash
+from moonlighter.core.migration_runner import run_migrations
 
 
 def db_path() -> str:
@@ -195,6 +196,4 @@ def init_db() -> None:
         ],
         safe=True,
     )
-    from moonlighter.core.migration_runner import run_migrations  # noqa: PLC0415 - migration_runner calls get_logger() at import, which configures logging; keep that out of import moonlighter.core.db
-
     run_migrations(db)

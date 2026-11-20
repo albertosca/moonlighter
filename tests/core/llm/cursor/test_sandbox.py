@@ -16,7 +16,8 @@ async def test_call_cursor_uses_sandbox_argv_and_stdin():
 
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
         ) as mock_exec,
         patch("moonlighter.core.llm.cursor.shutil.which", return_value="/usr/local/bin/agent"),
     ):
@@ -63,7 +64,7 @@ async def test_call_cursor_ignores_model_param():
     mock_process = cursor_process(b"output")
 
     with patch(
-        "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ) as mock_exec:
         await call_cursor("prompt", "claude-opus-99")
 
@@ -76,7 +77,8 @@ async def test_cursor_launch_invariants():
 
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
         ) as mock_exec,
         patch("moonlighter.core.llm.cursor.shutil.which", return_value="/usr/local/bin/agent"),
     ):
@@ -103,7 +105,8 @@ async def test_call_cursor_prefers_agent_over_cursor_agent():
 
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
         ) as mock_exec,
         patch("moonlighter.core.llm.cursor.shutil.which", side_effect=which) as mock_which,
     ):
@@ -123,7 +126,8 @@ async def test_call_cursor_falls_back_to_cursor_agent():
 
     with (
         patch(
-            "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+            "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec",
+            return_value=mock_process,
         ) as mock_exec,
         patch("moonlighter.core.llm.cursor.shutil.which", side_effect=which),
     ):
@@ -137,7 +141,7 @@ async def test_call_cursor_strips_anthropic_api_key_from_the_subprocess_env(monk
     mock_process = cursor_process()
 
     with patch(
-        "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ) as mock_exec:
         await call_cursor("prompt", "model")
 
@@ -150,7 +154,7 @@ async def test_call_cursor_forwards_cursor_model_and_ignores_a_blank_one():
     mock_process = cursor_process()
 
     with patch(
-        "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ) as mock_exec:
         await call_cursor("prompt", "claude-sonnet-4-6", cursor_model="gpt-5")
 
@@ -159,7 +163,7 @@ async def test_call_cursor_forwards_cursor_model_and_ignores_a_blank_one():
     assert "claude-sonnet-4-6" not in positional_arguments
 
     with patch(
-        "moonlighter.core.llm.cursor.asyncio.create_subprocess_exec", return_value=mock_process
+        "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ) as mock_exec:
         caller = make_caller({"llm_backend": "cursor", "cursor_model": "  "})
         await caller("prompt", "claude-sonnet-4-6")

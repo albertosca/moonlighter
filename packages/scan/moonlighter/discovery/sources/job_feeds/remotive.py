@@ -1,16 +1,16 @@
 """Remotive's portal-wide remote-jobs feed, optionally narrowed to one category."""
 
+import logging
 from typing import Any, override
 from urllib.parse import quote
 
 import httpx
 
-from moonlighter.core.log import get_logger
 from moonlighter.core.web.http_fetch import FetchError, get_json
 from moonlighter.core.web.posting import normalize_feed_description
 from moonlighter.discovery.sources.base import BaseScanner, RawJob, ScanStats, SourceStats
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class RemotiveScanner(BaseScanner):

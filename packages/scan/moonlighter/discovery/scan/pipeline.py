@@ -1,13 +1,13 @@
 """Evaluating and saving the jobs of one scan, in concurrent batches."""
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from typing import Any, cast
 
 from moonlighter.core.db import Job
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
-from moonlighter.core.log import get_logger
 from moonlighter.core.metrics import record_spend_limit_hit
 from moonlighter.discovery.evaluation.batch import evaluate_jobs_batch
 from moonlighter.discovery.evaluation.models import EvalInput
@@ -23,7 +23,7 @@ from moonlighter.discovery.screening.prefilter import (
 )
 from moonlighter.discovery.sources.base import RawJob
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class _StopScan:
