@@ -6,6 +6,12 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import ClassVar, cast, override
 
+from rich.console import Console
+from rich.highlighter import ReprHighlighter
+from rich.logging import RichHandler
+from rich.text import Text
+from rich.theme import Theme
+
 from moonlighter.core.config.paths import moonlighter_home
 
 _initialized = False
@@ -56,54 +62,46 @@ def _package_tag(logger_name: str) -> str | None:
     return package if package in _PACKAGE_STYLES else None
 
 
-try:
-    from rich.highlighter import ReprHighlighter as _ReprHighlighter
+class MetricsHighlighter(ReprHighlighter):
+    """Rich's repr highlights plus the vocabulary of moonlighter's log lines.
 
-    class MetricsHighlighter(_ReprHighlighter):
-        """Rich's repr highlights plus the vocabulary of moonlighter's log lines.
+    Adds a style each for the `op=` name and the `calls=`, `total_seconds=`, `input_tokens=`,
+    `output_tokens=` and `spend_limit_hits=` pairs of the summary lines core/metrics.py emits;
+    for an outcome word (green for filled, submitted and applied, red for `failed` and
+    `failed:<reason>`, gold for skipped, needs_review and unverified); and for a `#<id>` job
+    id. They stand out instead of blending into ordinary log text.
+    """
 
-        Adds a style each for the `op=` name and the `calls=`, `total_seconds=`, `input_tokens=`,
-        `output_tokens=` and `spend_limit_hits=` pairs of the summary lines core/metrics.py emits;
-        for an outcome word (green for filled, submitted and applied, red for `failed` and
-        `failed:<reason>`, gold for skipped, needs_review and unverified); and for a `#<id>` job
-        id. They stand out instead of blending into ordinary log text.
-        """
+    highlights: ClassVar[Sequence[str]] = [
+        *ReprHighlighter.highlights,
+        r"\b(?P<op_name>op=\S+)",
+        (
+            r"\b(?P<metric_key>calls|total_seconds|input_tokens|output_tokens|spend_limit_hits)="
+            r"(?P<metric_value>\S+)"
+        ),
+        r"\b(?P<status_ok>filled|submitted|applied)\b",
+        r"\b(?P<status_fail>failed(?::\w+)?)",
+        r"\b(?P<status_attn>skipped|needs_review|unverified)\b",
+        r"(?P<job_id>#\d+)",
+    ]
 
-        highlights: ClassVar[Sequence[str]] = [
-            *_ReprHighlighter.highlights,
-            r"\b(?P<op_name>op=\S+)",
-            (
-                r"\b(?P<metric_key>calls|total_seconds|input_tokens|output_tokens|spend_limit_hits)="
-                r"(?P<metric_value>\S+)"
-            ),
-            r"\b(?P<status_ok>filled|submitted|applied)\b",
-            r"\b(?P<status_fail>failed(?::\w+)?)",
-            r"\b(?P<status_attn>skipped|needs_review|unverified)\b",
-            r"(?P<job_id>#\d+)",
-        ]
 
-    from rich.logging import RichHandler as _RichHandler
-    from rich.text import Text as _Text
+class _PackageRichHandler(RichHandler):
+    """Prepends a colored package-name tag to every rendered message.
 
-    class _PackageRichHandler(_RichHandler):
-        """Prepends a colored package-name tag to every rendered message.
+    The tag (core/discovery/application/tracking/full) is derived from the logger name, so log
+    lines from different subsystems are visually grouped.
+    """
 
-        The tag (core/discovery/application/tracking/full) is derived from the logger name, so log
-        lines from different subsystems are visually grouped.
-        """
-
-        @override
-        def render_message(self, record: logging.LogRecord, message: str) -> _Text:
-            # RichHandler.render_message is annotated ConsoleRenderable; its body returns a Text.
-            text = cast("_Text", super().render_message(record, message))
-            package = _package_tag(record.name)
-            if package is None:
-                return text
-            style = _PACKAGE_STYLES[package]
-            return _Text.assemble((f"{package:<12}", style), text)
-
-except ImportError:  # pragma: no cover - rich optional, mirrors setup()'s own guard
-    pass
+    @override
+    def render_message(self, record: logging.LogRecord, message: str) -> Text:
+        # RichHandler.render_message is annotated ConsoleRenderable; its body returns a Text.
+        text = cast("Text", super().render_message(record, message))
+        package = _package_tag(record.name)
+        if package is None:
+            return text
+        style = _PACKAGE_STYLES[package]
+        return Text.assemble((f"{package:<12}", style), text)
 
 
 def setup(log_path: str | None = None) -> None:
@@ -133,11 +131,8 @@ def setup(log_path: str | None = None) -> None:
     file_handler.setFormatter(formatter)
     root.addHandler(file_handler)
 
-    try:
-        from rich.console import Console  # noqa: PLC0415 - kept inside the ImportError guard; the rich-missing test blocks this import
-        from rich.theme import Theme  # noqa: PLC0415 - kept inside the same ImportError guard as rich.console
-
-        console_handler = _PackageRichHandler(
+    root.addHandler(
+        _PackageRichHandler(
             console=Console(stderr=True, theme=Theme(_VIVID_LEVEL_STYLES)),
             level=logging.INFO,
             show_path=True,
@@ -145,9 +140,7 @@ def setup(log_path: str | None = None) -> None:
             rich_tracebacks=False,
             highlighter=MetricsHighlighter(),
         )
-        root.addHandler(console_handler)
-    except ImportError:
-        pass  # rich optional
+    )
 
 
 def get_logger(name: str) -> logging.Logger:
