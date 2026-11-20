@@ -204,3 +204,13 @@ module = [
     "google_auth_oauthlib.*",
 ]
 ignore_missing_imports = true
+
+# Tests are checked with the rest of strict but need no annotations: pytest
+# fixtures and test functions are typed by their use, and annotating ~2800 of
+# them buys little. scripts/check_mypy_ratchet.py holds the remaining errors
+# to a per-file baseline that may only shrink.
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false

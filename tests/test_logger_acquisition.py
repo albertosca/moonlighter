@@ -9,12 +9,13 @@ for external plugins such as moonlighter-linkedin.
 
 import ast
 from pathlib import Path
+from typing import TypeIs
 
 _PACKAGES_DIRECTORY = Path(__file__).resolve().parent.parent / "packages"
 _DEFINING_MODULE = _PACKAGES_DIRECTORY / "core" / "moonlighter" / "core" / "log.py"
 
 
-def _names_get_logger(node: ast.AST) -> bool:
+def _names_get_logger(node: ast.AST) -> TypeIs[ast.ImportFrom | ast.Name | ast.Attribute]:
     if isinstance(node, ast.ImportFrom):
         return any(alias.name == "get_logger" for alias in node.names)
     if isinstance(node, ast.Name | ast.Attribute):

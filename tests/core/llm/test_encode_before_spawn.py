@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from moonlighter.core.llm import claude_cli, codex, cursor, isolation
+from moonlighter.core.llm import claude_cli, codex, cursor
 
 UNENCODABLE_PROMPT = "a lone surrogate \ud800"
 
@@ -27,7 +27,7 @@ async def test_an_unencodable_prompt_spawns_nothing_and_leaves_no_workdir(
     spawn = AsyncMock()
     with (
         patch.object(module.shutil, "which", return_value="/opt/bin/cli"),
-        patch.object(isolation.asyncio, "create_subprocess_exec", spawn),
+        patch("moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", spawn),
         pytest.raises(UnicodeEncodeError),
     ):
         await call(UNENCODABLE_PROMPT, "gpt-5")
