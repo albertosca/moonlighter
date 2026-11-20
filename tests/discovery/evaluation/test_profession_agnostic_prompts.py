@@ -10,7 +10,7 @@ from moonlighter.discovery.evaluation.batch import evaluate_jobs_batch
 from moonlighter.discovery.evaluation.engagement import engagement_section
 from moonlighter.discovery.evaluation.models import EvalInput
 from moonlighter.discovery.evaluation.single import evaluate_job
-from tests.discovery.profession_agnostic.fake_callers import (
+from tests.discovery.evaluation.fake_nurse_profile import (
     BATCH_RESPONSE,
     NURSE_PROFILE,
     SINGLE_RESPONSE,
