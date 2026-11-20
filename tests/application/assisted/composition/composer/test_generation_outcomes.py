@@ -2,7 +2,10 @@
 
 import pytest
 
-from moonlighter.application.assisted.composition.composer import compose_answers
+from moonlighter.application.assisted.composition.composer import (
+    CompositionContext,
+    compose_answers,
+)
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE
 
@@ -13,7 +16,9 @@ async def test_an_empty_generated_answer_becomes_a_gap_rather_than_an_empty_fiel
         return "   "
 
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
-    composed = await compose_answers([question], PROFILE, {}, JOB, returns_nothing)
+    composed = await compose_answers(
+        [question], CompositionContext(PROFILE, {}, JOB, returns_nothing)
+    )
     assert composed[0].answer is None
 
 
@@ -26,7 +31,7 @@ async def test_an_llm_failure_becomes_a_gap_and_does_not_abort_the_other_questio
         FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True),
         FormQuestion(label="First Name", kind=QuestionKind.TEXT, required=True),
     ]
-    composed = await compose_answers(questions, PROFILE, {}, JOB, explodes)
+    composed = await compose_answers(questions, CompositionContext(PROFILE, {}, JOB, explodes))
     assert composed[0].answer is None
     assert composed[1].answer == "Alberto"
 
@@ -45,7 +50,7 @@ async def test_an_llm_error_reports_generation_failure_not_a_knowledge_gap():
         raise RuntimeError("backend exploded")
 
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
-    composed = await compose_answers([question], PROFILE, {}, JOB, explodes)
+    composed = await compose_answers([question], CompositionContext(PROFILE, {}, JOB, explodes))
     assert composed[0].answer is None
     assert composed[0].gap_reason == "answer generation failed — answer this yourself"
 
@@ -56,7 +61,9 @@ async def test_a_genuine_unknown_keeps_the_no_basis_reason():
         return "UNKNOWN"
 
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
-    composed = await compose_answers([question], PROFILE, {}, JOB, replies_unknown)
+    composed = await compose_answers(
+        [question], CompositionContext(PROFILE, {}, JOB, replies_unknown)
+    )
     assert composed[0].answer is None
     assert composed[0].gap_reason == "no basis in your profile to answer"
 
@@ -77,7 +84,7 @@ async def test_spend_limit_aborts_remaining_generations():
         FormQuestion(label="Why now?", kind=QuestionKind.LONG_TEXT, required=True),
         FormQuestion(label="Email", kind=QuestionKind.TEXT, required=True),
     ]
-    composed = await compose_answers(questions, PROFILE, {}, JOB, spent)
+    composed = await compose_answers(questions, CompositionContext(PROFILE, {}, JOB, spent))
 
     assert calls["n"] == 1
     assert composed[0].answer is None
@@ -99,6 +106,6 @@ async def test_a_non_spend_failure_still_tries_each_question():
         FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True),
         FormQuestion(label="Why now?", kind=QuestionKind.LONG_TEXT, required=True),
     ]
-    composed = await compose_answers(questions, PROFILE, {}, JOB, flaky)
+    composed = await compose_answers(questions, CompositionContext(PROFILE, {}, JOB, flaky))
     assert calls["n"] == 2
     assert all("generation failed" in item.gap_reason for item in composed)

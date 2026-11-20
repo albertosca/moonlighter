@@ -2,7 +2,10 @@
 
 import pytest
 
-from moonlighter.application.assisted.composition.composer import compose_answers
+from moonlighter.application.assisted.composition.composer import (
+    CompositionContext,
+    compose_answers,
+)
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE
 
@@ -19,7 +22,7 @@ async def test_the_prompt_carries_the_posting_so_the_answer_can_match_its_langua
 
     job = {**JOB, "description": "Vaga para pessoa desenvolvedora sênior, 100% remoto."}
     question = FormQuestion(label="Por que você?", kind=QuestionKind.LONG_TEXT, required=True)
-    await compose_answers([question], PROFILE, {}, job, capture)
+    await compose_answers([question], CompositionContext(PROFILE, {}, job, capture))
 
     assert "Vaga para pessoa desenvolvedora" in captured["prompt"]
     assert "same language as the job posting" in captured["prompt"]
@@ -45,7 +48,9 @@ async def test_llm_prompt_carries_only_the_curated_profile():
         return "An answer."
 
     questions = [FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)]
-    await compose_answers(questions, profile, {}, {"description": "A job."}, caller)
+    await compose_answers(
+        questions, CompositionContext(profile, {}, {"description": "A job."}, caller)
+    )
 
     assert len(prompts) == 1
     for leaked in ("Ref Person", "ref@example.com", "35000", "prefer not to say", "references"):
@@ -73,7 +78,9 @@ async def test_a_choice_prompt_tells_the_model_not_to_underclaim():
         options=("Basic", "Fluent"),
     )
     profile = {"languages": ["English (fluent/native)"]}
-    await compose_answers([question], profile, {}, {"description": "A job."}, caller)
+    await compose_answers(
+        [question], CompositionContext(profile, {}, {"description": "A job."}, caller)
+    )
 
     assert "strongest option the profile supports" in captured["prompt"]
 
@@ -92,5 +99,5 @@ async def test_multi_select_prompt_allows_more_than_one():
         required=False,
         options=("Ruby", "Elixir"),
     )
-    await compose_answers([question], PROFILE, {}, JOB, caller)
+    await compose_answers([question], CompositionContext(PROFILE, {}, JOB, caller))
     assert "one or more" in captured["prompt"]

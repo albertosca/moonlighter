@@ -5,7 +5,10 @@ import asyncio
 import pytest
 
 from moonlighter.application.assisted.composition import answer_generation
-from moonlighter.application.assisted.composition.composer import compose_answers
+from moonlighter.application.assisted.composition.composer import (
+    CompositionContext,
+    compose_answers,
+)
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from tests.application.assisted.composition.composer.sample_inputs import (
     JOB,
@@ -22,10 +25,9 @@ async def test_a_non_numeric_job_id_escapes_from_the_cv_file_gap(tmp_path):
     with pytest.raises(ValueError, match="invalid literal for int"):
         await compose_answers(
             [question],
-            PROFILE,
-            {"cv": {"default": str(cv_path)}},
-            {**JOB, "id": "abc"},
-            answers_anything,
+            CompositionContext(
+                PROFILE, {"cv": {"default": str(cv_path)}}, {**JOB, "id": "abc"}, answers_anything
+            ),
         )
 
 
@@ -36,7 +38,7 @@ async def test_a_cancelled_llm_call_is_not_turned_into_a_gap():
 
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
     with pytest.raises(asyncio.CancelledError):
-        await compose_answers([question], PROFILE, {}, JOB, cancelled)
+        await compose_answers([question], CompositionContext(PROFILE, {}, JOB, cancelled))
 
 
 @pytest.mark.asyncio
@@ -51,4 +53,4 @@ async def test_a_failure_while_building_the_prompt_escapes_instead_of_becoming_a
     monkeypatch.setattr(answer_generation, "profile_for_answers", broken_profile)
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
     with pytest.raises(RuntimeError, match="profile rendering broke"):
-        await compose_answers([question], PROFILE, {}, JOB, answers_anything)
+        await compose_answers([question], CompositionContext(PROFILE, {}, JOB, answers_anything))

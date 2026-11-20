@@ -62,17 +62,8 @@ async def test_the_collaborators_receive_exactly_the_job_fields_they_read(job_fa
         seen["tailoring"] = job_details
         return None
 
-    async def spy_compose(  # noqa: PLR0913, PLR0917 - mirrors compose_answers' signature
-        questions: Any,
-        profile: Any,
-        config: Any,
-        job_details: Any,
-        compose_caller: Any,
-        *,
-        job_cache: Any = None,
-        answer_bank: Any = None,
-    ) -> list[Any]:
-        seen["composing"] = job_details
+    async def spy_compose(questions: Any, context: Any) -> list[Any]:
+        seen["composing"] = context.job
         return []
 
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", _one_question)

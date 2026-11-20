@@ -2,7 +2,10 @@
 
 import pytest
 
-from moonlighter.application.assisted.composition.composer import compose_answers
+from moonlighter.application.assisted.composition.composer import (
+    CompositionContext,
+    compose_answers,
+)
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE, never_called
 
@@ -17,10 +20,9 @@ def replying(reply: str):
 async def gap_for(question: FormQuestion, caller=never_called, **inputs) -> str | None:
     composed = await compose_answers(
         [question],
-        inputs.get("profile", PROFILE),
-        inputs.get("config", {}),
-        inputs.get("job", JOB),
-        caller,
+        CompositionContext(
+            inputs.get("profile", PROFILE), inputs.get("config", {}), inputs.get("job", JOB), caller
+        ),
     )
     return composed[0].gap_reason
 

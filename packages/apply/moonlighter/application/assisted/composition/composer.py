@@ -4,6 +4,7 @@ The rule that separates this from the automation it replaces: a question with no
 defensible answer becomes a visible gap. Never an invented answer, never silence.
 """
 
+from dataclasses import KW_ONLY, dataclass, field
 from typing import Any
 
 from moonlighter.application.answers.matching.field_map import pre_populate_answers
@@ -16,21 +17,28 @@ from moonlighter.application.assisted.sheet.file_gaps import file_gap_reason
 from moonlighter.core.llm.caller import LLMCaller
 
 
-async def compose_answers(  # noqa: PLR0913, PLR0917 - public entry point called with this shape by service.py and the whole test suite
-    questions: list[FormQuestion],
-    profile: dict[str, Any],
-    config: dict[str, Any],
-    job: dict[str, Any],
-    llm_caller: LLMCaller,
-    *,
-    job_cache: dict[str, Any] | None = None,
-    answer_bank: dict[str, str] | None = None,
+@dataclass(frozen=True)
+class CompositionContext:
+    """Everything compose_answers needs besides the questions.
+
+    The two caches default to a fresh dict per context, and the composer writes
+    new LLM answers into job_cache, so a caller that wants them back passes its own.
+    """
+
+    profile: dict[str, Any]
+    config: dict[str, Any]
+    job: dict[str, Any]
+    llm_caller: LLMCaller
+    _: KW_ONLY
+    job_cache: dict[str, Any] = field(default_factory=dict)
+    answer_bank: dict[str, str] = field(default_factory=dict)
+
+
+async def compose_answers(
+    questions: list[FormQuestion], context: CompositionContext
 ) -> list[ComposedAnswer]:
     """One answer or one gap per question, in order; each question waits for the previous one."""
-    if job_cache is None:
-        job_cache = {}
-    if answer_bank is None:
-        answer_bank = {}
+    profile, config, job = context.profile, context.config, context.job
     known = pre_populate_answers(
         [question.label for question in questions],
         profile,
@@ -41,10 +49,10 @@ async def compose_answers(  # noqa: PLR0913, PLR0917 - public entry point called
     sources = AnswerSources(
         profile=profile,
         job=job,
-        llm_caller=llm_caller,
+        llm_caller=context.llm_caller,
         known=known,
-        job_cache=job_cache,
-        answer_bank=answer_bank,
+        job_cache=context.job_cache,
+        answer_bank=context.answer_bank,
     )
     return [await _compose_one(question, config, sources) for question in questions]
 
