@@ -2,6 +2,7 @@
 
 import json
 
+from moonlighter.discovery.evaluation.models import EvalInput
 from moonlighter.discovery.evaluation.single import evaluate_job
 from tests.discovery.evaluation.fake_evaluation import JOB_DESCRIPTION, PROFILE, make_caller
 
@@ -19,14 +20,10 @@ async def test_evaluate_job_strips_markdown_fence():
     }
     wrapped = f"```json\n{json.dumps(payload)}\n```"
     result = await evaluate_job(
-        company="Co",
-        title="Eng",
-        description="desc",
-        profile=PROFILE,
+        EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+        PROFILE,
         model="test",
-        _caller=make_caller(wrapped),
-        location=None,
-        remote_type=None,
+        caller=make_caller(wrapped),
     )
     assert result.score == 7.5
 
@@ -44,14 +41,10 @@ async def test_evaluate_job_strips_markdown_fence_without_json_label():
     }
     wrapped = f"```\n{json.dumps(payload)}\n```"
     result = await evaluate_job(
-        company="Co",
-        title="Eng",
-        description="desc",
-        profile=PROFILE,
+        EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+        PROFILE,
         model="test",
-        _caller=make_caller(wrapped),
-        location=None,
-        remote_type=None,
+        caller=make_caller(wrapped),
     )
     assert result.score == 6.0
 
@@ -69,14 +62,10 @@ async def test_evaluate_job_strips_leading_prose():
     }
     with_prose = f"Here is my evaluation:\n\n{json.dumps(payload)}"
     result = await evaluate_job(
-        company="Co",
-        title="Eng",
-        description="desc",
-        profile=PROFILE,
+        EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+        PROFILE,
         model="test",
-        _caller=make_caller(with_prose),
-        location=None,
-        remote_type=None,
+        caller=make_caller(with_prose),
     )
     assert result.score == 8.0
 
@@ -85,13 +74,9 @@ async def test_evaluate_job_null_score_becomes_zero_keeps_notes():
     """A null score → 0.0 while preserving the notes (doesn't fall into 'evaluation error')."""
     caller = make_caller(json.dumps({"score": None, "score_notes": "no score", "caveats": ["x"]}))
     result = await evaluate_job(
-        company="C",
-        title="T",
-        description=JOB_DESCRIPTION,
-        profile=PROFILE,
-        _caller=caller,
-        location=None,
-        remote_type=None,
+        EvalInput("C", "T", JOB_DESCRIPTION, location=None, remote_type=None),
+        PROFILE,
+        caller=caller,
     )
     assert result.score == 0.0
     assert result.score_notes == "no score"
@@ -101,13 +86,9 @@ async def test_evaluate_job_null_score_becomes_zero_keeps_notes():
 async def test_evaluate_job_non_numeric_score_becomes_zero():
     caller = make_caller(json.dumps({"score": "high", "score_notes": "n"}))
     result = await evaluate_job(
-        company="C",
-        title="T",
-        description=JOB_DESCRIPTION,
-        profile=PROFILE,
-        _caller=caller,
-        location=None,
-        remote_type=None,
+        EvalInput("C", "T", JOB_DESCRIPTION, location=None, remote_type=None),
+        PROFILE,
+        caller=caller,
     )
     assert result.score == 0.0
 
@@ -115,12 +96,8 @@ async def test_evaluate_job_non_numeric_score_becomes_zero():
 async def test_evaluate_job_non_list_caveats_becomes_empty():
     caller = make_caller(json.dumps({"score": 7.0, "caveats": "not a list"}))
     result = await evaluate_job(
-        company="C",
-        title="T",
-        description=JOB_DESCRIPTION,
-        profile=PROFILE,
-        _caller=caller,
-        location=None,
-        remote_type=None,
+        EvalInput("C", "T", JOB_DESCRIPTION, location=None, remote_type=None),
+        PROFILE,
+        caller=caller,
     )
     assert result.caveats == []

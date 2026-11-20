@@ -61,7 +61,7 @@ def test_the_caller_is_built_from_the_config_and_handed_to_every_evaluation(monk
     factory = _run(monkeypatch, jobs, _settings(), evaluator=evaluator)
 
     factory.assert_called_once_with({"cfg": 1})
-    assert [call["_caller"] for call in evaluator.calls] == ["CALLER", "CALLER"]
+    assert [call["caller"] for call in evaluator.calls] == ["CALLER", "CALLER"]
     assert [call["profile"] for call in evaluator.calls] == [{"name": "Ana"}] * 2
 
 

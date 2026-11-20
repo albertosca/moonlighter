@@ -81,8 +81,8 @@ async def test_add_job_hands_the_ats_location_to_the_evaluator(temporary_databas
         patch("moonlighter.discovery.manual.jobs.evaluate_job", new=eval_mock),
     ):
         await add_job(url, "", "", "", CONFIG, PROFILE, MagicMock())
-    assert eval_mock.call_args.kwargs["location"] == "Bangalore, India"
-    assert eval_mock.call_args.kwargs["remote_type"] is None
+    assert eval_mock.call_args.args[0].location == "Bangalore, India"
+    assert eval_mock.call_args.args[0].remote_type is None
     job = Job.get(Job.url == url)
     assert job.location == "Bangalore, India"
 
@@ -107,9 +107,9 @@ async def test_add_job_takes_the_ats_location_even_when_every_field_was_given(
         patch("moonlighter.discovery.manual.jobs.evaluate_job", new=eval_mock),
     ):
         await add_job(url, "GitLab", "Engineer", "Pasted text.", CONFIG, PROFILE, MagicMock())
-    assert eval_mock.call_args.kwargs["location"] == "Bangalore, India"
+    assert eval_mock.call_args.args[0].location == "Bangalore, India"
     # What the person pasted still wins over the API's copy.
-    assert eval_mock.call_args.kwargs["description"] == "Pasted text."
+    assert eval_mock.call_args.args[0].description == "Pasted text."
 
 
 async def test_add_job_marks_a_remote_ats_posting_remote(temporary_database):
@@ -132,7 +132,7 @@ async def test_add_job_marks_a_remote_ats_posting_remote(temporary_database):
         await add_job(
             "https://jobs.channable.com/o/backend", "", "", "", CONFIG, PROFILE, MagicMock()
         )
-    assert eval_mock.call_args.kwargs["remote_type"] == "remote"
+    assert eval_mock.call_args.args[0].remote_type == "remote"
 
 
 async def test_add_job_http_non_200_returns_error(temporary_database):

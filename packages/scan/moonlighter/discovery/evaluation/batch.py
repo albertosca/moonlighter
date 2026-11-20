@@ -20,14 +20,16 @@ async def _eval_each(
     """Fallback: evaluates job by job (sequentially). A spend-limit in any of them propagates."""
     return [
         await evaluate_job(
-            job.company,
-            job.title,
-            job.description,
+            EvalInput(
+                job.company,
+                job.title,
+                job.description,
+                location=job.location,
+                remote_type=job.remote_type,
+            ),
             profile,
-            model,
-            caller,
-            location=job.location,
-            remote_type=job.remote_type,
+            model=model,
+            caller=caller,
         )
         for job in jobs
     ]

@@ -5,6 +5,7 @@ from typing import Any
 from moonlighter.core.db import Job
 from moonlighter.core.duplicates import find_original
 from moonlighter.core.llm.caller import LLMCaller
+from moonlighter.discovery.evaluation.models import EvalInput
 from moonlighter.discovery.evaluation.single import evaluate_job
 from moonlighter.discovery.manual.messages import format_add_result
 from moonlighter.discovery.scan.persistence import duplicate_fields, scored_fields
@@ -61,14 +62,12 @@ async def verify_job(
         return copy_answer
     threshold = config["score_threshold"]
     result = await evaluate_job(
-        company=job.company,
-        title=job.title,
-        description=page_text,
-        profile=profile,
+        EvalInput(
+            job.company, job.title, page_text, location=job.location, remote_type=job.remote_type
+        ),
+        profile,
         model=model_for(config),
-        _caller=caller,
-        location=job.location,
-        remote_type=job.remote_type,
+        caller=caller,
     )
     fields = scored_fields(result, threshold)
     job.description = page_text

@@ -1,6 +1,7 @@
 """Tests for the text of the single-job prompt and the rules both prefixes carry."""
 
 from moonlighter.discovery.evaluation.engagement import engagement_section
+from moonlighter.discovery.evaluation.models import EvalInput
 from moonlighter.discovery.evaluation.prompts import EVAL_BATCH_PREFIX, EVAL_PREFIX
 from moonlighter.discovery.evaluation.single import evaluate_job
 from tests.discovery.evaluation.fake_evaluation import (
@@ -23,14 +24,12 @@ async def test_evaluate_job_prompt_carries_location_and_remote_type():
         return MOCK_LLM_RESPONSE
 
     await evaluate_job(
-        company="Acme",
-        title="Eng",
-        description=JOB_DESCRIPTION,
-        profile=PROFILE,
+        EvalInput(
+            "Acme", "Eng", JOB_DESCRIPTION, location="Bangalore, India", remote_type="remote"
+        ),
+        PROFILE,
         model="claude-sonnet-4-6",
-        _caller=spy,
-        location="Bangalore, India",
-        remote_type="remote",
+        caller=spy,
     )
     assert "Location: Bangalore, India" in seen["prompt"]
     assert "Remote type: remote" in seen["prompt"]
@@ -75,14 +74,10 @@ async def test_evaluate_job_omits_location_lines_when_absent():
         return MOCK_LLM_RESPONSE
 
     await evaluate_job(
-        company="Acme",
-        title="Eng",
-        description=JOB_DESCRIPTION,
-        profile=PROFILE,
+        EvalInput("Acme", "Eng", JOB_DESCRIPTION, location=None, remote_type=None),
+        PROFILE,
         model="claude-sonnet-4-6",
-        _caller=spy,
-        location=None,
-        remote_type=None,
+        caller=spy,
     )
     assert "Location:" not in seen["prompt"]
     assert "Remote type:" not in seen["prompt"]

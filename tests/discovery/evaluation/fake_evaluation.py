@@ -46,7 +46,13 @@ def make_caller(text: str):
 
 def inputs(count: int) -> list[EvalInput]:
     return [
-        EvalInput(company=f"Co{index}", title=f"T{index}", description=f"d{index}")
+        EvalInput(
+            company=f"Co{index}",
+            title=f"T{index}",
+            description=f"d{index}",
+            location=None,
+            remote_type=None,
+        )
         for index in range(count)
     ]
 
@@ -64,13 +70,9 @@ def recording_caller(*replies: str):
 
 async def evaluate_once(caller, *, profile=None, location=None, remote_type=None):
     return await evaluate_job(
-        company="Co",
-        title="Eng",
-        description="desc",
-        profile=PROFILE if profile is None else profile,
-        _caller=caller,
-        location=location,
-        remote_type=remote_type,
+        EvalInput("Co", "Eng", "desc", location=location, remote_type=remote_type),
+        PROFILE if profile is None else profile,
+        caller=caller,
     )
 
 

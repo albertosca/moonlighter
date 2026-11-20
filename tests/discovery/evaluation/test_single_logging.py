@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from moonlighter.discovery.evaluation.models import EvalInput
 from moonlighter.discovery.evaluation.single import evaluate_job
 from tests.discovery.evaluation.fake_evaluation import (
     MOCK_LLM_RESPONSE,
@@ -32,13 +33,15 @@ async def test_evaluate_job_logs_score(caplog):
 
     with caplog.at_level(logging.DEBUG, logger="moonlighter.discovery.evaluation.single"):
         await evaluate_job(
-            company="Stripe",
-            title="Backend Engineer",
-            description="Python, distributed systems",
-            profile={"name": "Alberto"},
-            _caller=mock_caller,
-            location=None,
-            remote_type=None,
+            EvalInput(
+                "Stripe",
+                "Backend Engineer",
+                "Python, distributed systems",
+                location=None,
+                remote_type=None,
+            ),
+            {"name": "Alberto"},
+            caller=mock_caller,
         )
 
     assert "Stripe" in caplog.text

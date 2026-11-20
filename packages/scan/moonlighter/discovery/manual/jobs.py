@@ -8,6 +8,7 @@ from moonlighter.core.duplicates import find_original
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.web.posting import fetch_description, fetch_posting_via_ats
 from moonlighter.core.web.urls import normalize_job_url
+from moonlighter.discovery.evaluation.models import EvalInput
 from moonlighter.discovery.evaluation.single import evaluate_job
 from moonlighter.discovery.evaluation.title_filter import should_skip_by_title
 from moonlighter.discovery.manual.messages import existing_job_message, format_add_result
@@ -114,14 +115,16 @@ async def _score_and_store(
 ) -> str:
     threshold = config["score_threshold"]
     result = await evaluate_job(
-        company=posting.company,
-        title=posting.title,
-        description=posting.description,
-        profile=profile,
+        EvalInput(
+            posting.company,
+            posting.title,
+            posting.description,
+            location=posting.location,
+            remote_type=posting.remote_type,
+        ),
+        profile,
         model=model_for(config),
-        _caller=caller,
-        location=posting.location,
-        remote_type=posting.remote_type,
+        caller=caller,
     )
     fields = scored_fields(result, threshold)
     if track:

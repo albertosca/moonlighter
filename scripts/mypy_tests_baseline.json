@@ -47,7 +47,7 @@
   "tests/discovery/evaluation/test_prompt_content.py": 1,
   "tests/discovery/evaluation/test_prompt_injection.py": 2,
   "tests/discovery/evaluation/test_regional_eligibility.py": 1,
-  "tests/discovery/evaluation/test_single_errors.py": 3,
+  "tests/discovery/evaluation/test_single_errors.py": 1,
   "tests/discovery/fake_scan.py": 3,
   "tests/discovery/scan/pipeline/test_no_eval.py": 2,
   "tests/discovery/scan/pipeline/test_screening.py": 2,

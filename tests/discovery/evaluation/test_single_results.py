@@ -2,7 +2,7 @@
 
 import json
 
-from moonlighter.discovery.evaluation.models import EvaluationResult
+from moonlighter.discovery.evaluation.models import EvalInput, EvaluationResult
 from moonlighter.discovery.evaluation.single import evaluate_job
 from tests.discovery.evaluation.fake_evaluation import (
     JOB_DESCRIPTION,
@@ -14,14 +14,10 @@ from tests.discovery.evaluation.fake_evaluation import (
 
 async def test_evaluate_job_returns_result():
     result = await evaluate_job(
-        company="Acme",
-        title="Sr Elixir Eng",
-        description=JOB_DESCRIPTION,
-        profile=PROFILE,
+        EvalInput("Acme", "Sr Elixir Eng", JOB_DESCRIPTION, location=None, remote_type=None),
+        PROFILE,
         model="claude-sonnet-4-6",
-        _caller=make_caller(MOCK_LLM_RESPONSE),
-        location=None,
-        remote_type=None,
+        caller=make_caller(MOCK_LLM_RESPONSE),
     )
 
     assert isinstance(result, EvaluationResult)
@@ -44,14 +40,10 @@ async def test_evaluate_job_score_10():
         }
     )
     result = await evaluate_job(
-        company="Co",
-        title="Eng",
-        description="desc",
-        profile=PROFILE,
+        EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+        PROFILE,
         model="test",
-        _caller=make_caller(response),
-        location=None,
-        remote_type=None,
+        caller=make_caller(response),
     )
     assert result.score == 10.0
 
@@ -60,14 +52,10 @@ async def test_evaluate_job_partial_json_missing_salary():
     """JSON with no salary fields → salary_* all None."""
     response = json.dumps({"score": 7.0, "score_notes": "Good match.", "caveats": []})
     result = await evaluate_job(
-        company="Co",
-        title="Eng",
-        description="desc",
-        profile=PROFILE,
+        EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+        PROFILE,
         model="test",
-        _caller=make_caller(response),
-        location=None,
-        remote_type=None,
+        caller=make_caller(response),
     )
     assert result.salary_min is None
     assert result.salary_max is None
@@ -89,14 +77,10 @@ async def test_evaluate_job_caveats_empty_array():
         }
     )
     result = await evaluate_job(
-        company="Co",
-        title="Eng",
-        description="desc",
-        profile=PROFILE,
+        EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+        PROFILE,
         model="test",
-        _caller=make_caller(response),
-        location=None,
-        remote_type=None,
+        caller=make_caller(response),
     )
     assert result.caveats == []
 
@@ -115,14 +99,10 @@ async def test_evaluate_job_caveats_multiple():
         }
     )
     result = await evaluate_job(
-        company="Co",
-        title="Eng",
-        description="desc",
-        profile=PROFILE,
+        EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+        PROFILE,
         model="test",
-        _caller=make_caller(response),
-        location=None,
-        remote_type=None,
+        caller=make_caller(response),
     )
     assert len(result.caveats) == 3
     assert "US citizens only" in result.caveats
@@ -142,14 +122,10 @@ async def test_evaluate_job_salary_source_preserved():
         }
     )
     result = await evaluate_job(
-        company="Co",
-        title="Eng",
-        description="desc",
-        profile=PROFILE,
+        EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+        PROFILE,
         model="test",
-        _caller=make_caller(response),
-        location=None,
-        remote_type=None,
+        caller=make_caller(response),
     )
     assert result.salary_source == "stated"
     assert result.salary_min == 150000
