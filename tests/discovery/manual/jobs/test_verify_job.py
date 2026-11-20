@@ -72,8 +72,8 @@ async def test_verify_job_hands_the_stored_location_to_the_evaluator(temporary_d
             profile=PROFILE,
             caller=MagicMock(),
         )
-    assert eval_mock.call_args.kwargs["location"] == "Bangalore, India"
-    assert eval_mock.call_args.kwargs["remote_type"] == "onsite"
+    assert eval_mock.call_args.args[0].location == "Bangalore, India"
+    assert eval_mock.call_args.args[0].remote_type == "onsite"
 
 
 async def test_verify_job_updates_the_same_row_and_scores_above_threshold(temporary_database):

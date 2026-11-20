@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 
+from moonlighter.discovery.evaluation.models import EvalInput
 from moonlighter.discovery.evaluation.single import evaluate_job
 from tests.performance.timing import CONCURRENCY_RATIO
 
@@ -23,14 +24,10 @@ _MODEL_ANSWER = json.dumps(
 async def _evaluate(job, profile, caller):
     company, title, description = job
     return await evaluate_job(
-        company=company,
-        title=title,
-        description=description,
-        profile=profile,
+        EvalInput(company, title, description, location=None, remote_type=None),
+        profile,
         model="test",
-        _caller=caller,
-        location=None,
-        remote_type=None,
+        caller=caller,
     )
 
 

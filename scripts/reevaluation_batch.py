@@ -12,7 +12,7 @@ from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from moonlighter.core.metrics import operation_metrics
-from moonlighter.discovery.evaluation.models import EvaluationResult
+from moonlighter.discovery.evaluation.models import EvalInput, EvaluationResult
 from moonlighter.discovery.evaluation.single import evaluate_job
 from moonlighter.discovery.evaluation.title_filter import should_skip_by_title
 
@@ -86,14 +86,16 @@ class _Batch:
         else:
             description = job.description or f"{job.title} at {job.company}"
         return await evaluate_job(
-            company=job.company,
-            title=job.title,
-            description=description,
-            profile=self.settings.profile,
+            EvalInput(
+                job.company,
+                job.title,
+                description,
+                location=job.location,
+                remote_type=job.remote_type,
+            ),
+            self.settings.profile,
             model=self.settings.model,
-            _caller=self.caller,
-            location=job.location,
-            remote_type=job.remote_type,
+            caller=self.caller,
         )
 
     def _fail(self, label: str, job: Job, error: Exception) -> None:

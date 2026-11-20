@@ -2,6 +2,7 @@
 
 import json
 
+from moonlighter.discovery.evaluation.models import EvalInput
 from moonlighter.discovery.evaluation.single import evaluate_job
 from tests.discovery.evaluation.fake_evaluation import JOB_DESCRIPTION, PROFILE, make_caller
 
@@ -21,13 +22,9 @@ async def test_evaluate_job_negative_salary_becomes_none():
         )
     )
     result = await evaluate_job(
-        company="C",
-        title="T",
-        description=JOB_DESCRIPTION,
-        profile=PROFILE,
-        _caller=caller,
-        location=None,
-        remote_type=None,
+        EvalInput("C", "T", JOB_DESCRIPTION, location=None, remote_type=None),
+        PROFILE,
+        caller=caller,
     )
     assert result.salary_min is None
 
@@ -47,13 +44,9 @@ async def test_evaluate_job_non_integer_salary_becomes_none():
         )
     )
     result = await evaluate_job(
-        company="C",
-        title="T",
-        description=JOB_DESCRIPTION,
-        profile=PROFILE,
-        _caller=caller,
-        location=None,
-        remote_type=None,
+        EvalInput("C", "T", JOB_DESCRIPTION, location=None, remote_type=None),
+        PROFILE,
+        caller=caller,
     )
     assert result.salary_min is None
 
@@ -74,13 +67,9 @@ async def test_evaluate_job_bool_salary_becomes_none():
         )
     )
     result = await evaluate_job(
-        company="C",
-        title="T",
-        description=JOB_DESCRIPTION,
-        profile=PROFILE,
-        _caller=caller,
-        location=None,
-        remote_type=None,
+        EvalInput("C", "T", JOB_DESCRIPTION, location=None, remote_type=None),
+        PROFILE,
+        caller=caller,
     )
     assert result.salary_min is None
 
@@ -100,13 +89,9 @@ async def test_evaluate_job_float_salary_with_integer_value_is_accepted():
         )
     )
     result = await evaluate_job(
-        company="C",
-        title="T",
-        description=JOB_DESCRIPTION,
-        profile=PROFILE,
-        _caller=caller,
-        location=None,
-        remote_type=None,
+        EvalInput("C", "T", JOB_DESCRIPTION, location=None, remote_type=None),
+        PROFILE,
+        caller=caller,
     )
     assert result.salary_min == 150000
 
@@ -126,12 +111,8 @@ async def test_evaluate_job_non_integer_float_salary_becomes_none():
         )
     )
     result = await evaluate_job(
-        company="C",
-        title="T",
-        description=JOB_DESCRIPTION,
-        profile=PROFILE,
-        _caller=caller,
-        location=None,
-        remote_type=None,
+        EvalInput("C", "T", JOB_DESCRIPTION, location=None, remote_type=None),
+        PROFILE,
+        caller=caller,
     )
     assert result.salary_min is None

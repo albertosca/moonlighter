@@ -72,8 +72,8 @@ async def test_a_batch_reply_that_is_not_text_propagates_instead_of_falling_back
 async def test_the_batch_prompt_carries_each_jobs_location_and_remote_type():
     # Route of the 2026-08-21 GitLab false positives: no other test saw the batch lines.
     jobs = [
-        EvalInput("Acme", "Eng", "d0", "Bangalore, India", "remote"),
-        EvalInput("Beta", "Dev", "d1"),
+        EvalInput("Acme", "Eng", "d0", location="Bangalore, India", remote_type="remote"),
+        EvalInput("Beta", "Dev", "d1", location=None, remote_type=None),
     ]
     caller, calls = recording_caller('[{"score": 1.0}, {"score": 2.0}]')
     await evaluate_jobs_batch(jobs, {}, "m", caller=caller)
@@ -88,8 +88,10 @@ async def test_the_batch_prompt_carries_each_jobs_location_and_remote_type():
 
 
 async def test_each_batch_posting_is_capped_at_8000_characters():
-    job = EvalInput("Co", "Eng", "x" * 10000)
+    job = EvalInput("Co", "Eng", "x" * 10000, location=None, remote_type=None)
     caller, calls = recording_caller('[{"score": 1.0}, {"score": 2.0}]')
-    await evaluate_jobs_batch([job, EvalInput("Co", "Dev", "d")], {}, "m", caller=caller)
+    await evaluate_jobs_batch(
+        [job, EvalInput("Co", "Dev", "d", location=None, remote_type=None)], {}, "m", caller=caller
+    )
     assert "x" * 8001 not in calls[0][0]
     assert "x" * 7964 in calls[0][0]

@@ -78,15 +78,18 @@ async def test_an_invalid_batch_reply_is_logged_without_a_traceback_before_the_f
 async def test_a_batch_of_one_job_forwards_its_location_to_the_single_prompt():
     caller, calls = recording_caller('{"score": 1.0}')
     await evaluate_jobs_batch(
-        [EvalInput("Acme", "Eng", "d0", "Italy", "hybrid")], {}, "m", caller=caller
+        [EvalInput("Acme", "Eng", "d0", location="Italy", remote_type="hybrid")],
+        {},
+        "m",
+        caller=caller,
     )
     assert "Location: Italy\nRemote type: hybrid\nDescription:\nd0" in calls[0][0]
 
 
 async def test_the_per_job_fallback_forwards_the_model_and_each_jobs_location():
     jobs = [
-        EvalInput("Acme", "Eng", "d0", "Bangalore, India", "remote"),
-        EvalInput("Beta", "Dev", "d1"),
+        EvalInput("Acme", "Eng", "d0", location="Bangalore, India", remote_type="remote"),
+        EvalInput("Beta", "Dev", "d1", location=None, remote_type=None),
     ]
     caller, calls = recording_caller("garbage", '{"score": 5.0}')
     await evaluate_jobs_batch(jobs, {}, "model-x", caller=caller)

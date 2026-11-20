@@ -17,28 +17,22 @@ from moonlighter.discovery.evaluation.result_parsing import result_from
 logger = logging.getLogger(__name__)
 
 
-async def evaluate_job(  # noqa: PLR0913, PLR0917 - public keyword API of service.py, scripts and tests; a parameter object would change every caller
-    company: str,
-    title: str,
-    description: str,
+async def evaluate_job(
+    job: EvalInput,
     profile: dict[str, Any],
-    model: str = DEFAULT_LLM_MODEL,
-    _caller: LLMCaller | None = None,
     *,
-    # Required on purpose, even as None: an optional default let an ad-hoc caller
-    # drop them silently and the regional filter degraded to the description
-    # alone (2026-09-25 re-eval: 4 of 6 promoted jobs were false positives).
-    location: str | None,
-    remote_type: str | None,
+    model: str = DEFAULT_LLM_MODEL,
+    caller: LLMCaller | None = None,
 ) -> EvaluationResult:
-    if _caller is None:
-        _caller = make_api_caller()
+    if caller is None:
+        caller = make_api_caller()
+    company, title = job.company, job.title
     logger.debug("evaluating %s/%s", company, title)
     # Static prefix (profile + instructions) → cacheable; dynamic suffix = just the job.
     prefix = build_eval_prefix(profile)
-    suffix = eval_suffix(EvalInput(company, title, description, location, remote_type))
+    suffix = eval_suffix(job)
     try:
-        data = parse_llm_json(await _caller(suffix, model, cache_prefix=prefix))
+        data = parse_llm_json(await caller(suffix, model, cache_prefix=prefix))
         result = result_from(data)
         logger.debug("→ score %.1f (%s)", result.score, company)
     except json.JSONDecodeError:

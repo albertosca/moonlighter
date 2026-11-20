@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from moonlighter.discovery.evaluation.models import EvaluationResult
+from moonlighter.discovery.evaluation.models import EvalInput, EvaluationResult
 from moonlighter.discovery.evaluation.single import evaluate_job
 from tests.discovery.evaluation.fake_evaluation import (
     MOCK_LLM_RESPONSE,
@@ -18,14 +18,10 @@ from tests.discovery.evaluation.fake_evaluation import (
 
 async def test_evaluate_job_handles_malformed_json():
     result = await evaluate_job(
-        company="Acme",
-        title="Eng",
-        description="desc",
-        profile=PROFILE,
+        EvalInput("Acme", "Eng", "desc", location=None, remote_type=None),
+        PROFILE,
         model="claude-sonnet-4-6",
-        _caller=make_caller("not json"),
-        location=None,
-        remote_type=None,
+        caller=make_caller("not json"),
     )
 
     assert result.score == 0.0
@@ -39,14 +35,10 @@ async def test_evaluate_job_llm_exception_returns_zero():
         raise Exception("network timeout")  # noqa: TRY002 - a plain Exception is what an SDK failure looks like
 
     result = await evaluate_job(
-        company="Co",
-        title="Eng",
-        description="desc",
-        profile=PROFILE,
+        EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+        PROFILE,
         model="test",
-        _caller=failing_caller,
-        location=None,
-        remote_type=None,
+        caller=failing_caller,
     )
     assert result.score == 0.0
     assert "evaluation error" in result.score_notes.lower()
@@ -62,14 +54,10 @@ async def test_evaluate_job_spend_limit_propagates():
 
     with pytest.raises(Exception, match="spend limit"):
         await evaluate_job(
-            company="Co",
-            title="Eng",
-            description="desc",
-            profile=PROFILE,
+            EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+            PROFILE,
             model="test",
-            _caller=spend_limit_caller,
-            location=None,
-            remote_type=None,
+            caller=spend_limit_caller,
         )
 
 
@@ -81,14 +69,10 @@ async def test_evaluate_job_rate_limit_propagates():
 
     with pytest.raises(Exception, match="429"):
         await evaluate_job(
-            company="Co",
-            title="Eng",
-            description="desc",
-            profile=PROFILE,
+            EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+            PROFILE,
             model="test",
-            _caller=quota_caller,
-            location=None,
-            remote_type=None,
+            caller=quota_caller,
         )
 
 
@@ -103,27 +87,11 @@ async def test_evaluate_job_session_limit_propagates():
 
     with pytest.raises(Exception, match="session limit"):
         await evaluate_job(
-            company="Co",
-            title="Eng",
-            description="desc",
-            profile=PROFILE,
+            EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+            PROFILE,
             model="test",
-            _caller=session_limit_caller,
-            location=None,
-            remote_type=None,
+            caller=session_limit_caller,
         )
-
-
-async def test_evaluate_job_requires_location_and_remote_type_by_name():
-    """Optional defaults let an ad-hoc caller drop them silently (2026-09-25 re-eval:
-    4 of 6 promoted jobs were false positives). A caller must now say None on purpose.
-    """
-
-    async def caller(prompt, model, cache_prefix=None):
-        return '{"score": 5.0, "score_notes": "x", "caveats": []}'
-
-    with pytest.raises(TypeError, match="location"):
-        await evaluate_job("Co", "Eng", "desc", {}, "m", caller)
 
 
 async def test_a_reply_that_is_not_json_is_stored_with_this_exact_note():
@@ -153,13 +121,7 @@ async def test_building_the_prompt_is_outside_the_try_so_its_errors_propagate():
     caller, calls = recording_caller(MOCK_LLM_RESPONSE)
     with pytest.raises(TypeError):
         await evaluate_job(
-            company="Co",
-            title="Eng",
-            description="desc",
-            profile=None,
-            _caller=caller,
-            location=None,
-            remote_type=None,
+            EvalInput("Co", "Eng", "desc", location=None, remote_type=None), None, caller=caller
         )
     assert calls == []
 

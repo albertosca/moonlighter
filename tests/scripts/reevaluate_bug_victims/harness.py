@@ -20,31 +20,29 @@ _URLS = itertools.count(1)
 
 
 class Evaluator:
-    """Stands in for evaluate_job with its real keyword signature; suspends once per call unless told not to."""
+    """Stands in for evaluate_job with its real signature; suspends once per call unless told not to."""
 
     def __init__(self, outcomes: dict[str, object], *, suspend: bool) -> None:
         self.outcomes = outcomes
         self.suspend = suspend
         self.calls: list[dict[str, object]] = []
 
-    async def __call__(  # noqa: PLR0913, PLR0917 - mirrors evaluate_job's signature
-        self, company, title, description, profile, model, _caller, *, location, remote_type
-    ):
+    async def __call__(self, job, profile, *, model, caller):
         self.calls.append(
             {
-                "company": company,
-                "title": title,
-                "description": description,
+                "company": job.company,
+                "title": job.title,
+                "description": job.description,
                 "profile": profile,
                 "model": model,
-                "_caller": _caller,
-                "location": location,
-                "remote_type": remote_type,
+                "caller": caller,
+                "location": job.location,
+                "remote_type": job.remote_type,
             }
         )
         if self.suspend:
             await asyncio.sleep(0)
-        outcome = self.outcomes.get(title, EvaluationResult(score=1.0, score_notes="low"))
+        outcome = self.outcomes.get(job.title, EvaluationResult(score=1.0, score_notes="low"))
         if isinstance(outcome, Exception):
             raise outcome
         return outcome

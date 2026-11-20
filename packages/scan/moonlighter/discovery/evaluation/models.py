@@ -1,6 +1,6 @@
 """The value objects of job evaluation: what goes in and what comes out."""
 
-from dataclasses import dataclass, field
+from dataclasses import KW_ONLY, dataclass, field
 
 
 @dataclass(frozen=True)
@@ -15,8 +15,12 @@ class EvalInput:
     company: str
     title: str
     description: str
-    location: str | None = None
-    remote_type: str | None = None
+    _: KW_ONLY
+    # Required on purpose, even as None, and by name only: an optional default let a
+    # caller drop them silently and the regional filter degraded to the description
+    # alone (2026-09-25 re-eval: 4 of 6 promoted jobs were false positives).
+    location: str | None
+    remote_type: str | None
 
 
 @dataclass

@@ -36,10 +36,7 @@ def _assert_no_hardcoded_identity(text):
 
 async def test_single_evaluation_prompt_has_no_software_identity():
     caller, seen = spy(SINGLE_RESPONSE)
-    await evaluate_job(
-        "Hospital", "ICU Nurse", "Care for patients.", NURSE_PROFILE, "m", caller,
-        location="Lisbon", remote_type="onsite",
-    )  # fmt: skip
+    await evaluate_job(EvalInput("Hospital", "ICU Nurse", "Care for patients.", location="Lisbon", remote_type="onsite"), NURSE_PROFILE, model="m", caller=caller)  # fmt: skip
     _assert_no_hardcoded_identity(seen["prefix"])
     assert "Registered Nurse" in seen["prefix"]
     assert "described below" in seen["prefix"]
@@ -48,7 +45,10 @@ async def test_single_evaluation_prompt_has_no_software_identity():
 
 async def test_batch_evaluation_prompt_has_no_software_identity():
     caller, seen = spy(BATCH_RESPONSE)
-    jobs = [EvalInput("Hospital", "ICU Nurse", "Care."), EvalInput("Clinic", "Nurse", "Care.")]
+    jobs = [
+        EvalInput("Hospital", "ICU Nurse", "Care.", location=None, remote_type=None),
+        EvalInput("Clinic", "Nurse", "Care.", location=None, remote_type=None),
+    ]
     await evaluate_jobs_batch(jobs, NURSE_PROFILE, "m", caller=caller)
     _assert_no_hardcoded_identity(seen["prefix"])
     assert "## Engagement type" not in seen["prefix"]
@@ -58,12 +58,21 @@ async def test_the_engagement_the_profile_names_reaches_both_prompts():
     profile = {**NURSE_PROFILE, "preferences": {"engagement": "part-time hospital"}}
     caller, seen = spy(SINGLE_RESPONSE)
     await evaluate_job(
-        "Hospital", "Nurse", "Care.", profile, "m", caller, location=None, remote_type=None
+        EvalInput("Hospital", "Nurse", "Care.", location=None, remote_type=None),
+        profile,
+        model="m",
+        caller=caller,
     )
     assert "targets part-time hospital positions" in seen["prefix"]
     caller, seen = spy(BATCH_RESPONSE)
     await evaluate_jobs_batch(
-        [EvalInput("A", "B", "C"), EvalInput("D", "E", "F")], profile, "m", caller=caller
+        [
+            EvalInput("A", "B", "C", location=None, remote_type=None),
+            EvalInput("D", "E", "F", location=None, remote_type=None),
+        ],
+        profile,
+        "m",
+        caller=caller,
     )
     assert "targets part-time hospital positions" in seen["prefix"]
 

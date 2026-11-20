@@ -84,7 +84,7 @@ def test_every_argument_reaches_evaluate_job(monkeypatch, caller_factory):
 
     caller = caller_factory.return_value
     caller_factory.assert_called_once_with(CONFIG)
-    shared = {"company": "Acme", "profile": {"name": "Ana"}, "model": "m-eval", "_caller": caller}
+    shared = {"company": "Acme", "profile": {"name": "Ana"}, "model": "m-eval", "caller": caller}
     assert evaluator.calls == [
         {
             **shared,

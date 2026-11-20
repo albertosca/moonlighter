@@ -32,9 +32,20 @@ async def _prefixes_for(profile):
         captured.setdefault("batch", cache_prefix)
         return '[{"score": 5.0, "score_notes": "x", "caveats": []}, {"score": 5.0, "score_notes": "x", "caveats": []}]'
 
-    await evaluate_job("Co", "Eng", "desc", profile, "m", caller, location=None, remote_type=None)
+    await evaluate_job(
+        EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+        profile,
+        model="m",
+        caller=caller,
+    )
     await evaluate_jobs_batch(
-        [EvalInput("Co", "A", "d"), EvalInput("Co", "B", "d")], profile, "m", caller=batch_caller
+        [
+            EvalInput("Co", "A", "d", location=None, remote_type=None),
+            EvalInput("Co", "B", "d", location=None, remote_type=None),
+        ],
+        profile,
+        "m",
+        caller=batch_caller,
     )
     return captured["single"], captured["batch"]
 

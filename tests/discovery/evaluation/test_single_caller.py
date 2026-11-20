@@ -3,6 +3,7 @@
 import json
 from unittest.mock import patch
 
+from moonlighter.discovery.evaluation.models import EvalInput
 from moonlighter.discovery.evaluation.single import evaluate_job
 from tests.discovery.evaluation.fake_evaluation import (
     JOB_DESCRIPTION,
@@ -35,14 +36,10 @@ async def test_evaluate_job_description_capped_at_8000():
         return response
 
     await evaluate_job(
-        company="Co",
-        title="Eng",
-        description=long_description,
-        profile=PROFILE,
+        EvalInput("Co", "Eng", long_description, location=None, remote_type=None),
+        PROFILE,
         model="test",
-        _caller=capture_caller,
-        location=None,
-        remote_type=None,
+        caller=capture_caller,
     )
     assert len(captured_prompt) == 1
     assert "x" * 8001 not in captured_prompt[0]
@@ -72,14 +69,10 @@ async def test_evaluate_job_uses_injected_caller():
 
     with patch("moonlighter.discovery.evaluation.single.make_api_caller") as mock_factory:
         await evaluate_job(
-            company="Co",
-            title="Eng",
-            description="desc",
-            profile=PROFILE,
+            EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+            PROFILE,
             model="test",
-            _caller=tracking_caller,
-            location=None,
-            remote_type=None,
+            caller=tracking_caller,
         )
     mock_factory.assert_not_called()
     assert len(called) == 1
@@ -104,14 +97,10 @@ async def test_evaluate_job_caller_receives_model():
         )
 
     await evaluate_job(
-        company="Co",
-        title="Eng",
-        description="desc",
-        profile=PROFILE,
+        EvalInput("Co", "Eng", "desc", location=None, remote_type=None),
+        PROFILE,
         model="custom-model-xyz",
-        _caller=capture_caller,
-        location=None,
-        remote_type=None,
+        caller=capture_caller,
     )
     assert received_models == ["custom-model-xyz"]
 
@@ -126,7 +115,10 @@ async def test_evaluate_job_passes_cache_prefix():
         return '{"score": 8.0, "score_notes": "x", "caveats": []}'
 
     await evaluate_job(
-        "Co", "Eng", "JD here", {"skills": ["python"]}, "m", caller, location=None, remote_type=None
+        EvalInput("Co", "Eng", "JD here", location=None, remote_type=None),
+        {"skills": ["python"]},
+        model="m",
+        caller=caller,
     )
     assert captured["prefix"] is not None
     assert "python" in captured["prefix"]
@@ -135,19 +127,15 @@ async def test_evaluate_job_passes_cache_prefix():
 
 
 async def test_evaluate_job_builds_default_caller_when_none():
-    """_caller=None → uses make_api_caller() as the fallback (single.py)."""
+    """caller=None → uses make_api_caller() as the fallback (single.py)."""
     fake = make_caller(MOCK_LLM_RESPONSE)
     with patch(
         "moonlighter.discovery.evaluation.single.make_api_caller", return_value=fake
     ) as factory:
         result = await evaluate_job(
-            company="Co",
-            title="Eng",
-            description=JOB_DESCRIPTION,
-            profile=PROFILE,
-            _caller=None,
-            location=None,
-            remote_type=None,
+            EvalInput("Co", "Eng", JOB_DESCRIPTION, location=None, remote_type=None),
+            PROFILE,
+            caller=None,
         )
     factory.assert_called_once()
     assert result.score == 8.5
