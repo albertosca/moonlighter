@@ -3,12 +3,12 @@
 import httpx
 import pytest
 
-from moonlighter.application.assisted.sources.recruitee import (
+from moonlighter.application.assisted.question_sources.recruitee import (
     fetch_recruitee_questions,
     host_and_offer_from_url,
     parse_recruitee_questions,
 )
-from tests.application.assisted.sources.recruitee.recruitee_offers import PAYLOAD
+from tests.application.assisted.question_sources.recruitee.recruitee_offers import PAYLOAD
 
 
 def test_host_and_offer_are_read_from_a_recruitee_url():

@@ -10,6 +10,15 @@ from moonlighter.application.assisted.composition.composer import (
     CompositionContext,
     compose_answers,
 )
+from moonlighter.application.assisted.question_sources import registry
+from moonlighter.application.assisted.question_sources.base import (
+    questions_or_empty,
+    required_fields_or_empty,
+)
+from moonlighter.application.assisted.question_sources.pasted import (
+    ExtractionError,
+    extract_questions_from_page,
+)
 from moonlighter.application.assisted.questions import FormQuestion
 from moonlighter.application.assisted.sheet.bootstrap_offer import cv_bootstrap_offer
 from moonlighter.application.assisted.sheet.notes import (
@@ -20,15 +29,6 @@ from moonlighter.application.assisted.sheet.notes import (
 )
 from moonlighter.application.assisted.sheet.required_labels import mark_required
 from moonlighter.application.assisted.sheet.results import SheetKind, SheetResult, failed_sheet
-from moonlighter.application.assisted.sources import registry
-from moonlighter.application.assisted.sources.base import (
-    questions_or_empty,
-    required_fields_or_empty,
-)
-from moonlighter.application.assisted.sources.pasted import (
-    ExtractionError,
-    extract_questions_from_page,
-)
 from moonlighter.application.cvgen.service import ensure_tailored_cv
 from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.db import Application, Job

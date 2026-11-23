@@ -2,7 +2,7 @@
 
 import json
 
-from tests.application.assisted.sources.fixture_files import FIXTURES_DIRECTORY
+from tests.application.assisted.question_sources.fixture_files import FIXTURES_DIRECTORY
 
 PAYLOAD = json.loads((FIXTURES_DIRECTORY / "recruitee_offer.json").read_text())
 PAYLOAD_WITH_CHOICE = json.loads(

@@ -1,12 +1,12 @@
 import httpx
 
-from moonlighter.application.assisted.sources.base import (
+from moonlighter.application.assisted.question_sources.base import (
     SourceMatch,
     questions_or_empty,
     required_fields_or_empty,
 )
-from moonlighter.application.assisted.sources.greenhouse import GreenhouseSource
-from moonlighter.application.assisted.sources.recruitee import RecruiteeSource
+from moonlighter.application.assisted.question_sources.greenhouse import GreenhouseSource
+from moonlighter.application.assisted.question_sources.recruitee import RecruiteeSource
 
 
 class _UnreachableSource:

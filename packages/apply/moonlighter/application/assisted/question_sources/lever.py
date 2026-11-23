@@ -24,9 +24,9 @@ from typing import override
 
 import httpx
 
+from moonlighter.application.assisted.question_sources.base import UUID_PATTERN, SourceMatch
+from moonlighter.application.assisted.question_sources.lever_cards import card_questions
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.sources.base import UUID_PATTERN, SourceMatch
-from moonlighter.application.assisted.sources.lever_cards import card_questions
 from moonlighter.core.db import Job
 
 APPLY_PAGE = "https://jobs.lever.co/{company}/{posting_id}/apply"

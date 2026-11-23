@@ -8,22 +8,25 @@ from typing import Any
 import httpx
 import pytest
 
-from moonlighter.application.assisted.questions import FormQuestion
-from moonlighter.application.assisted.sources import base, pasted
-from moonlighter.application.assisted.sources.base import (
+from moonlighter.application.assisted.question_sources import base, pasted
+from moonlighter.application.assisted.question_sources.base import (
     SourceMatch,
     questions_or_empty,
     required_fields_or_empty,
 )
-from moonlighter.application.assisted.sources.greenhouse import fetch_greenhouse_questions
-from moonlighter.application.assisted.sources.inhire import fetch_inhire_required_fields
-from moonlighter.application.assisted.sources.lever import fetch_lever_questions, parse_lever_form
-from moonlighter.application.assisted.sources.pasted import (
+from moonlighter.application.assisted.question_sources.greenhouse import fetch_greenhouse_questions
+from moonlighter.application.assisted.question_sources.inhire import fetch_inhire_required_fields
+from moonlighter.application.assisted.question_sources.lever import (
+    fetch_lever_questions,
+    parse_lever_form,
+)
+from moonlighter.application.assisted.question_sources.pasted import (
     ExtractionError,
     extract_questions_from_page,
 )
-from moonlighter.application.assisted.sources.recruitee import fetch_recruitee_questions
-from moonlighter.application.assisted.sources.workable import fetch_workable_questions
+from moonlighter.application.assisted.question_sources.recruitee import fetch_recruitee_questions
+from moonlighter.application.assisted.question_sources.workable import fetch_workable_questions
+from moonlighter.application.assisted.questions import FormQuestion
 
 PROMPT_DIGEST = "a5286adec69fb7cfefc35f2a2e017e192487f4c829f6806bb206cadb7fdc6c26"
 LANGUAGE_TABLES_DIGEST = "cb03dfb25d4f041dd8f54ba0d1a4d976d92213657f6de2929ac156e139db8060"

@@ -1,6 +1,6 @@
 import pytest
 
-from moonlighter.application.assisted.sources import registry
+from moonlighter.application.assisted.question_sources import registry
 from moonlighter.core.db import Job
 
 # (job.source, job.url, the one source name expected to match, or None).

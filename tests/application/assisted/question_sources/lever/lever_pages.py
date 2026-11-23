@@ -4,7 +4,7 @@ import html
 import json
 import re
 
-from tests.application.assisted.sources.fixture_files import FIXTURES_DIRECTORY
+from tests.application.assisted.question_sources.fixture_files import FIXTURES_DIRECTORY
 
 PAGE = (FIXTURES_DIRECTORY / "lever_apply_palantir.html").read_text()
 

@@ -3,13 +3,13 @@ import json
 import httpx
 import pytest
 
-from moonlighter.application.assisted.questions import QuestionKind
-from moonlighter.application.assisted.sources.greenhouse import (
+from moonlighter.application.assisted.question_sources.greenhouse import (
     board_and_job_from_url,
     fetch_greenhouse_questions,
     parse_greenhouse_questions,
 )
-from tests.application.assisted.sources.fixture_files import FIXTURES_DIRECTORY
+from moonlighter.application.assisted.questions import QuestionKind
+from tests.application.assisted.question_sources.fixture_files import FIXTURES_DIRECTORY
 
 PAYLOAD = json.loads((FIXTURES_DIRECTORY / "greenhouse_job.json").read_text())
 

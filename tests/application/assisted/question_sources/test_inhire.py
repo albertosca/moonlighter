@@ -2,14 +2,14 @@ import json
 
 import httpx
 
-from moonlighter.application.assisted.sources.base import SourceMatch
-from moonlighter.application.assisted.sources.inhire import (
+from moonlighter.application.assisted.question_sources.base import SourceMatch
+from moonlighter.application.assisted.question_sources.inhire import (
     InHireSource,
     fetch_inhire_required_fields,
     parse_required_fields,
     tenant_and_job_from_url,
 )
-from tests.application.assisted.sources.fixture_files import FIXTURES_DIRECTORY
+from tests.application.assisted.question_sources.fixture_files import FIXTURES_DIRECTORY
 
 DETAIL = json.loads((FIXTURES_DIRECTORY / "inhire_job_infleet.json").read_text())
 JOB_ID = "1a3ea3dc-5558-45b6-aecb-58e89f5af1dd"
@@ -82,7 +82,7 @@ async def test_a_non_200_has_no_required_fields(caplog):
     [record] = [
         record
         for record in caplog.records
-        if record.name == "moonlighter.application.assisted.sources.inhire"
+        if record.name == "moonlighter.application.assisted.question_sources.inhire"
     ]
     assert record.levelname == "WARNING"
     assert "404" in record.getMessage()

@@ -6,8 +6,8 @@ import httpx
 import pytest
 
 from moonlighter.application.assisted import service
+from moonlighter.application.assisted.question_sources import greenhouse as greenhouse_source
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.sources import greenhouse as greenhouse_source
 from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
 from tests.application.assisted.service.fake_service import stub_caller

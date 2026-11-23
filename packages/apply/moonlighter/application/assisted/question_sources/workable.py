@@ -13,8 +13,8 @@ from typing import Any
 
 import httpx
 
+from moonlighter.application.assisted.question_sources.base import SourceMatch, yes_no_question
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.sources.base import SourceMatch, yes_no_question
 from moonlighter.core.db import Job
 
 API = "https://apply.workable.com/api/v1/jobs/{shortcode}/form"
