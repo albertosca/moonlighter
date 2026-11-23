@@ -31,7 +31,7 @@ class ArchiveResult:
     aged: list[dict[str, str]] = field(default_factory=list)
     max_age_days: int = 0
     failed_companies: list[str] = field(default_factory=list)
-    # Jobs no listing can confirm (source='manual' and the like): the person
+    # Jobs no listing can confirm (a manual URL off any supported board, and the like): the person
     # opens each link and says which closed. Never archived by age (Alberto's
     # rule, 2026-08-24).
     to_confirm: list[dict[str, Any]] = field(default_factory=list)

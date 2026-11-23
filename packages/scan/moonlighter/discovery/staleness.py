@@ -16,7 +16,8 @@ from typing import Any
 from moonlighter.core.db import Job
 from moonlighter.core.plugins import discover_entry_points_by_name
 from moonlighter.core.web.urls import normalize_job_url
-from moonlighter.discovery.sources.base import BaseScanner, ScanStats
+from moonlighter.discovery.manual.board_check import check_manual_jobs
+from moonlighter.discovery.sources.base import BaseScanner, RawJob, ScanStats
 from moonlighter.discovery.sources.registry import LISTING_SOURCES, PORTAL_SOURCES
 
 logger = logging.getLogger(__name__)
@@ -28,8 +29,8 @@ class StalenessResult:
     # Portal jobs past portal_max_age_days: age is the only closing signal a
     # portal feed offers, so these archive as aged-out, never as closed-at-source.
     stale_by_age: list[Job] = field(default_factory=list)
-    # Jobs from a source with no listing to diff against (source='manual', or a
-    # source with no checker plugin): only a person opening the link can say
+    # Jobs with no listing to diff against (a manual job whose URL matches no
+    # supported board, or a source with no checker plugin): only a person opening the link can say
     # whether it closed, so they are reported one by one, never archived.
     unverifiable: list[Job] = field(default_factory=list)
     failed_companies: list[str] = field(default_factory=list)
@@ -58,6 +59,8 @@ async def find_stale_jobs(
         elif source in checkers:
             check = partial(checkers[source], company, jobs, config, result)
             await _run_plugin_checker(check, source, company, result=result)
+        elif source == "manual":
+            await _check_manual(jobs, scanners=scanners, result=result)
         else:
             result.unverifiable.extend(jobs)
     result.failed_companies.extend(_portal_notes(portal_counts))
@@ -123,6 +126,35 @@ async def _check_via_listing(
     scanners: dict[str, BaseScanner],
     result: StalenessResult,
 ) -> None:
+    raw = await _fetch_listing(source, company, company, scanners=scanners, result=result)
+    if raw is None:
+        return
+    # Stored job.url is normalized (`normalize_job_url` strips the Recruitee /c/new apply
+    # suffix), but the fresh listing's raw URLs are not — normalize both sides,
+    # or every freshly-stored Recruitee job compares unequal and is archived
+    # as stale on its very first re-scan.
+    open_urls = {normalize_job_url(raw_job.url) for raw_job in raw}
+    result.stale.extend(job for job in jobs if normalize_job_url(job.url) not in open_urls)
+
+
+async def _check_manual(
+    jobs: list[Job], *, scanners: dict[str, BaseScanner], result: StalenessResult
+) -> None:
+    check = await check_manual_jobs(jobs, partial(_fetch_listing, scanners=scanners, result=result))
+    result.stale.extend(check.stale)
+    result.unverifiable.extend(check.unverifiable)
+    result.failed_companies.extend(check.failed_companies)
+
+
+async def _fetch_listing(
+    source: str,
+    slug: str,
+    company: str,
+    *,
+    scanners: dict[str, BaseScanner],
+    result: StalenessResult,
+) -> list[RawJob] | None:
+    """The board's open postings, or None once the failure is in result.failed_companies."""
     scanner = scanners[source]
     # The HTTP scanners never raise: gather_jobs swallows a failed fetch, counts
     # it in stats[source].errors and returns [] -- which, read as "zero open
@@ -131,17 +163,17 @@ async def _check_via_listing(
     # how the first-party ones report the same failure.
     stats: ScanStats = {}
     try:
-        raw: object = await scanner.scan([company], stats=stats)
+        raw: object = await scanner.scan([slug], stats=stats)
     except Exception as error:
         logger.warning(
             "staleness: %s scan failed for %s — %s", source, company, error, exc_info=True
         )
         result.failed_companies.append(company)
-        return
+        return None
     if not isinstance(raw, list):
         logger.warning("staleness: %s scan returned unexpected type for %s", source, company)
         result.failed_companies.append(company)
-        return
+        return None
     if (source_stats := stats.get(source)) is not None and source_stats.errors:
         logger.warning(
             "staleness: %s fetch failed for %s (%d error(s)) — not treated as closed",
@@ -150,10 +182,5 @@ async def _check_via_listing(
             source_stats.errors,
         )
         result.failed_companies.append(company)
-        return
-    # Stored job.url is normalized (`normalize_job_url` strips the Recruitee /c/new apply
-    # suffix), but the fresh listing's raw URLs are not — normalize both sides,
-    # or every freshly-stored Recruitee job compares unequal and is archived
-    # as stale on its very first re-scan.
-    open_urls = {normalize_job_url(raw_job.url) for raw_job in raw}
-    result.stale.extend(job for job in jobs if normalize_job_url(job.url) not in open_urls)
+        return None
+    return raw
