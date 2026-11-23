@@ -27,7 +27,9 @@ async def test_a_paste_matching_a_stored_job_is_archived_as_its_copy(temporary_d
     pending = _pending()
     evaluate = AsyncMock(return_value=evaluation_result(8.0))
     with patch("moonlighter.discovery.manual.verification.evaluate_job", new=evaluate):
-        answer = await verify_job(pending.id, PAGE, CONFIG, profile=PROFILE, caller=MagicMock())
+        answer = (
+            await verify_job(pending.id, PAGE, CONFIG, profile=PROFILE, caller=MagicMock())
+        ).message
     evaluate.assert_not_called()
     stored = Job.get_by_id(pending.id)
     assert (stored.status, stored.duplicate_of_id, stored.description) == (

@@ -1,5 +1,7 @@
 """Re-scoring a needs_review job from the text a person pasted from its page."""
 
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any
 
 from moonlighter.core.db import Job
@@ -14,6 +16,23 @@ from moonlighter.discovery.screening.evaluator_inputs import (
     is_description_insufficient,
     model_for,
 )
+
+
+class VerifyKind(StrEnum):
+    SCORED = "scored"  # evaluated, now new or archived by the threshold
+    DUPLICATE = "duplicate"  # the paste is a stored job's text: archived as its copy, not scored
+    JOB_NOT_FOUND = "job_not_found"
+    NOT_PENDING = "not_pending"  # the job is not needs_review
+    PASTE_TOO_SHORT = "paste_too_short"  # the job stays pending
+
+
+@dataclass(frozen=True)
+class VerifyResult:
+    """What verify_job did, by kind, and the text the person reads."""
+
+    kind: VerifyKind
+    job_id: int
+    message: str
 
 
 def _archive_if_copy(job: Job, page_text: str) -> str | None:
@@ -38,7 +57,7 @@ async def verify_job(
     *,
     profile: dict[str, Any],
     caller: LLMCaller,
-) -> str:
+) -> VerifyResult:
     """Re-score a job flagged needs_review (empty description) using text pasted from its page.
 
     Updates the same row in place.
@@ -46,20 +65,26 @@ async def verify_job(
     try:
         job = Job.get_by_id(job_id)
     except Job.DoesNotExist:
-        return f"Job #{job_id} not found."
+        return VerifyResult(VerifyKind.JOB_NOT_FOUND, job_id, f"Job #{job_id} not found.")
     if job.status != "needs_review":
-        return f"Job #{job_id} is not pending verification (status: {job.status!r})."
+        return VerifyResult(
+            VerifyKind.NOT_PENDING,
+            job_id,
+            f"Job #{job_id} is not pending verification (status: {job.status!r}).",
+        )
 
     if is_description_insufficient(page_text):
-        return (
+        return VerifyResult(
+            VerifyKind.PASTE_TOO_SHORT,
+            job_id,
             f"That paste is too short to score ({len(page_text.strip())} chars — need at least "
             f"{MINIMUM_DESCRIPTION_LENGTH}). Job #{job_id} stays pending — open {job.url} "
-            "and copy the whole page."
+            "and copy the whole page.",
         )
 
     copy_answer = _archive_if_copy(job, page_text)
     if copy_answer is not None:
-        return copy_answer
+        return VerifyResult(VerifyKind.DUPLICATE, job_id, copy_answer)
     threshold = config["score_threshold"]
     result = await evaluate_job(
         EvalInput(
@@ -74,4 +99,5 @@ async def verify_job(
     for name, value in fields.items():
         setattr(job, name, value)
     job.save()
-    return format_add_result(job, result, threshold=threshold, status=fields["status"])
+    message = format_add_result(job, result, threshold=threshold, status=fields["status"])
+    return VerifyResult(VerifyKind.SCORED, job_id, message)

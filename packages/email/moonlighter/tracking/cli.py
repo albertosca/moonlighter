@@ -51,6 +51,7 @@ from moonlighter.tracking.register import (
     register_to_dict,
 )
 from moonlighter.tracking.sync.monitor import sync_responses
+from moonlighter.tracking.sync.report import sync_update_to_dict
 
 # No Gmail token/credentials yet is a routine, anticipated failure -- not a
 # bug -- so run() maps it to exit 1 (expected_failure) instead of exit 3
@@ -116,7 +117,8 @@ async def _run(arguments: argparse.Namespace) -> tuple[dict[str, Any], int]:
             EXIT_OK if result.kind is RegisterKind.REGISTERED else EXIT_NOTHING
         )
     updates = await sync_responses(config, make_caller(config))
-    return {"kind": "synced", "updates": updates}, (EXIT_OK if updates else EXIT_NOTHING)
+    payload = {"kind": "synced", "updates": [sync_update_to_dict(update) for update in updates]}
+    return payload, (EXIT_OK if updates else EXIT_NOTHING)
 
 
 def main() -> None:  # pragma: no cover - entry point (boundary)
