@@ -153,9 +153,10 @@ async def archive_stale_jobs(  # noqa: D417 - context is injected by FastMCP; th
     Checks jobs currently in new/reviewed/applying/needs_review against the source's
     current listing (Greenhouse/Lever/Ashby API, or a LinkedIn page revisit). A company
     whose check fails (network error, malformed response) is reported explicitly and left
-    untouched — never silently archived by mistake. A job with no listing to compare
-    against (added by URL, source='manual') is listed with its link for the person to
-    confirm by hand, and is never archived.
+    untouched — never silently archived by mistake. A job added by URL from a Greenhouse
+    or Ashby board is checked against that board by posting id; any other job added by
+    URL has no listing to compare against, so it is listed with its link for the person
+    to confirm by hand, and is never archived.
 
     Args:
         job_id: check only this job (mutually exclusive with company).
