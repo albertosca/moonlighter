@@ -14,6 +14,7 @@ from moonlighter.core.db import Application
 from moonlighter.core.metrics import operation_metrics
 from moonlighter.tracking.gmail.client import GmailAuthError, run_gmail_oauth, setup_gmail_service
 from moonlighter.tracking.sync.monitor import sync_responses
+from moonlighter.tracking.sync.report import SyncUpdate
 
 
 @tool_logged
@@ -62,7 +63,7 @@ async def setup_email(*, context: Context[AppContext, Any]) -> str:
         return "✓ Gmail authentication configured successfully."
 
 
-def _promote_advanced_applications(updates: list[dict[str, Any]]) -> None:
+def _promote_advanced_applications(updates: list[SyncUpdate]) -> None:
     """Promotes the answers of every application an email reply moved forward.
 
     update_status(..., "submitted") is the operator-driven promotion trigger;
@@ -74,24 +75,24 @@ def _promote_advanced_applications(updates: list[dict[str, Any]]) -> None:
     not import the answer bank; this layer is the one that has both.
     """
     for update in updates:
-        if update.get("status_advanced"):
-            job_id = update["job_id"]
+        job_id = update.advanced_job_id
+        if job_id is not None:
             application = Application.get(Application.job == job_id)
             promote_application(application.get_form_data(), job_id)
 
 
-def _update_line(update: dict[str, Any]) -> str:
-    company = update.get("company") or "?"
-    title = update.get("title") or "?"
-    message_type = update.get("type", "?")
-    stage = update.get("stage") or ""
-    match_type = update.get("match_type", "")
-    stage_text = f" → {stage}" if stage else ""
-    line = f"- **{company}** / {title}: `{message_type}`{stage_text} (match: {match_type})"
-    if update.get("needs_confirmation"):
+def _update_line(update: SyncUpdate) -> str:
+    company = update.company or "?"
+    title = update.title or "?"
+    stage_text = f" → {update.stage}" if update.stage else ""
+    line = (
+        f"- **{company}** / {title}: `{update.message_type}`{stage_text} "
+        f"(match: {update.match_type})"
+    )
+    if update.needs_confirmation:
         line += (
             f" — ⚠️ suggestion not applied; confirm with "
-            f"update_status(job_id={update['suggested_job_id']}, status=...)"
+            f"update_status(job_id={update.suggested_job_id}, status=...)"
         )
     return line
 

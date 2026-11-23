@@ -21,13 +21,15 @@ async def test_verify_job_result_text_and_stored_fields_are_pinned(temporary_dat
         "moonlighter.discovery.manual.verification.evaluate_job",
         new=AsyncMock(return_value=evaluation_result(9.0, caveats=["visa"])),
     ):
-        result = await verify_job(
-            job.id,
-            "a pasted page that is long enough to score",
-            CONFIG,
-            profile=PROFILE,
-            caller=MagicMock(),
-        )
+        result = (
+            await verify_job(
+                job.id,
+                "a pasted page that is long enough to score",
+                CONFIG,
+                profile=PROFILE,
+                caller=MagicMock(),
+            )
+        ).message
     assert result == (
         "✓ NEW — Acme / Eng\n"
         "Score: 9.0/10  (threshold: 7.0)\n"
@@ -48,15 +50,15 @@ async def test_verify_job_result_text_and_stored_fields_are_pinned(temporary_dat
 
 async def test_verify_job_rejection_messages_are_pinned_exactly(temporary_database):
     init_db()
-    assert await verify_job(999, "x", CONFIG, profile=PROFILE, caller=MagicMock()) == (
+    assert (await verify_job(999, "x", CONFIG, profile=PROFILE, caller=MagicMock())).message == (
         "Job #999 not found."
     )
     settled = Job.create(
         source="manual", company="Acme", title="Eng", url="https://x.com/pin/v2", status="new"
     )
-    assert await verify_job(settled.id, "x", CONFIG, profile=PROFILE, caller=MagicMock()) == (
-        f"Job #{settled.id} is not pending verification (status: 'new')."
-    )
+    assert (
+        await verify_job(settled.id, "x", CONFIG, profile=PROFILE, caller=MagicMock())
+    ).message == (f"Job #{settled.id} is not pending verification (status: 'new').")
     pending = Job.create(
         source="manual",
         company="Acme",
@@ -64,9 +66,9 @@ async def test_verify_job_rejection_messages_are_pinned_exactly(temporary_databa
         url="https://x.com/pin/v3",
         status="needs_review",
     )
-    assert await verify_job(
-        pending.id, "  tiny  ", CONFIG, profile=PROFILE, caller=MagicMock()
-    ) == (
+    assert (
+        await verify_job(pending.id, "  tiny  ", CONFIG, profile=PROFILE, caller=MagicMock())
+    ).message == (
         f"That paste is too short to score (4 chars — need at least 30). Job #{pending.id} "
         "stays pending — open https://x.com/pin/v3 and copy the whole page."
     )

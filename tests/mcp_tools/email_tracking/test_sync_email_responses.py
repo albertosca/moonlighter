@@ -1,17 +1,19 @@
 """What sync_email_responses reports for the replies it found."""
 
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 from moonlighter.core.db import init_db
 from moonlighter.mcp_tools.email_tracking import sync_email_responses
 from tests._context import make_test_context
+from tests.tracking.sync_updates import as_sync_updates
 
 
 async def test_sync_email_responses_returns_summary(temporary_database):
     """sync_email_responses should call sync_responses and return a readable summary."""
     init_db()
 
-    fake_updates = [
+    fake_updates: list[dict[str, Any]] = [
         {
             "company": "Anthropic",
             "title": "Senior Engineer",
@@ -40,7 +42,7 @@ async def test_sync_email_responses_returns_summary(temporary_database):
 
     with patch(
         "moonlighter.mcp_tools.email_tracking.sync_responses",
-        new=AsyncMock(return_value=fake_updates),
+        new=AsyncMock(return_value=as_sync_updates(fake_updates)),
     ):
         result = await sync_email_responses(context=make_test_context(config=test_config))
 
@@ -81,18 +83,20 @@ async def test_sync_email_responses_flags_fuzzy_match_as_suggestion(temporary_da
     with patch(
         "moonlighter.mcp_tools.email_tracking.sync_responses",
         new=AsyncMock(
-            return_value=[
-                {
-                    "company": "Stripe",
-                    "title": "Backend Engineer",
-                    "type": "interview",
-                    "stage": "technical_interview",
-                    "match_type": "fuzzy",
-                    "summary": "x",
-                    "suggested_job_id": 42,
-                    "needs_confirmation": True,
-                }
-            ]
+            return_value=as_sync_updates(
+                [
+                    {
+                        "company": "Stripe",
+                        "title": "Backend Engineer",
+                        "type": "interview",
+                        "stage": "technical_interview",
+                        "match_type": "fuzzy",
+                        "summary": "x",
+                        "suggested_job_id": 42,
+                        "needs_confirmation": True,
+                    }
+                ]
+            )
         ),
     ):
         result = await sync_email_responses(context=make_test_context())

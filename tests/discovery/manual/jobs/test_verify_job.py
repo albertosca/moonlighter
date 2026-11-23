@@ -10,9 +10,9 @@ from tests.discovery.fake_scan import CONFIG, PROFILE, evaluation_result, run_sc
 
 async def test_verify_job_not_found_returns_message(temporary_database):
     init_db()
-    result = await verify_job(
-        999, "some page text here", CONFIG, profile=PROFILE, caller=MagicMock()
-    )
+    result = (
+        await verify_job(999, "some page text here", CONFIG, profile=PROFILE, caller=MagicMock())
+    ).message
     assert "not found" in result.lower()
 
 
@@ -26,7 +26,7 @@ async def test_verify_job_rejects_a_job_not_pending_verification(temporary_datab
         status="new",
         score=8.0,
     )
-    result = await verify_job(job.id, "text", CONFIG, profile=PROFILE, caller=MagicMock())
+    result = (await verify_job(job.id, "text", CONFIG, profile=PROFILE, caller=MagicMock())).message
     assert "not pending verification" in result
     assert "new" in result
 
@@ -43,7 +43,9 @@ async def test_verify_job_rejects_a_too_short_paste_and_leaves_job_pending(tempo
     )
     eval_mock = AsyncMock(return_value=evaluation_result(8.0))
     with patch("moonlighter.discovery.manual.verification.evaluate_job", new=eval_mock):
-        result = await verify_job(job.id, "  ", CONFIG, profile=PROFILE, caller=MagicMock())
+        result = (
+            await verify_job(job.id, "  ", CONFIG, profile=PROFILE, caller=MagicMock())
+        ).message
     eval_mock.assert_not_called()
     assert "too short" in result
     assert "0 chars" in result
@@ -91,13 +93,15 @@ async def test_verify_job_updates_the_same_row_and_scores_above_threshold(tempor
         "moonlighter.discovery.manual.verification.evaluate_job",
         new=AsyncMock(return_value=evaluation_result(8.0)),
     ):
-        result = await verify_job(
-            job.id,
-            "Full page text with the real job description.",
-            CONFIG,
-            profile=PROFILE,
-            caller=MagicMock(),
-        )
+        result = (
+            await verify_job(
+                job.id,
+                "Full page text with the real job description.",
+                CONFIG,
+                profile=PROFILE,
+                caller=MagicMock(),
+            )
+        ).message
     refreshed = Job.get_by_id(job.id)
     assert refreshed.status == "new"
     assert refreshed.score == 8.0
@@ -130,13 +134,15 @@ async def test_verify_job_scores_a_row_that_scan_actually_produced(temporary_dat
         "moonlighter.discovery.manual.verification.evaluate_job",
         new=AsyncMock(return_value=evaluation_result(8.0)),
     ):
-        result = await verify_job(
-            job.id,
-            "Full page text with the real job description.",
-            CONFIG,
-            profile=PROFILE,
-            caller=MagicMock(),
-        )
+        result = (
+            await verify_job(
+                job.id,
+                "Full page text with the real job description.",
+                CONFIG,
+                profile=PROFILE,
+                caller=MagicMock(),
+            )
+        ).message
     refreshed = Job.get_by_id(job.id)
     assert refreshed.status == "new"
     assert refreshed.description == "Full page text with the real job description."
@@ -157,13 +163,15 @@ async def test_verify_job_below_threshold_archives(temporary_database):
         "moonlighter.discovery.manual.verification.evaluate_job",
         new=AsyncMock(return_value=evaluation_result(3.0)),
     ):
-        result = await verify_job(
-            job.id,
-            "Full page text with the real job description.",
-            CONFIG,
-            profile=PROFILE,
-            caller=MagicMock(),
-        )
+        result = (
+            await verify_job(
+                job.id,
+                "Full page text with the real job description.",
+                CONFIG,
+                profile=PROFILE,
+                caller=MagicMock(),
+            )
+        ).message
     refreshed = Job.get_by_id(job.id)
     assert refreshed.status == "archived"
     assert "archived" in result

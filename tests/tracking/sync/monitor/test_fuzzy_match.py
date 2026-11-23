@@ -54,9 +54,9 @@ async def test_email_without_ref_fuzzy_match_is_suggestion_only(temporary_databa
     application_refreshed = Application.get_by_id(application.id)
     assert application_refreshed.status == "submitted"  # NOT mutated
     assert len(updates) == 1
-    assert updates[0]["match_type"] == "fuzzy"
-    assert updates[0]["needs_confirmation"] is True
-    assert updates[0]["suggested_job_id"] == job.id
+    assert updates[0].match_type == "fuzzy"
+    assert updates[0].needs_confirmation is True
+    assert updates[0].suggested_job_id == job.id
 
 
 async def test_fuzzy_rejection_never_auto_rejects(temporary_database):
@@ -102,7 +102,7 @@ async def test_fuzzy_rejection_never_auto_rejects(temporary_database):
     assert (
         Application.get_by_id(application.id).status == "submitted"
     )  # NEVER turns rejected without ref
-    assert updates[0]["needs_confirmation"] is True
+    assert updates[0].needs_confirmation is True
 
 
 async def test_ambiguous_match_marks_uncertain_in_notes(temporary_database):
@@ -144,4 +144,4 @@ async def test_ambiguous_match_marks_uncertain_in_notes(temporary_database):
         updates = await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
 
     # No application can have been updated for certain — uncertain
-    assert any("uncertain" in (update.get("match_type", "")) for update in updates)
+    assert any("uncertain" in update.match_type for update in updates)

@@ -12,6 +12,7 @@ from moonlighter.tracking import cli
 from moonlighter.tracking.cli import parse_args
 from moonlighter.tracking.gmail.client import GmailAuthError
 from moonlighter.tracking.register import RegisterKind, RegisterResult
+from tests.tracking.sync_updates import as_sync_updates
 
 
 def test_parse_args_sync():
@@ -42,7 +43,7 @@ async def test_run_sync_exits_0_with_the_updates_as_json(temporary_database):
     with (
         patch.object(cli, "bootstrap", return_value=({"email": {}}, {})),
         patch.object(cli, "make_caller", return_value=object()),
-        patch.object(cli, "sync_responses", new=AsyncMock(return_value=updates)),
+        patch.object(cli, "sync_responses", new=AsyncMock(return_value=as_sync_updates(updates))),
     ):
         payload, code = await cli._run(cli.parse_args(["sync"]))
     assert (payload["kind"], code) == ("synced", 0)

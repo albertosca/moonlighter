@@ -21,7 +21,7 @@ from moonlighter.tracking.sync.application_matching import extract_ref, resolve_
 from moonlighter.tracking.sync.classification import classify_response
 from moonlighter.tracking.sync.funnel import advance_application
 from moonlighter.tracking.sync.interview_stages import register_new_stage
-from moonlighter.tracking.sync.report import make_suggestion, make_update
+from moonlighter.tracking.sync.report import SyncUpdate, make_suggestion, make_update
 from moonlighter.tracking.sync.sweep import record_sweep_if_complete
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ class _ClassificationSkippedError(Exception):
     """One message could not be classified; it waits for the next run, and this run is no sweep."""
 
 
-async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[dict[str, Any]]:
+async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[SyncUpdate]:
     """Run the full flow: read recent emails, classify them, and update the database.
 
     Returns the list of updates made.
@@ -71,7 +71,7 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
     lookback_days = int(email_config.get("lookback_days", 30))
     started = datetime.now()  # noqa: DTZ005 - the database stores naive local time
     references = fetch_recent_messages(service, lookback_days)
-    updates: list[dict[str, Any]] = []
+    updates: list[SyncUpdate] = []
     skipped = 0
     try:
         for message_reference in references:
@@ -117,7 +117,7 @@ def _gmail_handles(service: Any, email_config: dict[str, Any]) -> _GmailHandles:
 
 async def _sync_message(
     message_id: str, gmail: _GmailHandles, settings: _SyncSettings, *, llm_caller: LLMCaller
-) -> dict[str, Any] | None:
+) -> SyncUpdate | None:
     """Classifies one message and applies it; returns its report entry, or None when it has none."""
     if ProcessedEmail.select().where(ProcessedEmail.message_id == message_id).exists():
         return None  # already processed in a previous run — don't re-call the LLM
@@ -165,7 +165,7 @@ async def _classify(
 
 def _apply_reply(
     message: dict[str, Any], classification: dict[str, Any], settings: _SyncSettings
-) -> tuple[dict[str, Any], bool]:
+) -> tuple[SyncUpdate, bool]:
     """Applies a classified reply to its application; returns its entry and whether to archive."""
     reference = extract_ref(message["to"], settings.base_address)
     application, match_type = resolve_application(reference, classification)

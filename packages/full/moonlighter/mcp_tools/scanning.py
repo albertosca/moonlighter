@@ -132,13 +132,14 @@ async def verify_job(  # noqa: D417 - context is injected by FastMCP; the docstr
         page_text: the copied page text — becomes the job's real description
     """  # noqa: D205 - served verbatim as the MCP tool description
     app_context = refreshed_app_context(context)
-    return await verification.verify_job(
+    result = await verification.verify_job(
         job_id,
         page_text,
         app_context.config,
         profile=app_context.profile,
         caller=app_context.llm_caller,
     )
+    return result.message
 
 
 @tool_logged
