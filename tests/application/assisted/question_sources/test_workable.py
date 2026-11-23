@@ -2,15 +2,15 @@ import json
 
 import httpx
 
-from moonlighter.application.assisted.questions import QuestionKind
-from moonlighter.application.assisted.sources.base import SourceMatch, questions_or_empty
-from moonlighter.application.assisted.sources.workable import (
+from moonlighter.application.assisted.question_sources.base import SourceMatch, questions_or_empty
+from moonlighter.application.assisted.question_sources.workable import (
     WorkableSource,
     fetch_workable_questions,
     parse_workable_form,
     shortcode_from_url,
 )
-from tests.application.assisted.sources.fixture_files import FIXTURES_DIRECTORY
+from moonlighter.application.assisted.questions import QuestionKind
+from tests.application.assisted.question_sources.fixture_files import FIXTURES_DIRECTORY
 
 SEEQ = json.loads((FIXTURES_DIRECTORY / "workable_form_seeq.json").read_text())
 DEVSU = json.loads((FIXTURES_DIRECTORY / "workable_form_devsu.json").read_text())
@@ -181,7 +181,7 @@ async def test_a_non_200_means_no_form(caplog):
     [record] = [
         record
         for record in caplog.records
-        if record.name == "moonlighter.application.assisted.sources.workable"
+        if record.name == "moonlighter.application.assisted.question_sources.workable"
     ]
     assert record.levelname == "WARNING"
     assert "404" in record.getMessage()

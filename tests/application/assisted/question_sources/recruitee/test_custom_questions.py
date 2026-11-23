@@ -1,10 +1,10 @@
 """Reading an offer's own questions: kinds, options, labels and the entries that are dropped."""
 
-from moonlighter.application.assisted.questions import QuestionKind
-from moonlighter.application.assisted.sources.recruitee import (
+from moonlighter.application.assisted.question_sources.recruitee import (
     parse_recruitee_questions,
 )
-from tests.application.assisted.sources.recruitee.recruitee_offers import (
+from moonlighter.application.assisted.questions import QuestionKind
+from tests.application.assisted.question_sources.recruitee.recruitee_offers import (
     PAYLOAD_WITH_BOOLEAN_AND_DATE,
     PAYLOAD_WITH_CHOICE,
 )

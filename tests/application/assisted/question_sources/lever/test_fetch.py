@@ -2,13 +2,13 @@
 
 import httpx
 
-from moonlighter.application.assisted.sources.base import SourceMatch, questions_or_empty
-from moonlighter.application.assisted.sources.lever import (
+from moonlighter.application.assisted.question_sources.base import SourceMatch, questions_or_empty
+from moonlighter.application.assisted.question_sources.lever import (
     LeverSource,
     fetch_lever_questions,
     posting_from_url,
 )
-from tests.application.assisted.sources.lever.lever_pages import PAGE
+from tests.application.assisted.question_sources.lever.lever_pages import PAGE
 
 
 async def test_lever_publishes_no_separate_required_fields():
@@ -52,7 +52,7 @@ async def test_a_non_200_means_no_form(caplog):
     [record] = [
         record
         for record in caplog.records
-        if record.name == "moonlighter.application.assisted.sources.lever"
+        if record.name == "moonlighter.application.assisted.question_sources.lever"
     ]
     assert record.levelname == "WARNING"
     assert "404" in record.getMessage()

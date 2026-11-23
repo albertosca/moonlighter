@@ -4,10 +4,10 @@ import logging
 from typing import Any
 
 from moonlighter.application.assisted import service
+from moonlighter.application.assisted.question_sources.pasted import ExtractionError
 from moonlighter.application.assisted.questions import FormQuestion
 from moonlighter.application.assisted.sheet.required_labels import REQUIRED_KEYWORDS
 from moonlighter.application.assisted.sheet.results import SheetKind
-from moonlighter.application.assisted.sources.pasted import ExtractionError
 from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
 from tests.application.assisted.service.fake_service import stub_caller
 

@@ -8,8 +8,8 @@ attacker-controlled, so it is wrapped as untrusted data.
 import re
 from typing import Any
 
+from moonlighter.application.assisted.question_sources.base import is_question, yes_no_for
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.sources.base import is_question, yes_no_for
 from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.parsing import parse_llm_json, wrap_untrusted

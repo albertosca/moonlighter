@@ -1,10 +1,10 @@
 """The standard fields a Recruitee offer always asks, switched on and off by its flags."""
 
-from moonlighter.application.assisted.questions import QuestionKind
-from moonlighter.application.assisted.sources.recruitee import (
+from moonlighter.application.assisted.question_sources.recruitee import (
     parse_recruitee_questions,
 )
-from tests.application.assisted.sources.recruitee.recruitee_offers import PAYLOAD
+from moonlighter.application.assisted.questions import QuestionKind
+from tests.application.assisted.question_sources.recruitee.recruitee_offers import PAYLOAD
 
 
 def test_an_offer_synthesizes_the_standard_fields_the_form_always_asks():

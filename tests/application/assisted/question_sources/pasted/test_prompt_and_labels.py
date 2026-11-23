@@ -4,11 +4,11 @@ import json
 
 import pytest
 
-from moonlighter.application.assisted.questions import QuestionKind
-from moonlighter.application.assisted.sources.pasted import (
+from moonlighter.application.assisted.question_sources.pasted import (
     extract_questions_from_page,
 )
-from tests.application.assisted.sources.pasted.pasted_replies import PAGE, fake_llm
+from moonlighter.application.assisted.questions import QuestionKind
+from tests.application.assisted.question_sources.pasted.pasted_replies import PAGE, fake_llm
 
 
 @pytest.mark.asyncio

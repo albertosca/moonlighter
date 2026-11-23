@@ -7,15 +7,15 @@ so it does not rot as postings close. A skipped e2e counts as a failure here.
 import httpx
 import pytest
 
-from moonlighter.application.assisted.questions import QuestionKind
-from moonlighter.application.assisted.sources.base import (
+from moonlighter.application.assisted.question_sources.base import (
     SourceMatch,
     questions_or_empty,
     required_fields_or_empty,
 )
-from moonlighter.application.assisted.sources.inhire import InHireSource
-from moonlighter.application.assisted.sources.lever import LeverSource
-from moonlighter.application.assisted.sources.workable import WorkableSource
+from moonlighter.application.assisted.question_sources.inhire import InHireSource
+from moonlighter.application.assisted.question_sources.lever import LeverSource
+from moonlighter.application.assisted.question_sources.workable import WorkableSource
+from moonlighter.application.assisted.questions import QuestionKind
 
 pytestmark = pytest.mark.e2e
 HEADERS = {"User-Agent": "moonlighter/0.1"}

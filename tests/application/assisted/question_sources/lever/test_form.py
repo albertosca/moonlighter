@@ -2,11 +2,11 @@
 
 import pytest
 
-from moonlighter.application.assisted.questions import QuestionKind
-from moonlighter.application.assisted.sources.lever import (
+from moonlighter.application.assisted.question_sources.lever import (
     parse_lever_form,
 )
-from tests.application.assisted.sources.lever.lever_pages import (
+from moonlighter.application.assisted.questions import QuestionKind
+from tests.application.assisted.question_sources.lever.lever_pages import (
     PAGE,
     by_label,
     card_fields,

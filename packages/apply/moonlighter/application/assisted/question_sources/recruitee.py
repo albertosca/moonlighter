@@ -19,12 +19,12 @@ from typing import Any
 
 import httpx
 
-from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
-from moonlighter.application.assisted.sources.base import (
+from moonlighter.application.assisted.question_sources.base import (
     SourceMatch,
     is_question,
     yes_no_question,
 )
+from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.core.db import Job
 
 API = "https://{host}/api/offers/{offer}"

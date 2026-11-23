@@ -13,8 +13,8 @@ import re
 
 import httpx
 
+from moonlighter.application.assisted.question_sources.base import UUID_PATTERN, SourceMatch
 from moonlighter.application.assisted.questions import FormQuestion
-from moonlighter.application.assisted.sources.base import UUID_PATTERN, SourceMatch
 from moonlighter.core.db import Job
 
 API = "https://api.inhire.app/job-posts/public/pages/{job_id}"

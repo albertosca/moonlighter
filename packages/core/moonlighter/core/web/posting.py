@@ -100,7 +100,7 @@ async def _fetch_recruitee_offer(host: str, offer: str) -> FetchedPosting | None
 
     The single-offer endpoint (GET /api/offers/{offer}) would avoid the
     matching below entirely, and is the same API shape already live-verified
-    (2026-08-11) in application/assisted/sources/recruitee.py -- but that
+    (2026-08-11) in application/assisted/question_sources/recruitee.py -- but that
     verification only covers <slug>.recruitee.com hosts. This module deliberately
     also matches custom career domains (jobs.channable.com), and the list feed
     (/api/offers/) is what's actually live-verified (2026-08-12, see module
