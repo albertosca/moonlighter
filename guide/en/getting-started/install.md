@@ -64,7 +64,7 @@ Using a different MCP client? Register the same command and args (`uvx` / `["moo
 uvx moonlighter init
 ```
 
-When `opencode` is on your PATH, the wizard offers to register the server in opencode's global config: `~/.config/opencode/opencode.json`, or the same file under `$XDG_CONFIG_HOME/opencode/` or `$OPENCODE_CONFIG_DIR` when those are set. It copies the file to `opencode.json.bak` before changing it. A file it cannot edit safely (JSONC, a layout it does not recognise, or moonlighter already registered) stays as it is, and the wizard prints the block to add by hand:
+When `opencode` is on your PATH, the wizard offers to register the server in opencode's global config: `~/.config/opencode/opencode.json`, or the same file under `$XDG_CONFIG_HOME/opencode/` or `$OPENCODE_CONFIG_DIR` when those are set. It copies the file to `opencode.json.bak` before changing it (`.bak.1`, `.bak.2` and so on when a backup is already there). A symlinked file is edited where the link points, so the link stays. A file it cannot edit safely (JSONC, a layout it does not recognise, or moonlighter already registered) stays as it is, and the wizard prints the block to add by hand:
 
 ```json
 {

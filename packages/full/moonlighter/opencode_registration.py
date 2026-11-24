@@ -53,17 +53,26 @@ def register_in_opencode(target: Path) -> Registration:
             path=target,
             reason=f"{jsonc} exists, and moonlighter does not edit JSONC",
         )
-    if not target.exists():
-        target.parent.mkdir(parents=True, exist_ok=True)
-        _write_json(target, {"$schema": _SCHEMA, "mcp": {"servers": {"moonlighter": MCP_ENTRY}}})
+    try:
+        return _register(target)
+    except OSError as error:
+        return Registration(written=False, path=target, reason=f"could not write {target}: {error}")
+
+
+def _register(target: Path) -> Registration:
+    # A config symlinked from a dotfiles repository is written through, so the link survives.
+    real_file = target.resolve()
+    if not real_file.exists():
+        real_file.parent.mkdir(parents=True, exist_ok=True)
+        _write_json(real_file, {"$schema": _SCHEMA, "mcp": {"servers": {"moonlighter": MCP_ENTRY}}})
         return Registration(written=True, path=target, reason=f"created {target}")
     config, refusal = _existing_config(target)
     if config is None:
         return Registration(written=False, path=target, reason=refusal)
-    backup = target.with_name(target.name + ".bak")
-    shutil.copy2(target, backup)
+    backup = _free_backup_path(target)
+    shutil.copyfile(real_file, backup)
     config.setdefault("mcp", {}).setdefault("servers", {})["moonlighter"] = MCP_ENTRY
-    _write_json(target, config)
+    _write_json(real_file, config)
     return Registration(
         written=True,
         path=target,
@@ -71,13 +80,29 @@ def register_in_opencode(target: Path) -> Registration:
     )
 
 
-def _write_json(target: Path, config: dict[str, Any]) -> None:
-    """Replace `target` in one step, so a crash never leaves half a config behind."""
-    with tempfile.NamedTemporaryFile(
-        "w", encoding="utf-8", dir=target.parent, prefix=".opencode-", delete=False
-    ) as staging:
-        staging.write(json.dumps(config, indent=2) + "\n")
-    Path(staging.name).replace(target)
+def _free_backup_path(target: Path) -> Path:
+    """`opencode.json.bak`, or the first `.bak.N` free: a backup the person kept is never replaced."""
+    candidate = target.with_name(f"{target.name}.bak")
+    number = 1
+    while candidate.exists() or candidate.is_symlink():
+        candidate = target.with_name(f"{target.name}.bak.{number}")
+        number += 1
+    return candidate
+
+
+def _write_json(real_file: Path, config: dict[str, Any]) -> None:
+    """Replace `real_file` in one step, in its own mode, so a crash never leaves half a config."""
+    descriptor, staging_name = tempfile.mkstemp(dir=real_file.parent, prefix=".opencode-")
+    staged = Path(staging_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as staging:
+            staging.write(json.dumps(config, indent=2, ensure_ascii=False) + "\n")
+        if real_file.exists():
+            shutil.copymode(real_file, staged)
+        staged.replace(real_file)
+    except OSError:
+        staged.unlink(missing_ok=True)
+        raise
 
 
 def _existing_config(target: Path) -> tuple[dict[str, Any] | None, str]:

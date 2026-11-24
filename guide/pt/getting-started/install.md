@@ -64,7 +64,7 @@ Usa outro cliente MCP? Registre o mesmo comando e argumentos (`uvx` / `["moonlig
 uvx moonlighter init
 ```
 
-Quando o `opencode` está no seu PATH, o assistente oferece registrar o servidor na configuração global do opencode: `~/.config/opencode/opencode.json`, ou o mesmo arquivo em `$XDG_CONFIG_HOME/opencode/` ou em `$OPENCODE_CONFIG_DIR` quando essas variáveis existem. Antes de mudar o arquivo, ele faz uma cópia em `opencode.json.bak`. Um arquivo que ele não consegue editar com segurança (JSONC, um formato que ele não reconhece, ou o moonlighter já registrado) fica como está, e o assistente imprime o bloco para você adicionar à mão:
+Quando o `opencode` está no seu PATH, o assistente oferece registrar o servidor na configuração global do opencode: `~/.config/opencode/opencode.json`, ou o mesmo arquivo em `$XDG_CONFIG_HOME/opencode/` ou em `$OPENCODE_CONFIG_DIR` quando essas variáveis existem. Antes de mudar o arquivo, ele faz uma cópia em `opencode.json.bak` (`.bak.1`, `.bak.2` e assim por diante quando já existe um backup). Um arquivo que é link simbólico é editado no destino do link, e o link continua. Um arquivo que ele não consegue editar com segurança (JSONC, um formato que ele não reconhece, ou o moonlighter já registrado) fica como está, e o assistente imprime o bloco para você adicionar à mão:
 
 ```json
 {
