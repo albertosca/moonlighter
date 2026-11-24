@@ -33,9 +33,10 @@ docs = [
 asyncio_mode = "auto"
 # scripts/ is not a package: tests import its modules by bare name, as `python scripts/x.py` does.
 pythonpath = ["scripts"]
-addopts = "--cov --cov-fail-under=100 -m 'not e2e'"
+addopts = "--cov --cov-fail-under=100 -m 'not e2e and not opencode_live'"
 markers = [
     "e2e: end-to-end tests that need a real browser, pdflatex, or the network (run with -m e2e)",
+    "opencode_live: sends one prompt to a real opencode provider (MOONLIGHTER_E2E_OPENCODE_MODEL; run with -m opencode_live)",
 ]
 
 [tool.ruff]
