@@ -14,7 +14,7 @@ from moonlighter.core.config.paths import resolve_under_home
 
 
 def generated_dir_for(config: Config, job_id: int) -> Path:
-    base = config.get("cv", {}).get("generated_dir")
+    base = config["cv"].get("generated_dir")
     root = resolve_under_home(base) if base else resolve_under_home("cv-generated")
     return root / str(job_id)
 
@@ -40,10 +40,10 @@ _DEFAULT_TEMPLATE_DIR_NAME = "cv-templates"
 # original brainstorm never covered. Revisit if a real config ever needs to
 # explicitly null cv.pool.
 def resolved_pool_path(config: Config) -> Path:
-    pool_path = config.get("cv", {}).get("pool") or _DEFAULT_POOL_NAME
+    pool_path = config["cv"].get("pool") or _DEFAULT_POOL_NAME
     return resolve_under_home(pool_path)
 
 
 def resolved_template_dir(config: Config) -> Path:
-    template_directory = config.get("cv", {}).get("template_dir") or _DEFAULT_TEMPLATE_DIR_NAME
+    template_directory = config["cv"].get("template_dir") or _DEFAULT_TEMPLATE_DIR_NAME
     return resolve_under_home(template_directory)

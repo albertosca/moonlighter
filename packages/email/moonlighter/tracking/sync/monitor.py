@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
 from moonlighter.core.config.model import Config, EmailConfig
 from moonlighter.core.db import ProcessedEmail
 from moonlighter.core.llm.caller import LLMCaller
@@ -97,7 +96,7 @@ def _read_settings(config: Config, email_config: EmailConfig) -> _SyncSettings:
         email_config=email_config,
         base_address=email_config["address"],
         stages=list(email_config.get("interview_stages", [])),
-        model=config.get("llm_model", DEFAULT_LLM_MODEL),
+        model=config["llm_model"],
         archive_all=archive_all,
         # Layer two is a superset of layer one by design.
         archive_reference_matched=archive_all

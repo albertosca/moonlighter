@@ -22,12 +22,11 @@ def configured_cv_path(config: Config, company: str = "") -> Path | None:
     Shared with the startup check so that a warning can never name a different
     file from the one the applier would actually upload.
     """
-    cv_config = config.get("cv", {})
+    cv_config = config["cv"]
     by_company = {
-        company_name.lower(): cv_path
-        for company_name, cv_path in (cv_config.get("by_company", {}) or {}).items()
+        company_name.lower(): cv_path for company_name, cv_path in cv_config["by_company"].items()
     }
-    rel = by_company.get((company or "").lower(), cv_config.get("default"))
+    rel = by_company.get((company or "").lower(), cv_config["default"])
     if not rel:
         return None
     return resolve_under_home(str(rel))

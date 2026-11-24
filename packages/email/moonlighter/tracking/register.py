@@ -96,7 +96,7 @@ def _merge(application: Application, request: RegisterRequest, *, now: datetime)
 def _registered(
     application: Application, config: Config, *, job_id: int, created: bool
 ) -> RegisterResult:
-    address = config.get("email", {}).get("address")
+    address = config["email"].get("address")
     # _merge minted the ref when it was missing, so str() only narrows the type.
     alias = build_email_alias(str(address), str(application.email_ref)) if address else None
     return RegisterResult(

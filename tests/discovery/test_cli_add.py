@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from unittest.mock import patch
 
 from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Job, init_db
 from moonlighter.discovery import cli
 from moonlighter.discovery.cli import _run, parse_args
@@ -59,7 +60,7 @@ def _adding(*, creates_row):
         return "Provide at least 'company' and 'title' along with the URL."
 
     with (
-        patch.object(cli, "bootstrap", return_value=({"score_threshold": 6.5}, {})),
+        patch.object(cli, "bootstrap", return_value=(build_config({"score_threshold": 6.5}), {})),
         patch.object(cli, "make_caller", return_value=object()),
         patch.object(cli, "add_job", new=fake_add_job),
     ):

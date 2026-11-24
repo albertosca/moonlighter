@@ -69,7 +69,7 @@ async def find_stale_jobs(
 
 def _split_aged(jobs: list[Job], config: Config) -> tuple[list[Job], list[Job]]:
     """The portal jobs past portal_max_age_days, and the ones left (all of them when it is off)."""
-    max_age = int(config.get("portal_max_age_days") or 0)
+    max_age = config["portal_max_age_days"]
     if max_age <= 0:
         return [], jobs
     cutoff = datetime.now() - timedelta(days=max_age)  # noqa: DTZ005 - the database stores naive local time

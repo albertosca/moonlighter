@@ -93,7 +93,7 @@ async def archive_stale_jobs(
     return ArchiveResult(
         archived=_archive_closed(staleness.stale, now),
         aged=_archive_aged(staleness.stale_by_age),
-        max_age_days=int(config.get("portal_max_age_days") or 0),
+        max_age_days=config["portal_max_age_days"],
         failed_companies=staleness.failed_companies,
         to_confirm=[_to_confirm_entry(job, now) for job in staleness.unverifiable],
     )

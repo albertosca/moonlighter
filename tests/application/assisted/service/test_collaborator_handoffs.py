@@ -111,6 +111,6 @@ async def test_the_answer_bank_age_comes_from_the_config_or_the_default(
     monkeypatch.setattr(service, "make_caller", lambda config: stub_caller())
     monkeypatch.setattr(service, "load_answer_bank", spy_load)
 
-    await service.prepare_application(job.id, config, {})
+    await service.prepare_application(job.id, build_config(config), {})
 
     assert ages == [expected_age]

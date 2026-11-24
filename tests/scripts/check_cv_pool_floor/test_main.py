@@ -11,7 +11,7 @@ from tests.scripts.check_cv_pool_floor.harness import compiling, configuration
 
 @pytest.mark.parametrize("settings", [{}, {"cv": {}}, {"cv": {"pool": ""}}])
 def test_a_missing_pool_setting_stops_with_exit_one(settings, capsys):
-    assert check_cv_pool_floor.main(settings) == 1
+    assert check_cv_pool_floor.main(build_config(settings)) == 1
 
     assert capsys.readouterr().out == "No cv.pool configured — nothing to check.\n"
 

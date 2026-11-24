@@ -1,7 +1,6 @@
 """Backend selection: `make_caller` turns `config['llm_backend']` into an LLM caller."""
 
 from moonlighter.core.config.backends import llm_backend
-from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.config.model import Config
 from moonlighter.core.llm.anthropic_api import make_api_caller
 from moonlighter.core.llm.caller import LLMCaller
@@ -27,7 +26,7 @@ def make_caller(config: Config) -> LLMCaller:
     backend = llm_backend(config)
     if backend == "api":
         return make_api_caller()
-    timeout_seconds = config.get("llm_timeout_seconds", DEFAULTS["llm_timeout_seconds"])
+    timeout_seconds = config["llm_timeout_seconds"]
     if backend == "cli":
         return _cli_caller(timeout_seconds)
     if backend == "cursor":

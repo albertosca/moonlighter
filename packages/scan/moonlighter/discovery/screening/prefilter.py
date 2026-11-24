@@ -35,7 +35,7 @@ class ScreeningRules:
 def screening_rules(config: Config, profile: dict[str, Any]) -> ScreeningRules:
     """The rules a scan screens its postings with."""
     return ScreeningRules(
-        blocklist=config.get("title_blocklist", []),
+        blocklist=config["title_blocklist"],
         home_city=(profile.get("criteria") or {}).get("home_city"),
         eligible_regions=eligible_regions_from(profile),
     )

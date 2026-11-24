@@ -45,7 +45,7 @@ def check(pool: CVPool, template: str) -> int | None:
 
 
 def _load_pool(config: Config) -> CVPool | None:
-    pool_path = config.get("cv", {}).get("pool")
+    pool_path = config["cv"].get("pool")
     if not pool_path:
         print("No cv.pool configured — nothing to check.")
         return None
@@ -57,7 +57,7 @@ def _load_pool(config: Config) -> CVPool | None:
 
 
 def _load_template(config: Config) -> str | None:
-    template_directory = config.get("cv", {}).get("template_dir")
+    template_directory = config["cv"].get("template_dir")
     if not template_directory:
         print("No cv.template_dir configured — nothing to check.")
         return None

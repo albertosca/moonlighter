@@ -28,12 +28,12 @@ async def setup_email(*, context: Context[AppContext, Any]) -> str:
     """  # noqa: D205, D212 - served verbatim as the MCP tool description
     app_context = refreshed_app_context(context)
     config = app_context.config
-    email_config = config.get("email", {})
+    email_config = config["email"]
 
     # Checked before resolving: Path("").expanduser() is ".", a directory that
     # always exists, so resolving an unconfigured path first would trade this
     # clear message for a confusing "Is a directory" failure further down.
-    credentials_path_raw = email_config.get("credentials_path", "")
+    credentials_path_raw = email_config["credentials_path"]
     if not credentials_path_raw:
         return (
             "⚠️  email.credentials_path is not configured.\n"

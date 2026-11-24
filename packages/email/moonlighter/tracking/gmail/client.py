@@ -43,7 +43,7 @@ def _required_scope(config: Config) -> str:
     That is marking processed, or the program-C archive flags; readonly by default —
     the sync is 100% read-only save for those opt-ins (S-08).
     """
-    email_config = config.get("email", {})
+    email_config = config["email"]
     mutates = any(email_config.get(flag, False) for flag in _MUTATING_FLAGS)
     return SCOPE_MODIFY if mutates else SCOPE_READONLY
 
@@ -109,7 +109,7 @@ def _is_ours(token_path: Path) -> bool:
 
 def _existing_token_path(config: Config) -> Path:
     """The configured token file; GmailAuthError when unset or missing."""
-    token_path_raw = config.get("email", {}).get("token_path")
+    token_path_raw = config["email"]["token_path"]
     if not token_path_raw:
         raise GmailAuthError(
             "email.token_path is not configured. Add an 'email:' block to "

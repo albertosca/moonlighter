@@ -30,7 +30,6 @@ from moonlighter.application.assisted.sheet.notes import (
 from moonlighter.application.assisted.sheet.required_labels import mark_required
 from moonlighter.application.assisted.sheet.results import SheetKind, SheetResult, failed_sheet
 from moonlighter.application.cvgen.service import ensure_tailored_cv
-from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.config.model import Config
 from moonlighter.core.db import Application, Job
 from moonlighter.core.email_alias import build_email_alias, new_email_ref
@@ -78,7 +77,7 @@ def _tracking_alias(application: Application, config: Config) -> str | None:
     sent to the old one). None when no tracking mailbox is configured — the sheet
     then keeps whatever email the field map filled in.
     """
-    address = config.get("email", {}).get("address")
+    address = config["email"].get("address")
     if not address:
         return None
     if not application.email_ref:
@@ -97,9 +96,7 @@ async def _sheet(
 ) -> SheetResult:
     application, _ = Application.get_or_create(job=job, defaults={"status": "draft"})
     job_cache: dict[str, Any] = application.get_form_data()
-    answer_bank = load_answer_bank(
-        config.get("answer_bank_max_age_days", DEFAULTS["answer_bank_max_age_days"])
-    )
+    answer_bank = load_answer_bank(config["answer_bank_max_age_days"])
     caller = make_caller(config)
     tailored = await ensure_tailored_cv(
         _job_dict(job),

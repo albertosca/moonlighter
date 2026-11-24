@@ -5,12 +5,13 @@ from unittest.mock import AsyncMock, Mock
 from moonlighter.application import cli
 from moonlighter.application.commands import bootstrap_cv as bootstrap_cv_command
 from moonlighter.application.cvgen.pool.bootstrap import BootstrapOutcome
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.cv_bootstrap import cv_bootstrap_declined
 from moonlighter.core.db import init_db
 
 
 async def test_bootstrap_cv_subcommand_reports_what_it_generated(monkeypatch, tmp_path):
-    monkeypatch.setattr(cli, "bootstrap", lambda: ({}, {"name": "Jane"}))
+    monkeypatch.setattr(cli, "bootstrap", lambda: (build_config({}), {"name": "Jane"}))
     outcome = BootstrapOutcome(
         pool_path=tmp_path / "cv-pool.yaml",
         template_path=tmp_path / "cv-templates" / "cv-template.en.tex",
@@ -29,7 +30,7 @@ async def test_bootstrap_cv_subcommand_reports_what_it_generated(monkeypatch, tm
 
 
 async def test_bootstrap_cv_subcommand_threads_the_force_flag(monkeypatch, tmp_path):
-    monkeypatch.setattr(cli, "bootstrap", lambda: ({}, {"name": "Jane"}))
+    monkeypatch.setattr(cli, "bootstrap", lambda: (build_config({}), {"name": "Jane"}))
     received: dict[str, object] = {}
 
     async def _fake_bootstrap(profile, config, caller, *, force=False):
@@ -45,7 +46,7 @@ async def test_bootstrap_cv_skip_records_the_decline_without_calling_the_llm(
     monkeypatch, temporary_database
 ):
     init_db()
-    monkeypatch.setattr(cli, "bootstrap", lambda: ({}, {"name": "Jane"}))
+    monkeypatch.setattr(cli, "bootstrap", lambda: (build_config({}), {"name": "Jane"}))
     monkeypatch.setattr(
         bootstrap_cv_command,
         "bootstrap_cv_pool",
@@ -61,7 +62,7 @@ async def test_bootstrap_cv_skip_records_the_decline_without_calling_the_llm(
 async def test_bootstrap_cv_subcommand_payload_has_exactly_these_keys_and_values(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setattr(cli, "bootstrap", lambda: ({}, {"name": "Jane"}))
+    monkeypatch.setattr(cli, "bootstrap", lambda: (build_config({}), {"name": "Jane"}))
     outcome = BootstrapOutcome(
         pool_path=tmp_path / "cv-pool.yaml",
         template_path=tmp_path / "cv-templates" / "cv-template.en.tex",
@@ -103,6 +104,6 @@ async def test_bootstrap_cv_subcommand_hands_over_profile_config_and_the_caller_
 async def test_bootstrap_cv_skip_payload_is_exactly_the_skipped_kind(
     monkeypatch, temporary_database
 ):
-    monkeypatch.setattr(cli, "bootstrap", lambda: ({}, {"name": "Jane"}))
+    monkeypatch.setattr(cli, "bootstrap", lambda: (build_config({}), {"name": "Jane"}))
     payload, code = await cli._run(cli.parse_args(["bootstrap-cv", "--skip"]))
     assert (payload, code) == ({"kind": "cv_bootstrap_skipped"}, 0)

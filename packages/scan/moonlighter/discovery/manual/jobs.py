@@ -86,7 +86,7 @@ def _answer_without_scoring(posting: _Posting, config: Config, *, track: bool) -
         return _store_copy(posting, original, track=track)
     if track:
         return None
-    matched = should_skip_by_title(posting.title, config.get("title_blocklist", []))
+    matched = should_skip_by_title(posting.title, config["title_blocklist"])
     if matched:
         _persist_manual(posting, **archived_fields(f"title filtered: {matched!r}"))
         return f"Job discarded by the title filter (pattern: {matched!r})."

@@ -111,7 +111,7 @@ async def get_context(config: Mapping[str, Any]) -> BrowserContext:
     _playwright = await async_playwright().start()
     _browser = await _playwright.chromium.connect_over_cdp(
         f"http://localhost:{port}",
-        slow_mo=config.get("slow_mo_ms", 300),
+        slow_mo=config["slow_mo_ms"],
     )
     logger.info("CDP connected")
     return await _first_or_new_context(_browser)

@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, time
 from typing import Any
 
-from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.config.model import Config
 from moonlighter.core.db import Application, EmailSyncRun, Job
 from moonlighter.core.job_status import sync_job_status
@@ -102,10 +101,8 @@ def mark_unanswered_applications(config: Config, now: datetime) -> UnansweredRes
     runs = list(EmailSyncRun.select().order_by(EmailSyncRun.finished_at.desc()))
     newest = runs[0] if runs else None
     last_sync = newest.finished_at.isoformat() if newest is not None else None
-    after_days = int(config.get("no_response_after_days", DEFAULTS["no_response_after_days"]))
-    oldest_trusted_sync_days = int(
-        config.get("email_sync_max_age_days", DEFAULTS["email_sync_max_age_days"])
-    )
+    after_days = config["no_response_after_days"]
+    oldest_trusted_sync_days = config["email_sync_max_age_days"]
     if newest is None or (now - newest.finished_at).days >= oldest_trusted_sync_days:
         return UnansweredResult(ran=False, last_sync=last_sync, after_days=after_days)
     result = UnansweredResult(ran=True, last_sync=last_sync, after_days=after_days)

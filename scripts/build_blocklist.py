@@ -26,7 +26,6 @@ from typing import Any
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from moonlighter.core.config.defaults import DEFAULT_EVAL_MODEL
 from moonlighter.core.config.loading import load_config, load_profile
 from moonlighter.core.config.model import Config
 from moonlighter.core.db import init_db
@@ -151,7 +150,7 @@ def main() -> None:
         profile = {}
     init_db()  # resolves the path via moonlighter_home() / MOONLIGHTER_DB_PATH (single source in db.py)
 
-    model = config.get("eval_model", DEFAULT_EVAL_MODEL)
+    model = config["eval_model"]
     print(f"Model: {model}  |  blocklist_learned: {learned_path()}")
     print()
 

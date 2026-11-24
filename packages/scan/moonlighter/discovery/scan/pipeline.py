@@ -130,9 +130,9 @@ async def evaluate_and_store(
         profile=profile,
         caller=caller,
         stop=asyncio.Event(),
-        semaphore=asyncio.Semaphore(config.get("scan_concurrency", 5)),
+        semaphore=asyncio.Semaphore(config["scan_concurrency"]),
     )
-    batch_size: int = config.get("scan_batch_size", 5)
+    batch_size: int = config["scan_batch_size"]
     chunks = [new_jobs[start : start + batch_size] for start in range(0, len(new_jobs), batch_size)]
     outcomes = await asyncio.gather(
         *(_evaluate_chunk(run, chunk) for chunk in chunks), return_exceptions=True
