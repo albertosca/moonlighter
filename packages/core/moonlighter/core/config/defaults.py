@@ -1,11 +1,11 @@
 """Default values for config.yaml, merged under the user's settings at load time."""
 
-from typing import Any
+from moonlighter.core.config.model import DefaultsConfig
 
 DEFAULT_LLM_MODEL = "claude-sonnet-4-6"
 DEFAULT_EVAL_MODEL = "claude-haiku-4-5-20251001"
 
-DEFAULTS: dict[str, Any] = {
+DEFAULTS: DefaultsConfig = {
     # Browser executable path (Chrome/Chromium/Brave). Empty by default:
     # set browser_path in config.yaml. Accepts brave_path (legacy) as a fallback.
     "browser_path": "",
