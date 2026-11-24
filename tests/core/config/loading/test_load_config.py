@@ -1,3 +1,6 @@
+import pytest
+
+from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.loading import load_config
 from moonlighter.core.config.validation import validate_config
 
@@ -130,3 +133,11 @@ def test_load_config_full_email_block_still_overrides_both(tmp_path):
     config = load_config(config_path=str(config_file))
     assert config["email"]["credentials_path"] == "a.json"
     assert config["email"]["token_path"] == "b.json"
+
+
+@pytest.mark.parametrize("document", ["- score_threshold: 7\n", "just a sentence\n"])
+def test_a_config_yaml_that_is_not_a_mapping_is_refused(tmp_path, document):
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(document)
+    with pytest.raises(ConfigError, match="mapping"):
+        load_config(config_path=str(config_file))

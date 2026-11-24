@@ -9,6 +9,7 @@ import yaml
 
 from moonlighter.core.config.api_key import fill_api_key_from_file
 from moonlighter.core.config.defaults import DEFAULTS
+from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.model import Config
 from moonlighter.core.config.paths import learned_blocklist_path, moonlighter_home
 from moonlighter.core.config.validation import validate_config
@@ -68,7 +69,9 @@ def _merge(user: Mapping[str, Any]) -> dict[str, Any]:
 def _read_user_config(config_path: Path) -> dict[str, Any]:
     if not config_path.exists():
         return {}
-    user: dict[str, Any] = yaml.safe_load(config_path.read_text()) or {}
+    user = yaml.safe_load(config_path.read_text()) or {}
+    if not isinstance(user, dict):
+        raise ConfigError(f"{config_path} must be a mapping of keys, got {type(user).__name__}")
     return user
 
 
