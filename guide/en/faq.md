@@ -24,7 +24,7 @@ Your pipeline — jobs, drafted answers, application history — is a local SQLi
 
 ### What does an opencode call send and keep?
 
-Each call runs `opencode run` once, in a private temporary directory, under a config moonlighter writes for that call: every tool, MCP server, skill and plugin is denied, your own opencode config and `AGENTS.md` files are not loaded, and the prompt goes over standard input. The prompt goes to the provider you named in `llm_model` / `eval_model`. opencode records each call as a session in its own database; moonlighter deletes that session when the call returns. A call that times out is killed before opencode reports its session, so that one session stays in opencode's history.
+Each call runs `opencode run` once, in a private temporary directory, under a config moonlighter writes for that call: every tool, MCP server, skill and plugin is denied, your own opencode config and `AGENTS.md` files are not loaded, and the prompt goes over standard input. The prompt goes to the provider you named in `llm_model` / `eval_model`. opencode records each call as a session in its own database; moonlighter deletes that session when the call returns. A call that times out is killed and its output discarded, so moonlighter never reads its session id, and that one session stays in opencode's history.
 
 ## Troubleshooting
 
@@ -35,7 +35,7 @@ Each call runs `opencode run` once, in a private temporary directory, under a co
 - **LLM errors with `llm_backend: cursor`** — the Cursor CLI (`agent`, or `cursor-agent`) must be installed, and `agent login` done.
 - **LLM errors with `llm_backend: codex`** — the `codex` CLI must be installed and `codex login` done with a ChatGPT account (an API-key login is refused), and `llm_model` / `eval_model` must name models that account can run, not Claude ids.
 - **"Missing profile / CV" warnings** — ask Claude to run `get_pipeline`: besides the funnel it reports exactly which setup file is missing and where it should live.
-- **LLM errors with `llm_backend: opencode`** — the `opencode` CLI must be installed, `opencode auth login` done for the provider, and `llm_model` / `eval_model` written as `provider/model`, as `opencode models` lists them. At startup `get_pipeline` warns when opencode does not list a configured model.
+- **LLM errors with `llm_backend: opencode`** — the `opencode` CLI must be installed, `opencode auth login` done for the provider, and `llm_model` / `eval_model` written as `provider/model`, as `opencode models` lists them. At startup `get_pipeline` warns when opencode does not list a configured model, and when your opencode is not the 2.4 release moonlighter's call isolation was verified on.
 - **The moonlighter tools don't show up in opencode** — run `opencode mcp list`; it should show `✓ moonlighter connected`. An entry without `"protocol": "2026-07-28"` fails the handshake, and one without `"codemode": false` hides the tools behind opencode's `execute` tool. The block to use is under Option C in [Install](getting-started/install.md).
 - **Gmail sync does nothing** — email tracking is optional and off until `setup_email` completes the OAuth flow; see [Gmail tracking](getting-started/gmail.md).
 

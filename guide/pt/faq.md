@@ -24,7 +24,7 @@ Seu pipeline — vagas, respostas rascunhadas, histórico de candidaturas — é
 
 ### O que uma chamada do opencode envia e guarda?
 
-Cada chamada roda `opencode run` uma vez, num diretório temporário privado, com uma configuração que o moonlighter escreve para aquela chamada: toda ferramenta, servidor MCP, skill e plugin fica negado, a sua própria configuração do opencode e os arquivos `AGENTS.md` não são carregados, e o prompt vai pela entrada padrão. O prompt vai para o provedor que você nomeou em `llm_model` / `eval_model`. O opencode registra cada chamada como uma sessão no próprio banco; o moonlighter apaga essa sessão quando a chamada volta. Uma chamada que estoura o tempo é morta antes de o opencode informar a sessão, então essa sessão fica no histórico do opencode.
+Cada chamada roda `opencode run` uma vez, num diretório temporário privado, com uma configuração que o moonlighter escreve para aquela chamada: toda ferramenta, servidor MCP, skill e plugin fica negado, a sua própria configuração do opencode e os arquivos `AGENTS.md` não são carregados, e o prompt vai pela entrada padrão. O prompt vai para o provedor que você nomeou em `llm_model` / `eval_model`. O opencode registra cada chamada como uma sessão no próprio banco; o moonlighter apaga essa sessão quando a chamada volta. Uma chamada que estoura o tempo é morta e a saída dela é descartada; o moonlighter nunca lê o id da sessão, e essa sessão fica no histórico do opencode.
 
 ## Solução de problemas
 
@@ -34,6 +34,8 @@ Cada chamada roda `opencode run` uma vez, num diretório temporário privado, co
 - **Erros de LLM com `llm_backend: cli`** — o backend padrão chama o [Claude Code CLI](https://claude.ai/code); ele precisa estar instalado e logado. Troque para `llm_backend: api` + `ANTHROPIC_API_KEY` se preferir pagar em créditos de API.
 - **Erros de LLM com `llm_backend: cursor`** — a CLI do Cursor (`agent`, ou `cursor-agent`) precisa estar instalada, e o `agent login` feito.
 - **Erros de LLM com `llm_backend: codex`** — a CLI `codex` precisa estar instalada e o `codex login` feito com uma conta ChatGPT (login por API key é recusado), e `llm_model` / `eval_model` precisam nomear modelos que essa conta consiga rodar, não ids do Claude.
+- **Erros de LLM com `llm_backend: opencode`** — a CLI `opencode` precisa estar instalada, o `opencode auth login` feito para o provedor, e `llm_model` / `eval_model` escritos como `provedor/modelo`, do jeito que o `opencode models` lista. Na inicialização o `get_pipeline` avisa quando o opencode não lista um modelo configurado, e quando o seu opencode não é a versão 2.4, em que o isolamento das chamadas do moonlighter foi verificado.
+- **As ferramentas do moonlighter não aparecem no opencode** — rode `opencode mcp list`; ele deve mostrar `✓ moonlighter connected`. Uma entrada sem `"protocol": "2026-07-28"` falha no handshake, e uma sem `"codemode": false` esconde as ferramentas atrás da ferramenta `execute` do opencode. O bloco a usar está na Opção C de [Instalação](getting-started/install.md).
 - **Avisos de "missing profile / CV"** — peça ao Claude para rodar o `get_pipeline`: além do funil, ele reporta exatamente qual arquivo de configuração falta e onde ele deve ficar.
 - **A sincronização do Gmail não faz nada** — o acompanhamento por e-mail é opcional e fica desligado até o `setup_email` completar o fluxo OAuth; veja [Acompanhamento pelo Gmail](getting-started/gmail.md).
 
