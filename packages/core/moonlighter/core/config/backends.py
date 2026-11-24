@@ -51,11 +51,15 @@ def _is_codex_runnable(model: object) -> bool:
 
 
 def is_provider_model(model: object) -> bool:
-    """`provider/model`, both sides non-blank: the only form `opencode run -m` accepts."""
-    if not isinstance(model, str):
+    """`provider/model`, both sides non-blank: the only form `opencode run -m` accepts.
+
+    Whitespace is refused, not stripped: the value reaches `-m` and the startup
+    check exactly as typed, so a stray space would pass here and fail there.
+    """
+    if not isinstance(model, str) or any(character.isspace() for character in model):
         return False
-    provider, slash, name = model.strip().partition("/")
-    return bool(slash and provider.strip() and name.strip())
+    provider, slash, name = model.partition("/")
+    return bool(slash and provider and name)
 
 
 def require_opencode_models(config: Mapping[str, Any]) -> None:
