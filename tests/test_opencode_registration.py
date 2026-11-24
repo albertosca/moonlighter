@@ -135,4 +135,5 @@ def test_the_snippet_is_the_canonical_entry():
         "type": "local",
         "command": ["uvx", "moonlighter"],
         "protocol": "2026-07-28",
+        "codemode": False,
     }

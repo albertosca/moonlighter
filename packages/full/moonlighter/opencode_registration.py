@@ -8,13 +8,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-# opencode 2.4.0's default handshake ("auto") fails against this server; the explicit
-# protocol connects. `mcp.servers.<name>` is the canonical form: the flat
-# `mcp.<name>` is normalized and loses `protocol`.
+# Measured on opencode 2.4.0. Its default handshake ("auto") fails against this
+# server; the explicit protocol connects. By default it also hides MCP tools behind
+# Code Mode's `execute`, so the model never sees `moonlighter_get_pipeline` and the
+# rest; `codemode: false` offers them as tools, the way Claude Code does.
+# `mcp.servers.<name>` is the canonical form: the flat `mcp.<name>` is normalized
+# and loses `protocol`.
 MCP_ENTRY: dict[str, Any] = {
     "type": "local",
     "command": ["uvx", "moonlighter"],
     "protocol": "2026-07-28",
+    "codemode": False,
 }
 _CANONICAL_MCP_KEYS = frozenset({"servers", "timeout"})
 _SCHEMA = "https://opencode.ai/config.json"
