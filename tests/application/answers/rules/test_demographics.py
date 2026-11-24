@@ -2,9 +2,9 @@
 
 import pytest
 
-from moonlighter.application.answers.matching.field_map import pre_populate_answers
 from moonlighter.application.answers.rules.demographics import demographic_answer
 from tests.application.answers.candidate_profiles import PROFILE
+from tests.application.answers.prepopulate import pre_populate_answers
 
 # EEO/demographics: demographic_answer, NOT the _RULES ladder
 # These live outside pre_populate_answers on purpose: composer's is_sensitive_label

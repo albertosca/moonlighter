@@ -5,7 +5,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from moonlighter.core.config.loading import build_config
 from moonlighter.core.config.model import Config
 from moonlighter.core.config.paths import moonlighter_home, resolve_under_home
 
@@ -165,13 +164,13 @@ def setup_gmail_service(config: Config) -> Any:
     return build("gmail", "v1", credentials=credentials)
 
 
-def run_gmail_oauth(credentials_path: str, token_path: str, config: Config | None = None) -> None:
+def run_gmail_oauth(credentials_path: str, token_path: str, config: Config) -> None:
     """Runs the interactive OAuth2 flow and saves the token."""
     if InstalledAppFlow is None:
         raise GmailAuthError(
             "google-auth-oauthlib not installed. Run: pip install google-auth-oauthlib"
         )
-    scope = _required_scope(config if config is not None else build_config({}))
+    scope = _required_scope(config)
     flow = InstalledAppFlow.from_client_secrets_file(credentials_path, [scope])
     credentials = flow.run_local_server(port=0)
     expanded = Path(token_path).expanduser()

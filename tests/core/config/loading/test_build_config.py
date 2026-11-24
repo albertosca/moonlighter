@@ -48,3 +48,11 @@ def test_a_built_config_shares_no_block_with_the_defaults():
     config = build_config({})
     assert config["cv"]["by_company"] is not DEFAULTS["cv"]["by_company"]
     assert config["email"] is not DEFAULTS["email"]
+
+
+def test_a_built_config_shares_no_block_with_the_overrides():
+    overrides = {"cv": {"by_company": {"acme": "acme.pdf"}}, "title_blocklist": ["intern"]}
+    config = build_config(overrides)
+    config["cv"]["by_company"]["globex"] = "globex.pdf"
+    config["title_blocklist"].append("senior")
+    assert overrides == {"cv": {"by_company": {"acme": "acme.pdf"}}, "title_blocklist": ["intern"]}

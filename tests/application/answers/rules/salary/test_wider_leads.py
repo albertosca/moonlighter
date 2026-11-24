@@ -1,9 +1,9 @@
 """The salary rule's wider leads: value words, bare PT-BR keywords and question-shaped labels."""
 
-from moonlighter.application.answers.matching.field_map import pre_populate_answers
 from moonlighter.application.answers.needs_review import NEEDS_REVIEW_SENTINEL
 from moonlighter.application.answers.rules.static_rules import static_answer
 from moonlighter.core.config.loading import build_config
+from tests.application.answers.prepopulate import pre_populate_answers
 
 # Salary Coverage — wider lead words and bare PT keywords
 

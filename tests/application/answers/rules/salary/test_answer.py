@@ -1,7 +1,7 @@
 """What the salary rule answers: the configured target in BRL per month, or a review marker."""
 
-from moonlighter.application.answers.matching.field_map import pre_populate_answers
 from moonlighter.application.answers.needs_review import NEEDS_REVIEW_SENTINEL
+from tests.application.answers.prepopulate import pre_populate_answers
 
 
 def test_salary_field_filled_from_preferences():

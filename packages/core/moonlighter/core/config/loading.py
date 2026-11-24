@@ -54,7 +54,8 @@ def _merge(user: Mapping[str, Any]) -> dict[str, Any]:
         "browser_session_dir": str(home / "browser-session"),
         "screenshots_dir": str(home / "screenshots"),
     }
-    _merge_user_config(config, user)
+    # Copied too: a caller's overrides must not change when the built config does.
+    _merge_user_config(config, copy.deepcopy(dict(user)))
     if config.get("llm_backend") == "codex" and "eval_model" not in user:
         # The shipped eval_model is a Claude id; one model to name is enough for a
         # user who did not pick a cheaper one for evaluations.
