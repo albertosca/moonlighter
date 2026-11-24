@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, cast
 
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import Job
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
@@ -111,7 +112,7 @@ def _tally(outcomes: list[list[Job | _StopScan] | BaseException]) -> tuple[list[
 
 async def evaluate_and_store(
     new_jobs: list[RawJob],
-    config: dict[str, Any],
+    config: Config,
     profile: dict[str, Any],
     *,
     caller: LLMCaller | NoEval,

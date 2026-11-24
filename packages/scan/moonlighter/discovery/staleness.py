@@ -11,8 +11,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import partial
-from typing import Any
 
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import Job
 from moonlighter.core.plugins import discover_entry_points_by_name
 from moonlighter.core.web.urls import normalize_job_url
@@ -39,7 +39,7 @@ class StalenessResult:
 async def find_stale_jobs(
     jobs_by_company: dict[tuple[str, str], list[Job]],
     scanners: dict[str, BaseScanner],
-    config: dict[str, Any],
+    config: Config,
 ) -> StalenessResult:
     result = StalenessResult()
     # A browser-based staleness checker for a non-listing source (e.g. LinkedIn) is
@@ -67,7 +67,7 @@ async def find_stale_jobs(
     return result
 
 
-def _split_aged(jobs: list[Job], config: dict[str, Any]) -> tuple[list[Job], list[Job]]:
+def _split_aged(jobs: list[Job], config: Config) -> tuple[list[Job], list[Job]]:
     """The portal jobs past portal_max_age_days, and the ones left (all of them when it is off)."""
     max_age = int(config.get("portal_max_age_days") or 0)
     if max_age <= 0:
@@ -81,7 +81,7 @@ def _tally_portal_jobs(
     source: str,
     jobs: list[Job],
     *,
-    config: dict[str, Any],
+    config: Config,
     result: StalenessResult,
     portal_counts: dict[str, int],
 ) -> None:

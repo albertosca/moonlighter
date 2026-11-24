@@ -1,9 +1,8 @@
 """The one-time offer to draft a tailored-CV pool, shown in place of a sheet until it is settled."""
 
-from typing import Any
-
 from moonlighter.application.assisted.sheet.results import SheetKind, SheetResult, failed_sheet
 from moonlighter.application.cvgen.paths import resolved_pool_path
+from moonlighter.core.config.model import Config
 from moonlighter.core.cv_bootstrap import cv_bootstrap_declined
 
 _CV_BOOTSTRAP_OFFER_MESSAGE = (
@@ -15,7 +14,7 @@ _CV_BOOTSTRAP_OFFER_MESSAGE = (
 )
 
 
-def cv_bootstrap_offer(config: dict[str, Any]) -> SheetResult | None:
+def cv_bootstrap_offer(config: Config) -> SheetResult | None:
     """The sheet that offers to bootstrap a CV pool, or None once a pool exists or the offer was declined."""
     if resolved_pool_path(config).exists() or cv_bootstrap_declined():
         return None

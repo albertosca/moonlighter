@@ -14,6 +14,7 @@ from moonlighter.application.assisted.composition.answer_sources import AnswerSo
 from moonlighter.application.assisted.composition.composed_answer import ComposedAnswer
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sheet.file_gaps import file_gap_reason
+from moonlighter.core.config.model import Config
 from moonlighter.core.llm.caller import LLMCaller
 
 
@@ -26,7 +27,7 @@ class CompositionContext:
     """
 
     profile: dict[str, Any]
-    config: dict[str, Any]
+    config: Config
     job: dict[str, Any]
     llm_caller: LLMCaller
     _: KW_ONLY
@@ -58,7 +59,7 @@ async def compose_answers(
 
 
 async def _compose_one(
-    question: FormQuestion, config: dict[str, Any], sources: AnswerSources
+    question: FormQuestion, config: Config, sources: AnswerSources
 ) -> ComposedAnswer:
     if question.kind is QuestionKind.FILE:
         return ComposedAnswer(question, None, file_gap_reason(question, config, sources.job))

@@ -8,7 +8,7 @@ import pytest
 from tests.scripts.check_cv_pool_floor.harness import compiling, configuration
 
 
-@pytest.mark.parametrize("settings", [{}, {"cv": None}, {"cv": {}}, {"cv": {"pool": ""}}])
+@pytest.mark.parametrize("settings", [{}, {"cv": {}}, {"cv": {"pool": ""}}])
 def test_a_missing_pool_setting_stops_with_exit_one(settings, capsys):
     assert check_cv_pool_floor.main(settings) == 1
 

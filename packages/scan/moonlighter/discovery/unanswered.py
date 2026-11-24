@@ -10,6 +10,7 @@ from datetime import datetime, time
 from typing import Any
 
 from moonlighter.core.config.defaults import DEFAULTS
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import Application, EmailSyncRun, Job
 from moonlighter.core.job_status import sync_job_status
 from moonlighter.core.notes import append_dated_note, latest_note_date
@@ -96,7 +97,7 @@ def _classify(
         result.marked.append(_summary(application, days))
 
 
-def mark_unanswered_applications(config: dict[str, Any], now: datetime) -> UnansweredResult:
+def mark_unanswered_applications(config: Config, now: datetime) -> UnansweredResult:
     """Mark the silent submitted applications, list the silent later stages, hold the flagged."""
     runs = list(EmailSyncRun.select().order_by(EmailSyncRun.finished_at.desc()))
     newest = runs[0] if runs else None

@@ -27,6 +27,7 @@ from moonlighter.application.cvgen.paths import resolved_pool_path, resolved_tem
 from moonlighter.application.cvgen.pool.bootstrap_error import BootstrapError
 from moonlighter.application.cvgen.pool.draft import draft_pool
 from moonlighter.application.cvgen.pool.loader import CVPool, PoolError, dump_pool, load_pool
+from moonlighter.core.config.model import Config
 from moonlighter.core.llm.caller import LLMCaller
 
 DRAFT_HEADER = (
@@ -74,7 +75,7 @@ class BootstrapOutcome:
 
 
 async def bootstrap_cv_pool(
-    profile: dict[str, Any], config: dict[str, Any], caller: LLMCaller, *, force: bool = False
+    profile: dict[str, Any], config: Config, caller: LLMCaller, *, force: bool = False
 ) -> BootstrapOutcome:
     """Draft a CV pool + adapt the generic template from `profile`.
 

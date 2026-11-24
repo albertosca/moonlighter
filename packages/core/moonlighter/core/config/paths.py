@@ -1,6 +1,7 @@
 """Locations: MOONLIGHTER_HOME, the paths resolved under it, and the browser executable."""
 
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +32,7 @@ def learned_blocklist_path() -> Path:
     return moonlighter_home() / "blocklist_learned.yaml"
 
 
-def browser_executable(config: dict[str, Any]) -> str:
+def browser_executable(config: Mapping[str, Any]) -> str:
     """Browser executable path.
 
     Reads 'browser_path'; falls back to the legacy 'brave_path' key when browser_path is empty.

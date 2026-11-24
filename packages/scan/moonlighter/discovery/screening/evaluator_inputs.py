@@ -1,13 +1,12 @@
 """What the evaluator needs before it can score a posting: a model and a real description."""
 
-from typing import Any
-
 from moonlighter.core.config.defaults import DEFAULT_EVAL_MODEL
+from moonlighter.core.config.model import Config
 
 MINIMUM_DESCRIPTION_LENGTH = 30
 
 
-def model_for(config: dict[str, Any]) -> str:
+def model_for(config: Config) -> str:
     """The model a scan or a manual job is scored with: `eval_model`, then `llm_model`."""
     model: str = config.get("eval_model", config.get("llm_model", DEFAULT_EVAL_MODEL))
     return model

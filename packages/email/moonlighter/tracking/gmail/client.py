@@ -5,6 +5,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from moonlighter.core.config.loading import build_config
+from moonlighter.core.config.model import Config
 from moonlighter.core.config.paths import moonlighter_home, resolve_under_home
 
 logger = logging.getLogger(__name__)
@@ -35,7 +37,7 @@ class GmailAuthError(Exception):
 _MUTATING_FLAGS = ("mark_processed", "archive_ref_matched", "archive_all_classified")
 
 
-def _required_scope(config: dict[str, Any]) -> str:
+def _required_scope(config: Config) -> str:
     """gmail.modify only when the operator opts into some Gmail mutation.
 
     That is marking processed, or the program-C archive flags; readonly by default —
@@ -105,9 +107,9 @@ def _is_ours(token_path: Path) -> bool:
         return False
 
 
-def _existing_token_path(config: dict[str, Any]) -> Path:
+def _existing_token_path(config: Config) -> Path:
     """The configured token file; GmailAuthError when unset or missing."""
-    token_path_raw = (config.get("email") or {}).get("token_path")
+    token_path_raw = config.get("email", {}).get("token_path")
     if not token_path_raw:
         raise GmailAuthError(
             "email.token_path is not configured. Add an 'email:' block to "
@@ -136,7 +138,7 @@ def _refresh_if_expired(credentials: Any, token_path: Path) -> None:
         logger.debug("token at %s belongs to another project — not writing back", token_path)
 
 
-def setup_gmail_service(config: dict[str, Any]) -> Any:
+def setup_gmail_service(config: Config) -> Any:
     """Loads credentials + OAuth2 token and returns the Gmail API resource.
 
     Raises GmailAuthError with a clear message if the token doesn't exist; refreshes
@@ -163,15 +165,13 @@ def setup_gmail_service(config: dict[str, Any]) -> Any:
     return build("gmail", "v1", credentials=credentials)
 
 
-def run_gmail_oauth(
-    credentials_path: str, token_path: str, config: dict[str, Any] | None = None
-) -> None:
+def run_gmail_oauth(credentials_path: str, token_path: str, config: Config | None = None) -> None:
     """Runs the interactive OAuth2 flow and saves the token."""
     if InstalledAppFlow is None:
         raise GmailAuthError(
             "google-auth-oauthlib not installed. Run: pip install google-auth-oauthlib"
         )
-    scope = _required_scope(config or {})
+    scope = _required_scope(config if config is not None else build_config({}))
     flow = InstalledAppFlow.from_client_secrets_file(credentials_path, [scope])
     credentials = flow.run_local_server(port=0)
     expanded = Path(token_path).expanduser()

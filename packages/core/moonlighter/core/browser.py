@@ -11,6 +11,7 @@ import contextlib
 import logging
 import subprocess
 import urllib.request
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -58,7 +59,7 @@ async def _first_or_new_context(browser: Browser) -> BrowserContext:
     return browser.contexts[0] if browser.contexts else await browser.new_context()
 
 
-async def _launch_browser(config: dict[str, Any], session_directory: Path) -> int:
+async def _launch_browser(config: Mapping[str, Any], session_directory: Path) -> int:
     """Launch the browser (Chrome/Chromium/Brave) and return its debug port.
 
     The port is RANDOM, chosen by the OS itself (--remote-debugging-port=0),
@@ -94,7 +95,7 @@ async def _launch_browser(config: dict[str, Any], session_directory: Path) -> in
     raise RuntimeError("Browser did not become available (DevToolsActivePort) within 30s")
 
 
-async def get_context(config: dict[str, Any]) -> BrowserContext:
+async def get_context(config: Mapping[str, Any]) -> BrowserContext:
     """Return a browser context via CDP. Launches the browser if not running."""
     global _playwright, _browser  # noqa: PLW0603 - one browser per process, so the session lives in module singletons
 
@@ -116,7 +117,7 @@ async def get_context(config: dict[str, Any]) -> BrowserContext:
     return await _first_or_new_context(_browser)
 
 
-async def new_page(config: dict[str, Any]) -> Page:
+async def new_page(config: Mapping[str, Any]) -> Page:
     context = await get_context(config)
     page = await context.new_page()
     logger.debug("new_page created")

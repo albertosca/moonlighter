@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from moonlighter.core.config.company_list import load_company_list
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import Job
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.discovery.archive import archive_stale_jobs
@@ -22,7 +23,7 @@ from moonlighter.discovery.unanswered import mark_unanswered_applications
 async def scan_and_evaluate(  # noqa: PLR0917 - test_run_no_eval_passes_no_caller_to_the_service reads the caller as the last positional argument
     keywords: str,
     phase: str,
-    config: dict[str, Any],
+    config: Config,
     profile: dict[str, Any],
     caller: LLMCaller | NoEval,
 ) -> ScanResult:
@@ -67,7 +68,7 @@ def _unknown_source_report(
 async def scan_company(
     source: str,
     company: str,
-    config: dict[str, Any],
+    config: Config,
     *,
     profile: dict[str, Any],
     caller: LLMCaller | NoEval,

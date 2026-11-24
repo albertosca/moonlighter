@@ -7,6 +7,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import Job
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.dispatch import make_caller
@@ -138,9 +139,7 @@ class _Batch:
         print(f"  LLM calls ({settings.model}):      {self.total - tally.skipped_by_title}")
 
 
-async def reevaluate(
-    jobs: list[Job], config: dict[str, Any], settings: ReevaluationSettings
-) -> None:
+async def reevaluate(jobs: list[Job], config: Config, settings: ReevaluationSettings) -> None:
     """Evaluates every job concurrently, writes the outcomes unless it is a dry run, and prints a summary."""
     with operation_metrics("reevaluate"):
         batch = _Batch(make_caller(config), len(jobs), settings)

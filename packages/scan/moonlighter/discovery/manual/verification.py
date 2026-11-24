@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import Job
 from moonlighter.core.duplicates import find_original
 from moonlighter.core.llm.caller import LLMCaller
@@ -53,7 +54,7 @@ def _archive_if_copy(job: Job, page_text: str) -> str | None:
 async def verify_job(
     job_id: int,
     page_text: str,
-    config: dict[str, Any],
+    config: Config,
     *,
     profile: dict[str, Any],
     caller: LLMCaller,

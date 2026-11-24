@@ -14,12 +14,14 @@ from typing import Any
 from moonlighter.application.answers.matching.label_cleaning import clean_label
 from moonlighter.application.answers.rules.static_rules import static_answer
 from moonlighter.application.answers.rules.work_auth import infer_country, resolve_work_auth
+from moonlighter.core.config.loading import build_config
+from moonlighter.core.config.model import Config
 
 
 def pre_populate_answers(
     fields: list[str],
     profile: dict[str, Any],
-    config: dict[str, Any] | None = None,
+    config: Config | None = None,
     *,
     job_location: str | None = None,
     job_remote_type: str | None = None,
@@ -30,7 +32,7 @@ def pre_populate_answers(
     fields are handled separately, in a country-dependent way (see work_auth).
     Fields with no match are ignored (the LLM fills them).
     """
-    options = config or {}
+    options = config if config is not None else build_config({})
     country = infer_country(job_location, job_remote_type)
 
     result: dict[str, str] = {}

@@ -10,6 +10,7 @@ from mcp.server.mcpserver import Context
 
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.loading import load_config
+from moonlighter.core.config.model import Config
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.startup import StartupWarning
@@ -43,7 +44,7 @@ class WatchedFile:
 
 @dataclass
 class AppContext:
-    config: dict[str, Any]
+    config: Config
     profile: dict[str, Any]
     companies: dict[str, Any]
     llm_caller: LLMCaller

@@ -3,6 +3,7 @@
 from dataclasses import dataclass, replace
 from typing import Any
 
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import Job
 from moonlighter.core.duplicates import find_original
 from moonlighter.core.llm.caller import LLMCaller
@@ -73,9 +74,7 @@ def _persist_manual(posting: _Posting, **scoring: Any) -> Job | None:
     return job
 
 
-def _answer_without_scoring(
-    posting: _Posting, config: dict[str, Any], *, track: bool
-) -> str | None:
+def _answer_without_scoring(posting: _Posting, config: Config, *, track: bool) -> str | None:
     """The answer when no evaluation is needed, else None. A tracked job skips the title filter."""
     if not posting.company or not posting.title:
         return "Provide at least 'company' and 'title' along with the URL."
@@ -107,7 +106,7 @@ def _store_copy(posting: _Posting, original: Job, *, track: bool) -> str:
 
 async def _score_and_store(
     posting: _Posting,
-    config: dict[str, Any],
+    config: Config,
     profile: dict[str, Any],
     *,
     caller: LLMCaller,
@@ -143,7 +142,7 @@ async def add_job(  # noqa: PLR0913, PLR0917 - the MCP tool takes these seven fi
     company: str,
     title: str,
     description: str,
-    config: dict[str, Any],
+    config: Config,
     profile: dict[str, Any],
     caller: LLMCaller,
     *,

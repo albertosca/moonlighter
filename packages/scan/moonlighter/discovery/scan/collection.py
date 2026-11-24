@@ -3,6 +3,7 @@
 from dataclasses import replace
 from typing import Any, Protocol
 
+from moonlighter.core.config.model import Config
 from moonlighter.core.plugins import discover_entry_points
 from moonlighter.core.web.urls import normalize_job_url
 from moonlighter.discovery.scan.portals import scan_portals
@@ -25,7 +26,7 @@ class BrowserScanner(Protocol):
 
 
 async def _run_browser_scanner(
-    scanner_class: type[BrowserScanner], keywords: str, config: dict[str, Any]
+    scanner_class: type[BrowserScanner], keywords: str, config: Config
 ) -> tuple[list[RawJob], str | None]:
     """Run one browser-based scanner plugin (requires prior login, same shape as LinkedInScanner).
 
@@ -72,7 +73,7 @@ async def _scan_boards(
     return raw_jobs
 
 
-async def _run_plugins(keywords: str, config: dict[str, Any]) -> tuple[list[RawJob], list[str]]:
+async def _run_plugins(keywords: str, config: Config) -> tuple[list[RawJob], list[str]]:
     raw_jobs: list[RawJob] = []
     warnings: list[str] = []
     for scanner_class in discover_entry_points("moonlighter.scanners"):
@@ -83,7 +84,7 @@ async def _run_plugins(keywords: str, config: dict[str, Any]) -> tuple[list[RawJ
     return raw_jobs, warnings
 
 
-def _gupy_warnings(config: dict[str, Any], keywords: str) -> list[str]:
+def _gupy_warnings(config: Config, keywords: str) -> list[str]:
     if config.get("scan_gupy") and not keywords.strip():
         return [
             (
@@ -101,7 +102,7 @@ def normalize_urls(raw_jobs: list[RawJob]) -> list[RawJob]:
 
 async def collect_raw_jobs(
     keywords: str,
-    config: dict[str, Any],
+    config: Config,
     companies: dict[str, list[str]],
     *,
     stats: ScanStats | None = None,

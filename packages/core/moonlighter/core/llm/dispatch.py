@@ -1,9 +1,8 @@
 """Backend selection: `make_caller` turns `config['llm_backend']` into an LLM caller."""
 
-from typing import Any
-
 from moonlighter.core.config.backends import llm_backend
 from moonlighter.core.config.defaults import DEFAULTS
+from moonlighter.core.config.model import Config
 from moonlighter.core.llm.anthropic_api import make_api_caller
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.claude_cli import call_cli
@@ -11,7 +10,7 @@ from moonlighter.core.llm.codex import call_codex
 from moonlighter.core.llm.cursor import call_cursor
 
 
-def make_caller(config: dict[str, Any]) -> LLMCaller:
+def make_caller(config: Config) -> LLMCaller:
     """Return the appropriate LLM caller based on config['llm_backend'].
 
     llm_backend: "cli"     → uses the `claude -p` CLI (no API key required)

@@ -15,6 +15,7 @@ from moonlighter.application.assisted.sheet.results import (
     sheet_result_to_dict,
 )
 from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK
+from moonlighter.core.config.model import Config
 from moonlighter.core.web.ingest import job_from_url
 
 
@@ -23,7 +24,7 @@ def _read_paste(source: str) -> str:
 
 
 async def run_prepare(
-    arguments: argparse.Namespace, config: dict[str, Any], profile: dict[str, Any]
+    arguments: argparse.Namespace, config: Config, profile: dict[str, Any]
 ) -> tuple[dict[str, Any], int]:
     """Prepare the sheet for --url's posting or JOB_ID; exit 0 only when a sheet came out."""
     job_id = arguments.job_id
