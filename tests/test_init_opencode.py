@@ -50,7 +50,7 @@ def test_a_written_registration_points_at_opencode_mcp_list():
     )
     assert str(TARGET) in text
     assert "opencode mcp list" in text
-    assert "claude mcp add-json" not in text
+    assert text.index("opencode mcp list") < text.index("claude mcp add-json")
 
 
 def test_a_refused_registration_shows_the_reason_and_the_snippet():
@@ -62,13 +62,20 @@ def test_a_refused_registration_shows_the_reason_and_the_snippet():
     assert "it uses the flat form" in text
     assert f"Add this to {TARGET}:" in text
     assert registration_snippet() in text
-    assert "claude mcp add-json" not in text
+    assert text.index(registration_snippet()) < text.index("claude mcp add-json")
 
 
 def test_opencode_without_a_registration_still_gets_the_snippet():
     text = _text(next_steps("opencode", None))
     assert registration_snippet() in text
-    assert "claude mcp add-json" not in text
+    assert text.index(registration_snippet()) < text.index("claude mcp add-json")
+
+
+def test_an_opencode_backend_still_offers_claude_code_as_the_client():
+    """The LLM backend says nothing about the MCP client the person runs."""
+    text = _text(next_steps("opencode", None))
+    assert "Claude Code as your MCP client" in text
+    assert "different MCP client" not in text
 
 
 def test_a_claude_backend_keeps_the_claude_line():

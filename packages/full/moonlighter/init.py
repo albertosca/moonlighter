@@ -86,16 +86,18 @@ def run_init(home: Path, answers: dict[str, str]) -> Path:
 
 def next_steps(backend: str, registration: Registration | None) -> list[str]:
     """What to run after the config is written, for the client the person uses."""
-    lines = _claude_lines(backend, registration) + _opencode_lines(backend, registration)
+    if backend == "opencode":
+        # The LLM backend does not pick the MCP client: opencode first, Claude Code still offered.
+        lines = _opencode_lines(backend, registration) + _claude_as_client_lines()
+    else:
+        lines = _claude_lines(registration) + _opencode_lines(backend, registration)
     lines.append(
         "Once connected, ask your agent to run get_pipeline to check your setup for problems."
     )
     return lines
 
 
-def _claude_lines(backend: str, registration: Registration | None) -> list[str]:
-    if backend == "opencode":
-        return []
+def _claude_lines(registration: Registration | None) -> list[str]:
     lines = ["Then register the MCP server:", "", _CLAUDE_REGISTRATION, ""]
     if registration is None:
         lines += [
@@ -103,6 +105,15 @@ def _claude_lines(backend: str, registration: Registration | None) -> list[str]:
             "",
         ]
     return lines
+
+
+def _claude_as_client_lines() -> list[str]:
+    return [
+        "Using Claude Code as your MCP client too? Register it there with:",
+        "",
+        _CLAUDE_REGISTRATION,
+        "",
+    ]
 
 
 def _opencode_lines(backend: str, registration: Registration | None) -> list[str]:
