@@ -1,4 +1,4 @@
-"""The llm_backend setting: accepted values, the validated reader and the Codex model check."""
+"""The llm_backend setting: accepted values, the validated reader and the model checks."""
 
 from collections.abc import Mapping
 from typing import Any
@@ -6,7 +6,7 @@ from typing import Any
 from moonlighter.core.config.defaults import DEFAULTS
 from moonlighter.core.config.errors import ConfigError
 
-LLM_BACKENDS = ("cli", "api", "cursor", "codex")
+LLM_BACKENDS = ("cli", "api", "cursor", "codex", "opencode")
 
 
 def llm_backend(config: Mapping[str, Any]) -> str:
@@ -56,3 +56,19 @@ def is_provider_model(model: object) -> bool:
         return False
     provider, slash, name = model.strip().partition("/")
     return bool(slash and provider.strip() and name.strip())
+
+
+def require_opencode_models(config: Mapping[str, Any]) -> None:
+    """Refuse an llm_model or eval_model that is not `provider/model`.
+
+    `opencode run -m` takes nothing else, and the shipped defaults are bare
+    Claude ids: refuse them at load time instead of on every call mid-scan.
+    """
+    for key in ("llm_model", "eval_model"):
+        model = config.get(key, DEFAULTS[key])
+        if not is_provider_model(model):
+            raise ConfigError(
+                f"config key '{key}' must name an opencode model as provider/model (for "
+                "example 'anthropic/claude-sonnet-5-5'; `opencode models` lists them) when "
+                f"llm_backend is 'opencode', got {model!r}"
+            )

@@ -13,6 +13,7 @@ from moonlighter.core.config.model import Config
 from moonlighter.core.config.paths import browser_executable, moonlighter_home
 from moonlighter.core.llm.codex import codex_executable
 from moonlighter.core.llm.cursor import cursor_executable
+from moonlighter.core.llm.opencode import opencode_executable
 from moonlighter.discovery.evaluation.regional_eligibility import LOCATION_PRECEDENCES
 
 
@@ -93,6 +94,14 @@ _BACKEND_CREDENTIALS: dict[str, tuple[Callable[[], bool], str]] = {
             "llm_backend is 'codex' but the `codex` CLI was not found on PATH. "
             "scan_and_evaluate and prepare_application will not work. "
             "Install the Codex CLI and run `codex login` with your ChatGPT account."
+        ),
+    ),
+    "opencode": (
+        lambda: opencode_executable() is not None,
+        (
+            "llm_backend is 'opencode' but the `opencode` CLI was not found on PATH. "
+            "scan_and_evaluate and prepare_application will not work. "
+            "Install opencode (https://opencode.ai) and run `opencode auth login` for your provider."
         ),
     ),
     "cli": (

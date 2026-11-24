@@ -40,7 +40,8 @@ def load_config(config_path: str | Path | None = None) -> Config:
     _merge_learned_blocklist(config)
     validate_config(config)
     # Only the api backend needs the key. cli strips it so `claude -p` bills the
-    # subscription; cursor and codex authenticate with their own login and never read it.
+    # subscription; cursor, codex and opencode authenticate with their own login and never
+    # read it.
     if config["llm_backend"] == "api":
         fill_api_key_from_file()
     return cast("Config", config)
@@ -57,8 +58,8 @@ def _merge(user: Mapping[str, Any]) -> dict[str, Any]:
     }
     # Copied too: a caller's overrides must not change when the built config does.
     _merge_user_config(config, copy.deepcopy(dict(user)))
-    if config.get("llm_backend") == "codex" and "eval_model" not in user:
-        # The shipped eval_model is a Claude id; one model to name is enough for a
+    if config.get("llm_backend") in {"codex", "opencode"} and "eval_model" not in user:
+        # The shipped eval_model is a bare Claude id; one model to name is enough for a
         # user who did not pick a cheaper one for evaluations.
         config["eval_model"] = config["llm_model"]
     for key in _PATH_KEYS:

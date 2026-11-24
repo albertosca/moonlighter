@@ -137,6 +137,31 @@ def test_make_caller_codex_defaults_to_the_shared_timeout():
     assert delegate.await_args.kwargs["timeout_seconds"] == DEFAULTS["llm_timeout_seconds"]
 
 
-def test_an_unknown_backend_still_lists_codex():
-    with pytest.raises(ConfigError, match="cli, api, cursor, codex"):
+def test_an_unknown_backend_lists_every_backend():
+    with pytest.raises(ConfigError, match="cli, api, cursor, codex, opencode"):
         make_caller({**build_config({}), "llm_backend": "nope"})
+
+
+OPENCODE_CONFIG = {
+    "llm_backend": "opencode",
+    "llm_model": "fake/echo",
+    "eval_model": "fake/echo",
+}
+
+
+def test_make_caller_opencode_delegates_with_the_configured_timeout():
+    delegate = AsyncMock(return_value="x")
+    with patch("moonlighter.core.llm.dispatch.call_opencode", delegate):
+        caller = make_caller(build_config({**OPENCODE_CONFIG, "llm_timeout_seconds": 42}))
+        result = asyncio.run(caller("prompt", "fake/echo", "prefix"))
+    assert result == "x"
+    delegate.assert_awaited_once_with("prompt", "fake/echo", "prefix", timeout_seconds=42)
+
+
+def test_make_caller_opencode_defaults_to_the_shared_timeout():
+    delegate = AsyncMock(return_value="x")
+    with patch("moonlighter.core.llm.dispatch.call_opencode", delegate):
+        asyncio.run(make_caller(build_config(OPENCODE_CONFIG))("prompt", "fake/echo"))
+    delegate.assert_awaited_once_with(
+        "prompt", "fake/echo", None, timeout_seconds=DEFAULTS["llm_timeout_seconds"]
+    )

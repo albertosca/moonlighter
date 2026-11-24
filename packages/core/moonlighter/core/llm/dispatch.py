@@ -7,6 +7,7 @@ from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.claude_cli import call_cli
 from moonlighter.core.llm.codex import call_codex
 from moonlighter.core.llm.cursor import call_cursor
+from moonlighter.core.llm.opencode import call_opencode
 
 
 def make_caller(config: Config) -> LLMCaller:
@@ -20,6 +21,9 @@ def make_caller(config: Config) -> LLMCaller:
     llm_backend: "codex"   → uses `codex exec` on the user's ChatGPT login
                              (`codex login`). `llm_model` / `eval_model` must name
                              non-Claude models and are forwarded as `--model`.
+    llm_backend: "opencode" → uses `opencode run` on any provider the user set up
+                             (`opencode auth login`). `llm_model` / `eval_model`
+                             are provider/model and are forwarded as `-m`.
     Default: "cli". Anything else raises ConfigError rather than silently
     selecting a backend the user did not ask for.
     """
@@ -33,7 +37,9 @@ def make_caller(config: Config) -> LLMCaller:
         return _cursor_caller(
             str(config.get("cursor_model") or "").strip() or None, timeout_seconds
         )
-    return _codex_caller(timeout_seconds)
+    if backend == "codex":
+        return _codex_caller(timeout_seconds)
+    return _opencode_caller(timeout_seconds)
 
 
 def _cli_caller(timeout_seconds: float) -> LLMCaller:
@@ -50,6 +56,15 @@ def _codex_caller(timeout_seconds: float) -> LLMCaller:
 
     async def _call(prompt: str, model: str, cache_prefix: str | None = None) -> str:
         return await call_codex(prompt, model, cache_prefix, timeout_seconds=timeout_seconds)
+
+    return _call
+
+
+def _opencode_caller(timeout_seconds: float) -> LLMCaller:
+    """Bind the shared call timeout to `opencode run`."""
+
+    async def _call(prompt: str, model: str, cache_prefix: str | None = None) -> str:
+        return await call_opencode(prompt, model, cache_prefix, timeout_seconds=timeout_seconds)
 
     return _call
 

@@ -141,3 +141,22 @@ def test_a_config_yaml_that_is_not_a_mapping_is_refused(tmp_path, document):
     config_file.write_text(document)
     with pytest.raises(ConfigError, match="mapping"):
         load_config(config_path=str(config_file))
+
+
+def test_load_config_opencode_eval_model_falls_back_to_llm_model(tmp_path, monkeypatch):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "config.yaml").write_text(
+        "llm_backend: opencode\nllm_model: anthropic/claude-sonnet-5-5\n"
+    )
+    config = load_config(tmp_path / "config.yaml")
+    assert config["eval_model"] == "anthropic/claude-sonnet-5-5"
+    validate_config(config)
+
+
+def test_load_config_opencode_keeps_an_explicit_eval_model(tmp_path, monkeypatch):
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "config.yaml").write_text(
+        "llm_backend: opencode\nllm_model: anthropic/claude-sonnet-5-5\n"
+        "eval_model: anthropic/claude-haiku-5-5\n"
+    )
+    assert load_config(tmp_path / "config.yaml")["eval_model"] == "anthropic/claude-haiku-5-5"

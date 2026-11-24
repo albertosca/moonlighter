@@ -2,12 +2,11 @@
 
 import pytest
 
-from moonlighter.core.llm import opencode
-
 
 @pytest.fixture(autouse=True)
 def _opencode_on_path(monkeypatch, tmp_path):
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(
-        opencode.shutil, "which", lambda name: "/opt/bin/opencode" if name == "opencode" else None
+        "moonlighter.core.llm.opencode.shutil.which",
+        lambda name: "/opt/bin/opencode" if name == "opencode" else None,
     )

@@ -79,7 +79,7 @@ def test_validate_config_leaves_claude_models_alone_for_other_backends():
         ({"llm_backend": 5}, "config key 'llm_backend' must be str, got int"),
         (
             {"llm_backend": "CLI"},
-            "config key 'llm_backend' must be one of cli, api, cursor, codex, got 'CLI'",
+            "config key 'llm_backend' must be one of cli, api, cursor, codex, opencode, got 'CLI'",
         ),
         (
             {"llm_backend": "codex", "llm_model": "claude-sonnet-4-6"},

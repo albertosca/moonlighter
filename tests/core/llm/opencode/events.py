@@ -4,6 +4,7 @@ The lines keep their real shape; long ids are shortened.
 """
 
 import json
+from typing import Any
 
 SESSION_ID = "ses_df1f5953fffe0sTA1HHPUux5hk"
 
@@ -27,7 +28,7 @@ _STEP_FINISH = {
 }
 
 
-def text_event(text: str, session_id: str = SESSION_ID) -> dict:
+def text_event(text: str, session_id: str = SESSION_ID) -> dict[str, Any]:
     return {
         "type": "text",
         "timestamp": 1795531895976,
@@ -43,11 +44,13 @@ def text_event(text: str, session_id: str = SESSION_ID) -> dict:
     }
 
 
-def error_event(error: object, session_id: str = "ses_df2227066ffeJDiIgMrH5Pndcg") -> dict:
+def error_event(
+    error: object, session_id: str = "ses_df2227066ffeJDiIgMrH5Pndcg"
+) -> dict[str, Any]:
     return {"type": "error", "timestamp": 1795528954849, "sessionID": session_id, "error": error}
 
 
-def tool_event(tool: str, status: str = "error") -> dict:
+def tool_event(tool: str, status: str = "error") -> dict[str, Any]:
     return {
         "type": "tool_use",
         "timestamp": 1795528862978,

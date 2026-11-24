@@ -61,6 +61,20 @@ def test_codex_backend_never_loads_the_anthropic_key(tmp_path, monkeypatch):
     assert "ANTHROPIC_API_KEY" not in os.environ
 
 
+def test_opencode_backend_never_loads_the_anthropic_key(tmp_path, monkeypatch):
+    """The opencode backend reads its own provider login; the Anthropic key file is for api."""
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    key_file = tmp_path / "api.env"
+    key_file.write_text("ANTHROPIC_API_KEY=sk-from-file\n")
+    monkeypatch.setattr(api_key, "anthropic_api_env_file", lambda: key_file)
+    (tmp_path / "config.yaml").write_text(
+        "llm_backend: opencode\nllm_model: anthropic/claude-sonnet-5-5\n"
+    )
+    load_config(tmp_path / "config.yaml")
+    assert "ANTHROPIC_API_KEY" not in os.environ
+
+
 def test_a_missing_or_unreadable_file_is_not_an_error(tmp_path, provider_file):
     load_config(_config_with_backend(tmp_path, "api"))  # file absent
     provider_file.mkdir()  # a directory where the file should be

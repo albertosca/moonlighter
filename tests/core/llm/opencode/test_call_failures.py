@@ -45,7 +45,7 @@ async def test_a_model_without_a_provider_is_refused_before_anything_starts(mode
 
 
 async def test_a_missing_binary_says_where_to_get_it(monkeypatch, tmp_path):
-    monkeypatch.setattr(opencode.shutil, "which", lambda _name: None)
+    monkeypatch.setattr("moonlighter.core.llm.opencode.shutil.which", lambda _name: None)
     with pytest.raises(RuntimeError, match=r"https://opencode\.ai"):
         await call_opencode("prompt", "fake/echo")
     assert not (tmp_path / "home").exists()
