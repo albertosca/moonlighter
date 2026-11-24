@@ -48,3 +48,11 @@ def _is_codex_runnable(model: object) -> bool:
         and bool(model.strip())
         and not model.strip().lower().startswith("claude")
     )
+
+
+def is_provider_model(model: object) -> bool:
+    """`provider/model`, both sides non-blank: the only form `opencode run -m` accepts."""
+    if not isinstance(model, str):
+        return False
+    provider, slash, name = model.strip().partition("/")
+    return bool(slash and provider.strip() and name.strip())
