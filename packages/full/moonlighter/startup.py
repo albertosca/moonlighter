@@ -15,6 +15,7 @@ from moonlighter.core.llm.codex import codex_executable
 from moonlighter.core.llm.cursor import cursor_executable
 from moonlighter.core.llm.opencode import opencode_executable
 from moonlighter.core.llm.opencode_models import list_opencode_models
+from moonlighter.core.llm.opencode_version import version_drift
 from moonlighter.discovery.evaluation.regional_eligibility import LOCATION_PRECEDENCES
 
 
@@ -42,6 +43,7 @@ def validate_startup(
         _check_location_precedence(profile),
         _check_llm_backend(config),
         _check_opencode_models(config),
+        _check_opencode_version(config),
         _check_cv(resume_path),
         _check_browser(config),
     ]
@@ -155,6 +157,12 @@ def _check_opencode_models(config: Config) -> StartupWarning | None:
         "provider, or pick a model `opencode models` shows. A hand-declared provider in "
         "your global opencode.json is not read: moonlighter runs opencode on its own config.",
     )
+
+
+def _check_opencode_version(config: Config) -> StartupWarning | None:
+    executable = opencode_executable() if llm_backend(config) == "opencode" else None
+    drift = None if executable is None else version_drift(executable)
+    return None if drift is None else StartupWarning("warn", drift)
 
 
 def _check_cv(cv_path: str) -> StartupWarning | None:

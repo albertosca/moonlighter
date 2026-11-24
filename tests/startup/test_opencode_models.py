@@ -63,3 +63,17 @@ def test_a_missing_binary_reports_only_the_binary(listing, monkeypatch):
 def test_another_backend_never_lists(listing):
     _messages({"llm_backend": "cli"})
     listing.assert_not_called()
+
+
+def test_an_unmeasured_opencode_version_is_a_warning(listing, monkeypatch):
+    monkeypatch.setattr("moonlighter.startup.version_drift", lambda _: "opencode 3.0.0 differs")
+    (warning,) = _opencode_warnings()
+    assert warning.level == "warn"
+    assert warning.message == "opencode 3.0.0 differs"
+
+
+def test_another_backend_never_asks_for_the_version(listing, monkeypatch):
+    drift = Mock(return_value="drift")
+    monkeypatch.setattr("moonlighter.startup.version_drift", drift)
+    _messages({"llm_backend": "cli"})
+    drift.assert_not_called()
