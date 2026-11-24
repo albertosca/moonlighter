@@ -5,6 +5,7 @@ import stat
 
 from moonlighter.core.llm.opencode_profile import (
     AGENT_NAME,
+    CallFiles,
     locked_config,
     opencode_environment,
     opencode_run_argv,
@@ -18,7 +19,12 @@ LOCKED_VARIABLES = {
     "OPENCODE_DISABLE_CLAUDE_CODE_SKILLS": "1",
     "OPENCODE_DISABLE_AUTOUPDATE": "1",
     "OPENCODE_DISABLE_FILEWATCHER": "1",
+    "OPENCODE_DISABLE_PROJECT_CONFIG": "1",
 }
+
+
+def _files(tmp_path):
+    return CallFiles(config_file=tmp_path / "opencode.json", config_directory=tmp_path / "config")
 
 
 def _keys(value: object) -> set[str]:
@@ -81,22 +87,41 @@ def test_the_environment_drops_the_pointers_to_the_persons_config(tmp_path):
         "OPENAI_API_KEY": "sk-test",
         "PATH": "/usr/bin",
     }
-    environment = opencode_environment(inherited, tmp_path / "config")
-    for pointer in (
-        "OPENCODE_CONFIG",
-        "OPENCODE_CONFIG_CONTENT",
-        "OPENCODE_DISABLE_PROJECT_CONFIG",
-    ):
-        assert pointer not in environment
+    environment = opencode_environment(inherited, _files(tmp_path))
+    assert "OPENCODE_CONFIG_CONTENT" not in environment
+    assert environment["OPENCODE_CONFIG"] == str(tmp_path / "opencode.json")
     assert environment["OPENCODE_CONFIG_DIR"] == str(tmp_path / "config")
     assert environment["OPENAI_API_KEY"] == "sk-test"
     assert environment["PATH"] == "/usr/bin"
     assert LOCKED_VARIABLES.items() <= environment.items()
 
 
+def test_project_config_and_instructions_are_off_and_the_locked_config_is_named(tmp_path):
+    """Measured on opencode 2.4.0: a project config also walks up for every AGENTS.md
+    between the workdir and the repository root, MOONLIGHTER_HOME's own included.
+    The locked config arrives through OPENCODE_CONFIG instead.
+    """
+    environment = opencode_environment({}, _files(tmp_path))
+    assert environment["OPENCODE_DISABLE_PROJECT_CONFIG"] == "1"
+    assert environment["OPENCODE_CONFIG"] == str(tmp_path / "opencode.json")
+
+
+def test_the_environment_drops_the_inherited_working_directory(tmp_path):
+    """On opencode 2.4.0 the project comes from PWD, over the real cwd.
+
+    An inherited PWD names the launcher's project, so the call would run in that
+    project instead of the private workdir.
+    """
+    inherited = {"PWD": "/home/me/project", "OLDPWD": "/home/me", "PATH": "/usr/bin"}
+    environment = opencode_environment(inherited, _files(tmp_path))
+    assert "PWD" not in environment
+    assert "OLDPWD" not in environment
+    assert environment["PATH"] == "/usr/bin"
+
+
 def test_the_environment_leaves_the_inherited_mapping_alone(tmp_path):
     inherited = {"OPENCODE_CONFIG": "x"}
-    opencode_environment(inherited, tmp_path)
+    opencode_environment(inherited, _files(tmp_path))
     assert inherited == {"OPENCODE_CONFIG": "x"}
 
 
@@ -118,8 +143,8 @@ def test_the_argv_names_the_agent_and_the_model_and_never_the_prompt():
 
 
 def test_the_call_files_are_the_locked_config_and_an_empty_private_config_directory(tmp_path):
-    config_directory = write_call_files(tmp_path)
-    assert json.loads((tmp_path / "opencode.json").read_text()) == locked_config()
-    assert config_directory == tmp_path / "config"
-    assert list(config_directory.iterdir()) == []
-    assert stat.S_IMODE(config_directory.stat().st_mode) == 0o700
+    files = write_call_files(tmp_path)
+    assert files == _files(tmp_path)
+    assert json.loads(files.config_file.read_text()) == locked_config()
+    assert list(files.config_directory.iterdir()) == []
+    assert stat.S_IMODE(files.config_directory.stat().st_mode) == 0o700

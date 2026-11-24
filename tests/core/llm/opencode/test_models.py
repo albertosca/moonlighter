@@ -75,8 +75,9 @@ def test_it_gets_the_locked_environment_and_its_own_group(fake_popen, monkeypatc
     list_opencode_models("/opt/bin/opencode")
     (launch,) = fake_popen.launches
     environment = launch.options["env"]
-    assert "OPENCODE_CONFIG" not in environment
-    assert environment["OPENCODE_CONFIG_DIR"] == str(Path(launch.options["cwd"]) / "config")
+    workdir = Path(launch.options["cwd"])
+    assert environment["OPENCODE_CONFIG"] == str(workdir / "opencode.json")
+    assert environment["OPENCODE_CONFIG_DIR"] == str(workdir / "config")
     assert launch.options["start_new_session"] is True
     assert launch.options["stdin"] == subprocess.DEVNULL
 

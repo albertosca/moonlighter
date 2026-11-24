@@ -72,8 +72,9 @@ async def test_an_inherited_config_pointer_never_reaches_the_child(fake, monkeyp
     monkeypatch.setenv("OPENCODE_CONFIG_DIR", "/home/me/.config/opencode")
     await _call(fake)
     environment = fake.run.options["env"]
-    assert "OPENCODE_CONFIG" not in environment
-    assert environment["OPENCODE_CONFIG_DIR"] != "/home/me/.config/opencode"
+    workdir = Path(fake.run.options["cwd"])
+    assert environment["OPENCODE_CONFIG"] == str(workdir / "opencode.json")
+    assert environment["OPENCODE_CONFIG_DIR"] == str(workdir / "config")
 
 
 async def test_the_run_gets_its_own_process_group(fake):
