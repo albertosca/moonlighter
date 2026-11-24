@@ -13,6 +13,9 @@ from moonlighter.core.config.model import Config
 from moonlighter.core.config.paths import browser_executable, moonlighter_home
 from moonlighter.core.llm.codex import codex_executable
 from moonlighter.core.llm.cursor import cursor_executable
+from moonlighter.core.llm.opencode import opencode_executable
+from moonlighter.core.llm.opencode_models import list_opencode_models
+from moonlighter.core.llm.opencode_version import version_drift
 from moonlighter.discovery.evaluation.regional_eligibility import LOCATION_PRECEDENCES
 
 
@@ -39,6 +42,8 @@ def validate_startup(
         _check_profile(profile),
         _check_location_precedence(profile),
         _check_llm_backend(config),
+        _check_opencode_models(config),
+        _check_opencode_version(config),
         _check_cv(resume_path),
         _check_browser(config),
     ]
@@ -95,6 +100,14 @@ _BACKEND_CREDENTIALS: dict[str, tuple[Callable[[], bool], str]] = {
             "Install the Codex CLI and run `codex login` with your ChatGPT account."
         ),
     ),
+    "opencode": (
+        lambda: opencode_executable() is not None,
+        (
+            "llm_backend is 'opencode' but the `opencode` CLI was not found on PATH. "
+            "scan_and_evaluate and prepare_application will not work. "
+            "Install opencode (https://opencode.ai) and run `opencode auth login` for your provider."
+        ),
+    ),
     "cli": (
         lambda: shutil.which("claude") is not None,
         (
@@ -119,6 +132,37 @@ def _check_llm_backend(config: Config) -> StartupWarning | None:
     if is_available():
         return None
     return StartupWarning("error", message)
+
+
+def _check_opencode_models(config: Config) -> StartupWarning | None:
+    """The configured models must be ones opencode lists, or every call fails mid-scan."""
+    if llm_backend(config) != "opencode":
+        return None
+    executable = opencode_executable()
+    if executable is None:
+        return None  # _check_llm_backend already reports the missing binary
+    listed = list_opencode_models(executable)
+    if listed is None:
+        return StartupWarning(
+            "warn",
+            "llm_backend is 'opencode' but `opencode models` failed, so the configured "
+            "models could not be checked.",
+        )
+    missing = sorted({config["llm_model"], config["eval_model"]} - set(listed))
+    if not missing:
+        return None
+    return StartupWarning(
+        "error",
+        f"opencode does not list {', '.join(missing)}. Run `opencode auth login` for that "
+        "provider, or pick a model `opencode models` shows. A hand-declared provider in "
+        "your global opencode.json is not read: moonlighter runs opencode on its own config.",
+    )
+
+
+def _check_opencode_version(config: Config) -> StartupWarning | None:
+    executable = opencode_executable() if llm_backend(config) == "opencode" else None
+    drift = None if executable is None else version_drift(executable)
+    return None if drift is None else StartupWarning("warn", drift)
 
 
 def _check_cv(cv_path: str) -> StartupWarning | None:

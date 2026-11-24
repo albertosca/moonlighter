@@ -1,5 +1,6 @@
 """MCP tools for the application sheet and the pipeline: prepare, list by status, update."""
 
+import asyncio
 from datetime import datetime
 from typing import Any
 
@@ -117,7 +118,9 @@ def _status_section(status: str) -> list[str]:
 async def get_pipeline(*, context: Context[AppContext, Any]) -> str:
     """Show full application funnel: counts and list by status."""
     app_context = refreshed_app_context(context)
-    lines = _warning_lines(validate_startup(app_context.config, app_context.profile))
+    # A thread: `opencode models` can take up to 20 s, and every other tool shares this loop.
+    warnings = await asyncio.to_thread(validate_startup, app_context.config, app_context.profile)
+    lines = _warning_lines(warnings)
     lines.append("# Application Pipeline\n")
     for status in _PIPELINE_STATUSES:
         lines.extend(_status_section(status))

@@ -11,3 +11,26 @@ def _startup_finds_claude():
     """
     with patch("moonlighter.startup.shutil.which", return_value="/usr/local/bin/claude"):
         yield
+
+
+@pytest.fixture(autouse=True)
+def _startup_finds_no_opencode():
+    """`opencode` may be on the dev machine and is never in CI: resolve it the CI way.
+    Tests that need it present patch `opencode_executable` themselves.
+    """
+    with patch("moonlighter.startup.opencode_executable", return_value=None):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _startup_lists_no_opencode_models():
+    """No startup test may run the real `opencode models`."""
+    with patch("moonlighter.startup.list_opencode_models", return_value=[]):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _startup_runs_the_measured_opencode():
+    """No startup test may run the real `opencode --version`."""
+    with patch("moonlighter.startup.version_drift", return_value=None):
+        yield

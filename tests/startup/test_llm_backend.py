@@ -8,6 +8,14 @@ from moonlighter.startup import validate_startup
 
 # The Codex CLI runs OpenAI models, so config validation refuses the Claude defaults.
 CODEX_CONFIG = {"llm_backend": "codex", "llm_model": "gpt-5", "eval_model": "gpt-5"}
+# opencode needs provider/model, which the defaults are not either.
+OPENCODE_CONFIG = {
+    "llm_backend": "opencode",
+    "llm_model": "anthropic/claude-sonnet-5-5",
+    "eval_model": "anthropic/claude-sonnet-5-5",
+}
+# The models each backend can load with; the others accept the defaults.
+BACKEND_CONFIGS = {"codex": CODEX_CONFIG, "opencode": OPENCODE_CONFIG}
 
 
 def test_validate_startup_cli_backend_without_the_claude_binary_produces_error(monkeypatch):
@@ -120,6 +128,27 @@ def test_codex_backend_with_the_cli_is_quiet_and_asks_for_no_api_key(monkeypatch
 def test_every_llm_backend_has_a_credential_check(backend):
     """A backend added to LLM_BACKENDS without a credential check would raise KeyError at startup."""
     warnings = validate_startup(
-        config=build_config({**CODEX_CONFIG, "llm_backend": backend}), profile={"skills": []}
+        config=build_config(BACKEND_CONFIGS.get(backend, {"llm_backend": backend})),
+        profile={"skills": []},
     )
     assert isinstance(warnings, list)
+
+
+def test_opencode_backend_without_the_cli_produces_an_error(monkeypatch):
+    monkeypatch.setattr("moonlighter.startup.opencode_executable", lambda: None)
+    warnings = validate_startup(config=build_config(OPENCODE_CONFIG), profile={"skills": []})
+    errors = [warning for warning in warnings if warning.level == "error"]
+    assert len(errors) == 1
+    assert "opencode auth login" in errors[0].message
+    assert "https://opencode.ai" in errors[0].message
+
+
+def test_opencode_backend_with_the_cli_is_quiet_and_asks_for_no_api_key(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr("moonlighter.startup.opencode_executable", lambda: "/opt/bin/opencode")
+    monkeypatch.setattr(
+        "moonlighter.startup.list_opencode_models", lambda _: [OPENCODE_CONFIG["llm_model"]]
+    )
+    warnings = validate_startup(config=build_config(OPENCODE_CONFIG), profile={"skills": []})
+    assert not any(warning.level == "error" for warning in warnings)
+    assert not any("ANTHROPIC_API_KEY" in warning.message for warning in warnings)

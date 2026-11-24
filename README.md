@@ -86,11 +86,12 @@ Applications go out under your name, so the bar is trust. Each decision below bo
 
 ## Install
 
-You need [uv](https://docs.astral.sh/uv/) (it fetches Python 3.14 for you) and an LLM backend: the Claude Code CLI by default, or an Anthropic API key.
+You need [uv](https://docs.astral.sh/uv/) (it fetches Python 3.14 for you) and an LLM backend: the Claude Code CLI by default, or the Anthropic API, Cursor, Codex or opencode.
 
 - **Claude Code:** `/plugin marketplace add albertosca/moonlighter`, then `/plugin install moonlighter@moonlighter`.
+- **opencode:** `uvx moonlighter init` offers to register the server in opencode's config.
 - **Any other MCP client:** register the server command `uvx moonlighter`.
-- **Then:** `uvx moonlighter init` writes your config; fill in `profile.yaml` and `company_list.yaml`, and ask Claude to "scan my companies".
+- **Then:** `uvx moonlighter init` writes your config; fill in `profile.yaml` and `company_list.yaml`, and ask your agent to "scan my companies".
 
 [Full install guide →](https://albertosca.github.io/moonlighter/getting-started/install/)
 

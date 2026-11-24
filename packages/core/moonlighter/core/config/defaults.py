@@ -20,6 +20,9 @@ DEFAULTS: DefaultsConfig = {
     #              key is refused. Unlike cursor it forwards llm_model / eval_model
     #              as `--model`, so both must name a non-Claude model (eval_model
     #              defaults to llm_model when omitted).
+    #   "opencode" -> `opencode run` on any provider set up with `opencode auth login`.
+    #                 llm_model / eval_model must be provider/model (for example
+    #                 "anthropic/claude-sonnet-5-5"); eval_model defaults to llm_model.
     # Default is "cli" because that is what `moonlighter init`, the README, and
     # config.example.yaml all lead with -- an installer coming through
     # `uvx moonlighter` has Claude Code far more often than an API key.

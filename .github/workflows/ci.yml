@@ -54,14 +54,15 @@ jobs:
             --package moonlighter.startup \
             --package moonlighter.views \
             --package moonlighter._tool_logging \
-            --package moonlighter.init
+            --package moonlighter.init \
+            --package moonlighter.opencode_registration
           uv run mypy scripts/
 
       - name: Type check ratchet over tests (mypy)
         run: uv run python scripts/check_mypy_ratchet.py
 
       - name: Tests (unit, coverage gate 100%)
-        run: uv run pytest -m "not e2e" --junitxml=test-report.xml
+        run: uv run pytest -m "not e2e and not opencode_live" --junitxml=test-report.xml
 
       - name: README facts and links
         run: uv run python scripts/check_readme_facts.py --junit test-report.xml

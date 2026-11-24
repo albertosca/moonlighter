@@ -3,7 +3,11 @@
 from collections.abc import Mapping
 from typing import Any
 
-from moonlighter.core.config.backends import llm_backend, require_codex_models
+from moonlighter.core.config.backends import (
+    llm_backend,
+    require_codex_models,
+    require_opencode_models,
+)
 from moonlighter.core.config.errors import ConfigError
 
 # (type, ...) — a tuple of acceptable types; bool is excluded from int keys explicitly.
@@ -86,6 +90,8 @@ def validate_config(config: Mapping[str, Any]) -> None:
         _validate_key(config, key, value)
     if config.get("llm_backend") == "codex":
         require_codex_models(config)
+    if config.get("llm_backend") == "opencode":
+        require_opencode_models(config)
 
 
 def _validate_key(config: Mapping[str, Any], key: str, value: Any) -> None:

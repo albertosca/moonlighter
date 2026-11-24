@@ -2,7 +2,7 @@
 
 # Install moonlighter
 
-moonlighter runs on your own machine as an MCP server for Claude Code (or any MCP client), plus one command-line tool per package. Setup is three steps: run the wizard, fill in two YAML files, register the server.
+moonlighter runs on your own machine as an MCP server for Claude Code, opencode or any other MCP client, plus one command-line tool per package. Setup is three steps: run the wizard, fill in two YAML files, register the server.
 
 ## Requirements
 
@@ -13,6 +13,7 @@ moonlighter runs on your own machine as an MCP server for Claude Code (or any MC
   - `llm_backend: api` — the Anthropic SDK, billed to API credits. Requires `ANTHROPIC_API_KEY`: from the environment, or, when it is not set there, from a line `ANTHROPIC_API_KEY=...` in `~/.config/anthropic/api.env`.
   - `llm_backend: cursor` — the [Cursor CLI](https://cursor.com/docs/cli/overview) (`agent`, or `cursor-agent`), after `agent login`. No API key. Optional `cursor_model`; otherwise the account's default model.
   - `llm_backend: codex` — the [Codex CLI](https://developers.openai.com/codex/cli) (`codex`), after `codex login` with a ChatGPT account. No API key. Set `llm_model` (and optionally `eval_model`) to a non-Claude model the account can run.
+  - `llm_backend: opencode` — the [opencode CLI](https://opencode.ai) (`opencode`), on any provider you log in to with `opencode auth login`. No API key in moonlighter's config. Set `llm_model` (and optionally `eval_model`) to `provider/model`, as `opencode models` lists it. Calls run under an isolated config, so a provider you declared by hand in your own `opencode.json` (Ollama and the like) is not available to them.
 - Gmail OAuth credentials (optional — only for [Gmail tracking](gmail.md))
 
 ## Setup
@@ -55,9 +56,34 @@ Then register the MCP server:
 claude mcp add-json --scope user moonlighter '{"command":"uvx","args":["moonlighter"]}'
 ```
 
-Using a different MCP client? Register the same command and args (`uvx` / `["moonlighter"]`) with your client's own registration mechanism — the `claude mcp add-json` command above is specific to the Claude Code CLI.
+Using a different MCP client? Register the same command and args (`uvx` / `["moonlighter"]`) with your client's own registration mechanism — the `claude mcp add-json` command above is specific to the Claude Code CLI. For opencode, see Option C.
 
-### After either option
+### Option C — opencode
+
+```bash
+uvx moonlighter init
+```
+
+When `opencode` is on your PATH, the wizard offers to register the server in opencode's global config: `~/.config/opencode/opencode.json`, or the same file under `$XDG_CONFIG_HOME/opencode/` or `$OPENCODE_CONFIG_DIR` when those are set. It copies the file to `opencode.json.bak` before changing it (`.bak.1`, `.bak.2` and so on when a backup is already there). A symlinked file is edited where the link points, so the link stays. A file it cannot edit safely (JSONC, a layout it does not recognise, or moonlighter already registered) stays as it is, and the wizard prints the block to add by hand:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "moonlighter": {
+        "type": "local",
+        "command": ["uvx", "moonlighter"],
+        "protocol": "2026-07-28",
+        "codemode": false
+      }
+    }
+  }
+}
+```
+
+`protocol` pins the handshake, because opencode's default (`auto`) fails against this server. `codemode: false` offers moonlighter's tools to the model directly: under opencode's default Code Mode they sit behind its `execute` tool. Check the connection with `opencode mcp list`, which should show `✓ moonlighter connected`.
+
+### After any option
 
 The wizard writes `config.yaml` into `MOONLIGHTER_HOME` (defaults to `~/.moonlighter/`). Two files still need your input:
 
@@ -70,7 +96,7 @@ Start from [`profile.example.yaml`](https://raw.githubusercontent.com/albertosca
 
 The wizard writes a minimal `config.yaml`; [`config.example.yaml`](https://raw.githubusercontent.com/albertosca/moonlighter/main/config.example.yaml) documents the rest of the configuration surface (summarised in [Configuration](../reference/config.md)), notably the `cv` block and the `email` block. The `cv` block is only needed to use a different resume per company: by default `prepare_application` points you at `cv.pdf` from `MOONLIGHTER_HOME` for the form's file-upload question, and tells you plainly if none is configured. `profile.yaml`, `company_list.yaml`, `config.yaml`, and `cv.pdf` (your resume — moonlighter names it for you to attach, never uploads it itself) all belong in `MOONLIGHTER_HOME` (defaults to `~/.moonlighter/`).
 
-Restart Claude Code, or start a new session, before the moonlighter tools appear. Once connected, ask Claude to run `get_pipeline` — besides the application funnel, it reports setup problems such as a missing profile, CV, or browser.
+Restart your MCP client (Claude Code, opencode), or start a new session, before the moonlighter tools appear. Once connected, ask your agent to run `get_pipeline` — besides the application funnel, it reports setup problems such as a missing profile, CV, or browser.
 
 Next: [run your first scan](first-scan.md). Reply tracking is optional and set up separately — see [Gmail tracking](gmail.md).
 
