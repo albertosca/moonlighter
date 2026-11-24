@@ -54,7 +54,8 @@ jobs:
             --package moonlighter.startup \
             --package moonlighter.views \
             --package moonlighter._tool_logging \
-            --package moonlighter.init
+            --package moonlighter.init \
+            --package moonlighter.opencode_registration
           uv run mypy scripts/
 
       - name: Type check ratchet over tests (mypy)
