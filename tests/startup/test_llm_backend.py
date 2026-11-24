@@ -146,6 +146,9 @@ def test_opencode_backend_without_the_cli_produces_an_error(monkeypatch):
 def test_opencode_backend_with_the_cli_is_quiet_and_asks_for_no_api_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr("moonlighter.startup.opencode_executable", lambda: "/opt/bin/opencode")
+    monkeypatch.setattr(
+        "moonlighter.startup.list_opencode_models", lambda _: [OPENCODE_CONFIG["llm_model"]]
+    )
     warnings = validate_startup(config=build_config(OPENCODE_CONFIG), profile={"skills": []})
     assert not any(warning.level == "error" for warning in warnings)
     assert not any("ANTHROPIC_API_KEY" in warning.message for warning in warnings)

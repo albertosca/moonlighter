@@ -20,3 +20,10 @@ def _startup_finds_no_opencode():
     """
     with patch("moonlighter.startup.opencode_executable", return_value=None):
         yield
+
+
+@pytest.fixture(autouse=True)
+def _startup_lists_no_opencode_models():
+    """No startup test may run the real `opencode models`."""
+    with patch("moonlighter.startup.list_opencode_models", return_value=[]):
+        yield
