@@ -1,5 +1,6 @@
 """The opencode backend: `opencode run` on any provider the person set up, one locked call each."""
 
+import asyncio
 import dataclasses
 import logging
 import os
@@ -24,6 +25,11 @@ from moonlighter.core.metrics import record_call
 
 logger = logging.getLogger(__name__)
 _SESSION_DELETE_TIMEOUT_SECONDS = 30.0
+# Concurrent first calls on a fresh opencode.db: some die before the server is up
+# (measured on 2.4.0). Such a run never reached the provider, so it is safe to retry.
+_NOT_STARTED = "before reporting readiness"
+_START_RETRIES = 2
+_START_RETRY_DELAY_SECONDS = 0.5
 
 
 def opencode_executable() -> str | None:
@@ -81,12 +87,32 @@ async def _delete_session(command: CliCommand) -> None:
         )
 
 
-async def _run_and_clean(command: CliCommand, stdin: bytes, timeout_seconds: float) -> str:
-    """Run the call, then delete the session it opened, whatever the outcome."""
+def _never_started(output: RunOutput) -> bool:
+    return output.session_id is None and _NOT_STARTED in (output.error or "")
+
+
+async def _run_until_started(
+    command: CliCommand, stdin: bytes, timeout_seconds: float
+) -> tuple[int | None, RunOutput, bytes]:
+    """One run, retried while opencode dies before its server is up."""
+    for attempt in range(_START_RETRIES):
+        code, stdout, stderr = await run_in_own_group(
+            command, stdin=stdin, timeout_seconds=timeout_seconds
+        )
+        output = parse_events(stdout)
+        if not _never_started(output):
+            return code, output, stderr
+        logger.info("opencode exited before its server was up; retrying the call")
+        await asyncio.sleep(_START_RETRY_DELAY_SECONDS * (attempt + 1))
     code, stdout, stderr = await run_in_own_group(
         command, stdin=stdin, timeout_seconds=timeout_seconds
     )
-    output = parse_events(stdout)
+    return code, parse_events(stdout), stderr
+
+
+async def _run_and_clean(command: CliCommand, stdin: bytes, timeout_seconds: float) -> str:
+    """Run the call, then delete the session it opened, whatever the outcome."""
+    code, output, stderr = await _run_until_started(command, stdin, timeout_seconds)
     try:
         return _answer_or_raise(code, output, stderr)
     finally:
@@ -108,7 +134,8 @@ async def call_opencode(
     0700 workdir per call, removed when the call returns; a hung call is killed
     with its process group. The workdir holds the locked config, and the
     session is deleted afterwards so prompts do not pile up in opencode.db.
-    A call that times out printed no session id, so its session stays.
+    A call that times out has its output discarded, so its session id is never
+    read and that session stays.
     """
     executable = _require_opencode(model)
     # Encoded before any process or workdir exists: a prompt that cannot be encoded fails here.

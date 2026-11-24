@@ -86,3 +86,11 @@ FREE_LIMIT_ERROR = {
 TEXT_RUN = output(_STEP_START, text_event("PONG"), _STEP_FINISH)
 FREE_LIMIT_RUN = output(error_event(FREE_LIMIT_ERROR))
 BLOCKED_TOOL_RUN = output(tool_event("shell"))
+# Five concurrent first calls on a fresh opencode.db: some die before the server is up,
+# with an empty sessionID (measured on 2.4.0, 2026-11-24, local fake provider).
+NOT_STARTED_RUN = output(
+    error_event(
+        {"type": "unknown", "message": "Standalone server exited before reporting readiness"},
+        session_id="",
+    )
+)

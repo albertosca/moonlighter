@@ -58,7 +58,10 @@ def parse_events(stdout: bytes) -> RunOutput:
         _error_message(event.get("error")) for event in events if event.get("type") == "error"
     ]
     session_ids = [
-        event["sessionID"] for event in events if isinstance(event.get("sessionID"), str)
+        # A run that died before its server was up reports an empty one.
+        event["sessionID"]
+        for event in events
+        if isinstance(event.get("sessionID"), str) and event["sessionID"]
     ]
     return RunOutput(
         answer="".join(str(part.get("text", "")) for part in _parts(events, "text")),
