@@ -10,7 +10,6 @@ from mcp.server.mcpserver import Context
 
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.loading import load_config
-from moonlighter.core.config.validation import validate_config
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.dispatch import make_caller
 from moonlighter.startup import StartupWarning
@@ -68,7 +67,6 @@ class AppContext:
         try:
             _read_mapping(self.config_file.path)
             config = load_config(self.config_file.path)
-            validate_config(config)
         except (ConfigError, OSError, yaml.YAMLError) as error:
             _keep_last_good("config.yaml", error)
         else:

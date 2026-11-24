@@ -1,38 +1,59 @@
 """Loading config.yaml (merged onto the defaults) and profile.yaml from MOONLIGHTER_HOME."""
 
+import copy
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
 from moonlighter.core.config.api_key import fill_api_key_from_file
 from moonlighter.core.config.defaults import DEFAULTS
+from moonlighter.core.config.model import Config
 from moonlighter.core.config.paths import learned_blocklist_path, moonlighter_home
+from moonlighter.core.config.validation import validate_config
 
 _PATH_KEYS = ("browser_session_dir", "screenshots_dir")
 
 
-def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
-    """Load configuration from YAML file, merging with defaults.
+def build_config(user: Mapping[str, Any]) -> Config:
+    """The validated config for a user mapping: the defaults merged under it, no file read.
 
-    Expands home directory (~) paths for designated path keys.
+    What tests call: the same shape production builds, with no YAML, learned blocklist
+    or API key involved. Raises ConfigError naming the first bad key.
+    """
+    config = _merge(user)
+    validate_config(config)
+    return cast("Config", config)
 
-    Args:
-        config_path: Path to config.yaml file
 
-    Returns:
-        dict with merged config (defaults + overrides)
+def load_config(config_path: str | Path | None = None) -> Config:
+    """config.yaml merged onto the defaults, the learned blocklist added, then validated.
+
+    Raises ConfigError naming the first bad key, before anything reads the API key file.
     """
     config_path = (
         Path(config_path) if config_path is not None else moonlighter_home() / "config.yaml"
     )
+    config = _merge(_read_user_config(config_path))
+    _merge_learned_blocklist(config)
+    validate_config(config)
+    # Only the api backend needs the key. cli strips it so `claude -p` bills the
+    # subscription; cursor and codex authenticate with their own login and never read it.
+    if config["llm_backend"] == "api":
+        fill_api_key_from_file()
+    return cast("Config", config)
+
+
+def _merge(user: Mapping[str, Any]) -> dict[str, Any]:
     home = moonlighter_home()
     config: dict[str, Any] = {
-        **DEFAULTS,
+        # A deep copy: a loaded config used to share its nested blocks with DEFAULTS,
+        # so a learned interview stage leaked into every later load (probe, 2026-11-24).
+        **copy.deepcopy(DEFAULTS),
         "browser_session_dir": str(home / "browser-session"),
         "screenshots_dir": str(home / "screenshots"),
     }
-    user = _read_user_config(config_path)
     _merge_user_config(config, user)
     if config.get("llm_backend") == "codex" and "eval_model" not in user:
         # The shipped eval_model is a Claude id; one model to name is enough for a
@@ -40,13 +61,6 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
         config["eval_model"] = config["llm_model"]
     for key in _PATH_KEYS:
         config[key] = str(Path(config[key]).expanduser())
-
-    _merge_learned_blocklist(config)
-
-    # Only the api backend needs the key. cli strips it so `claude -p` bills the
-    # subscription; cursor and codex authenticate with their own login and never read it.
-    if config.get("llm_backend") == "api":
-        fill_api_key_from_file()
     return config
 
 
@@ -57,7 +71,7 @@ def _read_user_config(config_path: Path) -> dict[str, Any]:
     return user
 
 
-def _merge_user_config(config: dict[str, Any], user: dict[str, Any]) -> None:
+def _merge_user_config(config: dict[str, Any], user: Mapping[str, Any]) -> None:
     for key, value in user.items():
         # A dict-valued default (e.g. email:) merges key-by-key: a user
         # overriding one sub-key must not silently drop the siblings'

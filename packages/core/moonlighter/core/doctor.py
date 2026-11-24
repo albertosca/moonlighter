@@ -14,7 +14,6 @@ from moonlighter.core.cli import EXIT_NOTHING, EXIT_OK
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.loading import load_config
 from moonlighter.core.config.paths import moonlighter_home
-from moonlighter.core.config.validation import validate_config
 from moonlighter.core.db import db_path
 from moonlighter.core.slices import Capability, capabilities, installed_slices, slices_to_install
 
@@ -39,7 +38,7 @@ def doctor_payload() -> tuple[dict[str, Any], int]:
     config_path = home / "config.yaml"
     valid, error = False, None
     try:
-        validate_config(load_config())
+        load_config()
         valid = True
     except (ConfigError, OSError, yaml.YAMLError) as failure:
         error = str(failure)

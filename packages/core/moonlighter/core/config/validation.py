@@ -1,5 +1,6 @@
 """Closed-schema validation of a loaded config: unknown keys and wrong types fail by name."""
 
+from collections.abc import Mapping
 from typing import Any
 
 from moonlighter.core.config.backends import llm_backend, require_codex_models
@@ -73,12 +74,13 @@ _NESTED_SCHEMAS = {
 }
 
 
-def validate_config(config: dict[str, Any]) -> None:
+def validate_config(config: Mapping[str, Any]) -> None:
     """Strict, closed-schema validation.
 
     Raises ConfigError on the first unknown key or wrong-typed value (naming the key). Runs
-    after the DEFAULTS merge, so an omitted key is filled by defaults and never fails here —
-    only wrong types and unknown extras fail.
+    inside load_config and build_config, after the DEFAULTS merge, so an omitted key is
+    filled by defaults and never fails here — only wrong types and unknown extras fail.
+    init.py also calls it on a partial mapping, which is why it takes any Mapping.
     """
     for key, value in config.items():
         _validate_key(config, key, value)
@@ -86,7 +88,7 @@ def validate_config(config: dict[str, Any]) -> None:
         require_codex_models(config)
 
 
-def _validate_key(config: dict[str, Any], key: str, value: Any) -> None:
+def _validate_key(config: Mapping[str, Any], key: str, value: Any) -> None:
     if key not in _CONFIG_SCHEMA:
         raise ConfigError(f"unknown config key '{key}'")
     _check_type(key, value, _CONFIG_SCHEMA[key])

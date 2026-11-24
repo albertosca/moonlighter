@@ -1,5 +1,6 @@
 """The llm_backend setting: accepted values, the validated reader and the Codex model check."""
 
+from collections.abc import Mapping
 from typing import Any
 
 from moonlighter.core.config.defaults import DEFAULTS
@@ -8,7 +9,7 @@ from moonlighter.core.config.errors import ConfigError
 LLM_BACKENDS = ("cli", "api", "cursor", "codex")
 
 
-def llm_backend(config: dict[str, Any]) -> str:
+def llm_backend(config: Mapping[str, Any]) -> str:
     """The configured LLM backend, validated.
 
     Single source of truth for every site that branches on the backend -- the
@@ -26,7 +27,7 @@ def llm_backend(config: dict[str, Any]) -> str:
     return backend
 
 
-def require_codex_models(config: dict[str, Any]) -> None:
+def require_codex_models(config: Mapping[str, Any]) -> None:
     """Refuse an llm_model or eval_model the Codex CLI cannot run.
 
     The Codex CLI runs OpenAI models: a Claude id (the shipped defaults) or an

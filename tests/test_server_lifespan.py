@@ -20,8 +20,10 @@ async def test_lifespan_yields_populated_appcontext(temporary_database):
 
 
 async def test_lifespan_rejects_invalid_config(temporary_database, monkeypatch):
-    bad = {"scan_concurrency": "five"}  # will fail validate_config
-    monkeypatch.setattr("moonlighter.server.load_config", lambda: bad)
+    # Raises the way the real loader does: validation now runs inside loading.
+    monkeypatch.setattr(
+        "moonlighter.server.load_config", lambda: loading.build_config({"scan_concurrency": "five"})
+    )
     with pytest.raises(ConfigError):
         async with lifespan(mcp):
             pass  # must raise before yielding

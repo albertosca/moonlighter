@@ -12,7 +12,6 @@ from moonlighter.core.config.company_list import load_company_list
 from moonlighter.core.config.loading import load_config, load_profile
 from moonlighter.core.config.paths import moonlighter_home
 from moonlighter.core.config.permissions import harden_permissions
-from moonlighter.core.config.validation import validate_config
 from moonlighter.core.db import init_db
 from moonlighter.core.doctor import doctor_payload
 from moonlighter.core.llm.dispatch import make_caller
@@ -41,8 +40,7 @@ async def lifespan(_server: MCPServer) -> AsyncIterator[AppContext]:
     home = moonlighter_home()
     config_file = WatchedFile(home / "config.yaml")
     profile_file = WatchedFile(home / "profile.yaml")
-    config = load_config()
-    validate_config(config)  # raises ConfigError -> server refuses to boot
+    config = load_config()  # raises ConfigError -> server refuses to boot
     try:
         profile = load_profile()
     except FileNotFoundError:
