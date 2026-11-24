@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import init_db
 from moonlighter.discovery.scan.pipeline import evaluate_and_store
 from tests.discovery.fake_scan import BatchRecorder, evaluation_result, make_raw_job, store_config
@@ -34,11 +35,15 @@ async def test_evaluation_model_comes_from_eval_model_then_llm_model_then_the_de
         for index, extra in enumerate(
             [
                 {"eval_model": "from-eval", "llm_model": "from-llm"},
-                {"llm_model": "from-llm"},
+                # eval_model follows llm_model only through the codex rule in loading.
+                {"llm_backend": "codex", "llm_model": "from-llm"},
                 {},
             ]
         ):
             await evaluate_and_store(
-                [make_raw_job(100 + index)], store_config(**extra), {}, caller=MagicMock()
+                [make_raw_job(100 + index)],
+                build_config({"score_threshold": 6.5, "title_blocklist": [], **extra}),
+                {},
+                caller=MagicMock(),
             )
     assert recorder.models == ["from-eval", "from-llm", "claude-haiku-4-5-20251001"]

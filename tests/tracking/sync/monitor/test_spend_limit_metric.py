@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import init_db
 from moonlighter.tracking.sync.monitor import sync_responses
 
@@ -29,7 +30,7 @@ async def _sync_with_failing_caller(failure: Exception) -> MagicMock:
         patch("moonlighter.tracking.sync.monitor.parse_message", return_value=MESSAGE),
         patch("moonlighter.tracking.sync.monitor.record_spend_limit_hit") as record_mock,
     ):
-        await sync_responses(CONFIG, failing_caller)
+        await sync_responses(build_config(CONFIG), failing_caller)
     return record_mock
 
 

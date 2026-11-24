@@ -1,15 +1,18 @@
 """The entry point: work authorization before the static rules, and what lands in the result."""
 
 from moonlighter.application.answers.matching.field_map import pre_populate_answers
+from moonlighter.core.config.loading import build_config
 from tests.application.answers.candidate_profiles import PROFILE
 
-WA_CONFIG_BRAZIL = {
-    "work_authorization": {
-        "citizenship_country": "brazil",
-        "authorized_answer": "Yes",
-        "not_authorized_answer": "No",
+WA_CONFIG_BRAZIL = build_config(
+    {
+        "work_authorization": {
+            "citizenship_country": "brazil",
+            "authorized_answer": "Yes",
+            "not_authorized_answer": "No",
+        }
     }
-}
+)
 
 
 def test_visa_field_unknown_country_needs_review():

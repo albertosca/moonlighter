@@ -7,6 +7,7 @@ from moonlighter.application.assisted.composition.composer import (
     compose_answers,
 )
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.core.config.loading import build_config
 from tests.application.assisted.composition.composer.sample_inputs import (
     JOB,
     PROFILE,
@@ -22,7 +23,8 @@ async def test_a_job_cache_hit_skips_the_llm():
     )
     job_cache = {"Describe a challenge you overcame": {"answer": "cached answer", "kind": "text"}}
     composed = await compose_answers(
-        [question], CompositionContext(PROFILE, {}, JOB, never_called, job_cache=job_cache)
+        [question],
+        CompositionContext(PROFILE, build_config({}), JOB, never_called, job_cache=job_cache),
     )
     assert composed[0].answer == "cached answer"
 
@@ -34,7 +36,8 @@ async def test_a_new_llm_answer_is_written_into_the_job_cache():
     )
     job_cache: dict[str, dict[str, str]] = {}
     await compose_answers(
-        [question], CompositionContext(PROFILE, {}, JOB, answers_anything, job_cache=job_cache)
+        [question],
+        CompositionContext(PROFILE, build_config({}), JOB, answers_anything, job_cache=job_cache),
     )
     assert job_cache["Describe a challenge you overcame"] == {
         "answer": "a generated answer",
@@ -53,7 +56,7 @@ async def test_a_gap_is_not_written_into_the_job_cache():
 
     job_cache: dict[str, dict[str, str]] = {}
     composed = await compose_answers(
-        [question], CompositionContext(PROFILE, {}, JOB, unknown, job_cache=job_cache)
+        [question], CompositionContext(PROFILE, build_config({}), JOB, unknown, job_cache=job_cache)
     )
     assert composed[0].answer is None
     assert job_cache == {}
@@ -74,7 +77,8 @@ async def test_an_operator_directed_answer_is_not_written_into_the_job_cache():
 
     job_cache: dict[str, dict[str, str]] = {}
     composed = await compose_answers(
-        [question], CompositionContext(PROFILE, {}, JOB, operator_directed, job_cache=job_cache)
+        [question],
+        CompositionContext(PROFILE, build_config({}), JOB, operator_directed, job_cache=job_cache),
     )
     assert composed[0].answer is None
     assert "operator" in composed[0].gap_reason
@@ -90,7 +94,9 @@ async def test_a_known_field_is_never_overridden_by_the_job_cache_or_answer_bank
     bank = {"first name": "ALSO WRONG"}
     composed = await compose_answers(
         [question],
-        CompositionContext(PROFILE, {}, JOB, never_called, job_cache=job_cache, answer_bank=bank),
+        CompositionContext(
+            PROFILE, build_config({}), JOB, never_called, job_cache=job_cache, answer_bank=bank
+        ),
     )
     assert composed[0].answer == "Alberto"
 
@@ -106,7 +112,8 @@ async def test_a_legacy_flat_shaped_job_cache_entry_is_treated_as_a_miss():
     question = FormQuestion(label=label, kind=QuestionKind.TEXT, required=True)
     job_cache = {label: "Yes, I have 10 years"}
     composed = await compose_answers(
-        [question], CompositionContext(PROFILE, {}, JOB, answers_anything, job_cache=job_cache)
+        [question],
+        CompositionContext(PROFILE, build_config({}), JOB, answers_anything, job_cache=job_cache),
     )
     assert composed[0].answer == "a generated answer"
 
@@ -120,6 +127,7 @@ async def test_an_empty_cached_answer_is_treated_as_a_miss():
     question = FormQuestion(label=label, kind=QuestionKind.LONG_TEXT, required=True)
     job_cache = {label: {"answer": "", "kind": "long_text"}}
     composed = await compose_answers(
-        [question], CompositionContext(PROFILE, {}, JOB, answers_anything, job_cache=job_cache)
+        [question],
+        CompositionContext(PROFILE, build_config({}), JOB, answers_anything, job_cache=job_cache),
     )
     assert composed[0].answer == "a generated answer"

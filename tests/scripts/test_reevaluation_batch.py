@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Job, init_db
 from moonlighter.core.llm.spend_limit import is_spend_limit
 from tests.scripts.reevaluate_bug_victims.harness import Evaluator, rows, victim
@@ -33,11 +34,14 @@ def _settings(**changes) -> ReevaluationSettings:
     return ReevaluationSettings(**{**fields, **changes})
 
 
+CONFIG = build_config({})
+
+
 def _run(monkeypatch, jobs, settings, *, evaluator) -> MagicMock:
     factory = MagicMock(return_value="CALLER")
     monkeypatch.setattr(reevaluation_batch, "make_caller", factory)
     monkeypatch.setattr(reevaluation_batch, "evaluate_job", evaluator)
-    asyncio.run(reevaluate(jobs, {"cfg": 1}, settings))
+    asyncio.run(reevaluate(jobs, CONFIG, settings))
     return factory
 
 
@@ -60,7 +64,7 @@ def test_the_caller_is_built_from_the_config_and_handed_to_every_evaluation(monk
 
     factory = _run(monkeypatch, jobs, _settings(), evaluator=evaluator)
 
-    factory.assert_called_once_with({"cfg": 1})
+    factory.assert_called_once_with(CONFIG)
     assert [call["caller"] for call in evaluator.calls] == ["CALLER", "CALLER"]
     assert [call["profile"] for call in evaluator.calls] == [{"name": "Ana"}] * 2
 

@@ -3,6 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.tracking.gmail import client as gmail_client
 from moonlighter.tracking.gmail.client import _token_scopes, setup_gmail_service
 
@@ -39,7 +40,7 @@ class TestTokenScopes:
         monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
         token = tmp_path / "gmail-token.json"
         token.write_text('{"scope": "https://www.googleapis.com/auth/gmail.modify"}')
-        config = {"email": {"token_path": str(token)}}
+        config = build_config({"email": {"token_path": str(token)}})
 
         with (
             patch("moonlighter.tracking.gmail.client.Credentials") as credentials_class,

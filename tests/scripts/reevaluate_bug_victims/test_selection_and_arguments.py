@@ -108,7 +108,8 @@ def test_every_argument_reaches_evaluate_job(monkeypatch, caller_factory):
     [
         (["--model", "cli"], {"eval_model": "e", "llm_model": "l"}, "cli"),
         ([], {"eval_model": "e", "llm_model": "l"}, "e"),
-        ([], {"llm_model": "l"}, "l"),
+        # eval_model follows llm_model only through the codex rule in loading.
+        ([], {"llm_backend": "codex", "llm_model": "l"}, "l"),
         ([], {}, "claude-haiku-4-5-20251001"),
     ],
 )

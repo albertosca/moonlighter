@@ -10,6 +10,7 @@ from moonlighter.application.assisted.composition.composer import (
     compose_answers,
 )
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.core.config.loading import build_config
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE
 
 EXPECTED_CHOICE_PROMPT = """Answer one question on a job application, as the candidate.
@@ -74,7 +75,7 @@ async def test_a_choice_question_sends_the_whole_prompt_byte_for_byte():
         options=("Platform", "Product"),
     )
     caller = RecordingCaller("Product")
-    await compose_answers([question], CompositionContext(PROFILE, {}, JOB, caller))
+    await compose_answers([question], CompositionContext(PROFILE, build_config({}), JOB, caller))
     assert without_nonces(caller.prompt) == EXPECTED_CHOICE_PROMPT
 
 
@@ -82,7 +83,7 @@ async def test_a_choice_question_sends_the_whole_prompt_byte_for_byte():
 async def test_the_llm_is_called_with_the_prompt_and_the_model_name_only():
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
     caller = RecordingCaller("An answer.")
-    await compose_answers([question], CompositionContext(PROFILE, {}, JOB, caller))
+    await compose_answers([question], CompositionContext(PROFILE, build_config({}), JOB, caller))
     positional, keywords = caller.calls[0]
     assert positional[1:] == ("claude-sonnet-4-6",)
     assert len(positional) == 2
@@ -93,7 +94,7 @@ async def test_the_llm_is_called_with_the_prompt_and_the_model_name_only():
 async def test_a_text_question_leaves_the_constraint_line_empty():
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
     caller = RecordingCaller("An answer.")
-    await compose_answers([question], CompositionContext(PROFILE, {}, JOB, caller))
+    await compose_answers([question], CompositionContext(PROFILE, build_config({}), JOB, caller))
     assert "\nQuestion: Why us?\n\n\nWrite the answer in the same language" in caller.prompt
 
 
@@ -106,7 +107,7 @@ async def test_a_multi_select_constraint_asks_for_one_or_more_lines():
         options=("Ruby", "Elixir"),
     )
     caller = RecordingCaller("Ruby")
-    await compose_answers([question], CompositionContext(PROFILE, {}, JOB, caller))
+    await compose_answers([question], CompositionContext(PROFILE, build_config({}), JOB, caller))
     assert (
         "\nReply with one or more of these options, one per line, copied verbatim:\n"
         "- Ruby\n- Elixir\nPick the strongest option"
@@ -118,7 +119,8 @@ async def test_a_job_without_a_description_puts_the_whole_job_into_the_prompt():
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
     caller = RecordingCaller("An answer.")
     await compose_answers(
-        [question], CompositionContext(PROFILE, {}, {"company": "acme", "id": 3}, caller)
+        [question],
+        CompositionContext(PROFILE, build_config({}), {"company": "acme", "id": 3}, caller),
     )
     assert "\nJob:\n<job_NONCE>\n{'company': 'acme', 'id': 3}\n</job_NONCE>\n" in without_nonces(
         caller.prompt
@@ -131,7 +133,8 @@ async def test_the_profile_and_the_job_are_each_capped_at_6000_characters():
     caller = RecordingCaller("An answer.")
     profile = {"summary": "y" * 7000}
     await compose_answers(
-        [question], CompositionContext(profile, {}, {"description": "x" * 7000}, caller)
+        [question],
+        CompositionContext(profile, build_config({}), {"description": "x" * 7000}, caller),
     )
     prompt = without_nonces(caller.prompt)
     profile_block = prompt.split("<profile_NONCE>\n")[1].split("\n</profile_NONCE>")[0]
@@ -148,7 +151,9 @@ async def test_a_failed_generation_logs_one_warning_naming_the_question(caplog):
 
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
     with caplog.at_level(logging.WARNING):
-        await compose_answers([question], CompositionContext(PROFILE, {}, JOB, explodes))
+        await compose_answers(
+            [question], CompositionContext(PROFILE, build_config({}), JOB, explodes)
+        )
     messages = [
         (record.levelno, record.getMessage())
         for record in caplog.records

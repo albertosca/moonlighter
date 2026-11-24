@@ -11,7 +11,7 @@ def test_bootstrap_loads_config_and_profile_and_inits_the_db(
     monkeypatch.setattr(cli, "load_profile", lambda: {"name": "Jane"})
     monkeypatch.setattr(cli, "harden_permissions", list)
     config, profile = cli.bootstrap()
-    assert config == {"score_threshold": 7.0}
+    assert dict(config) == {"score_threshold": 7.0}
     assert profile == {"name": "Jane"}
     Job.select().count()  # init_db ran: the table exists
 
@@ -23,7 +23,7 @@ def test_bootstrap_tolerates_a_missing_profile(temporary_database, monkeypatch):
     monkeypatch.setattr(cli, "load_config", dict)
     monkeypatch.setattr(cli, "load_profile", _missing)
     monkeypatch.setattr(cli, "harden_permissions", list)
-    assert cli.bootstrap() == ({}, {})
+    assert tuple(map(dict, cli.bootstrap())) == ({}, {})
 
 
 def test_bootstrap_prints_permission_warnings_to_stderr_not_stdout(

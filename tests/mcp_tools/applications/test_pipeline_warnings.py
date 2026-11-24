@@ -20,7 +20,9 @@ async def test_get_pipeline_shows_warnings_when_setup_incomplete(temporary_datab
     assert result.index("# Setup Warnings") < result.index("# Application Pipeline")
 
 
-async def test_get_pipeline_no_warnings_section_when_setup_is_clean(temporary_database, tmp_path):
+async def test_get_pipeline_no_warnings_section_when_setup_is_clean(
+    temporary_database, tmp_path, monkeypatch
+):
     """A fully-configured setup (real profile, real cv.pdf, cli backend, existing
     browser) produces zero warnings -> no Setup Warnings section at all, and the
     pipeline output is unchanged from the pre-existing behavior.
@@ -33,6 +35,8 @@ async def test_get_pipeline_no_warnings_section_when_setup_is_clean(temporary_da
     browser.write_text("fake browser")
     config = {"llm_backend": "cli", "browser_path": str(browser)}
     profile = {"skills": ["python"]}
+    # The built config names cv.default, which resolves under MOONLIGHTER_HOME.
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
 
     # `claude` must be pinned as present: the cli backend now checks for it, and
     # the dev machine has it while CI does not -- otherwise this passes locally

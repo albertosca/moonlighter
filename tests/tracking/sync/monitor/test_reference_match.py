@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Application, ProcessedEmail, init_db
 from moonlighter.tracking.sync.monitor import sync_responses
 from tests.tracking.llm_callers import make_llm_caller
@@ -47,7 +48,7 @@ async def test_email_with_ref_updates_application_status(temporary_database):
         patch("moonlighter.tracking.sync.monitor.mark_processed") as mock_mark,
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        updates = await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        updates = await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     application_refreshed = Application.get_by_id(application.id)
     assert application_refreshed.status == "interviews"
@@ -94,7 +95,7 @@ async def test_rejection_sets_status_rejected(temporary_database):
         patch("moonlighter.tracking.sync.monitor.mark_processed"),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     assert Application.get_by_id(application.id).status == "rejected"
 
@@ -136,7 +137,7 @@ async def test_status_never_regresses(temporary_database):
         patch("moonlighter.tracking.sync.monitor.mark_processed"),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     application_refreshed = Application.get_by_id(application.id)
     assert application_refreshed.status == "interviews"  # did not regress

@@ -3,14 +3,17 @@
 import pytest
 
 from moonlighter.application.answers.rules.work_auth import infer_country, resolve_work_auth
+from moonlighter.core.config.loading import build_config
 
-WA_CONFIG = {
-    "work_authorization": {
-        "citizenship_country": "brazil",
-        "authorized_answer": "Yes",
-        "not_authorized_answer": "No",
+WA_CONFIG = build_config(
+    {
+        "work_authorization": {
+            "citizenship_country": "brazil",
+            "authorized_answer": "Yes",
+            "not_authorized_answer": "No",
+        }
     }
-}
+)
 
 
 def test_resolve_authorized_for_brazil():
@@ -46,21 +49,25 @@ def test_resolve_non_work_auth_field_returns_none():
     assert resolve_work_auth("What is your favorite language?", "brazil", WA_CONFIG) is None
 
 
-WA_CONFIG_EMPTY_CITIZENSHIP = {
-    "work_authorization": {
-        "citizenship_country": "",
-        "authorized_answer": "Yes",
-        "not_authorized_answer": "No",
+WA_CONFIG_EMPTY_CITIZENSHIP = build_config(
+    {
+        "work_authorization": {
+            "citizenship_country": "",
+            "authorized_answer": "Yes",
+            "not_authorized_answer": "No",
+        }
     }
-}
+)
 
 
-WA_CONFIG_NO_CITIZENSHIP = {
-    "work_authorization": {
-        "authorized_answer": "Yes",
-        "not_authorized_answer": "No",
+WA_CONFIG_NO_CITIZENSHIP = build_config(
+    {
+        "work_authorization": {
+            "authorized_answer": "Yes",
+            "not_authorized_answer": "No",
+        }
     }
-}
+)
 
 
 def test_empty_citizenship_needs_review_even_with_known_country():
@@ -82,21 +89,21 @@ def test_missing_citizenship_needs_review():
 def test_resolve_citizenship_locale_normalized():
     """A non-canonical citizenship_country ('Brasil'/'Brazil'/'BR') must match 'brazil'."""
     for form in ("Brasil", "Brazil", "BR", " brazil "):
-        config = {"work_authorization": {"citizenship_country": form}}
+        config = build_config({"work_authorization": {"citizenship_country": form}})
         answer = resolve_work_auth("Are you authorized to work here?", "brazil", config)
         assert answer == "Yes", f"failed for {form!r}"
 
 
 def test_resolve_us_citizenship_normalized():
     """citizenship_country in US form ('USA') normalizes and matches country 'united states'."""
-    config = {"work_authorization": {"citizenship_country": "USA"}}
+    config = build_config({"work_authorization": {"citizenship_country": "USA"}})
     answer = resolve_work_auth("Are you authorized to work here?", "united states", config)
     assert answer == "Yes"
 
 
 def test_resolve_unrecognized_citizenship_needs_review():
     """Unrecognized citizenship country (neither BR nor US) → review (conservative)."""
-    config = {"work_authorization": {"citizenship_country": "Portugal"}}
+    config = build_config({"work_authorization": {"citizenship_country": "Portugal"}})
     answer = resolve_work_auth("Are you authorized to work here?", "united states", config)
     assert answer == "__NEEDS_REVIEW__"
 
@@ -118,7 +125,7 @@ def test_resolve_work_auth_for_ambiguous_canada_string_needs_review_not_us():
 
 
 def test_resolve_defaults_the_not_authorized_answer_to_no():
-    config = {"work_authorization": {"citizenship_country": "brazil"}}
+    config = build_config({"work_authorization": {"citizenship_country": "brazil"}})
     assert resolve_work_auth("Are you authorized to work here?", "united states", config) == "No"
 
 
@@ -144,5 +151,5 @@ def test_resolve_recognises_each_sponsorship_phrasing(label):
     "citizenship", ["united states", "US", "u.s.", "U.S.A", "United States of America"]
 )
 def test_resolve_accepts_each_us_citizenship_alias(citizenship):
-    config = {"work_authorization": {"citizenship_country": citizenship}}
+    config = build_config({"work_authorization": {"citizenship_country": citizenship}})
     assert resolve_work_auth("Are you authorized to work here?", "united states", config) == "Yes"

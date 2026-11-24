@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Application, ProcessedEmail, init_db
 from moonlighter.tracking.sync.monitor import sync_responses
 from tests.tracking.llm_callers import make_llm_caller
@@ -44,7 +45,7 @@ async def test_unrelated_email_skipped_and_marked_processed(temporary_database):
         patch("moonlighter.tracking.sync.monitor.mark_processed") as mock_mark,
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        updates = await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        updates = await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     # Application was not touched
     assert Application.get_by_id(application.id).status == "submitted"
@@ -86,7 +87,7 @@ async def test_every_email_recorded_locally_without_gmail_writes(temporary_datab
         patch("moonlighter.tracking.sync.monitor.mark_processed") as mock_mark,
         patch("moonlighter.tracking.sync.monitor.get_or_create_label") as mock_label,
     ):
-        await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     mock_mark.assert_not_called()  # nothing written to Gmail
     mock_label.assert_not_called()  # not even the label is created
@@ -106,7 +107,9 @@ async def test_mark_processed_only_when_opted_in(temporary_database):
     }
     messages = [{"to": BASE_EMAIL, "from_": "a@a.com", "subject": "A", "body": "a"}]
     raw_ids = [{"id": "msg0", "threadId": "t0"}]
-    config = {**SYNC_CONFIG, "email": {**SYNC_CONFIG["email"], "mark_processed": True}}
+    config = build_config(
+        {**SYNC_CONFIG, "email": {**SYNC_CONFIG["email"], "mark_processed": True}}
+    )
 
     with (
         patch("moonlighter.tracking.sync.monitor.setup_gmail_service", return_value=MagicMock()),
@@ -148,7 +151,7 @@ async def test_already_processed_email_is_skipped(temporary_database):
         patch("moonlighter.tracking.sync.monitor.parse_message") as mock_parse,
         patch("moonlighter.tracking.sync.monitor.classify_response", new=classify_mock),
     ):
-        updates = await sync_responses(SYNC_CONFIG, make_llm_caller({}))
+        updates = await sync_responses(build_config(SYNC_CONFIG), make_llm_caller({}))
 
     mock_parse.assert_not_called()  # not even parsed
     classify_mock.assert_not_called()  # not even classified
@@ -162,6 +165,6 @@ async def test_returns_empty_list_when_no_emails(temporary_database):
         patch("moonlighter.tracking.sync.monitor.fetch_recent_messages", return_value=[]),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        updates = await sync_responses(SYNC_CONFIG, make_llm_caller({}))
+        updates = await sync_responses(build_config(SYNC_CONFIG), make_llm_caller({}))
 
     assert updates == []

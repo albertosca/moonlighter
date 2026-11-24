@@ -1,11 +1,12 @@
 """A missing CV or browser is a warning that names the path the application would use."""
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.startup import validate_startup
 
 
 def test_validate_startup_missing_cv_produces_warn(tmp_path):
     warnings = validate_startup(
-        config={},
+        config=build_config({}),
         profile={"skills": []},
         cv_path=str(tmp_path / "nonexistent.pdf"),
     )
@@ -17,7 +18,7 @@ def test_validate_startup_default_cv_path_resolves_under_moonlighter_home(monkey
     relative to the installed package (which is an ephemeral cache dir under uvx).
     """
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
-    warnings = validate_startup(config={}, profile={"skills": []})
+    warnings = validate_startup(config=build_config({}), profile={"skills": []})
     cv_warning = next(warning for warning in warnings if "cv" in warning.message.lower())
     assert str(tmp_path / "cv.pdf") in cv_warning.message
 
@@ -30,7 +31,7 @@ def test_validate_startup_honours_a_configured_cv_default(tmp_path):
     resume.parent.mkdir()
     resume.touch()
     warnings = validate_startup(
-        config={"cv": {"default": str(resume)}},
+        config=build_config({"cv": {"default": str(resume)}}),
         profile={"skills": []},
     )
     assert not any("cv" in warning.message.lower() for warning in warnings)
@@ -42,7 +43,7 @@ def test_validate_startup_names_the_configured_cv_when_it_is_missing(tmp_path):
     """
     configured = tmp_path / "resumes" / "senior.pdf"
     warnings = validate_startup(
-        config={"cv": {"default": str(configured)}},
+        config=build_config({"cv": {"default": str(configured)}}),
         profile={"skills": []},
     )
     cv_warning = next(warning for warning in warnings if "cv" in warning.message.lower())
@@ -57,7 +58,7 @@ def test_validate_startup_resolves_a_relative_cv_default_from_moonlighter_home(
     resume = tmp_path / "my-cv.pdf"
     resume.touch()
     warnings = validate_startup(
-        config={"cv": {"default": "my-cv.pdf"}},
+        config=build_config({"cv": {"default": "my-cv.pdf"}}),
         profile={"skills": []},
     )
     assert not any("cv" in warning.message.lower() for warning in warnings)
@@ -67,7 +68,7 @@ def test_validate_startup_cv_present_no_cv_warning(tmp_path):
     resume = tmp_path / "cv.pdf"
     resume.touch()
     warnings = validate_startup(
-        config={},
+        config=build_config({}),
         profile={"skills": []},
         cv_path=str(resume),
     )
@@ -76,7 +77,7 @@ def test_validate_startup_cv_present_no_cv_warning(tmp_path):
 
 def test_validate_startup_missing_browser_produces_warn():
     warnings = validate_startup(
-        config={"browser_path": "/nonexistent/Chrome"},
+        config=build_config({"browser_path": "/nonexistent/Chrome"}),
         profile={"skills": []},
     )
     assert any(
@@ -89,7 +90,7 @@ def test_validate_startup_legacy_brave_path_still_works(tmp_path):
     brave = tmp_path / "brave"
     brave.touch()
     warnings = validate_startup(
-        config={"brave_path": str(brave)},
+        config=build_config({"brave_path": str(brave)}),
         profile={"skills": []},
     )
     assert not any("browser" in warning.message.lower() for warning in warnings)

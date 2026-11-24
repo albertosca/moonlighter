@@ -4,12 +4,13 @@ from unittest.mock import patch
 from moonlighter.application.cvgen.latex.page_fit import TailoredCV
 from moonlighter.application.cvgen.paths import generated_dir_for
 from moonlighter.application.cvgen.service import ensure_tailored_cv
+from moonlighter.core.config.loading import build_config
 from tests.application.cvgen.sample_tailored_cv import GENERATE, JOB, counting_caller
 
 
 async def test_no_pool_configured_is_none_without_calls(tmp_path):
     call, calls = counting_caller()
-    assert await ensure_tailored_cv(JOB, {"cv": {}}, {}, caller=call) is None
+    assert await ensure_tailored_cv(JOB, build_config({"cv": {}}), {}, caller=call) is None
     assert calls["n"] == 0
 
 
@@ -95,5 +96,5 @@ async def test_ensure_tailored_cv_is_still_off_with_no_config_and_no_bootstrappe
     # itself -- only an actual file at that path does (nothing ever calls the
     # bootstrap in this test).
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
-    result = await ensure_tailored_cv(JOB, {}, {}, caller=counting_caller())
+    result = await ensure_tailored_cv(JOB, build_config({}), {}, caller=counting_caller())
     assert result is None

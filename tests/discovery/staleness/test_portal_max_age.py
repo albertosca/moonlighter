@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from moonlighter.core.config.errors import ConfigError
+from moonlighter.core.config.loading import build_config
 from moonlighter.discovery.staleness import find_stale_jobs
 from tests.discovery.staleness.fake_jobs import make_job
 
@@ -14,27 +16,16 @@ def _aged_job(days):
     return job
 
 
-async def test_a_string_age_limit_is_read_as_a_number_of_days():
-    old = _aged_job(45)
-    result = await find_stale_jobs({("remoteok", "acme"): [old]}, {}, {"portal_max_age_days": "30"})
-    assert result.stale_by_age == [old]
+@pytest.mark.parametrize("age_limit", ["30", None, "soon"])
+def test_an_age_limit_that_is_not_an_integer_is_refused_at_load(age_limit):
+    with pytest.raises(ConfigError, match="portal_max_age_days"):
+        build_config({"portal_max_age_days": age_limit})
 
 
 async def test_a_negative_age_limit_archives_nothing_by_age():
     old = _aged_job(400)
-    result = await find_stale_jobs({("remoteok", "acme"): [old]}, {}, {"portal_max_age_days": -5})
+    result = await find_stale_jobs(
+        {("remoteok", "acme"): [old]}, {}, build_config({"portal_max_age_days": -5})
+    )
     assert result.stale_by_age == []
     assert result.failed_companies == ["1 remoteok job(s) (portal feed, no per-company listing)"]
-
-
-async def test_a_null_age_limit_archives_nothing_by_age():
-    old = _aged_job(400)
-    result = await find_stale_jobs({("remoteok", "acme"): [old]}, {}, {"portal_max_age_days": None})
-    assert result.stale_by_age == []
-
-
-async def test_an_age_limit_that_is_not_a_number_raises_value_error():
-    with pytest.raises(ValueError, match="invalid literal"):
-        await find_stale_jobs(
-            {("remoteok", "acme"): [_aged_job(1)]}, {}, {"portal_max_age_days": "soon"}
-        )

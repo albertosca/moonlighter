@@ -7,6 +7,7 @@ from moonlighter.application.assisted.composition.composer import (
     compose_answers,
 )
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.core.config.loading import build_config
 from tests.application.assisted.composition.composer.sample_inputs import (
     JOB,
     PROFILE,
@@ -18,7 +19,7 @@ from tests.application.assisted.composition.composer.sample_inputs import (
 async def test_a_file_question_is_always_a_gap_because_a_file_cannot_be_pasted():
     question = FormQuestion(label="Resume/CV", kind=QuestionKind.FILE, required=True)
     composed = await compose_answers(
-        [question], CompositionContext(PROFILE, {}, JOB, answers_anything)
+        [question], CompositionContext(PROFILE, build_config({}), JOB, answers_anything)
     )
     assert composed[0].answer is None
     assert "upload" in composed[0].gap_reason
@@ -31,7 +32,9 @@ async def test_a_file_gap_names_the_cv_to_attach_when_one_is_configured(tmp_path
     question = FormQuestion(label="Resume/CV", kind=QuestionKind.FILE, required=True)
     composed = await compose_answers(
         [question],
-        CompositionContext(PROFILE, {"cv": {"default": str(cv_path)}}, JOB, answers_anything),
+        CompositionContext(
+            PROFILE, build_config({"cv": {"default": str(cv_path)}}), JOB, answers_anything
+        ),
     )
     assert str(cv_path) in composed[0].gap_reason
 
@@ -40,7 +43,7 @@ async def test_a_file_gap_names_the_cv_to_attach_when_one_is_configured(tmp_path
 async def test_a_file_gap_still_appears_when_no_cv_is_configured():
     question = FormQuestion(label="Resume/CV", kind=QuestionKind.FILE, required=True)
     composed = await compose_answers(
-        [question], CompositionContext(PROFILE, {}, JOB, answers_anything)
+        [question], CompositionContext(PROFILE, build_config({}), JOB, answers_anything)
     )
     assert composed[0].answer is None
     assert "no CV is configured" in composed[0].gap_reason
@@ -57,7 +60,7 @@ async def test_a_cv_file_gap_names_the_tailored_pdf_with_review_instruction(tmp_
     composed = await compose_answers(
         [question],
         CompositionContext(
-            PROFILE, {"cv": {"generated_dir": str(tmp_path)}}, job, answers_anything
+            PROFILE, build_config({"cv": {"generated_dir": str(tmp_path)}}), job, answers_anything
         ),
     )
     assert str(cv_path) in composed[0].gap_reason
@@ -75,7 +78,9 @@ async def test_a_non_cv_file_gap_does_not_name_the_cv(tmp_path):
     question = FormQuestion(label="Cover Letter", kind=QuestionKind.FILE, required=False)
     composed = await compose_answers(
         [question],
-        CompositionContext(PROFILE, {"cv": {"default": str(cv_path)}}, JOB, answers_anything),
+        CompositionContext(
+            PROFILE, build_config({"cv": {"default": str(cv_path)}}), JOB, answers_anything
+        ),
     )
     assert composed[0].answer is None
     assert str(cv_path) not in composed[0].gap_reason

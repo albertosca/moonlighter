@@ -8,6 +8,7 @@ from moonlighter.application.answers.bank.store import promote_application
 from moonlighter.application.assisted import service
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sheet.results import render_sheet_result
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import AnswerBankEntry, Application
 from tests.application.assisted.service.fake_service import (
     bypass_cv_bootstrap_offer,
@@ -33,11 +34,11 @@ async def test_preparing_the_same_job_twice_reuses_the_job_cache_and_skips_the_l
     monkeypatch.setattr(service, "extract_questions_from_page", one_essay)
     monkeypatch.setattr(service, "make_caller", lambda config: counting_caller)
 
-    await service.prepare_application_from_paste(job.id, "p", {}, profile={})
+    await service.prepare_application_from_paste(job.id, "p", build_config({}), profile={})
     calls_after_first = calls
     assert calls_after_first > 0
 
-    await service.prepare_application_from_paste(job.id, "p", {}, profile={})
+    await service.prepare_application_from_paste(job.id, "p", build_config({}), profile={})
     assert calls == calls_after_first  # second call served entirely from the job cache
 
 
@@ -66,7 +67,7 @@ async def test_a_submitted_bank_eligible_answer_is_available_to_a_different_job(
     monkeypatch.setattr(service, "extract_questions_from_page", one_boolean)
     monkeypatch.setattr(service, "make_caller", lambda config: stub_caller("Yes"))
 
-    await service.prepare_application_from_paste(job1.id, "p", {}, profile={})
+    await service.prepare_application_from_paste(job1.id, "p", build_config({}), profile={})
     application1 = Application.get(Application.job == job1)
     # Promotion is server.py's job: simulate it here directly against the answer bank,
     # so this test does not depend on the server.
@@ -82,7 +83,7 @@ async def test_a_submitted_bank_eligible_answer_is_available_to_a_different_job(
     monkeypatch.setattr(service, "make_caller", lambda config: _never_llm_here)
 
     out2 = render_sheet_result(
-        await service.prepare_application_from_paste(job2.id, "p", {}, profile={})
+        await service.prepare_application_from_paste(job2.id, "p", build_config({}), profile={})
     )
     assert label in out2
     assert "Yes" in out2
@@ -111,7 +112,7 @@ async def test_a_legacy_flat_form_data_row_self_heals_into_the_new_shape(job_fac
     monkeypatch.setattr(service, "make_caller", lambda config: stub_caller())
 
     out = render_sheet_result(
-        await service.prepare_application_from_paste(job.id, "p", {}, profile={})
+        await service.prepare_application_from_paste(job.id, "p", build_config({}), profile={})
     )
 
     assert "a generated answer" in out  # the run completed instead of raising
@@ -135,7 +136,7 @@ async def test_a_banked_answer_older_than_max_age_is_not_replayed(job_factory, m
 
     monkeypatch.setattr(service, "extract_questions_from_page", one_boolean)
     monkeypatch.setattr(service, "make_caller", lambda config: stub_caller("Yes"))
-    await service.prepare_application_from_paste(job1.id, "p", {}, profile={})
+    await service.prepare_application_from_paste(job1.id, "p", build_config({}), profile={})
     promote_application(Application.get(Application.job == job1).get_form_data(), job1.id)
     AnswerBankEntry.update(
         updated_at=datetime.now() - timedelta(days=100)  # noqa: DTZ005 - the database stores naive local time
@@ -143,7 +144,7 @@ async def test_a_banked_answer_older_than_max_age_is_not_replayed(job_factory, m
 
     monkeypatch.setattr(service, "make_caller", lambda config: stub_caller("No"))
     out2 = render_sheet_result(
-        await service.prepare_application_from_paste(job2.id, "p", {}, profile={})
+        await service.prepare_application_from_paste(job2.id, "p", build_config({}), profile={})
     )
     assert label in out2
     assert "No" in out2

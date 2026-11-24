@@ -1,5 +1,6 @@
 import pytest
 
+from moonlighter.core.config.loading import build_config
 from tests.application.cvgen.sample_tailored_cv import POOL_YAML, TEMPLATE
 
 
@@ -10,10 +11,12 @@ def config(tmp_path):
     template_directory = tmp_path / "templates"
     template_directory.mkdir()
     (template_directory / "cv-template.en.tex").write_text(TEMPLATE)
-    return {
-        "cv": {
-            "pool": str(pool),
-            "template_dir": str(template_directory),
-            "generated_dir": str(tmp_path / "generated"),
+    return build_config(
+        {
+            "cv": {
+                "pool": str(pool),
+                "template_dir": str(template_directory),
+                "generated_dir": str(tmp_path / "generated"),
+            }
         }
-    }
+    )

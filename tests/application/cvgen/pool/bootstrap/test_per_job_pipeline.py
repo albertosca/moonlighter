@@ -8,6 +8,7 @@ from moonlighter.application.cvgen.paths import resolved_pool_path
 from moonlighter.application.cvgen.pool.bootstrap import bootstrap_cv_pool
 from moonlighter.application.cvgen.pool.loader import load_pool
 from moonlighter.application.cvgen.service import ensure_tailored_cv
+from moonlighter.core.config.loading import build_config
 from tests.application.cvgen.sample_bootstrap import scripted_caller
 
 REAL_PROFILE = {
@@ -68,9 +69,9 @@ async def test_bootstrap_cv_pool_output_is_immediately_usable_by_ensure_tailored
             {"company": "Acme", "role": "Eng", "period": "2020", "highlights": ["Did X."]}
         ],
     }
-    await bootstrap_cv_pool(profile, {}, scripted_caller())
+    await bootstrap_cv_pool(profile, build_config({}), scripted_caller())
 
-    pool = load_pool(resolved_pool_path({}))
+    pool = load_pool(resolved_pool_path(build_config({})))
     # scripted_caller()'s default response is the module-level DRAFT_RESPONSE fixture
     # (a canned LLM reply, like every other draft_pool test above) -- it does
     # not parse `profile`, so the drafted company is DRAFT_RESPONSE's own
@@ -84,7 +85,7 @@ async def test_bootstrap_cv_pool_output_is_immediately_usable_by_ensure_tailored
 async def test_bootstrap_output_compiles_and_feeds_the_per_job_pipeline(monkeypatch, tmp_path):
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
 
-    outcome = await bootstrap_cv_pool(REAL_PROFILE, {}, scripted_caller())
+    outcome = await bootstrap_cv_pool(REAL_PROFILE, build_config({}), scripted_caller())
 
     # Not `is None or exists()`: a real PDF, or this fails.
     assert outcome.pdf_path is not None
@@ -100,7 +101,7 @@ async def test_bootstrap_output_compiles_and_feeds_the_per_job_pipeline(monkeypa
         "description": "We need a backend engineer for our distributed services.",
     }
     tailored = await ensure_tailored_cv(
-        job, {}, REAL_PROFILE, caller=scripted_caller(DECIDE_RESPONSE)
+        job, build_config({}), REAL_PROFILE, caller=scripted_caller(DECIDE_RESPONSE)
     )
     assert tailored is not None
     assert tailored.compiled is True

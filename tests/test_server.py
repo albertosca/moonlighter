@@ -97,6 +97,8 @@ async def test_get_pipeline_whole_text_is_pinned(temporary_database, monkeypatch
     create_application(linear, status="interviews")
 
     config = {"llm_backend": "api", "browser_path": "/nonexistent/browser"}
+    # The built config names cv.default, which resolves under MOONLIGHTER_HOME.
+    monkeypatch.setenv("MOONLIGHTER_HOME", "/nonexistent-home")
     with patch("moonlighter.startup.moonlighter_home", return_value=Path("/nonexistent-home")):
         result = await get_pipeline(context=make_test_context(config=config, profile={}))
     snapshot_text(result, "get_pipeline")

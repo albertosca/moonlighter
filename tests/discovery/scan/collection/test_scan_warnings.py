@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.discovery.scan.collection import collect_raw_jobs
 from tests.discovery.sources.fake_http_clients import mock_client_class
 
@@ -19,7 +20,9 @@ async def test_dead_api_reaches_the_scan_report():
         patch("httpx.AsyncClient", mock_client_class(mock_client)),
         patch("moonlighter.discovery.scan.collection.discover_entry_points", return_value=[]),
     ):
-        raw_jobs, warning = await collect_raw_jobs("", {}, {"ashby": ["linear", "posthog"]})
+        raw_jobs, warning = await collect_raw_jobs(
+            "", build_config({}), {"ashby": ["linear", "posthog"]}
+        )
     assert raw_jobs == []
     assert warning is not None
     assert "ashby: 0 jobs from 2 companies" in warning
@@ -27,6 +30,6 @@ async def test_dead_api_reaches_the_scan_report():
 
 async def test_unknown_company_list_source_warns():
     with patch("httpx.AsyncClient", mock_client_class(AsyncMock())):
-        _, warning = await collect_raw_jobs("", {}, {"workday": ["acme"]})
+        _, warning = await collect_raw_jobs("", build_config({}), {"workday": ["acme"]})
     assert warning is not None
     assert "unknown source 'workday'" in warning

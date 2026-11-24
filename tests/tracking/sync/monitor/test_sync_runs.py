@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import EmailSyncRun, ProcessedEmail, init_db
 from moonlighter.tracking.sync.monitor import sync_responses
 
@@ -27,7 +28,7 @@ async def _sync(caller):
         patch("moonlighter.tracking.sync.monitor.parse_message", return_value=MESSAGE),
         patch("moonlighter.tracking.sync.monitor.record_spend_limit_hit"),
     ):
-        await sync_responses(CONFIG, caller)
+        await sync_responses(build_config(CONFIG), caller)
 
 
 def _failing(message):
@@ -61,7 +62,7 @@ async def test_a_complete_sync_records_the_start_of_the_window_it_read():
         patch("moonlighter.tracking.sync.monitor.fetch_recent_messages", return_value=[]),
     ):
         await sync_responses(
-            {"email": {"address": "candidaturas@gmail.com", "lookback_days": 20}},
+            build_config({"email": {"address": "candidaturas@gmail.com", "lookback_days": 20}}),
             _failing("unused"),
         )
     run = EmailSyncRun.get()
@@ -75,7 +76,7 @@ async def test_an_empty_window_is_still_a_complete_run():
         patch("moonlighter.tracking.sync.monitor.setup_gmail_service", return_value=MagicMock()),
         patch("moonlighter.tracking.sync.monitor.fetch_recent_messages", return_value=[]),
     ):
-        await sync_responses(CONFIG, _failing("unused"))
+        await sync_responses(build_config(CONFIG), _failing("unused"))
     assert EmailSyncRun.select().count() == 1
 
 
@@ -97,5 +98,5 @@ async def test_a_sync_that_raises_records_nothing():
         ),
         pytest.raises(RuntimeError, match="gmail down"),
     ):
-        await sync_responses(CONFIG, _failing("unused"))
+        await sync_responses(build_config(CONFIG), _failing("unused"))
     assert EmailSyncRun.select().count() == 0

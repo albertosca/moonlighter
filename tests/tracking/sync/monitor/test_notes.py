@@ -3,6 +3,7 @@
 from datetime import date, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Application, init_db
 from moonlighter.tracking.sync.monitor import sync_responses
 from tests.tracking.llm_callers import make_llm_caller
@@ -44,7 +45,7 @@ async def test_notes_include_date_and_match_type(temporary_database):
         patch("moonlighter.tracking.sync.monitor.mark_processed"),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     notes = Application.get_by_id(application.id).notes
     today = date.today().strftime("%Y-%m-%d")  # noqa: DTZ011 - the sync stamps notes with the local calendar day
@@ -91,7 +92,7 @@ async def test_notes_appended_to_existing_notes(temporary_database):
         patch("moonlighter.tracking.sync.monitor.mark_processed"),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     notes = Application.get_by_id(application.id).notes
     assert existing_notes in notes
@@ -133,7 +134,7 @@ async def test_updated_at_refreshed_after_email_sync(temporary_database):
         patch("moonlighter.tracking.sync.monitor.mark_processed"),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     application_refreshed = Application.get_by_id(application.id)
     assert application_refreshed.updated_at > old_time

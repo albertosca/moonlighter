@@ -2,7 +2,10 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
-CONFIG: dict = {}
+from moonlighter.core.config.loading import build_config
+
+# A partial config left the age check off; the defaults would turn it on.
+CONFIG = build_config({"portal_max_age_days": 0})
 CHECKERS = "moonlighter.discovery.staleness.discover_entry_points_by_name"
 
 

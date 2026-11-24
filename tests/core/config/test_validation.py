@@ -170,7 +170,7 @@ def test_a_non_positive_timeout_is_rejected(value):
 
 
 def test_a_non_numeric_timeout_is_rejected():
-    config = load_config()
+    config = dict(load_config())
     config["llm_timeout_seconds"] = "three minutes"
     with pytest.raises(ConfigError, match="llm_timeout_seconds"):
         validate_config(config)

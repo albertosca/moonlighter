@@ -7,6 +7,7 @@ from moonlighter.application.assisted.composition.composer import (
     compose_answers,
 )
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.core.config.loading import build_config
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE
 from tests.application.operator_incidents import OPERATOR_NOTE_ADDRESS, OPERATOR_NOTE_REFERENCES
 
@@ -31,7 +32,7 @@ async def test_operator_directed_prose_becomes_a_gap(note):
         FormQuestion(label="Anything else to add?", kind=QuestionKind.LONG_TEXT, required=False)
     ]
     composed = await compose_answers(
-        questions, CompositionContext({}, {}, {"description": "A job."}, caller)
+        questions, CompositionContext({}, build_config({}), {"description": "A job."}, caller)
     )
     assert composed[0].answer is None
     assert composed[0].gap_reason is not None
@@ -47,7 +48,7 @@ async def test_ordinary_first_person_answer_passes():
         FormQuestion(label="Tell us about you", kind=QuestionKind.LONG_TEXT, required=False)
     ]
     composed = await compose_answers(
-        questions, CompositionContext({}, {}, {"description": "A job."}, caller)
+        questions, CompositionContext({}, build_config({}), {"description": "A job."}, caller)
     )
     assert composed[0].answer is not None
     assert composed[0].gap_reason is None
@@ -71,6 +72,8 @@ async def test_a_verbatim_option_naming_the_candidate_stays_selectable():
     async def caller(prompt: str, model: str) -> str:
         return "Yes, I am the candidate"
 
-    composed = await compose_answers([question], CompositionContext(PROFILE, {}, JOB, caller))
+    composed = await compose_answers(
+        [question], CompositionContext(PROFILE, build_config({}), JOB, caller)
+    )
     assert composed[0].answer == "Yes, I am the candidate"
     assert composed[0].gap_reason is None

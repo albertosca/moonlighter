@@ -9,6 +9,7 @@ from moonlighter.application.assisted.question_sources.base import SourceMatch
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sheet.required_labels import mark_required
 from moonlighter.application.assisted.sheet.results import render_sheet_result
+from moonlighter.core.config.loading import build_config
 from tests.application.assisted.service.fake_service import bypass_cv_bootstrap_offer, stub_caller
 
 
@@ -39,7 +40,7 @@ async def test_needs_paste_lists_the_required_fields(job_factory, monkeypatch):
         registry, "SOURCES", (_FakeSource("inhire", "inhire.app", required=("LinkedIn", "CV")),)
     )
 
-    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
+    out = render_sheet_result(await service.prepare_application(job.id, build_config({}), {}))
 
     assert "prepare_application_from_paste" in out
     assert "This form requires: LinkedIn, CV." in out
@@ -50,7 +51,7 @@ async def test_needs_paste_without_required_fields_is_unchanged(job_factory, mon
     bypass_cv_bootstrap_offer()
     monkeypatch.setattr(registry, "SOURCES", (_FakeSource("inhire", "inhire.app"),))
 
-    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
+    out = render_sheet_result(await service.prepare_application(job.id, build_config({}), {}))
 
     assert out == service.PASTE_HINT.format(url=job.url, job_id=job.id)
 
@@ -69,7 +70,9 @@ async def test_paste_on_an_api_job_uses_the_api_and_says_so(job_factory, monkeyp
 
     monkeypatch.setattr(service, "extract_questions_from_page", never_extract)
 
-    result = await service.prepare_application_from_paste(job.id, "Q1? Q2?", {}, profile={})
+    result = await service.prepare_application_from_paste(
+        job.id, "Q1? Q2?", build_config({}), profile={}
+    )
 
     assert [item.question.label for item in result.composed] == ["From the API"]
     assert result.source_note == service.SOURCE_NOTE_PASTE_IGNORED
@@ -93,7 +96,9 @@ async def test_paste_on_an_api_job_falls_back_to_the_paste_when_the_api_fails(
 
     monkeypatch.setattr(service, "extract_questions_from_page", extract)
 
-    result = await service.prepare_application_from_paste(job.id, "Q1?", {}, profile={})
+    result = await service.prepare_application_from_paste(
+        job.id, "Q1?", build_config({}), profile={}
+    )
 
     assert [item.question.label for item in result.composed] == ["From the paste"]
     assert result.source_note is None
@@ -127,7 +132,9 @@ async def test_paste_on_inhire_marks_the_required_fields(job_factory, monkeypatc
 
     monkeypatch.setattr(service, "extract_questions_from_page", extract)
 
-    result = await service.prepare_application_from_paste(job.id, "page", {}, profile={})
+    result = await service.prepare_application_from_paste(
+        job.id, "page", build_config({}), profile={}
+    )
 
     required = {item.question.label: item.question.required for item in result.composed}
     assert required == {

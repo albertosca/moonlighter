@@ -8,6 +8,7 @@ from moonlighter.application.assisted.question_sources.pasted import ExtractionE
 from moonlighter.application.assisted.questions import FormQuestion
 from moonlighter.application.assisted.sheet.required_labels import REQUIRED_KEYWORDS
 from moonlighter.application.assisted.sheet.results import SheetKind
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
 from tests.application.assisted.service.fake_service import stub_caller
 
@@ -25,7 +26,9 @@ async def test_a_failed_paste_reading_is_logged_and_told_to_run_again(
     monkeypatch.setattr(service, "extract_questions_from_page", refuse)
 
     with caplog.at_level(logging.WARNING):
-        result = await service.prepare_application_from_paste(job.id, "page", {}, profile={})
+        result = await service.prepare_application_from_paste(
+            job.id, "page", build_config({}), profile={}
+        )
 
     assert result.kind is SheetKind.NO_QUESTIONS
     assert result.error == (
@@ -49,7 +52,9 @@ async def test_a_paste_without_questions_asks_whether_the_whole_page_was_copied(
     monkeypatch.setattr(service, "make_caller", lambda config: stub_caller())
     monkeypatch.setattr(service, "extract_questions_from_page", nothing)
 
-    result = await service.prepare_application_from_paste(job.id, "page", {}, profile={})
+    result = await service.prepare_application_from_paste(
+        job.id, "page", build_config({}), profile={}
+    )
 
     assert result.error == "No questions could be found in that text. Was the whole page copied?"
 
@@ -58,7 +63,7 @@ async def test_the_bootstrap_offer_says_exactly_this(job_factory, monkeypatch, t
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     job = job_factory(source="smartrecruiters", url="https://jobs.smartrecruiters.com/x/y")
 
-    result = await service.prepare_application(job.id, {}, {})
+    result = await service.prepare_application(job.id, build_config({}), {})
 
     assert result.error == (
         "You don't have a tailored-CV pool yet. I can draft one from your profile.yaml — "

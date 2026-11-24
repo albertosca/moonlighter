@@ -97,7 +97,8 @@ async def test_setup_email_missing_credentials_path_gives_a_clear_message():
     without this guard the tool falls through to a confusing 'Is a directory'
     failure deep in the OAuth flow instead of naming the actual problem.
     """
-    test_config = {"email": {"token_path": "gmail-token.json"}}
+    # Blank, not absent: the defaults fill an absent credentials_path.
+    test_config = {"email": {"credentials_path": "", "token_path": "gmail-token.json"}}
     result = await setup_email(context=make_test_context(config=test_config))
     assert "credentials_path" in result
     assert "not configured" in result.lower()

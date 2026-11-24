@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import build_blocklist
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Job
 
 _URLS = itertools.count(1)
@@ -57,7 +58,9 @@ def run_main(monkeypatch, *flags, answers=None, profile=None, config=None, confi
         return profile
 
     monkeypatch.setattr(sys, "argv", ["build_blocklist.py", *flags])
-    monkeypatch.setattr(build_blocklist, "load_config", lambda: config or {"eval_model": "m-eval"})
+    monkeypatch.setattr(
+        build_blocklist, "load_config", lambda: build_config(config or {"eval_model": "m-eval"})
+    )
     monkeypatch.setattr(build_blocklist, "load_profile", load_profile)
     monkeypatch.setattr(build_blocklist, "make_caller", lambda _config: caller)
     forbidden = AssertionError("input() must not be called")

@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.scan.pipeline import evaluate_and_store
 from moonlighter.discovery.screening.no_eval import NO_EVAL
@@ -15,12 +16,14 @@ async def test_no_eval_persists_evaluable_jobs_as_needs_review_without_an_llm(te
     raw = make_raw_job(1)  # a plain "Engineer" title with a description: evaluable
     saved, spend_hit = await evaluate_and_store(
         [raw],
-        {
-            "score_threshold": 6.5,
-            "title_blocklist": [],
-            "scan_concurrency": 2,
-            "scan_batch_size": 5,
-        },
+        build_config(
+            {
+                "score_threshold": 6.5,
+                "title_blocklist": [],
+                "scan_concurrency": 2,
+                "scan_batch_size": 5,
+            }
+        ),
         {},
         caller=NO_EVAL,
     )
@@ -35,12 +38,14 @@ async def test_no_eval_still_archives_title_filtered_jobs_deterministically(temp
     raw = make_raw_job(2, title="Recruiter")
     saved, _ = await evaluate_and_store(
         [raw],
-        {
-            "score_threshold": 6.5,
-            "title_blocklist": ["recruiter"],
-            "scan_concurrency": 2,
-            "scan_batch_size": 5,
-        },
+        build_config(
+            {
+                "score_threshold": 6.5,
+                "title_blocklist": ["recruiter"],
+                "scan_concurrency": 2,
+                "scan_batch_size": 5,
+            }
+        ),
         {},
         caller=NO_EVAL,
     )
@@ -57,12 +62,14 @@ async def test_no_eval_needs_review_integrity_error_skips_silently(temporary_dat
     raw = make_raw_job(1)
     saved, spend_hit = await evaluate_and_store(
         [raw],
-        {
-            "score_threshold": 6.5,
-            "title_blocklist": [],
-            "scan_concurrency": 2,
-            "scan_batch_size": 5,
-        },
+        build_config(
+            {
+                "score_threshold": 6.5,
+                "title_blocklist": [],
+                "scan_concurrency": 2,
+                "scan_batch_size": 5,
+            }
+        ),
         {},
         caller=NO_EVAL,
     )
@@ -80,12 +87,14 @@ async def test_a_stray_none_caller_does_not_take_the_no_eval_shortcut(temporary_
     with patch("moonlighter.discovery.scan.pipeline.evaluate_jobs_batch", batch):
         await evaluate_and_store(
             [raw],
-            {
-                "score_threshold": 6.5,
-                "title_blocklist": [],
-                "scan_concurrency": 2,
-                "scan_batch_size": 5,
-            },
+            build_config(
+                {
+                    "score_threshold": 6.5,
+                    "title_blocklist": [],
+                    "scan_concurrency": 2,
+                    "scan_batch_size": 5,
+                }
+            ),
             {},
             caller=None,
         )
