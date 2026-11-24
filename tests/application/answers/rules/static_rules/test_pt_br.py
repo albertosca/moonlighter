@@ -1,7 +1,7 @@
 """PT-BR labels: the Portuguese spellings of the contact and location rules."""
 
-from moonlighter.application.answers.matching.field_map import pre_populate_answers
 from tests.application.answers.candidate_profiles import PROFILE
+from tests.application.answers.prepopulate import pre_populate_answers
 
 
 def test_ptbr_nome_first_name():

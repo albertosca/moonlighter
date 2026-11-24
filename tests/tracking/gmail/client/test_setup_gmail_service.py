@@ -5,7 +5,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from moonlighter.core.config.loading import build_config
+from moonlighter.core.config.model import Config
 from moonlighter.tracking.gmail.client import GmailAuthError, setup_gmail_service
+
+
+def _email_config(**settings: str) -> Config:
+    return build_config({"email": settings})
 
 
 def test_returns_service_when_token_exists(tmp_path):
@@ -16,12 +22,7 @@ def test_returns_service_when_token_exists(tmp_path):
     mock_credentials.valid = True
     mock_credentials.expired = False
 
-    config = {
-        "email": {
-            "credentials_path": credentials_path,
-            "token_path": token_path,
-        }
-    }
+    config = _email_config(credentials_path=credentials_path, token_path=token_path)
 
     with (
         patch("moonlighter.tracking.gmail.client.Credentials") as credentials_class,
@@ -46,7 +47,7 @@ def test_resolves_a_relative_token_path_under_moonlighter_home(tmp_path, monkeyp
     (tmp_path / "gmail-token.json").write_text("{}")
 
     mock_credentials = MagicMock(valid=True, expired=False)
-    config = {"email": {"token_path": "gmail-token.json"}}
+    config = _email_config(token_path="gmail-token.json")
 
     with (
         patch("moonlighter.tracking.gmail.client.Credentials") as credentials_class,
@@ -68,7 +69,7 @@ def test_refreshed_token_is_persisted_when_the_file_is_ours(tmp_path, monkeypatc
 
     mock_credentials = MagicMock(valid=False, expired=True, refresh_token="r")
     mock_credentials.to_json.return_value = '{"token": "novo"}'
-    config = {"email": {"token_path": str(token_path)}}
+    config = _email_config(token_path=str(token_path))
 
     with (
         patch("moonlighter.tracking.gmail.client.Credentials") as credentials_class,
@@ -95,7 +96,7 @@ def test_refreshed_token_is_not_written_back_to_a_foreign_file(tmp_path, monkeyp
 
     mock_credentials = MagicMock(valid=False, expired=True, refresh_token="r")
     mock_credentials.to_json.return_value = '{"token": "sobrescrito"}'
-    config = {"email": {"token_path": str(foreign)}}
+    config = _email_config(token_path=str(foreign))
 
     with (
         patch("moonlighter.tracking.gmail.client.Credentials") as credentials_class,
@@ -110,12 +111,10 @@ def test_refreshed_token_is_not_written_back_to_a_foreign_file(tmp_path, monkeyp
 
 
 def test_raises_gmail_auth_error_when_token_missing(tmp_path):
-    config = {
-        "email": {
-            "credentials_path": str(tmp_path / "gmail-client.json"),
-            "token_path": str(tmp_path / "nonexistent-token.json"),
-        }
-    }
+    config = _email_config(
+        credentials_path=str(tmp_path / "gmail-client.json"),
+        token_path=str(tmp_path / "nonexistent-token.json"),
+    )
 
     with pytest.raises(GmailAuthError, match="setup_email"):
         setup_gmail_service(config)
@@ -126,12 +125,7 @@ def test_refreshes_expired_token(tmp_path, monkeypatch):
     # has to put it inside MOONLIGHTER_HOME.
     monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
     token_path = str(tmp_path / "gmail-token.json")
-    config = {
-        "email": {
-            "credentials_path": str(tmp_path / "creds.json"),
-            "token_path": token_path,
-        }
-    }
+    config = _email_config(credentials_path=str(tmp_path / "creds.json"), token_path=token_path)
 
     Path(token_path).write_text("{}")  # token precisa existir
 
@@ -161,12 +155,12 @@ def test_setup_gmail_service_raises_without_google_libs():
         patch("moonlighter.tracking.gmail.client.Credentials", None),
         pytest.raises(GmailAuthError, match="google-api-python-client"),
     ):
-        setup_gmail_service({"email": {}})
+        setup_gmail_service(_email_config())
 
 
 def test_setup_gmail_service_without_email_block_raises_config_message():
     with pytest.raises(GmailAuthError, match=r"email.token_path is not configured"):
-        setup_gmail_service({})
+        setup_gmail_service(_email_config(token_path=""))
 
 
 @pytest.mark.parametrize(
@@ -185,7 +179,7 @@ def test_token_is_not_refreshed_unless_expired_with_a_refresh_token(
     token_path = tmp_path / "gmail-token.json"
     token_path.write_text("{}")
     mock_credentials = MagicMock(**credential_state)
-    config = {"email": {"token_path": str(token_path)}}
+    config = _email_config(token_path=str(token_path))
 
     with (
         patch("moonlighter.tracking.gmail.client.Credentials") as credentials_class,

@@ -26,8 +26,8 @@ from typing import Any
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from moonlighter.core.config.defaults import DEFAULT_EVAL_MODEL
 from moonlighter.core.config.loading import load_config, load_profile
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import init_db
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.dispatch import make_caller
@@ -99,7 +99,7 @@ def _save_or_report(new_patterns: list[str], arguments: argparse.Namespace) -> N
 
 
 async def _run(
-    arguments: argparse.Namespace, *, model: str, config: dict[str, Any], profile: dict[str, Any]
+    arguments: argparse.Namespace, *, model: str, config: Config, profile: dict[str, Any]
 ) -> None:
     with operation_metrics("build_blocklist"):
         caller = make_caller(config)
@@ -150,7 +150,7 @@ def main() -> None:
         profile = {}
     init_db()  # resolves the path via moonlighter_home() / MOONLIGHTER_DB_PATH (single source in db.py)
 
-    model = config.get("eval_model", DEFAULT_EVAL_MODEL)
+    model = config["eval_model"]
     print(f"Model: {model}  |  blocklist_learned: {learned_path()}")
     print()
 

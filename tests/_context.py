@@ -1,16 +1,17 @@
 """A stand-in FastMCP Context for tool tests."""
 
+from collections.abc import Mapping
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
 from moonlighter.app_context import AppContext
-from moonlighter.core.config.loading import load_config
+from moonlighter.core.config.loading import build_config, load_config
 
 
 def make_test_context(
     *,
-    config: dict[str, Any] | None = None,
+    config: Mapping[str, Any] | None = None,
     profile: dict[str, Any] | None = None,
     companies: dict[str, Any] | None = None,
     llm_caller: Any = None,
@@ -18,6 +19,8 @@ def make_test_context(
     """Build a stand-in Context whose .request_context.lifespan_context is an AppContext.
 
     Tool tests pass context=make_test_context(...) instead of building the chain by hand.
+    config is overrides, built through build_config the way load_config builds the real
+    one; None keeps load_config().
 
     llm_caller defaults to a MagicMock, never None: the real server (server.lifespan)
     always hands the scan a real caller from make_caller(config), and --no-eval is
@@ -26,7 +29,7 @@ def make_test_context(
     must still exercise the evaluated path.
     """
     app = AppContext(
-        config=config if config is not None else load_config(),
+        config=build_config(config) if config is not None else load_config(),
         profile=profile if profile is not None else {},
         companies=companies if companies is not None else {},
         llm_caller=llm_caller if llm_caller is not None else MagicMock(),

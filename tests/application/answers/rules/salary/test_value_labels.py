@@ -1,6 +1,6 @@
 """Which labels the salary rule claims: short value questions, never essays that start with the keyword."""
 
-from moonlighter.application.answers.matching.field_map import pre_populate_answers
+from tests.application.answers.prepopulate import pre_populate_answers
 
 # Compensation — filled statically so the salary figure never reaches the LLM
 

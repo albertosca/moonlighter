@@ -7,13 +7,14 @@ from typing import Any
 from moonlighter.application.answers.rules.cv import CVNotFoundError, resolve_cv_path
 from moonlighter.application.assisted.questions import FormQuestion
 from moonlighter.application.cvgen.paths import generated_dir_for
+from moonlighter.core.config.model import Config
 
 # File fields whose label asks for a CV/resume — the only ones whose gap should
 # name the configured CV as the file to attach.
 _CV_LABEL = re.compile(r"\bcv\b|resume|curr[ií]c", re.IGNORECASE)
 
 
-def file_gap_reason(question: FormQuestion, config: dict[str, Any], job: dict[str, Any]) -> str:
+def file_gap_reason(question: FormQuestion, config: Config, job: dict[str, Any]) -> str:
     """Why a file question is always a gap, and which file to attach when that is knowable."""
     # A file cannot be pasted, but naming the exact file to attach turns a
     # dead end into an instruction — only for CV-shaped labels: a "Cover

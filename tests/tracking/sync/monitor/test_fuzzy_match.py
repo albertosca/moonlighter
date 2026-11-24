@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Application, init_db
 from moonlighter.tracking.sync.monitor import sync_responses
 from tests.tracking.llm_callers import make_llm_caller
@@ -49,7 +50,7 @@ async def test_email_without_ref_fuzzy_match_is_suggestion_only(temporary_databa
         patch("moonlighter.tracking.sync.monitor.mark_processed"),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        updates = await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        updates = await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     application_refreshed = Application.get_by_id(application.id)
     assert application_refreshed.status == "submitted"  # NOT mutated
@@ -97,7 +98,7 @@ async def test_fuzzy_rejection_never_auto_rejects(temporary_database):
         patch("moonlighter.tracking.sync.monitor.mark_processed"),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        updates = await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        updates = await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     assert (
         Application.get_by_id(application.id).status == "submitted"
@@ -141,7 +142,7 @@ async def test_ambiguous_match_marks_uncertain_in_notes(temporary_database):
         patch("moonlighter.tracking.sync.monitor.mark_processed"),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        updates = await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        updates = await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     # No application can have been updated for certain — uncertain
     assert any("uncertain" in update.match_type for update in updates)

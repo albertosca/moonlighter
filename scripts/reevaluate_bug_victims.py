@@ -24,7 +24,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from moonlighter.core.config.defaults import DEFAULT_EVAL_MODEL
 from moonlighter.core.config.loading import load_config, load_profile
 from moonlighter.core.db import Job, init_db
 from moonlighter.core.log import setup as setup_logging
@@ -71,7 +70,7 @@ def main() -> None:
     profile = load_profile()
     init_db()  # resolves the path via moonlighter_home() / MOONLIGHTER_DB_PATH (single source in db.py)
 
-    model = arguments.model or config.get("eval_model", config.get("llm_model", DEFAULT_EVAL_MODEL))
+    model = arguments.model or config["eval_model"]
 
     victims = _fetch_victims(arguments.company, arguments.limit)
     if not victims:
@@ -91,8 +90,8 @@ def main() -> None:
     settings = ReevaluationSettings(
         model=model,
         profile=profile,
-        threshold=config.get("score_threshold", 6.5),
-        title_blocklist=config.get("title_blocklist", []),
+        threshold=config["score_threshold"],
+        title_blocklist=config["title_blocklist"],
         dry_run=arguments.dry_run,
         title_only=arguments.title_only,
         concurrency=arguments.concurrency,

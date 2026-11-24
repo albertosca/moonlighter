@@ -9,12 +9,12 @@ Usage:
 """
 
 import sys
-from typing import Any
 
 from moonlighter.application.cvgen.latex.compile import compile_pdf, latex_available, page_count
 from moonlighter.application.cvgen.latex.render import CVSelection, render_cv
 from moonlighter.application.cvgen.pool.loader import CVPool, PoolError, load_pool
 from moonlighter.core.config.loading import load_config
+from moonlighter.core.config.model import Config
 from moonlighter.core.config.paths import resolve_under_home
 
 
@@ -44,8 +44,8 @@ def check(pool: CVPool, template: str) -> int | None:
     return page_count(tex_path)
 
 
-def _load_pool(config: dict[str, Any]) -> CVPool | None:
-    pool_path = (config.get("cv") or {}).get("pool")
+def _load_pool(config: Config) -> CVPool | None:
+    pool_path = config["cv"].get("pool")
     if not pool_path:
         print("No cv.pool configured — nothing to check.")
         return None
@@ -56,8 +56,8 @@ def _load_pool(config: dict[str, Any]) -> CVPool | None:
         return None
 
 
-def _load_template(config: dict[str, Any]) -> str | None:
-    template_directory = (config.get("cv") or {}).get("template_dir")
+def _load_template(config: Config) -> str | None:
+    template_directory = config["cv"].get("template_dir")
     if not template_directory:
         print("No cv.template_dir configured — nothing to check.")
         return None
@@ -79,7 +79,7 @@ def _report(pages: int) -> int:
     return 1
 
 
-def main(config: dict[str, Any]) -> int:
+def main(config: Config) -> int:
     pool = _load_pool(config)
     if pool is None:
         return 1

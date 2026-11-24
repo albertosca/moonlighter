@@ -8,6 +8,7 @@ from moonlighter.application.assisted.question_sources import recruitee as recru
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sheet.results import render_sheet_result
 from moonlighter.application.cvgen.latex.page_fit import TailoredCV
+from moonlighter.core.config.loading import build_config
 from tests.application.assisted.service.fake_service import (
     bypass_cv_bootstrap_offer,
     never_fetch_recruitee,
@@ -33,7 +34,7 @@ async def test_sheet_generates_the_tailored_cv_before_composing(job_factory, mon
     monkeypatch.setattr(service, "make_caller", lambda config: stub_caller())
     monkeypatch.setattr(service, "ensure_tailored_cv", spy_ensure)
 
-    await service.prepare_application(job.id, {}, {})
+    await service.prepare_application(job.id, build_config({}), {})
 
     assert seen["job"]["id"] == job.id
     assert seen["job"]["company"] == job.company
@@ -74,7 +75,7 @@ async def test_sheet_builds_one_caller_and_reuses_it_for_both_llm_users(job_fact
     monkeypatch.setattr(service, "ensure_tailored_cv", spy_ensure)
     monkeypatch.setattr(service, "compose_answers", spy_compose)
 
-    await service.prepare_application(job.id, {}, {})
+    await service.prepare_application(job.id, build_config({}), {})
 
     assert calls == 1
     assert seen["cv_caller"] is caller
@@ -99,7 +100,7 @@ async def test_sheet_notes_the_uncompiled_tex(job_factory, monkeypatch, tmp_path
     monkeypatch.setattr(service, "make_caller", lambda config: stub_caller())
     monkeypatch.setattr(service, "ensure_tailored_cv", uncompiled)
 
-    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
+    out = render_sheet_result(await service.prepare_application(job.id, build_config({}), {}))
 
     assert "pdflatex" in out
     assert "cv.tex" in out
@@ -133,7 +134,7 @@ async def test_a_compiled_cv_reaches_the_sheet_when_no_cv_question_exists(
     monkeypatch.setattr(service, "make_caller", lambda config: stub_caller())
     monkeypatch.setattr(service, "ensure_tailored_cv", compiled)
 
-    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
+    out = render_sheet_result(await service.prepare_application(job.id, build_config({}), {}))
 
     assert str(pdf) in out
     assert "review it before uploading" in out
@@ -149,7 +150,7 @@ async def test_a_compiled_cv_already_named_by_a_cv_gap_is_not_repeated(
     output_directory.mkdir(parents=True)
     pdf = output_directory / "cv.pdf"
     pdf.write_bytes(b"%PDF-1.5\n...\n%%EOF\n")  # real-shaped: resolve_cv_path sniffs it
-    config = {"cv": {"generated_dir": str(generated)}}
+    config = build_config({"cv": {"generated_dir": str(generated)}})
 
     async def one_question(board: str, job_id: str, client: Any) -> list[FormQuestion]:
         return [FormQuestion(label="Resume", kind=QuestionKind.FILE, required=True)]

@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, cast
 
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import Job
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
@@ -111,7 +112,7 @@ def _tally(outcomes: list[list[Job | _StopScan] | BaseException]) -> tuple[list[
 
 async def evaluate_and_store(
     new_jobs: list[RawJob],
-    config: dict[str, Any],
+    config: Config,
     profile: dict[str, Any],
     *,
     caller: LLMCaller | NoEval,
@@ -129,9 +130,9 @@ async def evaluate_and_store(
         profile=profile,
         caller=caller,
         stop=asyncio.Event(),
-        semaphore=asyncio.Semaphore(config.get("scan_concurrency", 5)),
+        semaphore=asyncio.Semaphore(config["scan_concurrency"]),
     )
-    batch_size: int = config.get("scan_batch_size", 5)
+    batch_size: int = config["scan_batch_size"]
     chunks = [new_jobs[start : start + batch_size] for start in range(0, len(new_jobs), batch_size)]
     outcomes = await asyncio.gather(
         *(_evaluate_chunk(run, chunk) for chunk in chunks), return_exceptions=True

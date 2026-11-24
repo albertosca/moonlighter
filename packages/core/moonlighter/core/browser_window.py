@@ -6,12 +6,13 @@ of the session singletons in `browser`.
 
 import contextlib
 from pathlib import Path
-from typing import Any
 
 from playwright.async_api import Page
 
+from moonlighter.core.config.model import Config
 
-async def save_screenshot(page: Page, *, job_id: int, step: str, config: dict[str, Any]) -> str:
+
+async def save_screenshot(page: Page, *, job_id: int, step: str, config: Config) -> str:
     """Capture the page, restoring a minimized window for the duration.
 
     `page.screenshot()` captures from the compositor surface, and a minimized

@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Application, init_db
 from moonlighter.tracking.sync.monitor import sync_responses
 from tests.tracking.llm_callers import make_llm_caller
@@ -30,10 +31,12 @@ async def test_new_stage_added_to_config(temporary_database):
         "body": "Vamos fazer pair programming.",
     }
 
-    config = {
-        **SYNC_CONFIG,
-        "email": {**SYNC_CONFIG["email"], "interview_stages": list(BASE_STAGES)},
-    }
+    config = build_config(
+        {
+            **SYNC_CONFIG,
+            "email": {**SYNC_CONFIG["email"], "interview_stages": list(BASE_STAGES)},
+        }
+    )
 
     with (
         patch("moonlighter.tracking.sync.monitor.setup_gmail_service", return_value=MagicMock()),
@@ -79,10 +82,12 @@ async def test_fuzzy_match_never_registers_a_new_stage(temporary_database):
         "summary": "Spoofed stage proposal.",
     }
 
-    config = {
-        **SYNC_CONFIG,
-        "email": {**SYNC_CONFIG["email"], "interview_stages": list(BASE_STAGES)},
-    }
+    config = build_config(
+        {
+            **SYNC_CONFIG,
+            "email": {**SYNC_CONFIG["email"], "interview_stages": list(BASE_STAGES)},
+        }
+    )
 
     with (
         patch("moonlighter.tracking.sync.monitor.setup_gmail_service", return_value=MagicMock()),
@@ -127,10 +132,12 @@ async def test_legitimately_registered_new_stage_is_accepted(temporary_database)
         "body": "x",
     }
 
-    config = {
-        **SYNC_CONFIG,
-        "email": {**SYNC_CONFIG["email"], "interview_stages": list(BASE_STAGES)},
-    }
+    config = build_config(
+        {
+            **SYNC_CONFIG,
+            "email": {**SYNC_CONFIG["email"], "interview_stages": list(BASE_STAGES)},
+        }
+    )
 
     with (
         patch("moonlighter.tracking.sync.monitor.setup_gmail_service", return_value=MagicMock()),

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from moonlighter.core.config.defaults import DEFAULT_LLM_MODEL
+from moonlighter.core.config.model import Config, EmailConfig
 from moonlighter.core.db import ProcessedEmail
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
@@ -26,14 +26,12 @@ from moonlighter.tracking.sync.sweep import record_sweep_if_complete
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MODEL = DEFAULT_LLM_MODEL
-
 
 @dataclass(frozen=True)
 class _SyncSettings:
     """What one sync reads from the config, with the one stage list every message shares."""
 
-    email_config: dict[str, Any]
+    email_config: EmailConfig
     base_address: str
     stages: list[str]
     model: str
@@ -58,7 +56,7 @@ class _ClassificationSkippedError(Exception):
     """One message could not be classified; it waits for the next run, and this run is no sweep."""
 
 
-async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[SyncUpdate]:
+async def sync_responses(config: Config, llm_caller: LLMCaller) -> list[SyncUpdate]:
     """Run the full flow: read recent emails, classify them, and update the database.
 
     Returns the list of updates made.
@@ -92,13 +90,13 @@ async def sync_responses(config: dict[str, Any], llm_caller: LLMCaller) -> list[
     return updates
 
 
-def _read_settings(config: dict[str, Any], email_config: dict[str, Any]) -> _SyncSettings:
+def _read_settings(config: Config, email_config: EmailConfig) -> _SyncSettings:
     archive_all = bool(email_config.get("archive_all_classified", False))
     return _SyncSettings(
         email_config=email_config,
         base_address=email_config["address"],
         stages=list(email_config.get("interview_stages", [])),
-        model=config.get("llm_model", _DEFAULT_MODEL),
+        model=config["llm_model"],
         archive_all=archive_all,
         # Layer two is a superset of layer one by design.
         archive_reference_matched=archive_all
@@ -106,7 +104,7 @@ def _read_settings(config: dict[str, Any], email_config: dict[str, Any]) -> _Syn
     )
 
 
-def _gmail_handles(service: Any, email_config: dict[str, Any]) -> _GmailHandles:
+def _gmail_handles(service: Any, email_config: EmailConfig) -> _GmailHandles:
     # The sync is 100% READ-ONLY on Gmail by default: dedup lives in a local table
     # (ProcessedEmail). Only writes to Gmail (read + label) if mark_processed=True.
     mutate_gmail = bool(email_config.get("mark_processed", False))

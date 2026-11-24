@@ -9,6 +9,7 @@ from typing import Any
 
 from peewee import fn
 
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import Job
 from moonlighter.discovery.sources.registry import build_http_scanners
 from moonlighter.discovery.staleness import find_stale_jobs
@@ -73,7 +74,7 @@ def _archive_aged(jobs: list[Job]) -> list[dict[str, str]]:
 
 
 async def archive_stale_jobs(
-    job_id: int | None, company: str | None, config: dict[str, Any]
+    job_id: int | None, company: str | None, config: Config
 ) -> ArchiveResult:
     """Detects and archives eligible jobs that disappeared from their source.
 
@@ -92,7 +93,7 @@ async def archive_stale_jobs(
     return ArchiveResult(
         archived=_archive_closed(staleness.stale, now),
         aged=_archive_aged(staleness.stale_by_age),
-        max_age_days=int(config.get("portal_max_age_days") or 0),
+        max_age_days=config["portal_max_age_days"],
         failed_companies=staleness.failed_companies,
         to_confirm=[_to_confirm_entry(job, now) for job in staleness.unverifiable],
     )

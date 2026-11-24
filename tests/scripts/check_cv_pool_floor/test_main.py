@@ -5,12 +5,13 @@ from unittest.mock import patch
 import check_cv_pool_floor
 import pytest
 
+from moonlighter.core.config.loading import build_config
 from tests.scripts.check_cv_pool_floor.harness import compiling, configuration
 
 
-@pytest.mark.parametrize("settings", [{}, {"cv": None}, {"cv": {}}, {"cv": {"pool": ""}}])
+@pytest.mark.parametrize("settings", [{}, {"cv": {}}, {"cv": {"pool": ""}}])
 def test_a_missing_pool_setting_stops_with_exit_one(settings, capsys):
-    assert check_cv_pool_floor.main(settings) == 1
+    assert check_cv_pool_floor.main(build_config(settings)) == 1
 
     assert capsys.readouterr().out == "No cv.pool configured — nothing to check.\n"
 
@@ -25,7 +26,7 @@ def test_an_unusable_pool_file_is_reported_with_the_loader_message(tmp_path, cap
 
 
 def test_a_missing_pool_file_is_reported_as_unusable(tmp_path, capsys):
-    settings = {"cv": {"pool": str(tmp_path / "nowhere.yaml")}}
+    settings = build_config({"cv": {"pool": str(tmp_path / "nowhere.yaml")}})
 
     assert check_cv_pool_floor.main(settings) == 1
 

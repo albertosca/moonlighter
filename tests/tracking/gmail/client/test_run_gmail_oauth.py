@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.tracking.gmail.client import GmailAuthError, run_gmail_oauth
 
 
@@ -20,7 +21,7 @@ def test_gmail_oauth_sets_chmod_600_on_token(tmp_path):
 
     with patch("moonlighter.tracking.gmail.client.InstalledAppFlow") as flow_class:
         flow_class.from_client_secrets_file.return_value = mock_flow
-        run_gmail_oauth(credentials_path, token_path)
+        run_gmail_oauth(credentials_path, token_path, build_config({}))
 
     written = Path(token_path)
     assert written.read_text() == '{"token": "abc"}'
@@ -33,4 +34,4 @@ def testrun_gmail_oauth_raises_without_oauthlib():
         patch("moonlighter.tracking.gmail.client.InstalledAppFlow", None),
         pytest.raises(GmailAuthError, match="google-auth-oauthlib"),
     ):
-        run_gmail_oauth("creds.json", "token.json")
+        run_gmail_oauth("creds.json", "token.json", build_config({}))

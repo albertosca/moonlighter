@@ -5,12 +5,13 @@ from typing import Any
 
 from moonlighter.application.cvgen.pool.bootstrap import bootstrap_cv_pool
 from moonlighter.core.cli import EXIT_OK
+from moonlighter.core.config.model import Config
 from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
 from moonlighter.core.llm.dispatch import make_caller
 
 
 async def run_bootstrap_cv(
-    arguments: argparse.Namespace, config: dict[str, Any], profile: dict[str, Any]
+    arguments: argparse.Namespace, config: Config, profile: dict[str, Any]
 ) -> tuple[dict[str, Any], int]:
     """Draft the pool, or with --skip record the decline without any LLM call."""
     if arguments.skip:

@@ -1,10 +1,11 @@
 """The job, config, profile and questions the sheet-result tests prepare applications from."""
 
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
 from moonlighter.core.db import Job, init_db
 
-CONFIG = {"llm_model": "claude-sonnet-4-6"}
+CONFIG = build_config({"llm_model": "claude-sonnet-4-6"})
 PROFILE = {"name": "Jane Doe", "email": "jane@example.com"}
 QUESTIONS = [
     FormQuestion(label="Full name", kind=QuestionKind.TEXT, options=[], required=True),

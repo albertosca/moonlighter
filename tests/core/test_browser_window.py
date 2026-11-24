@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 from moonlighter.core import browser_window
+from moonlighter.core.config.loading import build_config
 from tests.core.browser_config import CONFIG
 
 
@@ -12,7 +13,7 @@ async def test_save_screenshot_captures_the_whole_page(tmp_path):
     asking someone to approve what they could not see. full_page is what makes
     03-filled a review artifact rather than a thumbnail.
     """
-    config = {**CONFIG, "screenshots_dir": str(tmp_path)}
+    config = build_config({**CONFIG, "screenshots_dir": str(tmp_path)})
     mock_page = MagicMock()
     mock_page.screenshot = AsyncMock()
     path = await browser_window.save_screenshot(mock_page, job_id=42, step="fill", config=config)
@@ -22,7 +23,7 @@ async def test_save_screenshot_captures_the_whole_page(tmp_path):
 
 
 async def test_save_screenshot_creates_job_subdir(tmp_path):
-    config = {**CONFIG, "screenshots_dir": str(tmp_path)}
+    config = build_config({**CONFIG, "screenshots_dir": str(tmp_path)})
     mock_page = MagicMock()
     mock_page.screenshot = AsyncMock()
     await browser_window.save_screenshot(mock_page, job_id=99, step="submit", config=config)
@@ -36,7 +37,7 @@ async def test_save_screenshot_restores_a_minimized_window_and_re_minimizes_it(t
     filling, which made the 03-filled review artifact impossible to produce.
     Restore around the capture, then put the window back exactly as it was.
     """
-    config = {**CONFIG, "screenshots_dir": str(tmp_path)}
+    config = build_config({**CONFIG, "screenshots_dir": str(tmp_path)})
     mock_page = MagicMock()
     mock_page.screenshot = AsyncMock()
     mock_cdp = AsyncMock()
@@ -61,7 +62,7 @@ async def test_save_screenshot_leaves_an_already_visible_window_alone(tmp_path):
     re-minimizing after every capture would hide a window the flow means to
     keep on screen.
     """
-    config = {**CONFIG, "screenshots_dir": str(tmp_path)}
+    config = build_config({**CONFIG, "screenshots_dir": str(tmp_path)})
     mock_page = MagicMock()
     mock_page.screenshot = AsyncMock()
     mock_cdp = AsyncMock()
@@ -80,7 +81,7 @@ async def test_save_screenshot_still_captures_when_window_state_is_unavailable(t
     """CDP window-state calls are best-effort, as the browser-driven filler's
     were made in 96decbc; a failure here must not cost us the screenshot itself.
     """
-    config = {**CONFIG, "screenshots_dir": str(tmp_path)}
+    config = build_config({**CONFIG, "screenshots_dir": str(tmp_path)})
     mock_page = MagicMock()
     mock_page.screenshot = AsyncMock()
     mock_page.context.new_cdp_session = AsyncMock(side_effect=RuntimeError("no CDP"))

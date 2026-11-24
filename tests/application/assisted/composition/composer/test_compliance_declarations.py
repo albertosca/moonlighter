@@ -7,6 +7,7 @@ from moonlighter.application.assisted.composition.composer import (
     compose_answers,
 )
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.core.config.loading import build_config
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE, never_called
 
 GYMPASS_CONFLICT_OPTIONS = (
@@ -31,7 +32,9 @@ async def test_a_compliance_declaration_never_reaches_the_llm():
         required=True,
         options=GYMPASS_CONFLICT_OPTIONS,
     )
-    composed = await compose_answers([question], CompositionContext(PROFILE, {}, JOB, never_called))
+    composed = await compose_answers(
+        [question], CompositionContext(PROFILE, build_config({}), JOB, never_called)
+    )
     assert composed[0].answer is None
     assert "compliance" in composed[0].gap_reason
 
@@ -44,7 +47,9 @@ async def test_compliance_detected_by_options_under_a_neutral_label():
         required=True,
         options=GYMPASS_CONFLICT_OPTIONS,
     )
-    composed = await compose_answers([question], CompositionContext(PROFILE, {}, JOB, never_called))
+    composed = await compose_answers(
+        [question], CompositionContext(PROFILE, build_config({}), JOB, never_called)
+    )
     assert composed[0].answer is None
     assert "compliance" in composed[0].gap_reason
 
@@ -56,6 +61,8 @@ async def test_a_text_certification_question_is_also_guarded():
         kind=QuestionKind.TEXT,
         required=True,
     )
-    composed = await compose_answers([question], CompositionContext(PROFILE, {}, JOB, never_called))
+    composed = await compose_answers(
+        [question], CompositionContext(PROFILE, build_config({}), JOB, never_called)
+    )
     assert composed[0].answer is None
     assert "compliance" in composed[0].gap_reason

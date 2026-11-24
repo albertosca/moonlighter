@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.discovery.sources.base import RawJob
 from moonlighter.discovery.staleness import find_stale_jobs
 from tests.discovery.staleness.fake_jobs import CHECKERS, CONFIG, make_job, make_scanner
@@ -64,7 +65,7 @@ async def test_stale_by_age_keeps_the_order_the_companies_were_given_in():
     for job in (old_first, old_second):
         job.found_at = datetime.now() - timedelta(days=90)  # noqa: DTZ005 - the database stores naive local time
     jobs_by_company = {("remotive", "b"): [old_second], ("remoteok", "a"): [old_first]}
-    result = await find_stale_jobs(jobs_by_company, {}, {"portal_max_age_days": 30})
+    result = await find_stale_jobs(jobs_by_company, {}, build_config({"portal_max_age_days": 30}))
     assert result.stale_by_age == [old_second, old_first]
     assert result.failed_companies == []
 

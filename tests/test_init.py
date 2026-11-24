@@ -3,7 +3,6 @@ import yaml
 
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.loading import load_config
-from moonlighter.core.config.validation import validate_config
 from moonlighter.init import _ask, detect_browser, run_init
 
 
@@ -102,7 +101,7 @@ def test_run_init_writes_codex_models_that_load_back(tmp_path, monkeypatch):
     written = yaml.safe_load(path.read_text())
     assert written["llm_model"] == "gpt-6-luna"
     assert written["eval_model"] == "gpt-6-luna"
-    validate_config(load_config(path))
+    load_config(path)  # validates; raises ConfigError on a bad key
 
 
 def test_run_init_keeps_a_separate_codex_eval_model(tmp_path):

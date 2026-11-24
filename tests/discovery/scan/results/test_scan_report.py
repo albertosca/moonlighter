@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import ScanLog, init_db
 from moonlighter.discovery.scan.results import (
     ScanKind,
@@ -13,7 +14,7 @@ from moonlighter.discovery.scan.scanning import scan_company
 from moonlighter.discovery.sources.base import SourceStats
 from tests.discovery.fake_scan import make_raw_job, run_scan
 
-CONFIG = {"score_threshold": 7.0, "scan_concurrency": 2}
+CONFIG = build_config({"score_threshold": 7.0, "scan_concurrency": 2})
 
 
 def _patched_scanner(raw_jobs):

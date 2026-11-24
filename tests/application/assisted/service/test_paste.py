@@ -6,6 +6,7 @@ from moonlighter.application.assisted import service
 from moonlighter.application.assisted.question_sources.pasted import ExtractionError
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sheet.results import render_sheet_result
+from moonlighter.core.config.loading import build_config
 from tests.application.assisted.service.fake_service import (
     bypass_cv_bootstrap_offer,
     never_extract,
@@ -19,7 +20,9 @@ async def test_paste_with_no_recognisable_questions_says_so(job_factory, monkeyp
     monkeypatch.setattr(service, "extract_questions_from_page", _empty_extraction)
 
     out = render_sheet_result(
-        await service.prepare_application_from_paste(job.id, "just marketing copy", {}, profile={})
+        await service.prepare_application_from_paste(
+            job.id, "just marketing copy", build_config({}), profile={}
+        )
     )
 
     assert "No questions could be found" in out
@@ -38,7 +41,7 @@ async def test_paste_whose_reading_failed_says_so_instead_of_blaming_the_paste(
     monkeypatch.setattr(service, "extract_questions_from_page", failed_extraction)
     out = render_sheet_result(
         await service.prepare_application_from_paste(
-            job.id, "the whole copied page", {}, profile={}
+            job.id, "the whole copied page", build_config({}), profile={}
         )
     )
     assert "Was the whole page copied" not in out
@@ -62,7 +65,7 @@ async def test_paste_with_questions_returns_a_sheet(job_factory, monkeypatch):
 
     out = render_sheet_result(
         await service.prepare_application_from_paste(
-            job.id, "the whole copied page", {}, profile={}
+            job.id, "the whole copied page", build_config({}), profile={}
         )
     )
 
@@ -74,6 +77,6 @@ async def test_paste_with_questions_returns_a_sheet(job_factory, monkeypatch):
 async def test_paste_for_a_missing_job_is_reported_rather_than_raising(monkeypatch):
     monkeypatch.setattr(service, "extract_questions_from_page", never_extract)
     out = render_sheet_result(
-        await service.prepare_application_from_paste(999999, "text", {}, profile={})
+        await service.prepare_application_from_paste(999999, "text", build_config({}), profile={})
     )
     assert "999999" in out

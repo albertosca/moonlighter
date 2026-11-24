@@ -5,6 +5,7 @@ import pytest
 from moonlighter.application.cvgen.pool.bootstrap import BootstrapOutcome, bootstrap_cv_pool
 from moonlighter.application.cvgen.pool.bootstrap_error import BootstrapError
 from moonlighter.application.cvgen.pool.loader import load_pool
+from moonlighter.core.config.loading import build_config
 from tests.application.cvgen.sample_bootstrap import CANDIDATE_PROFILE, scripted_caller
 
 
@@ -27,7 +28,9 @@ async def test_bootstrap_cv_pool_place_holds_a_missing_title_and_period(monkeypa
             "summary_facts": [],
         }
     )
-    outcome = await bootstrap_cv_pool(CANDIDATE_PROFILE, {}, scripted_caller(thin_response))
+    outcome = await bootstrap_cv_pool(
+        CANDIDATE_PROFILE, build_config({}), scripted_caller(thin_response)
+    )
 
     reloaded = load_pool(outcome.pool_path)
     exp = reloaded.experiences[0]
@@ -61,7 +64,7 @@ async def test_bootstrap_cv_pool_refuses_to_report_success_on_an_unloadable_pool
         }
     )
     with pytest.raises(BootstrapError, match="not loadable"):
-        await bootstrap_cv_pool(CANDIDATE_PROFILE, {}, scripted_caller(zwsp_company))
+        await bootstrap_cv_pool(CANDIDATE_PROFILE, build_config({}), scripted_caller(zwsp_company))
 
     # write-to-temp-then-rename: a failed validation must leave NOTHING at
     # the real pool_path -- not a half-written pool for _cv_bootstrap_offer
@@ -110,7 +113,9 @@ async def test_bootstrap_cv_pool_force_preserves_the_previous_pool_on_a_failed_d
         }
     )
     with pytest.raises(BootstrapError, match="not loadable"):
-        await bootstrap_cv_pool(CANDIDATE_PROFILE, {}, scripted_caller(zwsp_company), force=True)
+        await bootstrap_cv_pool(
+            CANDIDATE_PROFILE, build_config({}), scripted_caller(zwsp_company), force=True
+        )
 
     reloaded = load_pool(tmp_path / "cv-pool.yaml")
     assert reloaded.experiences[0].company == "Previous Co"
@@ -131,7 +136,7 @@ async def test_bootstrap_cv_pool_writes_pool_template_and_compiled_pdf(monkeypat
             }
         ],
     }
-    outcome = await bootstrap_cv_pool(profile, {}, scripted_caller())
+    outcome = await bootstrap_cv_pool(profile, build_config({}), scripted_caller())
     assert isinstance(outcome, BootstrapOutcome)
     assert outcome.pool_path == tmp_path / "cv-pool.yaml"
     assert outcome.pool_path.exists()
@@ -149,7 +154,7 @@ async def test_bootstrap_cv_pool_refuses_to_overwrite_an_existing_pool(monkeypat
         "experience": [{"company": "Acme", "role": "Eng", "period": "2020", "highlights": ["X"]}],
     }
     with pytest.raises(BootstrapError, match="already exists"):
-        await bootstrap_cv_pool(profile, {}, scripted_caller())
+        await bootstrap_cv_pool(profile, build_config({}), scripted_caller())
 
 
 async def test_bootstrap_cv_pool_force_overwrites_an_existing_pool(monkeypatch, tmp_path):
@@ -159,5 +164,5 @@ async def test_bootstrap_cv_pool_force_overwrites_an_existing_pool(monkeypatch, 
         "name": "Jane Doe",
         "experience": [{"company": "Acme", "role": "Eng", "period": "2020", "highlights": ["X"]}],
     }
-    outcome = await bootstrap_cv_pool(profile, {}, scripted_caller(), force=True)
+    outcome = await bootstrap_cv_pool(profile, build_config({}), scripted_caller(), force=True)
     assert outcome.bullet_count == 1

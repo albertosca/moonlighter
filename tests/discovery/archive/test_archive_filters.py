@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Job, init_db
 from moonlighter.discovery.archive import archive_stale_jobs, format_archive_result
 from moonlighter.discovery.staleness import StalenessResult
@@ -76,7 +77,7 @@ async def test_aged_portal_jobs_archive_as_aged_not_closed(temporary_database):
         status="new",
         found_at=datetime.now() - timedelta(days=45),  # noqa: DTZ005 - the database stores naive local time
     )
-    result = await archive_stale_jobs(None, None, {"portal_max_age_days": 30})
+    result = await archive_stale_jobs(None, None, build_config({"portal_max_age_days": 30}))
 
     refreshed = Job.get_by_id(old.id)
     assert refreshed.status == "archived"  # aged out, NOT closed-at-source

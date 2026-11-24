@@ -55,6 +55,23 @@ async def test_apply_doctor_online_keeps_exit_0_when_links_are_fine_or_unverifie
     assert code == 0
 
 
+async def test_apply_doctor_online_does_not_check_links_against_an_invalid_config(
+    temporary_database, monkeypatch, tmp_path
+):
+    """A config that loads but fails validation is a broken config too (spec 2026-11-23, §4)."""
+    monkeypatch.setenv("MOONLIGHTER_HOME", str(tmp_path))
+    (tmp_path / "config.yaml").write_text("scan_concurrency: five\n")
+    report = AsyncMock(return_value=[])
+    with (
+        patch.object(doctor_command, "doctor_payload", return_value=({"kind": "doctor"}, 0)),
+        patch.object(doctor_command, "link_report", report),
+    ):
+        payload, _ = await cli._run(cli.parse_args(["doctor", "--online"]))
+    report.assert_not_awaited()
+    assert payload["links"] is None
+    assert payload["links_error"].startswith("config does not load:")
+
+
 async def test_apply_doctor_online_reports_a_broken_config_instead_of_crashing(
     temporary_database,
 ):

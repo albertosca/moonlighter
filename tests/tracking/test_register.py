@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Application, Job, init_db
 from moonlighter.tracking.register import (
     RegisterKind,
@@ -10,7 +11,7 @@ from moonlighter.tracking.register import (
     register_to_dict,
 )
 
-CONFIG = {"email": {"address": "jane@example.com"}}
+CONFIG = build_config({"email": {"address": "jane@example.com"}})
 NOVEMBER_10 = datetime(2026, 11, 10)  # noqa: DTZ001 - the database stores naive local time
 SEPTEMBER_1 = datetime(2026, 9, 1)  # noqa: DTZ001 - the database stores naive local time
 AUGUST_1 = datetime(2026, 8, 1)  # noqa: DTZ001 - the database stores naive local time
@@ -56,7 +57,7 @@ def test_register_leaves_an_already_advanced_application_alone(temporary_databas
 
 def test_register_without_a_configured_address_has_no_alias(temporary_database):
     job = _job()
-    register_result = register_application(job.id, {})
+    register_result = register_application(job.id, build_config({}))
     assert register_result.kind is RegisterKind.REGISTERED
     assert register_result.alias is None
     assert register_result.email_ref is not None

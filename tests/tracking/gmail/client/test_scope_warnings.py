@@ -3,6 +3,7 @@
 import logging
 from unittest.mock import MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.tracking.gmail.client import (
     SCOPE_MODIFY,
     SCOPE_READONLY,
@@ -14,12 +15,12 @@ from tests.tracking.archive_settings import archive_config
 
 
 def test_required_scope_defaults_to_readonly():
-    assert _required_scope({}) == SCOPE_READONLY
-    assert _required_scope({"email": {"mark_processed": False}}) == SCOPE_READONLY
+    assert _required_scope(build_config({})) == SCOPE_READONLY
+    assert _required_scope(build_config({"email": {"mark_processed": False}})) == SCOPE_READONLY
 
 
 def test_required_scope_is_modify_when_opted_in():
-    assert _required_scope({"email": {"mark_processed": True}}) == SCOPE_MODIFY
+    assert _required_scope(build_config({"email": {"mark_processed": True}})) == SCOPE_MODIFY
 
 
 def test_setup_gmail_service_warns_on_broader_scope_than_needed(tmp_path, caplog):
@@ -28,13 +29,15 @@ def test_setup_gmail_service_warns_on_broader_scope_than_needed(tmp_path, caplog
     auto-revoke, just say so plainly.
     """
     token_path = str(tmp_path / "gmail-token.json")
-    config = {
-        "email": {
-            "credentials_path": str(tmp_path / "gmail-client.json"),
-            "token_path": token_path,
-            "mark_processed": False,
+    config = build_config(
+        {
+            "email": {
+                "credentials_path": str(tmp_path / "gmail-client.json"),
+                "token_path": token_path,
+                "mark_processed": False,
+            }
         }
-    }
+    )
 
     mock_credentials = MagicMock()
     mock_credentials.valid = True
@@ -56,13 +59,15 @@ def test_setup_gmail_service_warns_on_broader_scope_than_needed(tmp_path, caplog
 
 def test_setup_gmail_service_no_warning_when_scope_already_matches(tmp_path, caplog):
     token_path = str(tmp_path / "gmail-token.json")
-    config = {
-        "email": {
-            "credentials_path": str(tmp_path / "gmail-client.json"),
-            "token_path": token_path,
-            "mark_processed": False,
+    config = build_config(
+        {
+            "email": {
+                "credentials_path": str(tmp_path / "gmail-client.json"),
+                "token_path": token_path,
+                "mark_processed": False,
+            }
         }
-    }
+    )
 
     mock_credentials = MagicMock()
     mock_credentials.valid = True
@@ -87,12 +92,14 @@ def test_setup_gmail_service_no_warning_when_scopes_attr_is_a_mock(tmp_path, cap
     never be iterated — the mismatch check is a no-op in that case.
     """
     token_path = str(tmp_path / "gmail-token.json")
-    config = {
-        "email": {
-            "credentials_path": str(tmp_path / "gmail-client.json"),
-            "token_path": token_path,
+    config = build_config(
+        {
+            "email": {
+                "credentials_path": str(tmp_path / "gmail-client.json"),
+                "token_path": token_path,
+            }
         }
-    }
+    )
 
     mock_credentials = MagicMock()
     mock_credentials.valid = True

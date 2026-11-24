@@ -7,6 +7,7 @@ from moonlighter.application.assisted.composition.composer import (
     compose_answers,
 )
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.core.config.loading import build_config
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE, never_called
 
 
@@ -19,7 +20,9 @@ async def test_a_demographic_question_never_reaches_the_llm():
     question = FormQuestion(
         label="Gender", kind=QuestionKind.SINGLE_SELECT, required=True, options=("Male", "Female")
     )
-    composed = await compose_answers([question], CompositionContext(PROFILE, {}, JOB, never_called))
+    composed = await compose_answers(
+        [question], CompositionContext(PROFILE, build_config({}), JOB, never_called)
+    )
     assert composed[0].answer is None
     assert "demographic" in composed[0].gap_reason
 
@@ -27,7 +30,9 @@ async def test_a_demographic_question_never_reaches_the_llm():
 @pytest.mark.asyncio
 async def test_a_references_question_never_reaches_the_llm():
     question = FormQuestion(label="References", kind=QuestionKind.LONG_TEXT, required=True)
-    composed = await compose_answers([question], CompositionContext(PROFILE, {}, JOB, never_called))
+    composed = await compose_answers(
+        [question], CompositionContext(PROFILE, build_config({}), JOB, never_called)
+    )
     assert composed[0].answer is None
     assert "demographic" in composed[0].gap_reason
 
@@ -48,7 +53,8 @@ async def test_a_configured_demographic_value_answers_instead_of_gapping():
         label="Gender", kind=QuestionKind.SINGLE_SELECT, required=True, options=("Male", "Female")
     )
     composed = await compose_answers(
-        [question], CompositionContext(PROFILE_WITH_DEMOGRAPHICS, {}, JOB, never_called)
+        [question],
+        CompositionContext(PROFILE_WITH_DEMOGRAPHICS, build_config({}), JOB, never_called),
     )
     assert composed[0].answer == "Male"
     assert composed[0].gap_reason is None
@@ -66,7 +72,8 @@ async def test_an_unconfigured_demographic_still_gaps_even_with_a_demographics_b
         options=("Yes", "No"),
     )
     composed = await compose_answers(
-        [question], CompositionContext(PROFILE_WITH_DEMOGRAPHICS, {}, JOB, never_called)
+        [question],
+        CompositionContext(PROFILE_WITH_DEMOGRAPHICS, build_config({}), JOB, never_called),
     )
     assert composed[0].answer is None
     assert "demographic" in composed[0].gap_reason
@@ -108,7 +115,9 @@ async def test_a_question_that_merely_mentions_a_sensitive_word_is_not_answered(
         required=True,
         options=(would_leak, "Something else"),
     )
-    composed = await compose_answers([question], CompositionContext(profile, {}, JOB, never_called))
+    composed = await compose_answers(
+        [question], CompositionContext(profile, build_config({}), JOB, never_called)
+    )
     assert composed[0].answer is None
     assert composed[0].gap_reason is not None
 
@@ -120,7 +129,8 @@ async def test_a_demographic_label_asked_as_free_text_is_not_answered():
     # carve-out requires a choice kind.
     question = FormQuestion(label="Gender", kind=QuestionKind.LONG_TEXT, required=True)
     composed = await compose_answers(
-        [question], CompositionContext(PROFILE_WITH_DEMOGRAPHICS, {}, JOB, never_called)
+        [question],
+        CompositionContext(PROFILE_WITH_DEMOGRAPHICS, build_config({}), JOB, never_called),
     )
     assert composed[0].answer is None
     assert "demographic" in composed[0].gap_reason
@@ -141,7 +151,9 @@ async def test_a_configured_demographic_answer_is_never_written_to_the_job_cache
     job_cache: dict[str, dict[str, str]] = {}
     composed = await compose_answers(
         [question],
-        CompositionContext(PROFILE_WITH_DEMOGRAPHICS, {}, JOB, never_called, job_cache=job_cache),
+        CompositionContext(
+            PROFILE_WITH_DEMOGRAPHICS, build_config({}), JOB, never_called, job_cache=job_cache
+        ),
     )
     assert composed[0].answer == "Male"
     assert job_cache == {}
@@ -153,7 +165,8 @@ async def test_references_gap_even_when_demographics_are_configured():
     # stay a gap regardless of what the demographics block holds.
     question = FormQuestion(label="References", kind=QuestionKind.LONG_TEXT, required=True)
     composed = await compose_answers(
-        [question], CompositionContext(PROFILE_WITH_DEMOGRAPHICS, {}, JOB, never_called)
+        [question],
+        CompositionContext(PROFILE_WITH_DEMOGRAPHICS, build_config({}), JOB, never_called),
     )
     assert composed[0].answer is None
     assert "demographic" in composed[0].gap_reason

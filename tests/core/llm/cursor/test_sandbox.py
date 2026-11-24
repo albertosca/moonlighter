@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.llm.cursor import _CURSOR_SANDBOX_ARGS, call_cursor
 from moonlighter.core.llm.dispatch import make_caller
 from tests.core.llm.fake_processes import cursor_process
@@ -165,6 +166,6 @@ async def test_call_cursor_forwards_cursor_model_and_ignores_a_blank_one():
     with patch(
         "moonlighter.core.llm.isolation.asyncio.create_subprocess_exec", return_value=mock_process
     ) as mock_exec:
-        caller = make_caller({"llm_backend": "cursor", "cursor_model": "  "})
+        caller = make_caller(build_config({"llm_backend": "cursor", "cursor_model": "  "}))
         await caller("prompt", "claude-sonnet-4-6")
     assert "--model" not in mock_exec.call_args.args

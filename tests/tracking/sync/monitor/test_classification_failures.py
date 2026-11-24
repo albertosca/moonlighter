@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Application, ProcessedEmail, init_db
 from moonlighter.tracking.sync.monitor import sync_responses
 from tests.tracking.llm_callers import make_llm_caller
@@ -44,7 +45,7 @@ async def test_llm_failure_does_not_burn_the_message_and_retries_on_next_sync(te
         patch("moonlighter.tracking.sync.monitor.mark_processed"),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        first_updates = await sync_responses(SYNC_CONFIG, raising_caller)
+        first_updates = await sync_responses(build_config(SYNC_CONFIG), raising_caller)
 
     assert first_updates == []
     assert not ProcessedEmail.select().where(ProcessedEmail.message_id == "msg0").exists()
@@ -69,7 +70,9 @@ async def test_llm_failure_does_not_burn_the_message_and_retries_on_next_sync(te
         patch("moonlighter.tracking.sync.monitor.mark_processed"),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        second_updates = await sync_responses(SYNC_CONFIG, make_llm_caller(healthy_result))
+        second_updates = await sync_responses(
+            build_config(SYNC_CONFIG), make_llm_caller(healthy_result)
+        )
 
     assert len(second_updates) == 1
     assert ProcessedEmail.select().where(ProcessedEmail.message_id == "msg0").exists()
@@ -119,7 +122,7 @@ async def test_spend_limit_stops_the_loop_instead_of_burning_remaining_messages(
         patch("moonlighter.tracking.sync.monitor.mark_processed"),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        updates = await sync_responses(SYNC_CONFIG, spend_limit_caller)
+        updates = await sync_responses(build_config(SYNC_CONFIG), spend_limit_caller)
 
     assert updates == []
     assert parse_mock.call_count == 1  # the loop stopped after the first spend-limit hit

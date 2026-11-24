@@ -1,5 +1,6 @@
 """A scan skips a job silently when its URL is already saved or claimed."""
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Job, ScanLog, init_db
 from moonlighter.discovery.scan.pipeline import evaluate_and_store
 from moonlighter.discovery.sources.base import RawJob
@@ -70,13 +71,15 @@ async def test_scan_chunk_skips_already_claimed_job(temporary_database):
     async def caller(prompt: str, model: str, cache_prefix: str | None = None) -> str:
         raise AssertionError("LLM must not be called for an already-claimed job")
 
-    config = {
-        "score_threshold": 6.5,
-        "eval_model": "m",
-        "scan_concurrency": 5,
-        "scan_batch_size": 5,
-        "title_blocklist": [],
-    }
+    config = build_config(
+        {
+            "score_threshold": 6.5,
+            "eval_model": "m",
+            "scan_concurrency": 5,
+            "scan_batch_size": 5,
+            "title_blocklist": [],
+        }
+    )
     saved, spend_hit = await evaluate_and_store([make_raw_job(99)], config, {}, caller=caller)
     assert saved == []
     assert spend_hit is False

@@ -9,6 +9,7 @@ from moonlighter.application.assisted import service
 from moonlighter.application.assisted.question_sources import greenhouse as greenhouse_source
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.core.config.defaults import DEFAULTS
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
 from tests.application.assisted.service.fake_service import stub_caller
 
@@ -42,7 +43,7 @@ async def test_the_ats_is_asked_with_a_twenty_second_timeout(job_factory, monkey
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", _no_questions)
     monkeypatch.setattr(service.httpx, "AsyncClient", SpyClient)
 
-    await service.prepare_application(job.id, {}, {})
+    await service.prepare_application(job.id, build_config({}), {})
 
     assert seen == {"timeout": 20}
 
@@ -71,7 +72,7 @@ async def test_the_collaborators_receive_exactly_the_job_fields_they_read(job_fa
     monkeypatch.setattr(service, "ensure_tailored_cv", spy_ensure)
     monkeypatch.setattr(service, "compose_answers", spy_compose)
 
-    await service.prepare_application(job.id, {}, {})
+    await service.prepare_application(job.id, build_config({}), {})
 
     assert seen["tailoring"] == {
         "id": job.id,
@@ -110,6 +111,6 @@ async def test_the_answer_bank_age_comes_from_the_config_or_the_default(
     monkeypatch.setattr(service, "make_caller", lambda config: stub_caller())
     monkeypatch.setattr(service, "load_answer_bank", spy_load)
 
-    await service.prepare_application(job.id, config, {})
+    await service.prepare_application(job.id, build_config(config), {})
 
     assert ages == [expected_age]

@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import ScanLog, init_db
 from moonlighter.discovery.scan.results import render_scan_report
 from moonlighter.discovery.scan.scanning import scan_company
@@ -13,7 +14,11 @@ _fake_caller = MagicMock()
 async def test_scan_company_rejects_unknown_source():
     report = render_scan_report(
         await scan_company(
-            "workday", "acme", {"score_threshold": 6.5}, profile={}, caller=_fake_caller
+            "workday",
+            "acme",
+            build_config({"score_threshold": 6.5}),
+            profile={},
+            caller=_fake_caller,
         )
     )
     assert "Unknown source 'workday'" in report
@@ -36,7 +41,11 @@ async def test_scan_company_scans_evaluates_and_reports(temporary_database):
         )
         report = render_scan_report(
             await scan_company(
-                "greenhouse", "stripe", {"score_threshold": 6.5}, profile={}, caller=_fake_caller
+                "greenhouse",
+                "stripe",
+                build_config({"score_threshold": 6.5}),
+                profile={},
+                caller=_fake_caller,
             )
         )
     assert evaluate_mock.await_count == 1
@@ -59,7 +68,11 @@ async def test_scan_company_no_new_jobs_skips_evaluation(temporary_database):
         )
         report = render_scan_report(
             await scan_company(
-                "greenhouse", "stripe", {"score_threshold": 6.5}, profile={}, caller=_fake_caller
+                "greenhouse",
+                "stripe",
+                build_config({"score_threshold": 6.5}),
+                profile={},
+                caller=_fake_caller,
             )
         )
     evaluate_mock.assert_not_called()
@@ -85,7 +98,11 @@ async def test_scan_company_zero_raw_jobs_does_not_claim_all_already_known(tempo
         mock_greenhouse.return_value.scan = AsyncMock(return_value=[])
         report = render_scan_report(
             await scan_company(
-                "greenhouse", "stripe", {"score_threshold": 6.5}, profile={}, caller=_fake_caller
+                "greenhouse",
+                "stripe",
+                build_config({"score_threshold": 6.5}),
+                profile={},
+                caller=_fake_caller,
             )
         )
     evaluate_mock.assert_not_called()

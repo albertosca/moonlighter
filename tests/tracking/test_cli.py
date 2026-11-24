@@ -7,12 +7,15 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from moonlighter.core.cli import run
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Application, Job, init_db
 from moonlighter.tracking import cli
 from moonlighter.tracking.cli import parse_args
 from moonlighter.tracking.gmail.client import GmailAuthError
 from moonlighter.tracking.register import RegisterKind, RegisterResult
 from tests.tracking.sync_updates import as_sync_updates
+
+MAILBOX_CONFIG = build_config({"email": {"address": "jane@example.com"}})
 
 
 def test_parse_args_sync():
@@ -41,7 +44,7 @@ async def test_run_sync_exits_0_with_the_updates_as_json(temporary_database):
         }
     ]
     with (
-        patch.object(cli, "bootstrap", return_value=({"email": {}}, {})),
+        patch.object(cli, "bootstrap", return_value=(build_config({"email": {}}), {})),
         patch.object(cli, "make_caller", return_value=object()),
         patch.object(cli, "sync_responses", new=AsyncMock(return_value=as_sync_updates(updates))),
     ):
@@ -53,7 +56,7 @@ async def test_run_sync_exits_0_with_the_updates_as_json(temporary_database):
 
 async def test_run_sync_with_no_updates_exits_1(temporary_database):
     with (
-        patch.object(cli, "bootstrap", return_value=({"email": {}}, {})),
+        patch.object(cli, "bootstrap", return_value=(build_config({"email": {}}), {})),
         patch.object(cli, "make_caller", return_value=object()),
         patch.object(cli, "sync_responses", new=AsyncMock(return_value=[])),
     ):
@@ -69,7 +72,7 @@ def test_run_via_run_classifies_a_missing_gmail_token_as_an_expected_failure(
     # anticipated failure -- exit 1, kind "expected_failure" -- not a crash.
     # Goes THROUGH run() with the real module tuple, per the review brief.
     with (
-        patch.object(cli, "bootstrap", return_value=({"email": {}}, {})),
+        patch.object(cli, "bootstrap", return_value=(build_config({"email": {}}), {})),
         patch.object(cli, "make_caller", return_value=object()),
         patch.object(cli, "sync_responses", new=AsyncMock(side_effect=GmailAuthError("no token"))),
     ):
@@ -91,9 +94,7 @@ async def test_run_register_exits_0_and_prints_the_alias(temporary_database):
         alias="jane+ab12cd34@example.com",
     )
     with (
-        patch.object(
-            cli, "bootstrap", return_value=({"email": {"address": "jane@example.com"}}, {})
-        ),
+        patch.object(cli, "bootstrap", return_value=(MAILBOX_CONFIG, {})),
         patch.object(cli, "register_application", return_value=register_result),
     ):
         payload, code = await cli._run(cli.parse_args(["register", "7"]))
@@ -107,7 +108,7 @@ async def test_run_register_exits_0_and_prints_the_alias(temporary_database):
 async def test_run_register_unknown_job_exits_1(temporary_database):
     register_result = RegisterResult(RegisterKind.JOB_NOT_FOUND, 7, error="Job 7 not found.")
     with (
-        patch.object(cli, "bootstrap", return_value=({}, {})),
+        patch.object(cli, "bootstrap", return_value=(build_config({}), {})),
         patch.object(cli, "register_application", return_value=register_result),
     ):
         payload, code = await cli._run(cli.parse_args(["register", "7"]))
@@ -175,7 +176,7 @@ async def test_register_command_passes_the_request_to_the_service(temporary_data
             "--reply-mailbox-unswept",
         ]
     )
-    with patch.object(cli, "bootstrap", return_value=({}, {})):
+    with patch.object(cli, "bootstrap", return_value=(build_config({}), {})):
         payload, code = await cli._run(arguments)
     application = Application.get(Application.job == job)
     assert (payload["kind"], payload["status"], payload["created"], code) == (

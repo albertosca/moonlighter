@@ -9,10 +9,11 @@ rendered document, and re-points a selection at the right language's base.
 import logging
 import re
 from dataclasses import replace
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 from moonlighter.application.cvgen.latex.render import CVSelection
 from moonlighter.application.cvgen.paths import resolved_template_dir
+from moonlighter.core.config.model import Config
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def strip_marker_lines(rendered: str) -> str:
     return _MARKER_LINES.sub("", rendered)
 
 
-def template_text(config: dict[str, Any], language: str) -> str | None:
+def template_text(config: Config, language: str) -> str | None:
     template_directory = resolved_template_dir(config)
     english_path = template_directory / "cv-template.en.tex"
     portuguese_path = template_directory / "cv-template.pt.tex"

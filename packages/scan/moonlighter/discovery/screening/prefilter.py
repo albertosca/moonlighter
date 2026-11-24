@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Any
 
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import Job
 from moonlighter.core.duplicates import find_original
 from moonlighter.discovery.evaluation.title_filter import should_skip_by_title
@@ -31,10 +32,10 @@ class ScreeningRules:
     eligible_regions: tuple[str, ...]
 
 
-def screening_rules(config: dict[str, Any], profile: dict[str, Any]) -> ScreeningRules:
+def screening_rules(config: Config, profile: dict[str, Any]) -> ScreeningRules:
     """The rules a scan screens its postings with."""
     return ScreeningRules(
-        blocklist=config.get("title_blocklist", []),
+        blocklist=config["title_blocklist"],
         home_city=(profile.get("criteria") or {}).get("home_city"),
         eligible_regions=eligible_regions_from(profile),
     )

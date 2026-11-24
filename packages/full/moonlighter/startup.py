@@ -9,6 +9,7 @@ from typing import Any, Literal
 
 from moonlighter.application.answers.rules.cv import configured_cv_path
 from moonlighter.core.config.backends import llm_backend
+from moonlighter.core.config.model import Config
 from moonlighter.core.config.paths import browser_executable, moonlighter_home
 from moonlighter.core.llm.codex import codex_executable
 from moonlighter.core.llm.cursor import cursor_executable
@@ -22,7 +23,7 @@ class StartupWarning:
 
 
 def validate_startup(
-    config: dict[str, Any],
+    config: Config,
     profile: dict[str, Any],
     cv_path: str | None = None,
 ) -> list[StartupWarning]:
@@ -105,7 +106,7 @@ _BACKEND_CREDENTIALS: dict[str, tuple[Callable[[], bool], str]] = {
 }
 
 
-def _check_llm_backend(config: dict[str, Any]) -> StartupWarning | None:
+def _check_llm_backend(config: Config) -> StartupWarning | None:
     """Whichever backend is configured needs its own credential to exist.
 
     Every backend is checked, from the same resolved backend: guarding only the
@@ -132,7 +133,7 @@ def _check_cv(cv_path: str) -> StartupWarning | None:
     )
 
 
-def _check_browser(config: dict[str, Any]) -> StartupWarning | None:
+def _check_browser(config: Config) -> StartupWarning | None:
     """Missing browser: a browser-based scan extension (e.g. LinkedIn) won't work.
 
     moonlighter itself never opens a browser (see DISCLAIMER.md).

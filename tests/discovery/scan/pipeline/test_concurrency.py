@@ -3,6 +3,7 @@
 import asyncio
 from unittest.mock import MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import init_db
 from moonlighter.discovery.scan.pipeline import evaluate_and_store
 from tests.discovery.fake_scan import BatchRecorder, make_raw_job, store_config
@@ -26,13 +27,15 @@ class _Tracker:
 async def test_scan_concurrency_is_capped(temporary_database):
     init_db()
     caller = _Tracker()
-    config = {
-        "score_threshold": 6.5,
-        "eval_model": "m",
-        "scan_concurrency": 2,
-        "scan_batch_size": 1,
-        "title_blocklist": [],
-    }
+    config = build_config(
+        {
+            "score_threshold": 6.5,
+            "eval_model": "m",
+            "scan_concurrency": 2,
+            "scan_batch_size": 1,
+            "title_blocklist": [],
+        }
+    )
     jobs = [make_raw_job(index) for index in range(6)]
     saved, spend_hit = await evaluate_and_store(jobs, config, {}, caller=caller)
     assert len(saved) == 6
@@ -52,13 +55,15 @@ async def test_scan_batches_jobs_into_one_call(temporary_database):
             + "]"
         )
 
-    config = {
-        "score_threshold": 6.5,
-        "eval_model": "m",
-        "scan_concurrency": 5,
-        "scan_batch_size": 4,
-        "title_blocklist": [],
-    }
+    config = build_config(
+        {
+            "score_threshold": 6.5,
+            "eval_model": "m",
+            "scan_concurrency": 5,
+            "scan_batch_size": 4,
+            "title_blocklist": [],
+        }
+    )
     jobs = [make_raw_job(index) for index in range(4)]
     saved, spend_hit = await evaluate_and_store(jobs, config, {}, caller=caller)
     assert len(saved) == 4

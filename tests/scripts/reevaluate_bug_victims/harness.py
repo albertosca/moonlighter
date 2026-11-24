@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import reevaluate_bug_victims
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Job
 from moonlighter.discovery.evaluation.models import EvaluationResult
 
@@ -15,7 +16,7 @@ import reevaluation_batch
 
 BUG = reevaluate_bug_victims.BUG_MARKER
 UNTOUCHED_NOTES = f"{BUG} (stdin)"
-CONFIG = {"title_blocklist": ["recruiter"], "eval_model": "m-eval"}
+CONFIG = build_config({"title_blocklist": ["recruiter"], "eval_model": "m-eval"})
 _URLS = itertools.count(1)
 
 
@@ -69,7 +70,7 @@ def run_main(monkeypatch, *flags, outcomes=None, config=CONFIG, suspend=True) ->
     """Runs main() with the given flags; a title missing from outcomes scores 1.0."""
     evaluator = Evaluator(outcomes or {}, suspend=suspend)
     monkeypatch.setattr(sys, "argv", ["reevaluate_bug_victims.py", *flags])
-    monkeypatch.setattr(reevaluate_bug_victims, "load_config", lambda: config)
+    monkeypatch.setattr(reevaluate_bug_victims, "load_config", lambda: build_config(config))
     with patch.object(reevaluation_batch, "evaluate_job", evaluator):
         reevaluate_bug_victims.main()
     return evaluator

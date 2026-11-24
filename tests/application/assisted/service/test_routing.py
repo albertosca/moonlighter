@@ -7,6 +7,7 @@ from moonlighter.application.assisted.question_sources import greenhouse as gree
 from moonlighter.application.assisted.question_sources import recruitee as recruitee_source
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sheet.results import render_sheet_result
+from moonlighter.core.config.loading import build_config
 from tests.application.assisted.service.fake_service import (
     bypass_cv_bootstrap_offer,
     never_fetch_greenhouse,
@@ -21,7 +22,7 @@ async def test_an_unsupported_source_asks_the_user_to_paste(job_factory, monkeyp
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", never_fetch_greenhouse)
     monkeypatch.setattr(recruitee_source, "fetch_recruitee_questions", never_fetch_recruitee)
 
-    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
+    out = render_sheet_result(await service.prepare_application(job.id, build_config({}), {}))
 
     assert "copy" in out.lower()
     assert "prepare_application_from_paste" in out
@@ -38,7 +39,7 @@ async def test_a_greenhouse_job_with_no_questions_asks_the_user_to_paste(job_fac
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", no_questions)
     monkeypatch.setattr(recruitee_source, "fetch_recruitee_questions", never_fetch_recruitee)
 
-    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
+    out = render_sheet_result(await service.prepare_application(job.id, build_config({}), {}))
 
     assert "prepare_application_from_paste" in out
 
@@ -53,7 +54,7 @@ async def test_a_recruitee_job_with_no_questions_asks_the_user_to_paste(job_fact
     monkeypatch.setattr(recruitee_source, "fetch_recruitee_questions", no_questions)
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", never_fetch_greenhouse)
 
-    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
+    out = render_sheet_result(await service.prepare_application(job.id, build_config({}), {}))
 
     assert "prepare_application_from_paste" in out
 
@@ -69,7 +70,7 @@ async def test_a_greenhouse_url_the_regex_cannot_parse_asks_the_user_to_paste(
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", never_fetch_greenhouse)
     monkeypatch.setattr(recruitee_source, "fetch_recruitee_questions", never_fetch_recruitee)
 
-    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
+    out = render_sheet_result(await service.prepare_application(job.id, build_config({}), {}))
 
     assert "prepare_application_from_paste" in out
 
@@ -82,7 +83,7 @@ async def test_a_recruitee_url_the_regex_cannot_parse_asks_the_user_to_paste(
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", never_fetch_greenhouse)
     monkeypatch.setattr(recruitee_source, "fetch_recruitee_questions", never_fetch_recruitee)
 
-    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
+    out = render_sheet_result(await service.prepare_application(job.id, build_config({}), {}))
 
     assert "prepare_application_from_paste" in out
 
@@ -101,7 +102,7 @@ async def test_a_greenhouse_job_with_questions_returns_a_sheet_not_the_paste_hin
     monkeypatch.setattr(recruitee_source, "fetch_recruitee_questions", never_fetch_recruitee)
     monkeypatch.setattr(service, "make_caller", lambda config: stub_caller("a generated answer"))
 
-    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
+    out = render_sheet_result(await service.prepare_application(job.id, build_config({}), {}))
 
     assert "prepare_application_from_paste" not in out
     assert "Favorite language" in out
@@ -122,7 +123,7 @@ async def test_a_recruitee_job_with_questions_returns_a_sheet_not_the_paste_hint
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", never_fetch_greenhouse)
     monkeypatch.setattr(service, "make_caller", lambda config: stub_caller("a generated answer"))
 
-    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
+    out = render_sheet_result(await service.prepare_application(job.id, build_config({}), {}))
 
     assert "prepare_application_from_paste" not in out
     assert "Favorite language" in out
@@ -130,5 +131,5 @@ async def test_a_recruitee_job_with_questions_returns_a_sheet_not_the_paste_hint
 
 
 async def test_a_missing_job_is_reported_rather_than_raising():
-    out = render_sheet_result(await service.prepare_application(999999, {}, {}))
+    out = render_sheet_result(await service.prepare_application(999999, build_config({}), {}))
     assert "999999" in out

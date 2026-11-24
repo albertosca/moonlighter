@@ -3,16 +3,19 @@
 from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.discovery.evaluation.models import EvaluationResult
 from moonlighter.discovery.scan.results import render_scan_report
 from moonlighter.discovery.scan.scanning import scan_and_evaluate
 from moonlighter.discovery.sources.base import RawJob
 
-CONFIG = {
-    "score_threshold": 7.0,
-    "llm_model": "claude-haiku-4-5-20251001",
-    "title_blocklist": ["staff accountant"],
-}
+CONFIG = build_config(
+    {
+        "score_threshold": 7.0,
+        "llm_model": "claude-haiku-4-5-20251001",
+        "title_blocklist": ["staff accountant"],
+    }
+)
 
 
 PROFILE: dict = {}
@@ -75,7 +78,7 @@ async def run_scan(  # noqa: PLR0913 - every knob a scan test turns, all keyword
     eval_mock: an AsyncMock applied per job within the batch. Can be
     AsyncMock(return_value=EvaluationResult) or AsyncMock(side_effect=exc).
     """
-    resolved_config = config or {**CONFIG, "title_blocklist": ["staff accountant"]}
+    resolved_config = build_config(config or {**CONFIG, "title_blocklist": ["staff accountant"]})
     _eval_per_job = eval_mock or AsyncMock(return_value=evaluation_result(8.0))
 
     async def _batch(jobs, profile, model, *, caller):
@@ -115,7 +118,7 @@ async def run_scan(  # noqa: PLR0913 - every knob a scan test turns, all keyword
 
 
 def store_config(**overrides):
-    return {"score_threshold": 6.5, "title_blocklist": [], **overrides}
+    return build_config({"score_threshold": 6.5, "title_blocklist": [], **overrides})
 
 
 class BatchRecorder:

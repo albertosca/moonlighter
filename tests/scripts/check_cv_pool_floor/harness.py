@@ -6,6 +6,7 @@ from unittest.mock import patch
 import check_cv_pool_floor
 
 from moonlighter.application.cvgen.pool.loader import load_pool
+from moonlighter.core.config.loading import build_config
 
 POOL_YAML = textwrap.dedent("""\
     experiences:
@@ -52,7 +53,7 @@ def configuration(tmp_path, *, with_template=True):
     template_directory.mkdir()
     if with_template:
         (template_directory / "cv-template.en.tex").write_text(TEMPLATE)
-    return {"cv": {"pool": str(pool_path), "template_dir": str(template_directory)}}
+    return build_config({"cv": {"pool": str(pool_path), "template_dir": str(template_directory)}})
 
 
 def compiling(pages):

@@ -3,6 +3,7 @@
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import ScanLog, init_db
 from moonlighter.discovery.scan.pipeline import evaluate_and_store
 from tests.discovery.fake_scan import make_raw_job, run_scan, store_config
@@ -16,13 +17,15 @@ async def test_scan_stops_before_llm_after_spend_limit(temporary_database):
         calls["n"] += 1
         raise RuntimeError("spend limit reached")
 
-    config = {
-        "score_threshold": 6.5,
-        "eval_model": "m",
-        "scan_concurrency": 1,
-        "scan_batch_size": 1,
-        "title_blocklist": [],
-    }
+    config = build_config(
+        {
+            "score_threshold": 6.5,
+            "eval_model": "m",
+            "scan_concurrency": 1,
+            "scan_batch_size": 1,
+            "title_blocklist": [],
+        }
+    )
     jobs = [make_raw_job(index) for index in range(5)]
     _saved, spend_hit = await evaluate_and_store(jobs, config, {}, caller=caller)
     assert spend_hit is True

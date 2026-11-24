@@ -1,10 +1,10 @@
 """Resolves the CV file per company (from config['cv'])."""
 
 from pathlib import Path
-from typing import Any
 
 from moonlighter.application.cvgen.latex.compile import looks_like_a_compiled_pdf
 from moonlighter.application.cvgen.paths import generated_dir_for
+from moonlighter.core.config.model import Config
 from moonlighter.core.config.paths import resolve_under_home
 
 
@@ -12,7 +12,7 @@ class CVNotFoundError(Exception):
     """The CV file resolved for the company does not exist on disk."""
 
 
-def configured_cv_path(config: dict[str, Any], company: str = "") -> Path | None:
+def configured_cv_path(config: Config, company: str = "") -> Path | None:
     """The CV path config points at, without checking whether it exists.
 
     Company matching is case-insensitive; falls back to 'default'. Relative
@@ -22,18 +22,17 @@ def configured_cv_path(config: dict[str, Any], company: str = "") -> Path | None
     Shared with the startup check so that a warning can never name a different
     file from the one the applier would actually upload.
     """
-    cv_config = config.get("cv", {}) or {}
+    cv_config = config["cv"]
     by_company = {
-        company_name.lower(): cv_path
-        for company_name, cv_path in (cv_config.get("by_company", {}) or {}).items()
+        company_name.lower(): cv_path for company_name, cv_path in cv_config["by_company"].items()
     }
-    rel = by_company.get((company or "").lower(), cv_config.get("default"))
+    rel = by_company.get((company or "").lower(), cv_config["default"])
     if not rel:
         return None
     return resolve_under_home(str(rel))
 
 
-def resolve_cv_path(company: str, config: dict[str, Any], job_id: int | None = None) -> str:
+def resolve_cv_path(company: str, config: Config, job_id: int | None = None) -> str:
     """Resolves the CV path to upload.
 
     The job's own tailored PDF when one exists,

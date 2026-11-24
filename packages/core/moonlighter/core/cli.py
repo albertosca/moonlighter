@@ -20,8 +20,8 @@ from typing import Any, NoReturn, override
 
 from moonlighter.core.config.errors import ConfigError
 from moonlighter.core.config.loading import load_config, load_profile
+from moonlighter.core.config.model import Config
 from moonlighter.core.config.permissions import harden_permissions
-from moonlighter.core.config.validation import validate_config
 from moonlighter.core.db import Job, init_db
 from moonlighter.core.log import setup as setup_logging
 
@@ -75,7 +75,7 @@ class JsonArgumentParser(argparse.ArgumentParser):
         sys.exit(EXIT_USAGE)
 
 
-def bootstrap() -> tuple[dict[str, Any], dict[str, Any]]:
+def bootstrap() -> tuple[Config, dict[str, Any]]:
     """Same boot the MCP server does, minus the server.
 
     Logging to stderr, config loaded and validated (ConfigError propagates — `run`
@@ -85,7 +85,6 @@ def bootstrap() -> tuple[dict[str, Any], dict[str, Any]]:
     """
     setup_logging()
     config = load_config()
-    validate_config(config)
     try:
         profile = load_profile()
     except FileNotFoundError:

@@ -22,6 +22,7 @@ from moonlighter.application.cvgen.latex.page_fit import TailoredCV, after_compi
 from moonlighter.application.cvgen.latex.render import CVSelection
 from moonlighter.application.cvgen.paths import generated_dir_for, resolved_pool_path
 from moonlighter.application.cvgen.pool.loader import CVPool, PoolError, load_pool
+from moonlighter.core.config.model import Config
 from moonlighter.core.llm.caller import LLMCaller
 from moonlighter.core.llm.spend_limit import is_spend_limit
 
@@ -39,13 +40,13 @@ class _Cache(Enum):
 
 
 class _Generation(NamedTuple):
-    config: dict[str, Any]
+    config: Config
     pool: CVPool
     english_template: str
     base: BaseFields
 
 
-def _output_directory(job: dict[str, Any], config: dict[str, Any]) -> Path | None:
+def _output_directory(job: dict[str, Any], config: Config) -> Path | None:
     raw_id = job.get("id")
     if raw_id is None:
         # "never raises" is only total if an id-less job dict degrades too:
@@ -72,7 +73,7 @@ def _cached_answer(out: Path) -> TailoredCV | _Cache | None:
     return _Cache.MISS
 
 
-def _generation_inputs(pool_path: Path, config: dict[str, Any]) -> _Generation | None:
+def _generation_inputs(pool_path: Path, config: Config) -> _Generation | None:
     try:
         pool = load_pool(pool_path)
     except PoolError as error:
@@ -114,7 +115,7 @@ def _materialised(
 
 async def ensure_tailored_cv(
     job: dict[str, Any],
-    config: dict[str, Any],
+    config: Config,
     profile: dict[str, Any],
     *,
     caller: LLMCaller,

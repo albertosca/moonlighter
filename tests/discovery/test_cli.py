@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.discovery import cli
 from moonlighter.discovery.cli import _run, parse_args
 from moonlighter.discovery.scan.results import ScanKind, ScanResult
@@ -17,7 +18,7 @@ def _patched(report):
     functions runs per test, patching the other one is harmless.
     """
     with (
-        patch.object(cli, "bootstrap", return_value=({"score_threshold": 6.5}, {})),
+        patch.object(cli, "bootstrap", return_value=(build_config({"score_threshold": 6.5}), {})),
         patch.object(cli, "make_caller", return_value=object()),
         patch.object(cli, "scan_and_evaluate", new=AsyncMock(return_value=report)),
         patch.object(cli, "scan_company", new=AsyncMock(return_value=report)),
@@ -88,7 +89,7 @@ async def test_run_no_eval_passes_no_caller_to_the_service(temporary_database):
     report = ScanResult(kind=ScanKind.NO_NEW_JOBS, threshold=6.5)
     scan = AsyncMock(return_value=report)
     with (
-        patch.object(cli, "bootstrap", return_value=({}, {})),
+        patch.object(cli, "bootstrap", return_value=(build_config({}), {})),
         patch.object(cli, "make_caller", side_effect=AssertionError("must not be called")),
         patch.object(cli, "scan_and_evaluate", new=scan),
     ):

@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import init_db
 from moonlighter.tracking.sync.monitor import sync_responses
 from tests.tracking.llm_callers import make_llm_caller
@@ -48,7 +49,7 @@ async def test_ref_match_reports_the_db_job_not_the_email_guess(temporary_databa
         ),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        updates = await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        updates = await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     assert len(updates) == 1
     assert updates[0].company == "Acme Robotics"
@@ -99,7 +100,7 @@ async def test_a_ref_match_that_advances_the_status_reports_the_job_id_and_the_a
         ),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        updates = await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        updates = await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     assert updates[0].job_id == job.id
     assert updates[0].status_advanced is True
@@ -146,7 +147,7 @@ async def test_a_ref_match_that_moves_nothing_reports_no_advance(temporary_datab
         ),
         patch("moonlighter.tracking.sync.monitor.get_or_create_label", return_value="Label_proc"),
     ):
-        updates = await sync_responses(SYNC_CONFIG, make_llm_caller(classify_result))
+        updates = await sync_responses(build_config(SYNC_CONFIG), make_llm_caller(classify_result))
 
     assert updates[0].job_id == job.id
     assert updates[0].status_advanced is False

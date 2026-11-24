@@ -13,6 +13,7 @@ from typing import Any
 import httpx
 
 from moonlighter.application.cvgen.paths import resolved_template_dir
+from moonlighter.core.config.model import Config
 from moonlighter.core.web.http_fetch import HEADERS
 
 _TEMPLATE_NAMES = ("cv-template.en.tex", "cv-template.pt.tex")
@@ -97,7 +98,7 @@ async def check_links(urls: list[str], client: httpx.AsyncClient) -> list[dict[s
 
 
 async def link_report(
-    config: dict[str, Any], client: httpx.AsyncClient | None = None
+    config: Config, client: httpx.AsyncClient | None = None
 ) -> list[dict[str, Any]]:
     """Check the header links of both CV templates in cv.template_dir."""
     directory = resolved_template_dir(config)

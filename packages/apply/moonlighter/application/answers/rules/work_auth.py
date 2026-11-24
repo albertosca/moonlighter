@@ -6,9 +6,9 @@ sentinel — never a guess (answering wrong about authorization is lying).
 """
 
 import re
-from typing import Any
 
 from moonlighter.application.answers.needs_review import NEEDS_REVIEW_SENTINEL
+from moonlighter.core.config.model import Config
 
 # Countries/cities that allow confident inference. Deliberately short list:
 # we prefer __NEEDS_REVIEW__ over a false positive.
@@ -92,18 +92,18 @@ def infer_country(
     return None
 
 
-def resolve_work_auth(field_label: str, country: str | None, config: dict[str, Any]) -> str | None:
+def resolve_work_auth(field_label: str, country: str | None, config: Config) -> str | None:
     """Returns the correct answer for the country on an authorization/sponsorship field.
 
     Returns the review sentinel when the country is unknown, and None if the field
     is not authorization-related (then the LLM handles it).
     """
-    work_authorization = config.get("work_authorization", {}) or {}
+    work_authorization = config["work_authorization"]
     # Normalizes to the canonical form: accepts "Brasil"/"Brazil"/"BR" etc. without
     # depending on the exact locale. Empty/missing/unknown → None → review (conservative).
-    citizenship = _canonical_country(work_authorization.get("citizenship_country") or "")
-    yes: str = work_authorization.get("authorized_answer", "Yes")
-    not_authorized_answer: str = work_authorization.get("not_authorized_answer", "No")
+    citizenship = _canonical_country(work_authorization["citizenship_country"])
+    yes: str = work_authorization["authorized_answer"]
+    not_authorized_answer: str = work_authorization["not_authorized_answer"]
     review: str = NEEDS_REVIEW_SENTINEL
 
     is_auth = bool(_AUTHORIZED_RE.search(field_label))

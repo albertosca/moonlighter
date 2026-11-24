@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Job, ScanLog, init_db
 from moonlighter.discovery.manual.jobs import add_job
 from tests.discovery.fake_scan import CONFIG, PROFILE, evaluation_result
@@ -119,11 +120,12 @@ async def test_add_job_takes_the_model_from_eval_model_then_llm_model_then_the_d
         for index, extra in enumerate(
             [
                 {"eval_model": "from-eval", "llm_model": "from-llm"},
-                {"llm_model": "from-llm"},
+                # eval_model follows llm_model only through the codex rule in loading.
+                {"llm_backend": "codex", "llm_model": "from-llm"},
                 {},
             ]
         ):
-            config = {"score_threshold": 7.0, **extra}
+            config = build_config({"score_threshold": 7.0, **extra})
             await add_job(
                 f"https://x.com/pin/m{index}",
                 "Acme",

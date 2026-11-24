@@ -3,6 +3,7 @@ import pytest
 
 from moonlighter.application.cvgen.latex import links
 from moonlighter.application.cvgen.latex.links import check_links, link_report, template_links
+from moonlighter.core.config.loading import build_config
 
 HEADER = r"""
 \social[linkedin]{albertosca}
@@ -92,7 +93,7 @@ async def test_link_report_reads_both_templates_from_the_configured_directory(tm
     (tmp_path / "cv-template.pt.tex").write_text(
         r"\social[github]{albertosca}" + "\n" + r"\homepage{albertosca.dev}"
     )
-    config = {"cv": {"template_dir": str(tmp_path)}}
+    config = build_config({"cv": {"template_dir": str(tmp_path)}})
     async with _client(
         {"https://github.com/albertosca": 200, "https://albertosca.dev": 200}
     ) as client:
@@ -106,7 +107,7 @@ async def test_link_report_reads_both_templates_from_the_configured_directory(tm
 @pytest.mark.asyncio
 async def test_link_report_is_empty_without_templates(tmp_path):
 
-    report = await link_report({"cv": {"template_dir": str(tmp_path)}})
+    report = await link_report(build_config({"cv": {"template_dir": str(tmp_path)}}))
     assert report == []
 
 
@@ -124,7 +125,7 @@ async def test_link_report_opens_a_client_that_follows_redirects(tmp_path, monke
         return real_client(transport=httpx.MockTransport(lambda request: httpx.Response(200)))
 
     monkeypatch.setattr(links.httpx, "AsyncClient", fake_client)
-    report = await links.link_report({"cv": {"template_dir": str(tmp_path)}})
+    report = await links.link_report(build_config({"cv": {"template_dir": str(tmp_path)}}))
     assert report[0]["ok"] is True
     assert opened["follow_redirects"] is True
     assert "User-Agent" in opened["headers"]

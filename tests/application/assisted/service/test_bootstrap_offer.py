@@ -8,6 +8,7 @@ from moonlighter.application.assisted import service
 from moonlighter.application.assisted.question_sources import greenhouse as greenhouse_source
 from moonlighter.application.assisted.questions import FormQuestion
 from moonlighter.application.assisted.sheet.results import SheetKind, render_sheet_result
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.cv_bootstrap import record_cv_bootstrap_decline
 from moonlighter.core.db import init_db
 from tests.application.assisted.service.fake_service import (
@@ -24,7 +25,7 @@ async def test_prepare_application_offers_the_bootstrap_when_no_pool_exists(
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", never_fetch_greenhouse)
     job = job_factory(source="smartrecruiters", url="https://jobs.smartrecruiters.com/x/y")
 
-    result = await service.prepare_application(job.id, {}, {})
+    result = await service.prepare_application(job.id, build_config({}), {})
 
     assert result.kind is SheetKind.CV_BOOTSTRAP_OFFER
     assert "bootstrap_cv_pool" in result.error
@@ -40,7 +41,7 @@ async def test_prepare_application_never_offers_twice_after_a_decline(
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", never_fetch_greenhouse)
     job = job_factory(source="smartrecruiters", url="https://jobs.smartrecruiters.com/x/y")
 
-    result = await service.prepare_application(job.id, {}, {})
+    result = await service.prepare_application(job.id, build_config({}), {})
 
     assert result.kind is not SheetKind.CV_BOOTSTRAP_OFFER
 
@@ -53,7 +54,7 @@ async def test_prepare_application_never_offers_once_a_pool_exists(
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", never_fetch_greenhouse)
     job = job_factory(source="smartrecruiters", url="https://jobs.smartrecruiters.com/x/y")
 
-    result = await service.prepare_application(job.id, {}, {})
+    result = await service.prepare_application(job.id, build_config({}), {})
 
     assert result.kind is not SheetKind.CV_BOOTSTRAP_OFFER
 
@@ -69,7 +70,9 @@ async def test_prepare_application_from_paste_also_offers_the_bootstrap_when_no_
     monkeypatch.setattr(service, "extract_questions_from_page", never_extract)
     job = job_factory(source="smartrecruiters", url="https://jobs.smartrecruiters.com/x/y")
 
-    result = await service.prepare_application_from_paste(job.id, "the whole page", {}, profile={})
+    result = await service.prepare_application_from_paste(
+        job.id, "the whole page", build_config({}), profile={}
+    )
 
     assert result.kind is SheetKind.CV_BOOTSTRAP_OFFER
     assert "bootstrap_cv_pool" in result.error
@@ -85,6 +88,6 @@ async def test_a_source_timeout_falls_back_to_the_paste_hint(job_factory, monkey
 
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", times_out)
 
-    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
+    out = render_sheet_result(await service.prepare_application(job.id, build_config({}), {}))
 
     assert "prepare_application_from_paste" in out

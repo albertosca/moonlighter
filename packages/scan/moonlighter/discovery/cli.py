@@ -36,6 +36,7 @@ from moonlighter.core.cli import (
     job_to_dict,
     run,
 )
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import Job
 from moonlighter.core.doctor import doctor_payload
 from moonlighter.core.llm.dispatch import make_caller
@@ -101,7 +102,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 async def _add(
-    arguments: argparse.Namespace, config: dict[str, Any], profile: dict[str, Any]
+    arguments: argparse.Namespace, config: Config, profile: dict[str, Any]
 ) -> tuple[dict[str, Any], int]:
     message = await add_job(
         arguments.url,

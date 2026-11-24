@@ -9,6 +9,7 @@ from moonlighter.application.commands import bootstrap_cv as bootstrap_cv_comman
 from moonlighter.application.commands import doctor as doctor_command
 from moonlighter.application.cvgen.pool.bootstrap_error import BootstrapError
 from moonlighter.core.cli import run
+from moonlighter.core.config.loading import build_config
 
 
 def test_parse_args_prepare_with_optional_paste():
@@ -34,7 +35,7 @@ def test_run_via_run_classifies_a_missing_paste_file_as_a_usage_error(temporary_
     # 3 (FileNotFoundError) today. A bad --paste path is a bad argument, not
     # a crash -- exit 2, kind "usage_error". Goes THROUGH run() with the real
     # module tuple, per the review brief.
-    with patch.object(cli, "bootstrap", return_value=({}, {})):
+    with patch.object(cli, "bootstrap", return_value=(build_config({}), {})):
         parsed_arguments = cli.parse_args(["prepare", "42", "--paste", "/nonexistent/file"])
         code = run(lambda: cli._run(parsed_arguments), usage=cli.USAGE_ERRORS)
     assert code == 2
@@ -93,7 +94,7 @@ def test_bootstrap_cv_subcommand_reports_a_bootstrap_error_as_expected_failure(m
     # as that sibling test does for USAGE_ERRORS -- not through a bare
     # `await cli._run(...)`, which would let the BootstrapError propagate
     # uncaught instead of returning a (payload, code) tuple.
-    monkeypatch.setattr(cli, "bootstrap", lambda: ({}, {"name": "Jane"}))
+    monkeypatch.setattr(cli, "bootstrap", lambda: (build_config({}), {"name": "Jane"}))
 
     async def _fake_bootstrap(profile, config, caller, *, force=False):
         raise BootstrapError("a pool already exists")

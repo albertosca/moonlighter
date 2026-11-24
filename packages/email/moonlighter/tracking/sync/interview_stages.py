@@ -1,7 +1,8 @@
 """Learning the interview stages an email proposes, bounded because an email is untrusted."""
 
 import re
-from typing import Any
+
+from moonlighter.core.config.model import EmailConfig
 
 _MAXIMUM_STAGE_LENGTH = 40
 _MAXIMUM_STAGES = 40
@@ -28,9 +29,7 @@ def _sanitize_stage(raw: str | None) -> str | None:
     return slug
 
 
-def register_new_stage(
-    new_stage: str | None, stages: list[str], email_config: dict[str, Any]
-) -> None:
+def register_new_stage(new_stage: str | None, stages: list[str], email_config: EmailConfig) -> None:
     """Learn a novel stage proposed by the LLM, persisting it to the in-memory config.
 
     The candidate is sanitized to a bounded slug (untrusted email input) and only

@@ -1,8 +1,9 @@
 """The salary rule's wider leads: value words, bare PT-BR keywords and question-shaped labels."""
 
-from moonlighter.application.answers.matching.field_map import pre_populate_answers
 from moonlighter.application.answers.needs_review import NEEDS_REVIEW_SENTINEL
 from moonlighter.application.answers.rules.static_rules import static_answer
+from moonlighter.core.config.loading import build_config
+from tests.application.answers.prepopulate import pre_populate_answers
 
 # Salary Coverage — wider lead words and bare PT keywords
 
@@ -59,7 +60,7 @@ def test_salary_question_with_foreign_units_refuses():
     answers = pre_populate_answers(
         ["What is your expected salary? (annual USD)"],
         profile,
-        {},
+        build_config({}),
         job_location=None,
         job_remote_type=None,
     )
@@ -69,7 +70,11 @@ def test_salary_question_with_foreign_units_refuses():
 def test_salary_question_plain_answers_the_figure():
     profile = {"preferences": {"salary_target_brl_monthly": 35000}}
     answers = pre_populate_answers(
-        ["What is your salary expectation?"], profile, {}, job_location=None, job_remote_type=None
+        ["What is your salary expectation?"],
+        profile,
+        build_config({}),
+        job_location=None,
+        job_remote_type=None,
     )
     assert answers["What is your salary expectation?"] == "BRL 35.000/month"
 
@@ -79,7 +84,7 @@ def test_salary_question_contracted_lead():
     answers = pre_populate_answers(
         ["What's your expected salary (BRL, monthly)?"],
         profile,
-        {},
+        build_config({}),
         job_location=None,
         job_remote_type=None,
     )
@@ -91,7 +96,7 @@ def test_salary_question_typographic_apostrophe():
     answers = pre_populate_answers(
         ["What’s your expected salary (BRL, monthly)?"],
         profile,
-        {},
+        build_config({}),
         job_location=None,
         job_remote_type=None,
     )
@@ -101,7 +106,11 @@ def test_salary_question_typographic_apostrophe():
 def test_salary_question_ptbr_lead():
     profile = {"preferences": {"salary_target_brl_monthly": 35000}}
     answers = pre_populate_answers(
-        ["Qual a sua pretensão salarial?"], profile, {}, job_location=None, job_remote_type=None
+        ["Qual a sua pretensão salarial?"],
+        profile,
+        build_config({}),
+        job_location=None,
+        job_remote_type=None,
     )
     assert answers["Qual a sua pretensão salarial?"] == "BRL 35.000/month"
 
@@ -114,7 +123,7 @@ def test_salary_essay_with_interrogative_lead_still_falls_through():
     answers = pre_populate_answers(
         ["What is your view on salary transparency?"],
         profile,
-        {},
+        build_config({}),
         job_location=None,
         job_remote_type=None,
     )
@@ -126,7 +135,7 @@ def test_salary_growth_question_still_falls_through():
     answers = pre_populate_answers(
         ["What is your expected salary growth over five years?"],
         profile,
-        {},
+        build_config({}),
         job_location=None,
         job_remote_type=None,
     )

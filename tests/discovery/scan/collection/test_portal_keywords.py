@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, patch
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.discovery.scan.portals import _matches_keywords, _scan_remoteok
 from moonlighter.discovery.sources.base import RawJob
 
@@ -21,5 +22,5 @@ async def test_portal_feed_is_filtered_by_keywords():
         "moonlighter.discovery.scan.portals.RemoteOKScanner.scan",
         new=AsyncMock(return_value=jobs),
     ):
-        got = await _scan_remoteok({"scan_remoteok": True}, {}, "backend")
+        got = await _scan_remoteok(build_config({"scan_remoteok": True}), {}, "backend")
     assert [job.title for job in got] == ["Backend Engineer"]

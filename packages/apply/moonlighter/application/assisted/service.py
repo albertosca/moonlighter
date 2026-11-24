@@ -30,7 +30,7 @@ from moonlighter.application.assisted.sheet.notes import (
 from moonlighter.application.assisted.sheet.required_labels import mark_required
 from moonlighter.application.assisted.sheet.results import SheetKind, SheetResult, failed_sheet
 from moonlighter.application.cvgen.service import ensure_tailored_cv
-from moonlighter.core.config.defaults import DEFAULTS
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import Application, Job
 from moonlighter.core.email_alias import build_email_alias, new_email_ref
 from moonlighter.core.llm.dispatch import make_caller
@@ -70,14 +70,14 @@ def _job_dict(job: Job) -> dict[str, Any]:
     }
 
 
-def _tracking_alias(application: Application, config: dict[str, Any]) -> str | None:
+def _tracking_alias(application: Application, config: Config) -> str | None:
     """The +ref alias for this application, minting its ref on first use.
 
     The ref is reused forever after (a regenerated ref orphans every reply already
     sent to the old one). None when no tracking mailbox is configured — the sheet
     then keeps whatever email the field map filled in.
     """
-    address = (config.get("email") or {}).get("address")
+    address = config["email"].get("address")
     if not address:
         return None
     if not application.email_ref:
@@ -89,16 +89,14 @@ def _tracking_alias(application: Application, config: dict[str, Any]) -> str | N
 async def _sheet(
     job: Job,
     questions: list[FormQuestion],
-    config: dict[str, Any],
+    config: Config,
     *,
     profile: dict[str, Any],
     source_note: str | None = None,
 ) -> SheetResult:
     application, _ = Application.get_or_create(job=job, defaults={"status": "draft"})
     job_cache: dict[str, Any] = application.get_form_data()
-    answer_bank = load_answer_bank(
-        config.get("answer_bank_max_age_days", DEFAULTS["answer_bank_max_age_days"])
-    )
+    answer_bank = load_answer_bank(config["answer_bank_max_age_days"])
     caller = make_caller(config)
     tailored = await ensure_tailored_cv(
         _job_dict(job),
@@ -135,7 +133,7 @@ async def _sheet(
     )
 
 
-def _precheck(job_id: int, config: dict[str, Any]) -> Job | SheetResult:
+def _precheck(job_id: int, config: Config) -> Job | SheetResult:
     """The job, or the sheet that ends the request before any question is read."""
     job = Job.get_or_none(Job.id == job_id)
     if job is None:
@@ -145,9 +143,7 @@ def _precheck(job_id: int, config: dict[str, Any]) -> Job | SheetResult:
     return job
 
 
-async def prepare_application(
-    job_id: int, config: dict[str, Any], profile: dict[str, Any]
-) -> SheetResult:
+async def prepare_application(job_id: int, config: Config, profile: dict[str, Any]) -> SheetResult:
     """The sheet for a job, read from its ATS form; a paste hint when the ATS publishes none."""
     job = _precheck(job_id, config)
     if isinstance(job, SheetResult):
@@ -162,7 +158,7 @@ async def prepare_application(
 
 
 async def prepare_application_from_paste(
-    job_id: int, page_text: str, config: dict[str, Any], *, profile: dict[str, Any]
+    job_id: int, page_text: str, config: Config, *, profile: dict[str, Any]
 ) -> SheetResult:
     """The sheet for a job whose form was pasted as page text; the ATS form wins when it has one."""
     job = _precheck(job_id, config)

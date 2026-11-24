@@ -8,6 +8,7 @@ from moonlighter.application.assisted.composition.composer import (
     compose_answers,
 )
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.core.config.loading import build_config
 from tests.application.assisted.composition.composer.sample_inputs import JOB, PROFILE, never_called
 
 COMPLIANCE_OPTIONS = (
@@ -31,7 +32,9 @@ async def test_a_file_question_is_a_file_gap_before_the_compliance_check():
     question = FormQuestion(
         label="Conflict of Interest Declaration", kind=QuestionKind.FILE, required=True
     )
-    composed = await compose_answers([question], CompositionContext(PROFILE, {}, JOB, never_called))
+    composed = await compose_answers(
+        [question], CompositionContext(PROFILE, build_config({}), JOB, never_called)
+    )
     assert composed[0].gap_reason == "upload a file yourself"
 
 
@@ -40,7 +43,9 @@ async def test_the_compliance_check_runs_before_the_sensitive_label_guard():
     question = FormQuestion(
         label="Gender", kind=QuestionKind.MULTI_SELECT, required=True, options=COMPLIANCE_OPTIONS
     )
-    composed = await compose_answers([question], CompositionContext(PROFILE, {}, JOB, never_called))
+    composed = await compose_answers(
+        [question], CompositionContext(PROFILE, build_config({}), JOB, never_called)
+    )
     assert composed[0].gap_reason == "declaration/compliance question — answer this yourself"
 
 
@@ -57,7 +62,7 @@ async def test_the_option_limit_gap_comes_before_the_spend_limit_gap():
     )
     first = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
     composed = await compose_answers(
-        [first, huge_select], CompositionContext(PROFILE, {}, JOB, spent)
+        [first, huge_select], CompositionContext(PROFILE, build_config({}), JOB, spent)
     )
     assert "spend limit" in composed[0].gap_reason
     assert composed[1].gap_reason == "pick your answer from the 201 options on the form"
@@ -74,7 +79,9 @@ async def test_the_job_cache_is_read_before_the_answer_bank():
     bank = {"do you have 5+ years of python experience": "From the bank"}
     composed = await compose_answers(
         [question],
-        CompositionContext(PROFILE, {}, JOB, never_called, job_cache=job_cache, answer_bank=bank),
+        CompositionContext(
+            PROFILE, build_config({}), JOB, never_called, job_cache=job_cache, answer_bank=bank
+        ),
     )
     assert composed[0].answer == "From the cache"
 
@@ -90,7 +97,7 @@ async def test_the_job_cache_stores_the_matched_option_and_serves_a_repeated_lab
     job_cache: dict[str, dict[str, str]] = {}
     composed = await compose_answers(
         [TEAM_SELECT, TEAM_SELECT],
-        CompositionContext(PROFILE, {}, JOB, lowercase_pick, job_cache=job_cache),
+        CompositionContext(PROFILE, build_config({}), JOB, lowercase_pick, job_cache=job_cache),
     )
     assert job_cache == {TEAM_SELECT.label: {"answer": "Product", "kind": "single_select"}}
     assert len(calls) == 1
@@ -107,7 +114,7 @@ async def test_the_operator_guard_also_screens_known_cached_and_banked_answers()
         [known, cached, banked],
         CompositionContext(
             {**PROFILE, "website": note},
-            {},
+            build_config({}),
             JOB,
             never_called,
             job_cache={cached.label: {"answer": note, "kind": "text"}},
@@ -130,7 +137,7 @@ async def test_a_comma_inside_a_multi_select_reply_splits_it():
         options=("Ruby, Rails", "Rails"),
     )
     composed = await compose_answers(
-        [question], CompositionContext(PROFILE, {}, JOB, replies_with_a_comma)
+        [question], CompositionContext(PROFILE, build_config({}), JOB, replies_with_a_comma)
     )
     assert composed[0].answer == "Ruby, Rails\nRails"
 
@@ -152,5 +159,7 @@ async def test_pre_population_runs_once_over_every_label(monkeypatch, include_qu
     ]
     if not include_questions:
         questions = []
-    await compose_answers(questions, CompositionContext(PROFILE, {}, JOB, never_called))
+    await compose_answers(
+        questions, CompositionContext(PROFILE, build_config({}), JOB, never_called)
+    )
     assert calls == [[question.label for question in questions]]

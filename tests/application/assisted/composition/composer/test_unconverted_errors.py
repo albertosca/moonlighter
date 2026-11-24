@@ -10,6 +10,7 @@ from moonlighter.application.assisted.composition.composer import (
     compose_answers,
 )
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
+from moonlighter.core.config.loading import build_config
 from tests.application.assisted.composition.composer.sample_inputs import (
     JOB,
     PROFILE,
@@ -26,7 +27,10 @@ async def test_a_non_numeric_job_id_escapes_from_the_cv_file_gap(tmp_path):
         await compose_answers(
             [question],
             CompositionContext(
-                PROFILE, {"cv": {"default": str(cv_path)}}, {**JOB, "id": "abc"}, answers_anything
+                PROFILE,
+                build_config({"cv": {"default": str(cv_path)}}),
+                {**JOB, "id": "abc"},
+                answers_anything,
             ),
         )
 
@@ -38,7 +42,9 @@ async def test_a_cancelled_llm_call_is_not_turned_into_a_gap():
 
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
     with pytest.raises(asyncio.CancelledError):
-        await compose_answers([question], CompositionContext(PROFILE, {}, JOB, cancelled))
+        await compose_answers(
+            [question], CompositionContext(PROFILE, build_config({}), JOB, cancelled)
+        )
 
 
 @pytest.mark.asyncio
@@ -53,4 +59,6 @@ async def test_a_failure_while_building_the_prompt_escapes_instead_of_becoming_a
     monkeypatch.setattr(answer_generation, "profile_for_answers", broken_profile)
     question = FormQuestion(label="Why us?", kind=QuestionKind.LONG_TEXT, required=True)
     with pytest.raises(RuntimeError, match="profile rendering broke"):
-        await compose_answers([question], CompositionContext(PROFILE, {}, JOB, answers_anything))
+        await compose_answers(
+            [question], CompositionContext(PROFILE, build_config({}), JOB, answers_anything)
+        )

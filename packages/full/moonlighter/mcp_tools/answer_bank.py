@@ -12,7 +12,6 @@ from moonlighter.application.answers.bank.store import (
     list_entries,
     render_answer_bank,
 )
-from moonlighter.core.config.defaults import DEFAULTS
 
 
 @tool_logged
@@ -23,10 +22,7 @@ async def list_answer_bank(*, context: Context[AppContext, Any]) -> str:
     on a sheet until a new submission refreshes them.
     """  # noqa: D205, D212 - served verbatim as the MCP tool description
     app_context = refreshed_app_context(context)
-    max_age = app_context.config.get(
-        "answer_bank_max_age_days", DEFAULTS["answer_bank_max_age_days"]
-    )
-    return render_answer_bank(list_entries(), max_age)
+    return render_answer_bank(list_entries(), app_context.config["answer_bank_max_age_days"])
 
 
 @tool_logged

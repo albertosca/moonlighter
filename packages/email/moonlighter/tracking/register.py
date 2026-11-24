@@ -11,6 +11,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from moonlighter.core.config.model import Config
 from moonlighter.core.db import Application, Job
 from moonlighter.core.email_alias import build_email_alias, new_email_ref
 from moonlighter.core.job_status import sync_job_status
@@ -54,7 +55,7 @@ class RegisterResult:
 
 
 def register_application(
-    job_id: int, config: dict[str, Any], request: RegisterRequest | None = None
+    job_id: int, config: Config, request: RegisterRequest | None = None
 ) -> RegisterResult:
     request = request or RegisterRequest()
     if request.status not in ACCEPTED_STATUSES:
@@ -93,9 +94,9 @@ def _merge(application: Application, request: RegisterRequest, *, now: datetime)
 
 
 def _registered(
-    application: Application, config: dict[str, Any], *, job_id: int, created: bool
+    application: Application, config: Config, *, job_id: int, created: bool
 ) -> RegisterResult:
-    address = (config.get("email") or {}).get("address")
+    address = config["email"].get("address")
     # _merge minted the ref when it was missing, so str() only narrows the type.
     alias = build_email_alias(str(address), str(application.email_ref)) if address else None
     return RegisterResult(

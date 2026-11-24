@@ -1,5 +1,6 @@
 """Sanitizing and registering the interview stages a reply proposes."""
 
+from moonlighter.core.config.loading import build_config
 from moonlighter.tracking.sync.interview_stages import (
     _MAXIMUM_STAGES,
     _sanitize_stage,
@@ -38,27 +39,27 @@ class TestSanitizeStage:
 class TestRegisterNewStageBounds:
     def test_registers_sanitized_slug_not_raw(self):
         stages = ["applied"]
-        email_config: dict = {}
+        email_config = build_config({})["email"]
         register_new_stage("Technical Screen", stages, email_config)
         assert stages == ["applied", "technical_screen"]
         assert email_config["interview_stages"] == ["applied", "technical_screen"]
 
     def test_rejects_unsanitizable(self):
         stages = ["applied"]
-        email_config: dict = {}
+        email_config = build_config({})["email"]
         register_new_stage("!@#$", stages, email_config)
         assert stages == ["applied"]
         assert "interview_stages" not in email_config
 
     def test_does_not_duplicate_after_sanitize(self):
         stages = ["technical_screen"]
-        email_config: dict = {}
+        email_config = build_config({})["email"]
         register_new_stage("Technical  Screen", stages, email_config)
         assert stages == ["technical_screen"]
 
     def test_count_cap_blocks_further_growth(self):
         stages = [f"s{index}" for index in range(_MAXIMUM_STAGES)]
-        email_config: dict = {}
+        email_config = build_config({})["email"]
         register_new_stage("new-one", stages, email_config)
         assert len(stages) == _MAXIMUM_STAGES
         assert "new-one" not in stages

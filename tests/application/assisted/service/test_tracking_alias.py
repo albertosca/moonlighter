@@ -7,6 +7,7 @@ from moonlighter.application.assisted.question_sources import greenhouse as gree
 from moonlighter.application.assisted.question_sources import recruitee as recruitee_source
 from moonlighter.application.assisted.questions import FormQuestion, QuestionKind
 from moonlighter.application.assisted.sheet.results import render_sheet_result
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.db import Application
 from tests.application.assisted.service.fake_service import (
     bypass_cv_bootstrap_offer,
@@ -20,7 +21,7 @@ from tests.application.assisted.service.fake_service import (
 # reads. Found live on the first gate application (2026-08-13) — the deleted
 # automation was the alias code's only caller.
 
-_TRACKING_CONFIG = {"email": {"address": "track@example.com"}}
+_TRACKING_CONFIG = build_config({"email": {"address": "track@example.com"}})
 
 
 async def _extract_email_and_essay(page_text: str, llm_caller: Any) -> list[FormQuestion]:
@@ -95,7 +96,7 @@ async def test_without_email_config_the_sheet_keeps_the_profile_email(job_factor
 
     out = render_sheet_result(
         await service.prepare_application_from_paste(
-            job.id, "p", {}, profile={"email": "personal@gmail.com"}
+            job.id, "p", build_config({}), profile={"email": "personal@gmail.com"}
         )
     )
 
@@ -192,7 +193,7 @@ async def test_a_manual_job_with_a_greenhouse_url_still_gets_the_api(job_factory
     monkeypatch.setattr(greenhouse_source, "fetch_greenhouse_questions", fake_fetch)
     monkeypatch.setattr(recruitee_source, "fetch_recruitee_questions", never_fetch_recruitee)
 
-    out = render_sheet_result(await service.prepare_application(job.id, {}, {}))
+    out = render_sheet_result(await service.prepare_application(job.id, build_config({}), {}))
 
     assert seen == {"board": "teachablecareers", "job_id": "4913809101"}
     assert "prepare_application_from_paste" not in out

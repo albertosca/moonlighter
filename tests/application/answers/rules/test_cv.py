@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from moonlighter.application.answers.rules.cv import CVNotFoundError, resolve_cv_path
+from moonlighter.core.config.loading import build_config
 from moonlighter.core.config.paths import moonlighter_home
 
 
@@ -12,14 +13,16 @@ def test_resolve_cv_path_uses_company_specific(tmp_path):
     nubank_cv.write_bytes(b"x")
     default_cv = tmp_path / "def.pdf"
     default_cv.write_bytes(b"x")
-    config = {"cv": {"default": str(default_cv), "by_company": {"nubank": str(nubank_cv)}}}
+    config = build_config(
+        {"cv": {"default": str(default_cv), "by_company": {"nubank": str(nubank_cv)}}}
+    )
     assert resolve_cv_path("nubank", config) == str(nubank_cv)
 
 
 def test_resolve_cv_path_falls_back_to_default(tmp_path):
     default_cv = tmp_path / "def.pdf"
     default_cv.write_bytes(b"x")
-    config = {"cv": {"default": str(default_cv), "by_company": {"nubank": "x.pdf"}}}
+    config = build_config({"cv": {"default": str(default_cv), "by_company": {"nubank": "x.pdf"}}})
     assert resolve_cv_path("stripe", config) == str(default_cv)
 
 
@@ -28,19 +31,21 @@ def test_resolve_cv_path_company_match_is_case_insensitive(tmp_path):
     nubank_cv.write_bytes(b"x")
     default_cv = tmp_path / "def.pdf"
     default_cv.write_bytes(b"x")
-    config = {"cv": {"default": str(default_cv), "by_company": {"nubank": str(nubank_cv)}}}
+    config = build_config(
+        {"cv": {"default": str(default_cv), "by_company": {"nubank": str(nubank_cv)}}}
+    )
     assert resolve_cv_path("Nubank", config) == str(nubank_cv)
 
 
 def test_resolve_cv_path_raises_when_mapped_file_missing(tmp_path):
-    config = {"cv": {"default": str(tmp_path / "missing.pdf"), "by_company": {}}}
+    config = build_config({"cv": {"default": str(tmp_path / "missing.pdf"), "by_company": {}}})
     with pytest.raises(CVNotFoundError):
         resolve_cv_path("stripe", config)
 
 
 def test_resolve_cv_path_raises_when_no_mapping_and_no_default():
     with pytest.raises(CVNotFoundError):
-        resolve_cv_path("stripe", {"cv": {"by_company": {}}})
+        resolve_cv_path("stripe", build_config({"cv": {"default": "", "by_company": {}}}))
 
 
 def test_resolve_cv_path_relative_resolved_from_moonlighter_home(monkeypatch, tmp_path):
@@ -48,7 +53,7 @@ def test_resolve_cv_path_relative_resolved_from_moonlighter_home(monkeypatch, tm
     cv_file = tmp_path / "cvs" / "general.pdf"
     cv_file.parent.mkdir(parents=True)
     cv_file.write_bytes(b"x")
-    config = {"cv": {"default": "cvs/general.pdf"}}
+    config = build_config({"cv": {"default": "cvs/general.pdf"}})
     result = resolve_cv_path("stripe", config)
     assert result == str(moonlighter_home() / "cvs" / "general.pdf")
     assert Path(result).exists()
@@ -59,13 +64,15 @@ def _tailored_config(tmp_path):
     company_cv.write_bytes(b"x")
     default_cv = tmp_path / "def.pdf"
     default_cv.write_bytes(b"x")
-    return {
-        "cv": {
-            "default": str(default_cv),
-            "by_company": {"nubank": str(company_cv)},
-            "generated_dir": str(tmp_path / "generated"),
+    return build_config(
+        {
+            "cv": {
+                "default": str(default_cv),
+                "by_company": {"nubank": str(company_cv)},
+                "generated_dir": str(tmp_path / "generated"),
+            }
         }
-    }, company_cv
+    ), company_cv
 
 
 def test_job_generated_pdf_wins_over_company_and_default(tmp_path):
@@ -117,17 +124,19 @@ def test_tilde_in_cv_default_expands_like_the_tailored_cv_keys(monkeypatch, tmp_
     default_cv = tmp_path / "cvs" / "x.pdf"
     default_cv.parent.mkdir()
     default_cv.write_bytes(b"%PDF")
-    assert resolve_cv_path("acme", {"cv": {"default": "~/cvs/x.pdf"}}) == str(default_cv)
+    assert resolve_cv_path("acme", build_config({"cv": {"default": "~/cvs/x.pdf"}})) == str(
+        default_cv
+    )
 
 
 def test_no_mapping_message_is_exact():
     message = "No CV mapped for 'stripe' and no 'cv.default' in config. Check config.yaml."
     with pytest.raises(CVNotFoundError, match="^" + re.escape(message) + "$"):
-        resolve_cv_path("stripe", {"cv": {"by_company": {}}})
+        resolve_cv_path("stripe", build_config({"cv": {"default": "", "by_company": {}}}))
 
 
 def test_missing_file_message_is_exact(tmp_path):
     missing = tmp_path / "missing.pdf"
     message = f"CV for 'stripe' not found at {missing}. Check the 'cv' mapping in config."
     with pytest.raises(CVNotFoundError, match="^" + re.escape(message) + "$"):
-        resolve_cv_path("stripe", {"cv": {"default": str(missing)}})
+        resolve_cv_path("stripe", build_config({"cv": {"default": str(missing)}}))
