@@ -16,11 +16,15 @@ Yes — any LLM can. moonlighter narrows the room for it: answers are drafted fr
 
 ### Does it work without Claude?
 
-Partly. The [command-line tools](reference/cli.md) run from any shell or cron job without Claude as an MCP client, and `moonlighter-scan --no-eval` scans with no LLM call at all. Scoring postings, drafting answers and classifying replies need an LLM backend: Anthropic's, through the Claude Code CLI (`llm_backend: cli`) or the API (`llm_backend: api`), Cursor's, through the Cursor CLI (`llm_backend: cursor`), or OpenAI's, through the Codex CLI (`llm_backend: codex`).
+Partly. The [command-line tools](reference/cli.md) run from any shell or cron job without Claude as an MCP client, and `moonlighter-scan --no-eval` scans with no LLM call at all. Scoring postings, drafting answers and classifying replies need an LLM backend: Anthropic's, through the Claude Code CLI (`llm_backend: cli`) or the API (`llm_backend: api`), Cursor's, through the Cursor CLI (`llm_backend: cursor`), OpenAI's, through the Codex CLI (`llm_backend: codex`), or any provider you log in to in opencode (`llm_backend: opencode`). opencode can also be the MCP client in place of Claude: see [Install](getting-started/install.md).
 
 ### What leaves my machine?
 
-Your pipeline — jobs, drafted answers, application history — is a local SQLite file under `MOONLIGHTER_HOME`. What leaves is what goes to the services you configure. To the LLM: job descriptions, a filtered subset of your profile, your CV pool's bullets when the [tailored CV](guides/tailored-cv.md) is on, and any page text you paste into `prepare_application_from_paste`. With `cli` or `api` that provider is Anthropic; with `cursor` it is Cursor and the model the account uses; with `codex` it is OpenAI and the model you name. Beyond that: read-only requests to the job boards, and, if you turn on [Gmail tracking](getting-started/gmail.md), your recent mail, read through the Gmail API and sent to the LLM to be classified. There is no moonlighter server and no telemetry. [PRIVACY.md](https://github.com/albertosca/moonlighter/blob/main/PRIVACY.md) has the details.
+Your pipeline — jobs, drafted answers, application history — is a local SQLite file under `MOONLIGHTER_HOME`. What leaves is what goes to the services you configure. To the LLM: job descriptions, a filtered subset of your profile, your CV pool's bullets when the [tailored CV](guides/tailored-cv.md) is on, and any page text you paste into `prepare_application_from_paste`. With `cli` or `api` that provider is Anthropic; with `cursor` it is Cursor and the model the account uses; with `codex` it is OpenAI and the model you name; with `opencode` it is the provider in the `provider/model` you name. Beyond that: read-only requests to the job boards, and, if you turn on [Gmail tracking](getting-started/gmail.md), your recent mail, read through the Gmail API and sent to the LLM to be classified. There is no moonlighter server and no telemetry. [PRIVACY.md](https://github.com/albertosca/moonlighter/blob/main/PRIVACY.md) has the details.
+
+### What does an opencode call send and keep?
+
+Each call runs `opencode run` once, in a private temporary directory, under a config moonlighter writes for that call: every tool, MCP server, skill and plugin is denied, your own opencode config and `AGENTS.md` files are not loaded, and the prompt goes over standard input. The prompt goes to the provider you named in `llm_model` / `eval_model`. opencode records each call as a session in its own database; moonlighter deletes that session when the call returns. A call that times out is killed before opencode reports its session, so that one session stays in opencode's history.
 
 ## Troubleshooting
 
@@ -31,6 +35,8 @@ Your pipeline — jobs, drafted answers, application history — is a local SQLi
 - **LLM errors with `llm_backend: cursor`** — the Cursor CLI (`agent`, or `cursor-agent`) must be installed, and `agent login` done.
 - **LLM errors with `llm_backend: codex`** — the `codex` CLI must be installed and `codex login` done with a ChatGPT account (an API-key login is refused), and `llm_model` / `eval_model` must name models that account can run, not Claude ids.
 - **"Missing profile / CV" warnings** — ask Claude to run `get_pipeline`: besides the funnel it reports exactly which setup file is missing and where it should live.
+- **LLM errors with `llm_backend: opencode`** — the `opencode` CLI must be installed, `opencode auth login` done for the provider, and `llm_model` / `eval_model` written as `provider/model`, as `opencode models` lists them. At startup `get_pipeline` warns when opencode does not list a configured model.
+- **The moonlighter tools don't show up in opencode** — run `opencode mcp list`; it should show `✓ moonlighter connected`. An entry without `"protocol": "2026-07-28"` fails the handshake, and one without `"codemode": false` hides the tools behind opencode's `execute` tool. The block to use is under Option C in [Install](getting-started/install.md).
 - **Gmail sync does nothing** — email tracking is optional and off until `setup_email` completes the OAuth flow; see [Gmail tracking](getting-started/gmail.md).
 
 Still stuck? [Open a discussion](https://github.com/albertosca/moonlighter/discussions) — a report that includes what `get_pipeline` printed travels fastest.

@@ -35,10 +35,22 @@ browser_path: ""
 #              non-Claude model (eval_model defaults to llm_model if omitted):
 # llm_model: gpt-6-luna
 # eval_model: gpt-6-luna
+#   "opencode" -> uses the opencode CLI (`opencode`) on any provider you log
+#                 in to with `opencode auth login`. The profile subset, the
+#                 CV-pool bullets and pasted page text go to the provider you
+#                 name. Each call runs in a private temporary directory under a
+#                 config that denies every tool, MCP server, skill and plugin,
+#                 and its opencode session is deleted when the call returns (a
+#                 timed-out call's session stays). A provider declared by hand
+#                 in your own opencode.json is not available. llm_model and
+#                 eval_model are forwarded as provider/model, as `opencode
+#                 models` lists them (eval_model defaults to llm_model):
+# llm_model: anthropic/claude-sonnet-5-5
+# eval_model: anthropic/claude-sonnet-5-5
 # Anything else is rejected at startup rather than silently falling back.
 llm_backend: cli
 
-# Seconds a CLI call may run before it is killed and fails (cli backend only).
+# Seconds a CLI call may run before it is killed and fails (cli, cursor, codex, opencode).
 llm_timeout_seconds: 180
 
 # Main model (answer generation) and evaluation model (cheaper, for scoring jobs).

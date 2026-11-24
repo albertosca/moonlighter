@@ -86,11 +86,12 @@ As candidaturas saem com o seu nome, então a régua é confiança. Cada decisã
 
 ## Instalação
 
-Você precisa do [uv](https://docs.astral.sh/uv/) (ele baixa o Python 3.14 para você) e de um backend de LLM: o Claude Code CLI por padrão, ou uma API key da Anthropic.
+Você precisa do [uv](https://docs.astral.sh/uv/) (ele baixa o Python 3.14 para você) e de um backend de LLM: o Claude Code CLI por padrão, ou a API da Anthropic, o Cursor, o Codex ou o opencode.
 
 - **Claude Code:** `/plugin marketplace add albertosca/moonlighter`, depois `/plugin install moonlighter@moonlighter`.
+- **opencode:** `uvx moonlighter init` oferece registrar o servidor na configuração do opencode.
 - **Qualquer outro cliente MCP:** registre o comando do servidor `uvx moonlighter`.
-- **Depois:** `uvx moonlighter init` escreve a sua config; preencha `profile.yaml` e `company_list.yaml` e peça ao Claude "varre minhas empresas".
+- **Depois:** `uvx moonlighter init` escreve a sua config; preencha `profile.yaml` e `company_list.yaml` e peça ao seu agente "varre minhas empresas".
 
 [Guia completo de instalação →](https://albertosca.github.io/moonlighter/pt/getting-started/install/)
 
