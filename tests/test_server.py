@@ -49,6 +49,14 @@ def test_dispatch_help_prints_usage_and_returns_0(capsys):
     assert out.startswith("usage: moonlighter")
 
 
+def test_the_usage_names_no_single_mcp_client(capsys):
+    """The server runs under Claude Code, opencode or any other MCP client."""
+    _dispatch(["--help"])
+    out = capsys.readouterr().out
+    assert "(what your MCP client runs)" in out
+    assert "Claude Code" not in out
+
+
 def test_dispatch_short_help_flag_also_works(capsys):
     assert _dispatch(["-h"]) == 0
     assert capsys.readouterr().out.startswith("usage: moonlighter")

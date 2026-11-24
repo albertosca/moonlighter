@@ -98,7 +98,7 @@ del _tool
 
 _USAGE = """usage: moonlighter [init | doctor | -h]
 
-  (no arguments)  start the MCP server on stdio (what Claude Code runs)
+  (no arguments)  start the MCP server on stdio (what your MCP client runs)
   init            interactive first-run setup: writes config.yaml
   doctor          where the state lives and whether the config loads, as JSON
 """
