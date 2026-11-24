@@ -1,5 +1,6 @@
 """The MCP server's composition root: lifespan wiring, tool registration and the entry point."""
 
+import asyncio
 import contextlib
 import sys
 from collections.abc import AsyncIterator
@@ -48,7 +49,8 @@ async def lifespan(_server: MCPServer) -> AsyncIterator[AppContext]:
     companies = load_company_list()
     init_db()
     permission_warnings = harden_permissions()
-    startup_warnings = validate_startup(config, profile)
+    # A thread, because `opencode models` can take up to 20 s and the loop serves the protocol.
+    startup_warnings = await asyncio.to_thread(validate_startup, config, profile)
     for message in permission_warnings:
         print(f"⚠️  {message}", file=sys.stderr, flush=True)  # noqa: T201 - the boot report is for the human on stderr; stdout carries the MCP protocol
     for warning in startup_warnings:

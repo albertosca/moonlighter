@@ -1,5 +1,7 @@
 """The server's lifespan: what it yields, when it refuses to boot, and that importing the server does nothing."""
 
+import threading
+
 import pytest
 
 from moonlighter.app_context import AppContext
@@ -63,3 +65,18 @@ def test_importing_server_has_no_side_effects(monkeypatch):
     )
     import_server_afresh(monkeypatch)
     assert calls == []  # importing the server must not load config / init db / harden perms
+
+
+async def test_the_startup_checks_run_off_the_event_loop(temporary_database, monkeypatch):
+    """`opencode models` can take up to 20 s: the boot checks must not stall the loop."""
+    threads: list[str] = []
+
+    def record_thread(config, profile):
+        threads.append(threading.current_thread().name)
+        return []
+
+    monkeypatch.setattr("moonlighter.server.validate_startup", record_thread)
+    async with lifespan(mcp):
+        pass
+    assert threads
+    assert threads[0] != threading.main_thread().name

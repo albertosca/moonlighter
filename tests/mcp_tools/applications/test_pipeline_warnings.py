@@ -1,6 +1,7 @@
 """get_pipeline lists the setup warnings only while there are some, and tells errors from warnings."""
 
 import os
+import threading
 from unittest.mock import patch
 
 from moonlighter.core.db import init_db
@@ -69,3 +70,18 @@ async def test_get_pipeline_warnings_distinguish_error_and_warn_levels(
         )
     assert "[ERROR]" in result
     assert "[WARN]" in result
+
+
+async def test_get_pipeline_runs_the_setup_checks_off_the_event_loop(temporary_database):
+    """`opencode models` can take up to 20 s: one get_pipeline must not stall every other tool."""
+    init_db()
+    threads: list[str] = []
+
+    def record_thread(config, profile):
+        threads.append(threading.current_thread().name)
+        return []
+
+    with patch("moonlighter.mcp_tools.applications.validate_startup", record_thread):
+        await get_pipeline(context=make_test_context())
+    assert threads
+    assert threads[0] != threading.main_thread().name
