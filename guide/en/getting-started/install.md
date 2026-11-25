@@ -83,6 +83,8 @@ When `opencode` is on your PATH, the wizard offers to register the server in ope
 
 `protocol` pins the handshake, because opencode's default (`auto`) fails against this server. `codemode: false` offers moonlighter's tools to the model directly: under opencode's default Code Mode they sit behind its `execute` tool. Check the connection with `opencode mcp list`, which should show `✓ moonlighter connected`.
 
+moonlighter takes a few seconds to connect after opencode starts. A question sent in those first seconds can reach the model before moonlighter's tools do, and the model may answer that they don't exist. Ask again once they are connected. A server that is already running (opencode's background server, which `opencode` and `opencode run` use by default) has them from the first question, while `opencode run --standalone` starts a new server each time and its question usually arrives too early.
+
 ### After any option
 
 The wizard writes `config.yaml` into `MOONLIGHTER_HOME` (defaults to `~/.moonlighter/`). Two files still need your input:

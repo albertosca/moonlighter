@@ -83,6 +83,8 @@ Quando o `opencode` está no seu PATH, o assistente oferece registrar o servidor
 
 `protocol` fixa o handshake, porque o padrão do opencode (`auto`) falha com este servidor. `codemode: false` oferece as ferramentas do moonlighter direto ao modelo: no Code Mode, padrão do opencode, elas ficam atrás da ferramenta `execute`. Confira a conexão com `opencode mcp list`, que deve mostrar `✓ moonlighter connected`.
 
+O moonlighter leva alguns segundos para conectar depois que o opencode abre. Uma pergunta enviada nesses primeiros segundos pode chegar ao modelo antes das ferramentas do moonlighter, e o modelo pode responder que elas não existem. Pergunte de novo quando elas estiverem conectadas. Um servidor que já está rodando (o servidor de fundo do opencode, que `opencode` e `opencode run` usam por padrão) tem as ferramentas desde a primeira pergunta, enquanto `opencode run --standalone` sobe um servidor novo a cada vez e a pergunta dele costuma chegar cedo demais.
+
 ### Depois de qualquer uma das opções
 
 O assistente grava o `config.yaml` em `MOONLIGHTER_HOME` (padrão: `~/.moonlighter/`). Dois arquivos ainda precisam de você:
